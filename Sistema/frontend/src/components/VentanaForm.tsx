@@ -33,7 +33,7 @@ export default function VentanaForm({
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest border-b border-navy-800/60 pb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <AlignLeft size={14} className="text-blue-400" />
+            <AlignLeft size={14} className="text-orange-400" />
             <span>Información General</span>
           </span>
           <button
@@ -42,7 +42,7 @@ export default function VentanaForm({
             className="flex items-center gap-1 bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-2.5 py-1 rounded text-xs font-bold transition-all shadow-sm active:scale-95"
             title="Importar y sobrescribir con Excel"
           >
-            <FileSpreadsheet size={12} className="text-cyan-400" />
+            <FileSpreadsheet size={12} className="text-amber-400" />
             <span>Importar Excel</span>
           </button>
         </h3>
@@ -55,7 +55,7 @@ export default function VentanaForm({
               id="header-celda"
               value={header.celda}
               onChange={(e) => handleChange('celda', e.target.value.toUpperCase())}
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold"
+              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 font-bold"
             />
           </div>
           <div className="space-y-1">
@@ -66,7 +66,7 @@ export default function VentanaForm({
                 type="text"
                 value={header.mapeador || ''}
                 onChange={(e) => handleChange('mapeador', e.target.value)}
-                className="w-full bg-navy-950 border border-navy-800 rounded-lg pl-8 pr-2 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                className="w-full bg-navy-950 border border-navy-800 rounded-lg pl-8 pr-2 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 font-semibold"
               />
             </div>
           </div>
@@ -136,10 +136,10 @@ export default function VentanaForm({
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest border-b border-navy-800/60 pb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <ArrowRightLeft size={14} className="text-cyan-400" />
+            <ArrowRightLeft size={14} className="text-amber-400" />
             <span>Scanline de Detalle 3D</span>
           </span>
-          <span className="text-xs bg-navy-900 border border-navy-800 px-1.5 py-0.5 rounded text-cyan-400 font-bold uppercase shrink-0">
+          <span className="text-xs bg-navy-900 border border-navy-800 px-1.5 py-0.5 rounded text-amber-400 font-bold uppercase shrink-0">
             Largo: {calculated ? `${calculated.largo.toFixed(2)}m` : '0m'}
           </span>
         </h3>
@@ -292,7 +292,7 @@ export default function VentanaForm({
               </div>
               <div className="space-y-0.5 mt-1 border-t border-navy-850 pt-1">
                 <span className="font-bold text-slate-500 block">DipDir Talud:</span>
-                <span className="text-cyan-400 font-bold text-xs">{calculated.dip_dir_talud.toFixed(2)}&deg;</span>
+                <span className="text-amber-400 font-bold text-xs">{calculated.dip_dir_talud.toFixed(2)}&deg;</span>
               </div>
               <div className="space-y-0.5 mt-1 border-t border-navy-850 pt-1">
                 <span className="font-bold text-slate-500 block">RMR R89 Est:</span>

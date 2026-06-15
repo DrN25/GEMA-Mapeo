@@ -53,7 +53,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-6 max-w-lg mx-auto text-left select-none animate-fade-in">
       <div className="text-center space-y-2">
-        <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+        <div className="p-3 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-[0_0_15px_rgba(249,115,22,0.1)]">
           <FileSpreadsheet size={24} />
         </div>
         <div>
@@ -64,7 +64,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
         </div>
       </div>
 
-      <div className="border border-dashed border-navy-700/80 hover:border-cyan-500/40 rounded-xl p-6 text-center bg-navy-950/45 transition-colors cursor-pointer relative group">
+      <div className="border border-dashed border-navy-700/80 hover:border-orange-500/40 rounded-xl p-6 text-center bg-navy-950/45 transition-colors cursor-pointer relative group">
         <input
           type="file"
           accept=".xlsx, .xls"
@@ -72,7 +72,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           disabled={status === 'uploading'}
         />
-        <Upload size={32} className="mx-auto text-slate-500 group-hover:text-cyan-400 transition-colors mb-2" />
+        <Upload size={32} className="mx-auto text-slate-500 group-hover:text-orange-400 transition-colors mb-2" />
         <span className="text-xs font-semibold text-slate-300 block">
           {file ? file.name : 'Arrastra aquí tu archivo Excel o haz clic para buscar'}
         </span>
@@ -85,7 +85,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
           status === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' :
           'bg-red-500/10 border-red-500/20 text-red-300'
         }`}>
-          {status === 'uploading' && <RefreshCw className="animate-spin text-cyan-400 shrink-0" size={16} />}
+          {status === 'uploading' && <RefreshCw className="animate-spin text-orange-400 shrink-0" size={16} />}
           {status === 'success' && <CheckCircle2 className="text-emerald-400 shrink-0" size={16} />}
           {status === 'error' && <AlertCircle className="text-red-400 shrink-0" size={16} />}
           <div className="space-y-1">
@@ -110,7 +110,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
         <button
           onClick={handleUpload}
           disabled={!file || status === 'uploading'}
-          className="bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed animate-pulse-ring"
+          className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed animate-pulse-ring"
         >
           Procesar Archivo
         </button>
@@ -118,7 +118,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
 
       <div className="bg-navy-950/40 p-4 rounded-xl border border-navy-850 space-y-2 text-xxs text-slate-500">
         <p className="font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wide">
-          <Info size={12} className="text-cyan-400 shrink-0" />
+          <Info size={12} className="text-orange-400 shrink-0" />
           <span>Información de Formato Soportada</span>
         </p>
         <ul className="list-disc pl-4 space-y-1">

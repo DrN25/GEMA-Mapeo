@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { X, FileSpreadsheet, Upload, AlertTriangle, Check, ArrowRight, Info } from 'lucide-react';
+import { X, FileSpreadsheet, Upload, AlertTriangle, Check, ArrowRight, Info, Filter } from 'lucide-react';
 import type { WindowHeader, JointRow } from '../utils/rmrCalculator';
 
 interface WindowData {
@@ -497,7 +497,7 @@ export default function ExcelImportModal({
       <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
         
         {/* Top colorful gradient border from stable taladros */}
-        <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 w-full" />
+        <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-orange-400 to-amber-500 w-full" />
 
         {/* Head */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
@@ -530,7 +530,7 @@ export default function ExcelImportModal({
             <div className="space-y-4">
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-navy-800 hover:border-cyan-500/40 bg-navy-950/45 hover:bg-navy-950/70 rounded-xl p-10 text-center cursor-pointer transition-all space-y-4 group"
+                className="border-2 border-dashed border-navy-800 hover:border-orange-500/40 bg-navy-950/45 hover:bg-navy-950/70 rounded-xl p-10 text-center cursor-pointer transition-all space-y-4 group"
               >
                 <input
                   type="file"
@@ -539,7 +539,7 @@ export default function ExcelImportModal({
                   accept=".xlsx, .xls"
                   className="hidden"
                 />
-                <div className="w-12 h-12 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
                   <Upload size={22} />
                 </div>
                 <div className="space-y-1">
@@ -552,8 +552,8 @@ export default function ExcelImportModal({
                 </div>
               </div>
               
-              <div className="flex gap-3.5 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs text-slate-300 leading-relaxed shadow-sm">
-                <Info className="text-cyan-400 shrink-0 mt-0.5" size={16} />
+              <div className="flex gap-3.5 p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 text-xs text-slate-300 leading-relaxed shadow-sm">
+                <Info className="text-orange-400 shrink-0 mt-0.5" size={16} />
                 <div>
                   <span className="font-bold text-slate-200 block mb-0.5">Tipos de Planilla Soportados:</span>
                   <ul className="list-disc pl-4 space-y-1 mt-1">
@@ -572,7 +572,7 @@ export default function ExcelImportModal({
               {/* File details banner */}
               <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-navy-950/60 border border-navy-850 rounded-xl">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                  <div className="p-2 bg-orange-500/10 text-orange-400 rounded-lg">
                     <FileSpreadsheet size={18} />
                   </div>
                   <div>
@@ -611,7 +611,7 @@ export default function ExcelImportModal({
                   
                   {/* Left Column: Mappings panel */}
                   <div className="lg:col-span-1 glass-panel p-4 rounded-xl border border-navy-800 space-y-4 max-h-[50vh] overflow-y-auto bg-navy-950/40">
-                    <div className="flex items-center gap-2 text-cyan-400 border-b border-navy-800 pb-2">
+                    <div className="flex items-center gap-2 text-orange-400 border-b border-navy-800 pb-2">
                       <Filter size={16} />
                       <h4 className="text-xs font-black uppercase tracking-wider">Mapear Columnas</h4>
                     </div>
@@ -636,7 +636,7 @@ export default function ExcelImportModal({
                               value={mappings[f.key] ?? -1}
                               onChange={(e) => handleMappingChange(f.key, parseInt(e.target.value))}
                               className={`w-full bg-navy-900 border text-xs rounded-lg px-2 py-1.5 focus:outline-none transition-all ${
-                                isMapped ? 'border-cyan-500/30 text-cyan-300' : 'border-navy-800 text-slate-400 hover:border-navy-700'
+                                isMapped ? 'border-orange-500/30 text-orange-300' : 'border-navy-800 text-slate-400 hover:border-navy-700'
                               }`}
                             >
                               <option value={-1}>— No Asignado —</option>
@@ -667,7 +667,7 @@ export default function ExcelImportModal({
                                 onClick={() => setSelectedCeldaCode(code)}
                                 className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 ${
                                   isSelected
-                                    ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
+                                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.15)]'
                                     : 'bg-navy-900/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
                                 }`}
                               >
@@ -752,13 +752,13 @@ export default function ExcelImportModal({
                                 onClick={() => setSelectedCeldaCode(code)}
                                 className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-1.5 ${
                                   isSelected
-                                    ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.15)] font-bold'
+                                    ? 'bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.15)] font-bold'
                                     : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
                                 }`}
                               >
                                 <div className="flex justify-between items-center">
                                   <span className="text-sm font-black tracking-wide">{code}</span>
-                                  {isSelected && <Check size={14} className="text-cyan-400" />}
+                                  {isSelected && <Check size={14} className="text-orange-400" />}
                                 </div>
                                 <div className="flex justify-between items-center text-[11px] text-slate-500">
                                   <span>{cData.header.lito_3}</span>
@@ -855,7 +855,7 @@ export default function ExcelImportModal({
           <button
             onClick={handleImportClick}
             disabled={!selectedCeldaCode}
-            className="bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-4.5 py-2 rounded-lg text-xs font-black transition-all shadow-sm active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed animate-pulse-ring flex items-center gap-1.5"
+            className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-4.5 py-2 rounded-lg text-xs font-black transition-all shadow-sm active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed animate-pulse-ring flex items-center gap-1.5"
           >
             <span>Importar Datos</span>
             <ArrowRight size={14} />

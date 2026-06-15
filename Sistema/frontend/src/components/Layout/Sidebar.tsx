@@ -36,8 +36,8 @@ export default function Sidebar({
       {/* Brand Header */}
       <div className="p-6 border-b border-navy-800 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-black text-slate-100 tracking-wider bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">VENTANAS 2.0</h1>
-          <p className="text-xxs text-cyan-500 dark:text-cyan-400 font-semibold uppercase mt-0.5">
+          <h1 className="text-lg font-black text-slate-100 tracking-wider bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">VENTANAS 2.0</h1>
+          <p className="text-xxs text-orange-500 dark:text-amber-400 font-semibold uppercase mt-0.5">
             {selectedWindow ? `Celda: ${selectedWindow}` : 'Ninguna celda'}
           </p>
         </div>
@@ -71,21 +71,21 @@ export default function Sidebar({
                     onClick={() => onViewChange(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-all group relative ${
                       isActive
-                        ? 'bg-blue-600/10 text-blue-600 dark:bg-blue-500/10 dark:text-cyan-400 font-bold border-l-2 border-blue-600 dark:border-cyan-400 shadow-sm'
+                        ? 'bg-orange-600/10 text-orange-600 dark:bg-orange-500/10 dark:text-amber-400 font-bold border-l-2 border-orange-600 dark:border-amber-400 shadow-sm'
                         : 'hover:bg-navy-900/40 hover:text-slate-100 text-slate-400'
                     }`}
                   >
                     <div className="flex items-center gap-3 text-left min-w-0">
                       <Icon
                         size={18}
-                        className={`${isActive ? 'text-blue-600 dark:text-cyan-400' : 'text-slate-500 group-hover:text-blue-600 dark:group-hover:text-cyan-400'
+                        className={`${isActive ? 'text-orange-600 dark:text-amber-400' : 'text-slate-500 group-hover:text-orange-600 dark:group-hover:text-amber-400'
                           } transition-colors shrink-0`}
                       />
                       <span className="text-left leading-tight break-words">{item.label}</span>
                     </div>
 
                     {isActive && (
-                      <span className="absolute right-0 top-1 bottom-1 w-1 bg-blue-600 dark:bg-cyan-400 rounded-l-md" />
+                      <span className="absolute right-0 top-1 bottom-1 w-1 bg-orange-600 dark:bg-amber-400 rounded-l-md" />
                     )}
                   </button>
                 );

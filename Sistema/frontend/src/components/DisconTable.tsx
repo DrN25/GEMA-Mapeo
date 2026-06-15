@@ -103,12 +103,12 @@ export default function DisconTable({
     <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 select-none">
       <div className="flex justify-between items-center border-b border-navy-800 pb-3">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-          <ShieldAlert size={14} className="text-cyan-400" />
+          <ShieldAlert size={14} className="text-orange-400" />
           <span>Tabla de Discontinuidades (Scanline)</span>
         </h3>
         <button
           onClick={addRow}
-          className="flex items-center gap-1 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+          className="flex items-center gap-1 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
         >
           <Plus size={14} />
           <span>Agregar Fila</span>
@@ -143,11 +143,11 @@ export default function DisconTable({
               <th className="py-3 px-2 w-24">Alteración</th>
 
               {/* Calculated ratings summary columns */}
-              <th className="py-3 px-2 text-center bg-navy-900/60 border-l border-navy-900 text-cyan-400 w-14">Alt R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-cyan-400 w-14">Rel R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-cyan-400 w-14">Cont R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-cyan-400 w-14">Aber R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-cyan-400 w-14">Rug R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 border-l border-navy-900 text-amber-400 w-14">Alt R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Rel R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Cont R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Aber R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Rug R89</th>
               <th className="py-3 px-2 text-center bg-navy-900/60 text-emerald-400 font-bold w-16">Total R89</th>
               <th className="py-3 px-2 text-center bg-navy-950 text-slate-500 w-16">Acción</th>
             </tr>
@@ -173,7 +173,7 @@ export default function DisconTable({
                   key={idx}
                   onClick={() => onSelectRow(idx)}
                   className={`hover:bg-navy-900/10 border-b border-navy-900/60 transition-colors ${
-                    isSelected ? 'bg-blue-600/5' : ''
+                    isSelected ? 'bg-orange-600/5' : ''
                   }`}
                 >
                   {/* Frozen cells */}
@@ -398,19 +398,19 @@ export default function DisconTable({
                   </td>
 
                   {/* Calculated ratings (Read Only) */}
-                  <td className="py-2 px-2 text-center bg-navy-900/30 border-l border-navy-900/60 font-bold text-cyan-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 border-l border-navy-900/60 font-bold text-amber-400">
                     {altR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-cyan-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
                     {relR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-cyan-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
                     {contR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-cyan-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
                     {aberR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-cyan-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
                     {rugR89}
                   </td>
                   <td className="py-2 px-2 text-center bg-navy-900/30 font-black text-emerald-400">

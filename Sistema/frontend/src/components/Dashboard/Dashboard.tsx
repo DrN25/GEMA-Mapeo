@@ -102,7 +102,7 @@ export default function Dashboard({
       {/* Welcome Banner */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-black text-slate-100 tracking-wide bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">Mapeo Geomecánico de Paredes</h2>
+          <h2 className="text-2xl font-black text-slate-100 tracking-wide bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">Mapeo Geomecánico de Paredes</h2>
           <p className="text-slate-400 text-xs mt-1">Registra, audita y calcula el RMR en ventanas de escaneo estructural en tiempo real.</p>
         </div>
         <div className="flex gap-2">
@@ -110,12 +110,12 @@ export default function Dashboard({
             onClick={onOpenImportModal}
             className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95"
           >
-            <FileSpreadsheet size={18} className="text-cyan-400" />
+            <FileSpreadsheet size={18} className="text-amber-400" />
             <span>Importar Excel (Local)</span>
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95"
           >
             <Plus size={18} />
             <span>Nueva Celda de Mapeo</span>
@@ -183,7 +183,7 @@ export default function Dashboard({
             placeholder="Buscar celda por código..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-navy-950 border border-navy-800 rounded-lg pl-10 pr-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg pl-10 pr-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
           />
         </div>
 
@@ -262,7 +262,7 @@ export default function Dashboard({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
           <div className="glass-panel w-full max-w-lg p-6 rounded-xl border border-navy-800 space-y-4 text-left shadow-2xl bg-navy-900/95 my-8">
             <h3 className="text-base font-bold text-slate-100 tracking-wide border-b border-navy-800 pb-2 uppercase flex items-center gap-2">
-              <Plus size={18} className="text-cyan-400" />
+              <Plus size={18} className="text-orange-400" />
               <span>Nueva Celda de Mapeo Geomecánico</span>
             </h3>
 
@@ -276,7 +276,7 @@ export default function Dashboard({
                     placeholder="ej. TD1"
                     value={celda}
                     onChange={(e) => setCelda(e.target.value.toUpperCase())}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold tracking-wider"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-bold tracking-wider"
                   />
                 </div>
                 <div className="space-y-1">
@@ -286,7 +286,7 @@ export default function Dashboard({
                     required
                     value={mapeador}
                     onChange={(e) => setMapeador(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
               </div>
@@ -299,7 +299,7 @@ export default function Dashboard({
                     required
                     value={proyecto}
                     onChange={(e) => setProyecto(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
                 <div className="space-y-1">
@@ -309,7 +309,7 @@ export default function Dashboard({
                     required
                     value={sector}
                     onChange={(e) => setSector(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
                 <div className="space-y-1">
@@ -319,7 +319,7 @@ export default function Dashboard({
                     required
                     value={fase}
                     onChange={(e) => setFase(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
                 <div className="space-y-1">
@@ -329,7 +329,7 @@ export default function Dashboard({
                     required
                     value={nivel}
                     onChange={(e) => setNivel(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
               </div>
@@ -346,7 +346,7 @@ export default function Dashboard({
                       required
                       value={esteFrom}
                       onChange={(e) => setEsteFrom(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
                   <div className="space-y-1">
@@ -357,7 +357,7 @@ export default function Dashboard({
                       required
                       value={norteFrom}
                       onChange={(e) => setNorteFrom(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
                   <div className="space-y-1">
@@ -368,7 +368,7 @@ export default function Dashboard({
                       required
                       value={cotaFrom}
                       onChange={(e) => setCotaFrom(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
                 </div>
@@ -386,7 +386,7 @@ export default function Dashboard({
                       required
                       value={esteTo}
                       onChange={(e) => setEsteTo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
                   <div className="space-y-1">
@@ -397,7 +397,7 @@ export default function Dashboard({
                       required
                       value={norteTo}
                       onChange={(e) => setNorteTo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
                   <div className="space-y-1">
@@ -408,7 +408,7 @@ export default function Dashboard({
                       required
                       value={cotaTo}
                       onChange={(e) => setCotaTo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                     />
                   </div>
                 </div>
@@ -492,7 +492,7 @@ export default function Dashboard({
                 </button>
                 <button
                   type="submit"
-                  className="bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 animate-pulse-ring"
+                  className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 animate-pulse-ring"
                 >
                   Crear Celda
                 </button>

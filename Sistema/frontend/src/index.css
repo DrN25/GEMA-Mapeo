@@ -9,9 +9,9 @@
   --navy-200: 51, 65, 85;
   --navy-300: 71, 85, 105;
   --navy-400: 100, 116, 139;
-  --navy-500: 37, 99, 235;   /* Premium blue as accent */
-  --navy-600: 29, 78, 216;
-  --navy-700: 30, 64, 175;
+  --navy-500: 249, 115, 22;   /* Premium orange as accent */
+  --navy-600: 234, 88, 12;    /* Darker orange */
+  --navy-700: 194, 65, 12;    /* Darkest orange */
   --navy-800: 203, 213, 225;   /* Borders in light mode */
   --navy-850: 226, 232, 240;   /* Secondary card background */
   --navy-900: 241, 245, 249;   /* Section/table-header background */
@@ -36,19 +36,19 @@
 }
 
 .dark {
-  /* Premium Deep Obsidian Navy Palette - High Tech, Glowing Accent, Sleek Dark Mode */
-  --navy-50: 238, 242, 246;
-  --navy-100: 213, 224, 238;
-  --navy-200: 176, 199, 224;
-  --navy-300: 127, 164, 205;
-  --navy-400: 72, 124, 182;
-  --navy-500: 59, 130, 246;   /* Cyber blue */
-  --navy-600: 37, 99, 235;
-  --navy-700: 29, 78, 216;
-  --navy-800: 18, 37, 63;
-  --navy-850: 14, 27, 48;
-  --navy-900: 8, 18, 35;
-  --navy-950: 5, 9, 20;
+  /* Premium Deep Obsidian Orange Palette - High Tech, Glowing Accent, Sleek Dark Mode */
+  --navy-50: 245, 245, 244;
+  --navy-100: 231, 229, 228;
+  --navy-200: 214, 211, 209;
+  --navy-300: 194, 120, 3;
+  --navy-400: 217, 119, 6;
+  --navy-500: 249, 115, 22;   /* Premium orange */
+  --navy-600: 234, 88, 12;    /* Accent orange */
+  --navy-700: 194, 65, 12;
+  --navy-800: 41, 37, 36;     /* Borders */
+  --navy-850: 28, 25, 23;     /* Secondary background */
+  --navy-900: 18, 16, 15;     /* Warm dark obsidian */
+  --navy-950: 12, 10, 9;      /* Deep obsidian */
 
   --slate-50: 248, 250, 252;
   --slate-100: 241, 245, 249;
@@ -60,9 +60,9 @@
   --slate-700: 51, 65, 85;
   --slate-800: 30, 41, 59;
   --slate-900: 15, 23, 42;
-  --slate-950: 5, 9, 20;
+  --slate-950: 12, 10, 9;
 
-  --bg-app: #050914;
+  --bg-app: #0c0a09;
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
   --scrollbar-track: rgba(255, 255, 255, 0.02);
@@ -78,7 +78,7 @@
 
 /* Glassmorphism custom classes */
 .glass-panel {
-  background-color: rgba(8, 18, 35, 0.75);
+  background-color: rgba(18, 16, 15, 0.75);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -112,13 +112,13 @@
 /* Animaciones */
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 10px rgba(249, 115, 22, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
   }
 }
 
@@ -139,13 +139,13 @@ input[type=number] {
 }
 
 /* ================================================================
- * Chrome-dark: Sidebar & Topbar always use deep navy background
+ * Chrome-dark: Sidebar & Topbar always use deep obsidian background
  * regardless of light/dark mode toggle
  * ================================================================ */
 .chrome-dark {
-  background-color: rgba(8, 18, 35, 0.97) !important;
+  background-color: rgba(18, 16, 15, 0.97) !important;
   backdrop-filter: blur(14px) !important;
-  border-color: rgba(18, 37, 63, 0.9) !important;
+  border-color: rgba(41, 37, 36, 0.9) !important;
   color: #cbd5e1; /* slate-300 equivalent */
 }
 
@@ -155,13 +155,13 @@ input[type=number] {
 
 /* Force border color to remain navy-800-like in light mode */
 .light .chrome-dark {
-  background-color: rgba(8, 18, 35, 0.98) !important;
-  border-color: rgba(18, 37, 63, 0.95) !important;
+  background-color: rgba(18, 16, 15, 0.98) !important;
+  border-color: rgba(41, 37, 36, 0.95) !important;
 }
 
 /* Scrollbar in chrome-dark areas */
 .chrome-dark ::-webkit-scrollbar-track {
-  background: rgba(5, 9, 20, 0.6);
+  background: rgba(12, 10, 9, 0.6);
 }
 
 .chrome-dark ::-webkit-scrollbar-thumb {
@@ -187,12 +187,12 @@ input[type=number] {
 }
 
 .th-rmr-cyan {
-  background-color: #0d1f2d !important;
-  color: #22d3ee !important;
+  background-color: #2b1f14 !important;
+  color: #fbbf24 !important;
 }
 .light .th-rmr-cyan {
-  background-color: #ecfeff !important;
-  color: #0891b2 !important;
+  background-color: #fffbeb !important;
+  color: #d97706 !important;
 }
 
 .th-rmr-emerald {

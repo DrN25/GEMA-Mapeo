@@ -26,15 +26,14 @@ export default function StructurePlot({
   // Auto-scale mapping helpers
   const getFamilyColor = (famNum: number): string => {
     const colors = [
-      '#38bdf8', // Cyan
-      '#ec4899', // Pink
-      '#10b981', // Emerald
-      '#a855f7', // Purple
-      '#f97316', // Orange
-      '#eab308', // Yellow
-      '#3b82f6', // Blue
-      '#ef4444', // Red
-      '#64748b'  // Slate
+      '#f97316', // Orange (F1)
+      '#f59e0b', // Amber (F2)
+      '#10b981', // Emerald (F3)
+      '#a855f7', // Purple (F4)
+      '#ec4899', // Pink (F5)
+      '#3b82f6', // Blue (F6)
+      '#ef4444', // Red (F7)
+      '#64748b'  // Slate (F8)
     ];
     return colors[(famNum - 1) % colors.length];
   };
@@ -53,7 +52,7 @@ export default function StructurePlot({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Dark mode grid styling
-    ctx.fillStyle = '#050914';
+    ctx.fillStyle = '#0c0a09';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw background grid lines
@@ -116,7 +115,7 @@ export default function StructurePlot({
     const yTo = toCanvasY(header.norte_to);
 
     // --- DRAW SCANLINE ---
-    ctx.strokeStyle = '#3b82f6';
+    ctx.strokeStyle = '#a8a29e';
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -125,7 +124,7 @@ export default function StructurePlot({
     ctx.stroke();
 
     // Scanline shadow glow
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)';
+    ctx.strokeStyle = 'rgba(168, 162, 158, 0.15)';
     ctx.lineWidth = 10;
     ctx.beginPath();
     ctx.moveTo(xFrom, yFrom);
@@ -133,7 +132,7 @@ export default function StructurePlot({
     ctx.stroke();
 
     // From and To Labels
-    ctx.fillStyle = '#60a5fa';
+    ctx.fillStyle = '#f97316';
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -142,7 +141,7 @@ export default function StructurePlot({
     ctx.fillText('FIN (TO)', xTo, yTo - 8);
 
     // Draw From/To dots
-    ctx.fillStyle = '#3b82f6';
+    ctx.fillStyle = '#ea580c';
     ctx.beginPath();
     ctx.arc(xFrom, yFrom, 5, 0, Math.PI * 2);
     ctx.fill();
@@ -283,7 +282,7 @@ export default function StructurePlot({
     <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 select-none">
       <div className="flex justify-between items-center border-b border-navy-800 pb-3">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-          <Layers size={14} className="text-blue-400" />
+          <Layers size={14} className="text-orange-400" />
           <span>Vista en Planta de Estructuras (Scanline 3D Proyectado)</span>
         </h3>
 
@@ -312,7 +311,7 @@ export default function StructurePlot({
           <button
             onClick={handleDownload}
             disabled={largo <= 0}
-            className="flex items-center gap-1 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed"
           >
             <Download size={14} />
             <span>Exportar PNG</span>
@@ -338,7 +337,7 @@ export default function StructurePlot({
               top: tooltipData.y + 15
             }}
           >
-            <p className="font-extrabold text-cyan-400 border-b border-navy-800 pb-1 uppercase tracking-wider">
+            <p className="font-extrabold text-orange-400 border-b border-navy-800 pb-1 uppercase tracking-wider">
               Discontinuidad #{tooltipData.joint.row.id}
             </p>
             <div className="grid grid-cols-2 gap-x-2 gap-y-1">
@@ -348,7 +347,7 @@ export default function StructurePlot({
               </div>
               <div>
                 <span className="text-slate-500 block text-[9px] uppercase">Estructura:</span>
-                <span className="font-bold text-cyan-400">
+                <span className="font-bold text-orange-400">
                   {STRUCTURE_CATALOG[tooltipData.joint.row.tipo_estructura] || tooltipData.joint.row.tipo_estructura}
                 </span>
               </div>
@@ -371,9 +370,9 @@ export default function StructurePlot({
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center text-xxs font-bold text-slate-400">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-500"></span>Línea de Scanline 3D</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#38bdf8]"></span>Familia 1 (F1)</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#ec4899]"></span>Familia 2 (F2)</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#a8a29e]"></span>Línea de Scanline 3D</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#f97316]"></span>Familia 1 (F1)</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#f59e0b]"></span>Familia 2 (F2)</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#10b981]"></span>Familia 3 (F3)</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#a855f7]"></span>Familia 4 (F4)</span>
         <span className="flex items-center gap-1.5 text-slate-500 italic">Hover sobre cualquier junta para ver coordenadas UTM</span>

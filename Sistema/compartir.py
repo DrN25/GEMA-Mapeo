@@ -37,7 +37,7 @@ def start_tunnel():
     
     # Iniciar cloudflared redirigiendo a 127.0.0.1:5173
     process = subprocess.Popen(
-        [CLOUDFLARED_EXE, "tunnel", "--url", "http://127.0.0.1:5173"],
+        [CLOUDFLARED_EXE, "tunnel", "--protocol", "http2", "--url", "http://127.0.0.1:5173"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,

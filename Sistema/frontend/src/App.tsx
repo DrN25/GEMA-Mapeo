@@ -396,7 +396,7 @@ export default function App() {
             {/* Server Connectivity Indicator */}
             <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
               <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'synced' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' :
-                syncStatus === 'saving' ? 'bg-blue-500 animate-pulse' :
+                syncStatus === 'saving' ? 'bg-orange-500 animate-pulse' :
                   syncStatus === 'unsaved' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
                     'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                 }`} />
@@ -417,7 +417,7 @@ export default function App() {
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 border ${syncStatus === 'unsaved'
                     ? 'bg-amber-500 hover:bg-amber-600 text-slate-900 border-amber-400/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse-ring'
                     : syncStatus === 'saving'
-                      ? 'bg-blue-600 text-white border-blue-500/30 cursor-wait'
+                      ? 'bg-orange-600 text-white border-orange-500/30 cursor-wait'
                       : syncStatus === 'synced'
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold'
                         : 'bg-navy-900 hover:bg-navy-850 text-slate-300 border-navy-800'
