@@ -33,11 +33,11 @@ def download_cloudflared():
         return False
 
 def start_tunnel():
-    print("--> Iniciando túnel de Cloudflare para el Frontend (puerto 5173)...")
+    print("--> Iniciando túnel de Cloudflare para el Frontend (puerto 5174)...")
     
-    # Iniciar cloudflared redirigiendo a 127.0.0.1:5173
+    # Iniciar cloudflared redirigiendo a 127.0.0.1:5174
     process = subprocess.Popen(
-        [CLOUDFLARED_EXE, "tunnel", "--protocol", "http2", "--url", "http://127.0.0.1:5173"],
+        [CLOUDFLARED_EXE, "tunnel", "--protocol", "http2", "--url", "http://127.0.0.1:5174"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
@@ -100,7 +100,7 @@ def update_env(tunnel_url):
         if line.strip().startswith("VITE_API_BASE="):
             new_lines.append(f"VITE_API_BASE={tunnel_url}\n")
         elif line.strip().startswith("VITE_PROXY_TARGET="):
-            new_lines.append(f"VITE_PROXY_TARGET=http://127.0.0.1:8000\n")
+            new_lines.append(f"VITE_PROXY_TARGET=http://127.0.0.1:8001\n")
         else:
             new_lines.append(line)
             
@@ -117,9 +117,9 @@ def restore_env():
 
 def main():
     # 1. Limpieza inicial de puertos por seguridad
-    print("--> Liberando puertos 5173 y 8000 de cualquier proceso previo...")
-    os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
-    os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
+    print("--> Liberando puertos 5174 y 8001 de cualquier proceso previo...")
+    os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
+    os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :8001 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
     
     if not download_cloudflared():
         print("ERROR: No se pudo preparar cloudflared. El script se cerrará.")
@@ -190,8 +190,8 @@ def main():
         
         # Matar servidores locales y cloudflared para que no queden colgados
         print("--> Apagando servidores locales...")
-        os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
-        os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
+        os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
+        os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :8001 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")
         os.system("taskkill /f /im cloudflared.exe >nul 2>&1")
         print("--> Todo limpio y restaurado con éxito.")
 

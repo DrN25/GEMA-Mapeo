@@ -58,7 +58,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
         </div>
         <div>
           <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">Ingesta de Estaciones Geomecánicas</h3>
-          <p className="text-xxs text-slate-400 max-w-sm mx-auto">
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
             Sube el archivo Excel original. El sistema procesará automáticamente las celdas y discontinuidades.
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
         <span className="text-xs font-semibold text-slate-300 block">
           {file ? file.name : 'Arrastra aquí tu archivo Excel o haz clic para buscar'}
         </span>
-        <span className="text-[10px] text-slate-500 block mt-1">Soporta formatos: .xlsx, .xls</span>
+        <span className="text-xs text-slate-500 block mt-1">Soporta formatos: .xlsx, .xls</span>
       </div>
 
       {status !== 'idle' && (
@@ -116,7 +116,7 @@ export default function ExcelImport({ onImportSuccess, apiBase }: ExcelImportPro
         </button>
       </div>
 
-      <div className="bg-navy-950/40 p-4 rounded-xl border border-navy-850 space-y-2 text-xxs text-slate-500">
+      <div className="bg-navy-950/40 p-4 rounded-xl border border-navy-850 space-y-2 text-xs text-slate-500">
         <p className="font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wide">
           <Info size={12} className="text-orange-400 shrink-0" />
           <span>Información de Formato Soportada</span>

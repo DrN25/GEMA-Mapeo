@@ -45,25 +45,25 @@ export default function RmrAnalysis({
       {/* 1. TOP CARDS OVERVIEW */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">RQD Estimado (Palmström)</span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">RQD Estimado (Palmström)</span>
           <span className="text-3xl font-black text-amber-400 tracking-tight mt-1">{calculated.rqd_est.toFixed(1)}%</span>
-          <span className="text-xxs text-slate-500 mt-1">Calculado de Jv: {calculated.jv.toFixed(2)} juntas/m³</span>
+          <span className="text-xs text-slate-500 mt-1">Calculado de Jv: {calculated.jv.toFixed(2)} juntas/m³</span>
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Espaciamiento Prom. Global</span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Espaciamiento Prom. Global</span>
           <span className="text-3xl font-black text-purple-400 tracking-tight mt-1">{(calculated.global_spacing * 1000).toFixed(0)} mm</span>
-          <span className="text-xxs text-slate-500 mt-1">Promedio de discontinuidades registradas</span>
+          <span className="text-xs text-slate-500 mt-1">Promedio de discontinuidades registradas</span>
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-gradient-to-br from-orange-500/5 to-amber-500/5 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Puntaje RMR R76</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Puntaje RMR R76</span>
           <span className="text-3xl font-black text-orange-400 tracking-tight mt-1">{calculated.rmr_76} Pts</span>
           <div className="mt-2">{getRmrClassBadge(calculated.rmr_76, calculated.class_76)}</div>
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-gradient-to-br from-emerald-500/5 to-orange-500/5 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Puntaje RMR R89</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Puntaje RMR R89</span>
           <span className="text-3xl font-black text-emerald-400 tracking-tight mt-1">{calculated.rmr_89} Pts</span>
           <div className="mt-2">{getRmrClassBadge(calculated.rmr_89, calculated.class_89)}</div>
         </div>
@@ -79,7 +79,7 @@ export default function RmrAnalysis({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
+              <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-850">
                 <th className="py-2.5 px-3">Parámetro / Propiedad</th>
                 <th className="py-2.5 px-3 text-center">Valor / Entrada</th>
                 <th className="py-2.5 px-3 text-center text-amber-400">RMR '76 Pts</th>
@@ -136,9 +136,9 @@ export default function RmrAnalysis({
         </h3>
 
         <div className="overflow-x-auto max-h-[350px] relative rounded-lg border border-navy-900 bg-navy-950/40">
-          <table className="w-full text-left border-collapse text-[11px] border-separate" style={{ minWidth: '900px' }}>
+          <table className="w-full text-left border-collapse text-xs border-separate" style={{ minWidth: '900px' }}>
             <thead>
-              <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
+              <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-850">
                 <th className="py-2.5 px-2 text-center sticky left-0 bg-navy-950 z-10 w-10">ID</th>
                 <th className="py-2.5 px-2 text-center sticky left-10 bg-navy-950 z-10 w-16">Dist (m)</th>
                 <th className="py-2.5 px-2">Tipo</th>
@@ -158,7 +158,7 @@ export default function RmrAnalysis({
               {calculated.joints.map((cj, idx) => (
                 <tr key={idx} className="hover:bg-navy-900/10">
                   <td className="py-2.5 px-2 text-center font-bold text-slate-400 sticky left-0 bg-navy-950">{cj.row.id}</td>
-                  <td className="py-2.5 px-2 text-center sticky left-10 bg-navy-950 text-slate-100 font-semibold">{cj.row.distancia.toFixed(2)}</td>
+                  <td className="py-2.5 px-2 text-center sticky left-10 bg-navy-950 text-slate-100 font-semibold">{cj.row.distancia?.toFixed(2) ?? '—'}</td>
                   <td className="py-2.5 px-2 font-bold text-amber-400">{STRUCTURE_CATALOG[cj.row.tipo_estructura] || cj.row.tipo_estructura}</td>
                   <td className="py-2.5 px-2 text-center">{cj.row.dip}&deg; / {cj.row.dip_dir}&deg;</td>
                   <td className="py-2.5 px-2 text-center" title={ALTERACION_CATALOG[cj.row.alteracion]?.name}>{cj.alteracion_89}</td>
@@ -167,9 +167,9 @@ export default function RmrAnalysis({
                   <td className="py-2.5 px-2 text-center">{cj.abertura_89}</td>
                   <td className="py-2.5 px-2 text-center">{cj.rugosidad_89}</td>
                   <td className="py-2.5 px-2 text-center text-emerald-400 font-black">{cj.total_condicion_89}</td>
-                  <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">{cj.x.toFixed(2)}</td>
-                  <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">{cj.y.toFixed(2)}</td>
-                  <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">{cj.z.toFixed(2)}</td>
+                  <td className="py-2.5 px-3 font-mono text-xs text-slate-400">{cj.x.toFixed(2)}</td>
+                  <td className="py-2.5 px-3 font-mono text-xs text-slate-400">{cj.y.toFixed(2)}</td>
+                  <td className="py-2.5 px-3 font-mono text-xs text-slate-400">{cj.z.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

@@ -158,11 +158,13 @@ export default function StructurePlot({
 
       // Strike direction of discontinuity: DipDir + 90 or - 90 deg
       // Let's compute the strike direction angle in radians
-      const dipDirRad = (cj.row.dip_dir * Math.PI) / 180;
+      const dipDir = cj.row.dip_dir !== undefined && cj.row.dip_dir !== -1 ? cj.row.dip_dir : 0;
+      const dipDirRad = (dipDir * Math.PI) / 180;
       const strikeAngle = dipDirRad - Math.PI / 2; // perpendicular to Dip Dir
 
       // Draw a line perpendicular to Dip Dir representing strike (longitud proportional to continuidad)
-      const visibleLength = Math.max(15, cj.row.continuidad * scale * 0.4);
+      const cont = cj.row.continuidad !== undefined && cj.row.continuidad !== -1 ? cj.row.continuidad : 1.5;
+      const visibleLength = Math.max(15, cont * scale * 0.4);
       const halfL = visibleLength / 2;
 
       const sx1 = cx - halfL * Math.cos(strikeAngle);
@@ -331,36 +333,36 @@ export default function StructurePlot({
 
         {showTooltip && tooltipData && (
           <div
-            className="absolute z-50 bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xxs shadow-2xl backdrop-blur-md space-y-1.5 w-60 text-left pointer-events-none text-slate-300"
+            className="absolute z-50 bg-navy-950/95 border border-navy-700 rounded-xl p-3.5 text-xs shadow-2xl backdrop-blur-md space-y-1.5 w-64 text-left pointer-events-none text-slate-300"
             style={{
               left: tooltipData.x + 15,
               top: tooltipData.y + 15
             }}
           >
-            <p className="font-extrabold text-orange-400 border-b border-navy-800 pb-1 uppercase tracking-wider">
+            <p className="font-extrabold text-orange-400 border-b border-navy-800 pb-1 uppercase tracking-wider text-sm">
               Discontinuidad #{tooltipData.joint.row.id}
             </p>
             <div className="grid grid-cols-2 gap-x-2 gap-y-1">
               <div>
-                <span className="text-slate-500 block text-[9px] uppercase">Distancia:</span>
-                <span className="font-bold text-slate-200">{tooltipData.joint.row.distancia.toFixed(2)} m</span>
+                <span className="text-slate-500 block text-xs uppercase">Distancia:</span>
+                <span className="font-bold text-slate-200">{tooltipData.joint.row.distancia?.toFixed(2) ?? '—'} m</span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px] uppercase">Estructura:</span>
+                <span className="text-slate-500 block text-xs uppercase">Estructura:</span>
                 <span className="font-bold text-orange-400">
                   {STRUCTURE_CATALOG[tooltipData.joint.row.tipo_estructura] || tooltipData.joint.row.tipo_estructura}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px] uppercase">Buzamiento:</span>
+                <span className="text-slate-500 block text-xs uppercase">Buzamiento:</span>
                 <span className="font-bold text-slate-200">{tooltipData.joint.row.dip}&deg; / {tooltipData.joint.row.dip_dir}&deg;</span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px] uppercase">Familia:</span>
+                <span className="text-slate-500 block text-xs uppercase">Familia:</span>
                 <span className="font-bold text-purple-400">F{tooltipData.joint.row.familia}</span>
               </div>
             </div>
-            <div className="border-t border-navy-850 pt-1.5 mt-1 space-y-0.5 font-mono text-[9px] text-slate-400">
+            <div className="border-t border-navy-850 pt-1.5 mt-1 space-y-0.5 font-mono text-xs text-slate-400">
               <p>UTM E (X): {tooltipData.joint.x.toFixed(2)}</p>
               <p>UTM N (Y): {tooltipData.joint.y.toFixed(2)}</p>
               <p>UTM C (Z): {tooltipData.joint.z.toFixed(2)}</p>
@@ -369,7 +371,7 @@ export default function StructurePlot({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center text-xxs font-bold text-slate-400">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center text-xs font-bold text-slate-400">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#a8a29e]"></span>Línea de Scanline 3D</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#f97316]"></span>Familia 1 (F1)</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#f59e0b]"></span>Familia 2 (F2)</span>

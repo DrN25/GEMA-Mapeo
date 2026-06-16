@@ -57,10 +57,10 @@ cd ..
 echo OK: Dependencias instaladas y listas.
 echo.
 
-:: 3. Liberar puertos 5173 y 8000 si estuvieran en uso
-echo [3/3] Liberando puertos 5173 y 8000 e iniciando servidores...
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
+:: 3. Liberar puertos 5174 y 8001 si estuvieran en uso
+echo [3/3] Liberando puertos 5174 y 8001 e iniciando servidores...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8001 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
 
 :: Iniciar Backend
 start "Ventanas Geomecánicas 2.0 - Backend (FastAPI)" cmd /k "cd backend && call venv\Scripts\activate.bat && python run.py"
@@ -72,8 +72,8 @@ echo.
 echo =======================================================================
 echo ¡Servidores locales iniciados correctamente!
 echo.
-echo Backend:  http://127.0.0.1:8000
-echo Frontend: http://localhost:5173
+echo Backend:  http://127.0.0.1:8001
+echo Frontend: http://localhost:5174
 echo =======================================================================
 echo.
 echo Presiona ENTER en esta ventana para apagar los servidores...
@@ -81,13 +81,13 @@ echo.
 
 :: Esperar 3 segundos y abrir navegador
 timeout /t 3 /nobreak >nul 2>&1
-start http://localhost:5173
+start http://localhost:5174
 
 pause >nul
 
 :: Apagar los servidores al presionar ENTER
 echo Apagando servidores...
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8001 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1
 
 echo Todo limpio. ¡Hasta luego!

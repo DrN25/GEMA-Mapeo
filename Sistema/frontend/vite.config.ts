@@ -5,12 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   // Cargar variables de entorno del frontend
   const env = loadEnv(mode, process.cwd(), '')
-  const proxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:8000'
+  const proxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:8001'
 
   return {
     plugins: [react()],
     server: {
-      port: 5173,
+      port: 5174,
       strictPort: true,
       host: '127.0.0.1',
       proxy: {

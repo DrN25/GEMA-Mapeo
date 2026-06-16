@@ -62,48 +62,64 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
   joints.forEach((j, index) => {
     const rowNum = index + 1;
 
+    const dist = j.distancia;
+    const dip = j.dip;
+    const dip_dir = j.dip_dir;
+    const espac = j.espaciamiento;
+    const nstr = j.n_estructuras ?? 1;
+    const esp = j.espesor ?? 0;
+    const aber = j.abertura ?? 0;
+    const ext = j.extremos_visibles;
+
+    // Skip validations if any main structural fields are vacant (-1 or undefined)
+    if (dist === undefined || dist === -1 || dip === undefined || dip === -1 || dip_dir === undefined || dip_dir === -1) {
+      return;
+    }
+
     // Distancia scanline checks
-    if (j.distancia < 0 || j.distancia > largo) {
+    if (dist < 0 || dist > largo) {
       alerts.push({
         fieldId: `joint-distancia-${index}`,
         type: "ERROR",
-        message: `Fila ${rowNum}: La distancia de la estructura (${j.distancia}m) está fuera del rango del scanline de la ventana (0m - ${largo.toFixed(2)}m).`
+        message: `Fila ${rowNum}: La distancia de la estructura (${dist}m) está fuera del rango del scanline de la ventana (0m - ${largo.toFixed(2)}m).`
       });
     }
 
     // Dip & Dip Direction bounds
-    if (j.dip < 0 || j.dip > 90) {
+    if (dip < 0 || dip > 90) {
       alerts.push({
         fieldId: `joint-dip-${index}`,
         type: "ERROR",
-        message: `Fila ${rowNum}: El buzamiento (Dip: ${j.dip}°) debe estar en el rango de 0° a 90°.`
+        message: `Fila ${rowNum}: El buzamiento (Dip: ${dip}°) debe estar en el rango de 0° a 90°.`
       });
     }
-    if (j.dip_dir < 0 || j.dip_dir > 360) {
+    if (dip_dir < 0 || dip_dir > 360) {
       alerts.push({
         fieldId: `joint-dip_dir-${index}`,
         type: "ERROR",
-        message: `Fila ${rowNum}: La dirección de buzamiento (Dip Dir: ${j.dip_dir}°) debe estar entre 0° y 360°.`
+        message: `Fila ${rowNum}: La dirección de buzamiento (Dip Dir: ${dip_dir}°) debe estar entre 0° y 360°.`
       });
     }
 
     // Spacing check (warning if 0)
-    if (j.espaciamiento <= 0) {
-      alerts.push({
-        fieldId: `joint-espaciamiento-${index}`,
-        type: "WARNING",
-        message: `Fila ${rowNum}: El espaciamiento es 0 o menor. Un espaciamiento nulo incrementará indefinidamente el índice volumétrico Jv.`
-      });
-    } else if (j.espaciamiento > 10) {
-      alerts.push({
-        fieldId: `joint-espaciamiento-${index}`,
-        type: "WARNING",
-        message: `Fila ${rowNum}: Espaciamiento de junta muy alto (${j.espaciamiento}m). Verifique si corresponde.`
-      });
+    if (espac !== undefined && espac !== -1) {
+      if (espac <= 0) {
+        alerts.push({
+          fieldId: `joint-espaciamiento-${index}`,
+          type: "WARNING",
+          message: `Fila ${rowNum}: El espaciamiento es 0 o menor. Un espaciamiento nulo incrementará indefinidamente el índice volumétrico Jv.`
+        });
+      } else if (espac > 10) {
+        alerts.push({
+          fieldId: `joint-espaciamiento-${index}`,
+          type: "WARNING",
+          message: `Fila ${rowNum}: Espaciamiento de junta muy alto (${espac}m). Verifique si corresponde.`
+        });
+      }
     }
 
     // Structures count check
-    if (j.n_estructuras < 1) {
+    if (nstr < 1) {
       alerts.push({
         fieldId: `joint-n_estructuras-${index}`,
         type: "ERROR",
@@ -112,27 +128,27 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     }
 
     // Abertura vs Espesor QA/QC
-    if (j.espesor > 0 && j.abertura === 0) {
+    if (esp > 0 && aber === 0) {
       alerts.push({
         fieldId: `joint-abertura-${index}`,
         type: "WARNING",
-        message: `Fila ${rowNum}: Declaró un espesor de relleno de ${j.espesor}mm pero la abertura de junta figura en 0mm.`
+        message: `Fila ${rowNum}: Declaró un espesor de relleno de ${esp}mm pero la abertura de junta figura en 0mm.`
       });
     }
-    if (j.abertura > 0 && j.espesor > j.abertura) {
+    if (aber > 0 && esp > aber) {
       alerts.push({
         fieldId: `joint-espesor-${index}`,
         type: "WARNING",
-        message: `Fila ${rowNum}: El espesor de relleno (${j.espesor}mm) es mayor que la abertura de junta (${j.abertura}mm).`
+        message: `Fila ${rowNum}: El espesor de relleno (${esp}mm) es mayor que la abertura de junta (${aber}mm).`
       });
     }
 
     // Terminations and visibility bounds
-    if (j.extremos_visibles < 0 || j.extremos_visibles > 2) {
+    if (ext < 0 || ext > 3) {
       alerts.push({
         fieldId: `joint-extremos_visibles-${index}`,
         type: "ERROR",
-        message: `Fila ${rowNum}: Cantidad de extremos visibles debe ser 0, 1 o 2.`
+        message: `Fila ${rowNum}: Cantidad de extremos visibles debe estar entre 0 y 3.`
       });
     }
   });

@@ -143,3 +143,45 @@ export const RUGOSIDAD_CATALOG: Record<number, { desc: string; r76: number; r89:
   8: { desc: "8 — Plana Pulida / Espejo", r76: 1, r89: 1 },
   9: { desc: "9 — Cizallada / Arcillosa", r76: 0, r89: 0 }
 };
+
+export interface LithologyClassificationItem {
+  grupo: string;
+  unidad: string;
+  litologia: string;
+  codigo: string;
+}
+
+export const LITHOLOGY_CLASSIFICATION: LithologyClassificationItem[] = [
+  { grupo: "INTRUSIVOS", unidad: "MZB", litologia: "MZB", codigo: "MZB_EQ" },
+  { grupo: "INTRUSIVOS", unidad: "MZB", litologia: "MZB", codigo: "MZB_P" },
+  { grupo: "INTRUSIVOS", unidad: "MBF1", litologia: "MBF", codigo: "MBF1" },
+  { grupo: "INTRUSIVOS", unidad: "MBF2", litologia: "MBF", codigo: "MBF2" },
+  { grupo: "INTRUSIVOS", unidad: "MBF2", litologia: "MBF", codigo: "MBF_P" },
+  { grupo: "INTRUSIVOS", unidad: "MZM", litologia: "MZM", codigo: "MZM_F" },
+  { grupo: "INTRUSIVOS", unidad: "MZM", litologia: "MZM", codigo: "MZM_M" },
+  { grupo: "INTRUSIVOS", unidad: "MZH", litologia: "MZH", codigo: "MZH_1" },
+  { grupo: "INTRUSIVOS", unidad: "MZH", litologia: "MZH", codigo: "MZH_2" },
+  { grupo: "INTRUSIVOS", unidad: "MZD", litologia: "MZD", codigo: "MZD" },
+  { grupo: "INTRUSIVOS", unidad: "MZQ", litologia: "MZQ", codigo: "MZQ" },
+  { grupo: "INTRUSIVOS", unidad: "AN", litologia: "LAM", codigo: "LAM" },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_M" },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_Mg" },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_S" },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_C" },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_U" },
+  { grupo: "SEDIMENTARIOS", unidad: "SHL", litologia: "HFL", codigo: "SHL_MA" },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "Varios" },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "Varios" },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MSK", codigo: "Varios" },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "Varios" },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBC", codigo: "Varios" },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "Varios" },
+  { grupo: "METAMORFICAS", unidad: "SHL", litologia: "HFL", codigo: "-" },
+  { grupo: "METAMORFICAS", unidad: "SND", litologia: "QZT", codigo: "-" },
+  { grupo: "BRECHAS", unidad: "TBX", litologia: "TBX", codigo: "TBX" },
+  { grupo: "BRECHAS", unidad: "HBX", litologia: "HBX", codigo: "HBX" },
+  { grupo: "BRECHAS", unidad: "MBX / varios", litologia: "MBX", codigo: "MBX" },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EPG", codigo: "-" },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EGT", codigo: "-" }
+];
+

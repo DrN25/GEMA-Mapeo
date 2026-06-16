@@ -9,20 +9,20 @@ import {
 export interface JointRow {
   id: number;
   familia: number; // 1 to 9
-  distancia: number; // meters
-  tipo_estructura: string; // J, BED, F, SZ, CON
-  dip: number; // degrees
-  dip_dir: number; // degrees
-  n_estructuras: number;
-  abertura: number; // mm
-  espesor: number; // mm
-  continuidad: number; // m
-  espaciamiento: number; // m
-  extremos_visibles: number; // 0, 1, 2
+  distancia?: number; // meters, can be undefined/-1
+  tipo_estructura: string; // JN, BED, F, SZ, CON
+  dip?: number; // degrees, can be undefined/-1
+  dip_dir?: number; // degrees, can be undefined/-1
+  n_estructuras?: number; // can be undefined/-1
+  abertura?: number; // mm, can be undefined/-1
+  espesor?: number; // mm, can be undefined/-1
+  continuidad?: number; // m, can be undefined/-1
+  espaciamiento?: number; // m, can be undefined/-1
+  extremos_visibles: number; // 0, 1, 2, 3
   terminacion: number; // 0 to 5
-  relleno1: string; // ca, sand, ch, cl, gy, RXF, FBX, GOU, PAT, SIO, QZ, SU, OX, ep, cwf
+  relleno1: string; // ca, sand, ch, cl, gy, etc.
   relleno2?: string;
-  jrc: number; // 0-20
+  jrc?: number; // 0-20, can be undefined/-1
   rugosidad: number; // 1-9
   forma: string; // P, C, O, E, I
   alteracion: string; // f, d, m, a, c, s
@@ -36,18 +36,27 @@ export interface WindowHeader {
   este_to: number;
   norte_to: number;
   cota_to: number;
+  largo?: number | string; // manual override length
   altura: number;
-  dip_talud?: number;
+  dip_talud: number;
+  dipdir_talud?: number;
+  dip_hw?: number;
+  az_hw?: number;
+  unidad_litologica?: string;
+  lito_1?: string;
+  lito_2?: string;
   lito_3?: string;
-  lito_model?: string;
-  mapeador?: string;
   sector?: string;
   fase?: string;
   nivel?: string;
-  sect_geot?: string;
   fecha?: string;
+  mapeador?: string;
+  sect_geot?: string;
+  intemperia?: string;
+  alt_zona?: string;
   condicion_agua: string; // C, H, M, E, F
   resistencia_ucs: string; // R0 to R6
+  comentario?: string;
 }
 
 export interface CalculatedJoint {
@@ -55,19 +64,23 @@ export interface CalculatedJoint {
   x: number;
   y: number;
   z: number;
-  // Ratings
-  alteracion_76: number;
-  alteracion_89: number;
-  relleno_76: number;
-  relleno_89: number;
-  continuidad_76: number;
-  continuidad_89: number;
-  abertura_76: number;
-  abertura_89: number;
-  rugosidad_76: number;
-  rugosidad_89: number;
-  total_condicion_76: number;
-  total_condicion_89: number;
+  // Ratings (can be null if parameters are vacant)
+  alteracion_76: number | null;
+  alteracion_89: number | null;
+  relleno_76: number | null;
+  relleno_89: number | null;
+  continuidad_76: number | null;
+  continuidad_89: number | null;
+  abertura_76: number | null;
+  abertura_89: number | null;
+  rugosidad_76: number | null;
+  rugosidad_89: number | null;
+  total_condicion_76: number | null;
+  total_condicion_89: number | null;
+  relleno1_score_89: number | null;
+  relleno2_score_89: number | null;
+  relleno1_score_76: number | null;
+  relleno2_score_76: number | null;
 }
 
 export interface CalculatorResult {
@@ -76,7 +89,7 @@ export interface CalculatorResult {
   az_hole: number;
   dip_dir_talud: number;
   // Averages
-  familias_spacing: Record<number, number>; // average spacing per family
+  familias_spacing: Record<number, number>; // weighted average spacing per family
   jv: number;
   rqd_est: number;
   rqd_rating_76: number;
@@ -99,7 +112,8 @@ export interface CalculatorResult {
 }
 
 // 1. Individual parameter rating calculations
-export function getContinuidadRating(val: number): { r76: number; r89: number } {
+export function getContinuidadRating(val: number | undefined | null): { r76: number | null; r89: number | null } {
+  if (val === undefined || val === null || val === -1) return { r76: null, r89: null };
   if (val < 1.0) return { r76: 5, r89: 6 };
   if (val <= 3.0) return { r76: 4, r89: 4 };
   if (val <= 10.0) return { r76: 3, r89: 2 };
@@ -107,7 +121,8 @@ export function getContinuidadRating(val: number): { r76: number; r89: number } 
   return { r76: 0, r89: 0 };
 }
 
-export function getAberturaRating(val: number): { r76: number; r89: number } {
+export function getAberturaRating(val: number | undefined | null): { r76: number | null; r89: number | null } {
+  if (val === undefined || val === null || val === -1) return { r76: null, r89: null };
   if (val <= 0) return { r76: 5, r89: 6 };
   if (val < 0.1) return { r76: 4, r89: 5 };
   if (val <= 1.0) return { r76: 3, r89: 3 };
@@ -115,20 +130,27 @@ export function getAberturaRating(val: number): { r76: number; r89: number } {
   return { r76: 0, r89: 0 };
 }
 
-export function getFillingRatingSingle(rellenoCode: string, thicknessMm: number): { r76: number; r89: number } {
+export function getFillingRatingSingle(rellenoCode: string | undefined | null, thicknessMm: number | undefined | null): { r76: number | null; r89: number | null } {
+  if (!rellenoCode || rellenoCode === '-1') return { r76: null, r89: null };
   const item = RELLENO_CATALOG[rellenoCode] || RELLENO_CATALOG['cwf'];
-  if (item.clase === 3 || thicknessMm === 0) {
-    return { r76: 5, r89: 6 };
+  
+  // If clean, thickness doesn't matter
+  if (item.clase === 3 || thicknessMm === 0 || thicknessMm === undefined || thicknessMm === null || thicknessMm === -1) {
+    return { r76: item.rmr76, r89: item.rmr89 };
   }
-  if (item.clase === 2) { // Duro
+  
+  const isBlando = item.clase === 1;
+  const isMenorA5 = thicknessMm < 5;
+
+  if (!isBlando) { // Duro
     return {
-      r76: thicknessMm < 5 ? 4 : 3,
-      r89: thicknessMm < 5 ? 4 : 2
+      r76: isMenorA5 ? item.rmr76 : item.rmr76_gt5,
+      r89: isMenorA5 ? item.rmr89 : item.rmr89_gt5
     };
   } else { // Blando
     return {
-      r76: thicknessMm < 5 ? 2 : 0,
-      r89: thicknessMm < 5 ? 2 : 0
+      r76: isMenorA5 ? item.rmr76 : item.rmr76_gt5,
+      r89: isMenorA5 ? item.rmr89 : item.rmr89_gt5
     };
   }
 }
@@ -181,59 +203,90 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const dz = header.cota_to - header.cota_from;
 
   // 3D Distance (Window Largo)
-  const largo = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  let largo = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const isCoordsValid = [header.este_from, header.norte_from, header.cota_from, header.este_to, header.norte_to, header.cota_to].every(c => c !== undefined && c !== null && !isNaN(c) && c !== 0);
+  if (!isCoordsValid || largo <= 0) {
+    largo = typeof header.largo === 'string' ? parseFloat(header.largo) : (header.largo || 0.0);
+    if (isNaN(largo)) largo = 0;
+  }
 
   // Inclinacion (Dip hole)
-  const dip_hole = largo > 0 ? Math.asin((header.cota_from - header.cota_to) / largo) * (180 / Math.PI) : 0;
+  const dip_hole = largo > 0 && isCoordsValid ? Math.asin((header.cota_from - header.cota_to) / largo) * (180 / Math.PI) : 0;
 
   // Azimut (Az hole)
-  let az_hole = Math.atan2(dx, dy) * (180 / Math.PI);
+  let az_hole = largo > 0 && isCoordsValid ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
   if (az_hole < 0) az_hole += 360;
 
-  // DipDir Talud = Az_hole + 90
-  const dip_dir_talud = (az_hole + 90) % 360;
+  // DipDir Talud = manual override or Az_hole + 90
+  const dip_dir_talud = header.dipdir_talud !== undefined && header.dipdir_talud !== -1
+    ? header.dipdir_talud
+    : (az_hole + 90) % 360;
 
   // 3D Direction Cosenes Unit Vectors
-  const vx = largo > 0 ? dx / largo : 0;
-  const vy = largo > 0 ? dy / largo : 0;
-  const vz = largo > 0 ? dz / largo : 0;
+  const vx = largo > 0 && isCoordsValid ? dx / largo : 0;
+  const vy = largo > 0 && isCoordsValid ? dy / largo : 0;
+  const vz = largo > 0 && isCoordsValid ? dz / largo : 0;
 
   // Calculate each joint coordinates and ratings
   const calculatedJoints: CalculatedJoint[] = joints.map(j => {
     // Spatial coordinates projection
-    const x = header.este_from + j.distancia * vx;
-    const y = header.norte_from + j.distancia * vy;
-    const z = header.cota_from + j.distancia * vz;
+    const hasDist = j.distancia !== undefined && j.distancia !== -1 && j.distancia >= 0;
+    const dist = hasDist ? j.distancia! : 0.0;
+    const x = header.este_from + dist * vx;
+    const y = header.norte_from + dist * vy;
+    const z = header.cota_from + dist * vz;
 
     // Alteracion
-    const altItem = ALTERACION_CATALOG[j.alteracion] || { r76: 3, r89: 3 };
-    const alt76 = altItem.r76;
-    const alt89 = altItem.r89;
+    const hasAlt = j.alteracion && j.alteracion !== '-1';
+    const altItem = hasAlt ? ALTERACION_CATALOG[j.alteracion] : null;
+    const alt76 = altItem ? altItem.r76 : null;
+    const alt89 = altItem ? altItem.r89 : null;
 
     // Relleno (Conservador: toma el menor puntaje entre Relleno 1 y Relleno 2)
-    const rel1_ratings = getFillingRatingSingle(j.relleno1, j.espesor);
-    const rel2_ratings = j.relleno2 ? getFillingRatingSingle(j.relleno2, j.espesor) : { r76: 99, r89: 99 };
-    const rel76 = Math.min(rel1_ratings.r76, rel2_ratings.r76);
-    const rel89 = Math.min(rel1_ratings.r89, rel2_ratings.r89);
+    const hasR1 = j.relleno1 && j.relleno1 !== '-1';
+    const hasR2 = j.relleno2 && j.relleno2 !== '-1';
+    
+    const rel1_ratings = hasR1 ? getFillingRatingSingle(j.relleno1, j.espesor) : null;
+    const rel2_ratings = hasR2 ? getFillingRatingSingle(j.relleno2, j.espesor) : null;
+
+    let rel76: number | null = null;
+    let rel89: number | null = null;
+
+    if (rel1_ratings && rel2_ratings) {
+      rel76 = Math.min(rel1_ratings.r76 ?? 99, rel2_ratings.r76 ?? 99);
+      rel89 = Math.min(rel1_ratings.r89 ?? 99, rel2_ratings.r89 ?? 99);
+    } else if (rel1_ratings) {
+      rel76 = rel1_ratings.r76;
+      rel89 = rel1_ratings.r89;
+    } else if (rel2_ratings) {
+      rel76 = rel2_ratings.r76;
+      rel89 = rel2_ratings.r89;
+    }
 
     // Continuidad
-    const contRatings = getContinuidadRating(j.continuidad);
-    const cont76 = contRatings.r76;
-    const cont89 = contRatings.r89;
+    const hasCont = j.continuidad !== undefined && j.continuidad !== -1;
+    const contRatings = hasCont ? getContinuidadRating(j.continuidad) : null;
+    const cont76 = contRatings ? contRatings.r76 : null;
+    const cont89 = contRatings ? contRatings.r89 : null;
 
     // Abertura
-    const abRatings = getAberturaRating(j.abertura);
-    const ab76 = abRatings.r76;
-    const ab89 = abRatings.r89;
+    const hasAber = j.abertura !== undefined && j.abertura !== -1;
+    const abRatings = hasAber ? getAberturaRating(j.abertura) : null;
+    const ab76 = abRatings ? abRatings.r76 : null;
+    const ab89 = abRatings ? abRatings.r89 : null;
 
     // Rugosidad
-    const rugItem = RUGOSIDAD_CATALOG[j.rugosidad] || { r76: 3, r89: 3 };
-    const rug76 = rugItem.r76;
-    const rug89 = rugItem.r89;
+    const hasRug = j.rugosidad && j.rugosidad !== -1;
+    const rugItem = hasRug ? RUGOSIDAD_CATALOG[j.rugosidad] : null;
+    const rug76 = rugItem ? rugItem.r76 : null;
+    const rug89 = rugItem ? rugItem.r89 : null;
 
-    // Total condition rating (cap at 25 for 76 and 30 for 89)
-    const total_condicion_76 = Math.min(25, alt76 + rel76 + cont76 + ab76 + rug76);
-    const total_condicion_89 = Math.min(30, alt89 + rel89 + cont89 + ab89 + rug89);
+    // Rating is only calculated if all required components are defined
+    const hasAll89 = alt89 !== null && rel89 !== null && cont89 !== null && ab89 !== null && rug89 !== null;
+    const hasAll76 = alt76 !== null && rel76 !== null && cont76 !== null && ab76 !== null && rug76 !== null;
+
+    const total_condicion_76 = hasAll76 ? Math.min(25, alt76! + rel76! + cont76! + ab76! + rug76!) : null;
+    const total_condicion_89 = hasAll89 ? Math.min(30, alt89! + rel89! + cont89! + ab89! + rug89!) : null;
 
     return {
       row: j,
@@ -251,30 +304,43 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
       rugosidad_76: rug76,
       rugosidad_89: rug89,
       total_condicion_76,
-      total_condicion_89
+      total_condicion_89,
+      relleno1_score_89: rel1_ratings ? rel1_ratings.r89 : null,
+      relleno2_score_89: rel2_ratings ? rel2_ratings.r89 : null,
+      relleno1_score_76: rel1_ratings ? rel1_ratings.r76 : null,
+      relleno2_score_76: rel2_ratings ? rel2_ratings.r76 : null
     };
   });
 
-  // Averages per family (group by familia 1 to 9)
-  const familySpacingSums: Record<number, number[]> = {};
-  calculatedJoints.forEach(cj => {
-    const fam = cj.row.familia;
-    if (cj.row.espaciamiento > 0) {
-      if (!familySpacingSums[fam]) familySpacingSums[fam] = [];
-      familySpacingSums[fam].push(cj.row.espaciamiento);
+  // Weighted Average per family: Σ(nStr_i * espac_i) / Σ(nStr_i)
+  const familias_spacing: Record<number, number> = {};
+  const familias_sum_pond: Record<number, number> = {};
+  const familias_sum_n: Record<number, number> = {};
+
+  joints.forEach(j => {
+    const fam = j.familia;
+    const sp = j.espaciamiento;
+    const n = j.n_estructuras || 1;
+    if (sp !== undefined && sp !== -1 && sp > 0 && n !== undefined && n !== -1 && n > 0) {
+      if (!familias_sum_pond[fam]) {
+        familias_sum_pond[fam] = 0;
+        familias_sum_n[fam] = 0;
+      }
+      familias_sum_pond[fam] += n * sp;
+      familias_sum_n[fam] += n;
     }
   });
 
-  const familias_spacing: Record<number, number> = {};
-  Object.keys(familySpacingSums).forEach(k => {
-    const fam = parseInt(k);
-    const arr = familySpacingSums[fam];
-    familias_spacing[fam] = arr.reduce((a, b) => a + b, 0) / arr.length;
-  });
+  for (let fam = 1; fam <= 9; fam++) {
+    if (familias_sum_n[fam] > 0) {
+      familias_spacing[fam] = familias_sum_pond[fam] / familias_sum_n[fam];
+    }
+  }
 
-  // Joint Volumetric Count (Jv)
+  // Joint Volumetric Count (Jv): sum of 1/spacing for all active families
   let jv = 0;
-  Object.values(familias_spacing).forEach(avgSp => {
+  Object.keys(familias_spacing).forEach(k => {
+    const avgSp = familias_spacing[parseInt(k)];
     if (avgSp > 0) {
       jv += 1 / avgSp;
     }
@@ -291,10 +357,11 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   let totalStructures = 0;
   let spacingWeightedSum = 0;
   calculatedJoints.forEach(cj => {
-    if (cj.row.espaciamiento > 0) {
+    const sp = cj.row.espaciamiento;
+    if (sp !== undefined && sp !== -1 && sp > 0) {
       const n = cj.row.n_estructuras || 1;
       totalStructures += n;
-      spacingWeightedSum += cj.row.espaciamiento * n;
+      spacingWeightedSum += sp * n;
     }
   });
   const global_spacing = totalStructures > 0 ? spacingWeightedSum / totalStructures : 0.5; // default if none
@@ -302,18 +369,26 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const spacing_rating_76 = getSpacingRating76(global_spacing);
   const spacing_rating_89 = getSpacingRating89(global_spacing);
 
-  // Global Condition Rating (weighted average by number of structures of each row)
-  let totalCondStructures = 0;
+  // Global Condition Rating (weighted average by number of structures, skipping nulls)
+  let totalCond76Structures = 0;
+  let totalCond89Structures = 0;
   let cond76WeightedSum = 0;
   let cond89WeightedSum = 0;
+  
   calculatedJoints.forEach(cj => {
     const n = cj.row.n_estructuras || 1;
-    totalCondStructures += n;
-    cond76WeightedSum += cj.total_condicion_76 * n;
-    cond89WeightedSum += cj.total_condicion_89 * n;
+    if (cj.total_condicion_76 !== null) {
+      totalCond76Structures += n;
+      cond76WeightedSum += cj.total_condicion_76 * n;
+    }
+    if (cj.total_condicion_89 !== null) {
+      totalCond89Structures += n;
+      cond89WeightedSum += cj.total_condicion_89 * n;
+    }
   });
-  const condicion_rating_76 = totalCondStructures > 0 ? Math.round(cond76WeightedSum / totalCondStructures) : 20;
-  const condicion_rating_89 = totalCondStructures > 0 ? Math.round(cond89WeightedSum / totalCondStructures) : 25;
+  
+  const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 20;
+  const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 25;
 
   // Water Ratings
   const waterItem = GROUNDWATER_CATALOG[header.condicion_agua] || GROUNDWATER_CATALOG['C'];

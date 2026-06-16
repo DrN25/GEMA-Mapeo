@@ -148,6 +148,8 @@ export default function ExcelImportModal({
       return;
     }
 
+    setRawGrid(grid);
+
     const isStacked = sheetName.toLowerCase().includes("ventana");
     setIsStackedTemplate(isStacked);
 
@@ -155,6 +157,16 @@ export default function ExcelImportModal({
       parseStackedTemplate(grid);
     } else {
       parseFlatTable(grid);
+    }
+  };
+
+  const handleToggleMode = (stacked: boolean) => {
+    if (!rawGrid) return;
+    setIsStackedTemplate(stacked);
+    if (stacked) {
+      parseStackedTemplate(rawGrid);
+    } else {
+      parseFlatTable(rawGrid);
     }
   };
 
@@ -213,7 +225,7 @@ export default function ExcelImportModal({
       const joints: JointRow[] = [];
       let jId = 1;
       
-      for (let r = start + 14; r <= start + 27; r++) {
+      for (let r = start + 12; r <= start + 25; r++) {
         const famVal = grid[r]?.[0];
         if (famVal === null || famVal === undefined || String(famVal).trim() === "") continue;
         const fam = parseInt(famVal);
@@ -247,7 +259,11 @@ export default function ExcelImportModal({
           celda: codigo,
           este_from, norte_from, cota_from,
           este_to, norte_to, cota_to,
-          altura, dip_talud, lito_3, lito_model,
+          altura, dip_talud,
+          lito_1: lito_model || '',
+          lito_2: '',
+          lito_3: lito_3 || '',
+          unidad_litologica: lito_model || '',
           mapeador, sector, fase, nivel, sect_geot,
           fecha, condicion_agua, resistencia_ucs
         },
@@ -396,8 +412,10 @@ export default function ExcelImportModal({
             cota_to: getNum(row, 'cota_to', 0),
             altura: getNum(row, 'altura', 15.0),
             dip_talud: getNum(row, 'dip_talud', 64.0),
+            lito_1: getStr(row, 'lito_model', 'MZQ_M'),
+            lito_2: '',
             lito_3: getStr(row, 'lito_3', 'MZQ'),
-            lito_model: getStr(row, 'lito_model', 'MZQ_M'),
+            unidad_litologica: getStr(row, 'lito_model', 'MZQ_M'),
             mapeador: getStr(row, 'mapeador', 'AS-HM'),
             sector: getStr(row, 'sector', 'E1'),
             fase: getStr(row, 'fase', '5'),
@@ -605,6 +623,39 @@ export default function ExcelImportModal({
                 </div>
               </div>
 
+              {/* Selector de Modo de Importación */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-navy-950/45 border border-navy-850 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                    Formato de Importación de la Hoja:
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleMode(true)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                      isStackedTemplate
+                        ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
+                        : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
+                    }`}
+                  >
+                    Plantilla Apilada ("ventana")
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleMode(false)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                      !isStackedTemplate
+                        ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
+                        : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
+                    }`}
+                  >
+                    Tabla Plana / Mapeable ("BD")
+                  </button>
+                </div>
+              </div>
+
               {/* DYNAMIC MAPPING MODE (Flat "BD" layout) */}
               {!isStackedTemplate && rawGrid && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -626,9 +677,9 @@ export default function ExcelImportModal({
                                 {f.label} {f.required && <span className="text-red-400">*</span>}
                               </span>
                               {isMapped ? (
-                                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Mapeado</span>
+                                <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Mapeado</span>
                               ) : (
-                                f.required && <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Requerido</span>
+                                f.required && <span className="text-xs text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Requerido</span>
                               )}
                             </div>
                             
@@ -672,7 +723,7 @@ export default function ExcelImportModal({
                                 }`}
                               >
                                 <span>{code}</span>
-                                <span className="text-[10px] text-slate-500 bg-navy-950 px-1 py-0.5 rounded">
+                                <span className="text-xs text-slate-500 bg-navy-950 px-1 py-0.5 rounded">
                                   {cData.joints.length} estruct.
                                 </span>
                               </button>
@@ -710,7 +761,7 @@ export default function ExcelImportModal({
                               {activeDataPreview.joints.slice(0, 5).map((j, i) => (
                                 <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
                                   <td className="py-2 px-3 font-semibold text-slate-200">F{j.familia}</td>
-                                  <td className="py-2 px-3 text-center">{j.distancia.toFixed(2)}</td>
+                                  <td className="py-2 px-3 text-center">{j.distancia?.toFixed(2) ?? '—'}</td>
                                   <td className="py-2 px-3 text-center">{j.tipo_estructura}</td>
                                   <td className="py-2 px-3 text-center">{j.dip}</td>
                                   <td className="py-2 px-3 text-center">{j.dip_dir}</td>
@@ -760,7 +811,7 @@ export default function ExcelImportModal({
                                   <span className="text-sm font-black tracking-wide">{code}</span>
                                   {isSelected && <Check size={14} className="text-orange-400" />}
                                 </div>
-                                <div className="flex justify-between items-center text-[11px] text-slate-500">
+                                <div className="flex justify-between items-center text-xs text-slate-500">
                                   <span>{cData.header.lito_3}</span>
                                   <span>{cData.joints.length} estruct.</span>
                                 </div>
@@ -808,7 +859,7 @@ export default function ExcelImportModal({
                                 {activeDataPreview.joints.slice(0, 5).map((j, i) => (
                                   <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
                                     <td className="py-2.5 px-3 font-semibold text-slate-200">F{j.familia}</td>
-                                    <td className="py-2.5 px-3 text-center">{j.distancia.toFixed(2)}</td>
+                                    <td className="py-2.5 px-3 text-center">{j.distancia?.toFixed(2) ?? '—'}</td>
                                     <td className="py-2.5 px-3 text-center">{j.tipo_estructura}</td>
                                     <td className="py-2.5 px-3 text-center">{j.dip}</td>
                                     <td className="py-2.5 px-3 text-center">{j.dip_dir}</td>

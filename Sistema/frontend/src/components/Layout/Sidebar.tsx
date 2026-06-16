@@ -4,7 +4,8 @@ import {
   TrendingUp,
   Share2,
   Moon,
-  Sun
+  Sun,
+  BookOpen
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,6 +27,7 @@ export default function Sidebar({
     { id: 'dashboard', label: 'Home / Dashboard', icon: Home, category: 'GENERAL' },
     { id: 'mapeo', label: 'Mapeo por Ventana', icon: Map, category: 'REGISTRO DE CAMPO' },
     { id: 'rmr', label: 'Análisis RMR', icon: TrendingUp, category: 'CONTROL Y ANÁLISIS' },
+    { id: 'catalogos', label: 'Catálogos de Referencia', icon: BookOpen, category: 'CONTROL Y ANÁLISIS' },
     { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' }
   ];
 
@@ -37,7 +39,7 @@ export default function Sidebar({
       <div className="p-6 border-b border-navy-800 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-black text-slate-100 tracking-wider bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">VENTANAS 2.0</h1>
-          <p className="text-xxs text-orange-500 dark:text-amber-400 font-semibold uppercase mt-0.5">
+          <p className="text-xs text-orange-500 dark:text-amber-400 font-bold uppercase mt-0.5">
             {selectedWindow ? `Celda: ${selectedWindow}` : 'Ninguna celda'}
           </p>
         </div>
@@ -58,7 +60,7 @@ export default function Sidebar({
 
           return (
             <div key={category} className="space-y-1">
-              <h3 className="text-xxs font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest px-3 mb-2">
                 {category}
               </h3>
               {items.map(item => {
@@ -96,7 +98,7 @@ export default function Sidebar({
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-navy-800 text-xxs text-slate-500 text-center">
+      <div className="p-4 border-t border-navy-800 text-xs text-slate-500 text-center font-bold">
         Ventanas Geomecánicas &copy; 2026
       </div>
     </aside>

@@ -102,17 +102,17 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
         <div className="flex items-center gap-2">
           <div className="flex gap-1.5">
             {errorCount > 0 && (
-              <span className="bg-red-500/20 border border-red-500/40 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">
+              <span className="bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold px-2 py-0.5 rounded-md animate-pulse">
                 {errorCount} ERROR
               </span>
             )}
             {warningCount > 0 && (
-              <span className="bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-md">
+              <span className="bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-md">
                 {warningCount} AVISO
               </span>
             )}
             {alerts.length === 0 && (
-              <span className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-md">
+              <span className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-md">
                 CONSISTENTE
               </span>
             )}
@@ -161,18 +161,18 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
                     )}
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex flex-wrap gap-1.5 items-center">
-                        <span className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                        <span className={`inline-flex items-center text-xs font-bold px-1.5 py-0.5 rounded-full border ${
                           isError
                             ? 'bg-red-500/20 border-red-500/40 text-red-300'
                             : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                         }`}>
                           {isError ? 'Error' : 'Aviso'}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-800/70 border border-slate-700/60 text-slate-300">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-800/70 border border-slate-700/60 text-slate-300">
                           <MapPin size={8} className="text-cyan-400 shrink-0" />
                           {context.tab}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
                           <Tag size={8} className="shrink-0" />
                           {context.column}
                         </span>
