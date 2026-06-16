@@ -83,16 +83,13 @@ export default function DisconTable({
   const handleKeyDown = (e: React.KeyboardEvent, index: number, colName: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      // If it's the last row, add a new row
       if (index === joints.length - 1) {
         addRow();
-        // Wait for render, focus the distancia input of the new row
         setTimeout(() => {
           const el = document.getElementById(`joint-distancia-${index + 1}`);
           if (el) el.focus();
         }, 100);
       } else {
-        // Just move to the next row, same column
         const nextEl = document.getElementById(`joint-${colName}-${index + 1}`);
         if (nextEl) nextEl.focus();
       }
@@ -103,12 +100,12 @@ export default function DisconTable({
     <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 select-none">
       <div className="flex justify-between items-center border-b border-navy-800 pb-3">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-          <ShieldAlert size={14} className="text-orange-400" />
+          <ShieldAlert size={14} className="text-orange-500" />
           <span>Tabla de Discontinuidades (Scanline)</span>
         </h3>
         <button
           onClick={addRow}
-          className="flex items-center gap-1 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+          className="flex items-center gap-1 bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
         >
           <Plus size={14} />
           <span>Agregar Fila</span>
@@ -116,15 +113,15 @@ export default function DisconTable({
       </div>
 
       <div className="overflow-x-auto relative rounded-lg border border-navy-900">
-        <table className="w-full text-left border-collapse text-xs border-separate" style={{ minWidth: '1800px' }}>
+        <table className="w-full text-left text-xs border-separate border-spacing-0" style={{ minWidth: '1800px' }}>
           <thead>
             <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-              {/* Frozen columns */}
-              <th className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-navy-900 w-12">ID</th>
-              <th className="py-3 px-2 text-center sticky left-12 bg-navy-950 z-20 border-r border-navy-900 w-24">Dist (m)</th>
-              <th className="py-3 px-3 sticky left-36 bg-navy-950 z-20 border-r border-navy-900 w-28">Tipo</th>
+              {/* Columnas fijas a la izquierda con anchos definidos en px y sin separaciones */}
+              <th className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-navy-900 w-[52px] min-w-[52px] max-w-[52px]">ID</th>
+              <th className="py-3 px-2 text-center sticky left-[52px] bg-navy-950 z-20 border-r border-navy-900 w-[80px] min-w-[80px] max-w-[80px]">Dist (m)</th>
+              <th className="py-3 px-3 sticky left-[132px] bg-navy-950 z-20 border-r border-navy-900 w-[110px] min-w-[110px] max-w-[110px]">Tipo</th>
 
-              {/* Scrollable columns */}
+              {/* Columnas dinámicas con scroll */}
               <th className="py-3 px-2 text-center w-16">Fam</th>
               <th className="py-3 px-2 text-center w-16">Dip (&deg;)</th>
               <th className="py-3 px-2 text-center w-20">DipDir (&deg;)</th>
@@ -142,23 +139,23 @@ export default function DisconTable({
               <th className="py-3 px-2 text-center w-16">Forma</th>
               <th className="py-3 px-2 w-24">Alteración</th>
 
-              {/* Calculated ratings summary columns */}
-              <th className="py-3 px-2 text-center bg-navy-900/60 border-l border-navy-900 text-amber-400 w-14">Alt R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Rel R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Cont R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Aber R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-amber-400 w-14">Rug R89</th>
-              <th className="py-3 px-2 text-center bg-navy-900/60 text-emerald-400 font-bold w-16">Total R89</th>
-              <th className="py-3 px-2 text-center bg-navy-950 text-slate-500 w-16">Acción</th>
+              {/* Columnas de cálculo */}
+              <th className="py-3 px-2 text-center bg-navy-900/60 border-l border-navy-900 text-orange-400 w-14">Alt R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-orange-400 w-14">Rel R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-orange-400 w-14">Cont R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-orange-400 w-14">Aber R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-orange-400 w-14">Rug R89</th>
+              <th className="py-3 px-2 text-center bg-navy-900/60 text-orange-400 font-bold w-16">Total R89</th>
+
+              {/* Columna de acción fija a la derecha */}
+              <th className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-navy-900 w-[60px] min-w-[60px] max-w-[60px]">Acción</th>
             </tr>
           </thead>
           <tbody>
             {joints.map((j, idx) => {
               const isSelected = selectedRowIndex === idx;
 
-              // Row ratings calculation in real time
               const altR89 = ALTERACION_CATALOG[j.alteracion]?.r89 || 3;
-              
               const rel1_ratings = getFillingRatingSingle(j.relleno1, j.espesor);
               const rel2_ratings = j.relleno2 ? getFillingRatingSingle(j.relleno2, j.espesor) : { r76: 99, r89: 99 };
               const relR89 = Math.min(rel1_ratings.r89, rel2_ratings.r89);
@@ -172,15 +169,14 @@ export default function DisconTable({
                 <tr
                   key={idx}
                   onClick={() => onSelectRow(idx)}
-                  className={`hover:bg-navy-900/10 border-b border-navy-900/60 transition-colors ${
-                    isSelected ? 'bg-orange-600/5' : ''
-                  }`}
+                  className={`hover:bg-navy-900/10 border-b border-navy-900/60 transition-colors ${isSelected ? 'bg-orange-500/10' : ''
+                    }`}
                 >
-                  {/* Frozen cells */}
-                  <td className="py-2 px-2 text-center font-bold text-slate-400 sticky left-0 bg-navy-950 border-r border-navy-900">
+                  {/* Celdas fijas a la izquierda con fondo sólido para evitar que se transluzca el fondo */}
+                  <td className="py-2 px-2 text-center font-bold text-slate-400 sticky left-0 bg-navy-950 z-10 border-r border-navy-900 w-[52px] min-w-[52px] max-w-[52px]">
                     {j.id}
                   </td>
-                  <td className="py-2 px-1 text-center sticky left-12 bg-navy-950 border-r border-navy-900">
+                  <td className="py-2 px-1 text-center sticky left-[52px] bg-navy-950 z-10 border-r border-navy-900 w-[80px] min-w-[80px] max-w-[80px]">
                     <input
                       type="number"
                       step="0.01"
@@ -191,7 +187,7 @@ export default function DisconTable({
                       className="w-full bg-transparent text-slate-100 text-center font-semibold focus:outline-none focus:bg-navy-900 px-1 py-0.5 rounded"
                     />
                   </td>
-                  <td className="py-2 px-1.5 sticky left-36 bg-navy-950 border-r border-navy-900">
+                  <td className="py-2 px-1.5 sticky left-[132px] bg-navy-950 z-10 border-r border-navy-900 w-[110px] min-w-[110px] max-w-[110px]">
                     <select
                       value={j.tipo_estructura}
                       onChange={(e) => handleRowChange(idx, 'tipo_estructura', e.target.value)}
@@ -205,7 +201,7 @@ export default function DisconTable({
                     </select>
                   </td>
 
-                  {/* Scrollable cells */}
+                  {/* Celdas normales con scroll */}
                   <td className="py-2 px-1 text-center">
                     <select
                       value={j.familia}
@@ -397,28 +393,28 @@ export default function DisconTable({
                     </select>
                   </td>
 
-                  {/* Calculated ratings (Read Only) */}
-                  <td className="py-2 px-2 text-center bg-navy-900/30 border-l border-navy-900/60 font-bold text-amber-400">
+                  {/* Resultados calculados */}
+                  <td className="py-2 px-2 text-center bg-navy-900/30 border-l border-navy-900/60 font-bold text-orange-400">
                     {altR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-orange-400">
                     {relR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-orange-400">
                     {contR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-orange-400">
                     {aberR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-amber-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-bold text-orange-400">
                     {rugR89}
                   </td>
-                  <td className="py-2 px-2 text-center bg-navy-900/30 font-black text-emerald-400">
+                  <td className="py-2 px-2 text-center bg-navy-900/30 font-black text-orange-400">
                     {totalR89}
                   </td>
 
-                  {/* Actions */}
-                  <td className="py-2 px-2 text-center bg-navy-950">
+                  {/* Columna Acción fija a la derecha */}
+                  <td className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-10 border-l border-navy-900 w-[60px] min-w-[60px] max-w-[60px]">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

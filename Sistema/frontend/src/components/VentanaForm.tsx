@@ -22,7 +22,12 @@ export default function VentanaForm({
     });
   };
 
+  // Se mejora la robustez para permitir escribir '-' o limpiar el campo temporalmente
   const handleCoordinateChange = (field: keyof WindowHeader, val: string) => {
+    if (val === '' || val === '-') {
+      handleChange(field, val);
+      return;
+    }
     const num = parseFloat(val);
     handleChange(field, isNaN(num) ? 0 : num);
   };
@@ -33,16 +38,16 @@ export default function VentanaForm({
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest border-b border-navy-800/60 pb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <AlignLeft size={14} className="text-orange-400" />
+            <AlignLeft size={14} className="text-orange-500" />
             <span>Información General</span>
           </span>
           <button
             type="button"
             onClick={onOpenImportModal}
-            className="flex items-center gap-1 bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-2.5 py-1 rounded text-xs font-bold transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-1 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-orange-500/30 text-slate-300 px-2.5 py-1 rounded text-xs font-bold transition-all shadow-sm active:scale-95"
             title="Importar y sobrescribir con Excel"
           >
-            <FileSpreadsheet size={12} className="text-amber-400" />
+            <FileSpreadsheet size={12} className="text-orange-500" />
             <span>Importar Excel</span>
           </button>
         </h3>
@@ -136,10 +141,10 @@ export default function VentanaForm({
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest border-b border-navy-800/60 pb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <ArrowRightLeft size={14} className="text-amber-400" />
+            <ArrowRightLeft size={14} className="text-orange-500" />
             <span>Scanline de Detalle 3D</span>
           </span>
-          <span className="text-xs bg-navy-900 border border-navy-800 px-1.5 py-0.5 rounded text-amber-400 font-bold uppercase shrink-0">
+          <span className="text-xs bg-orange-950/20 border border-orange-500/20 px-2 py-0.5 rounded text-orange-400 font-bold uppercase shrink-0">
             Largo: {calculated ? `${calculated.largo.toFixed(2)}m` : '0m'}
           </span>
         </h3>
@@ -156,7 +161,7 @@ export default function VentanaForm({
                 value={header.este_from}
                 id="header-este_from"
                 onChange={(e) => handleCoordinateChange('este_from', e.target.value)}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
                 title="Este FROM"
               />
               <input
@@ -165,7 +170,7 @@ export default function VentanaForm({
                 placeholder="Norte"
                 value={header.norte_from}
                 onChange={(e) => handleCoordinateChange('norte_from', e.target.value)}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
                 title="Norte FROM"
               />
               <input
@@ -174,7 +179,7 @@ export default function VentanaForm({
                 placeholder="Cota"
                 value={header.cota_from}
                 onChange={(e) => handleCoordinateChange('cota_from', e.target.value)}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
                 title="Cota FROM"
               />
             </div>
@@ -191,7 +196,7 @@ export default function VentanaForm({
                 value={header.este_to}
                 id="header-este_to"
                 onChange={(e) => handleCoordinateChange('este_to', e.target.value)}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
                 title="Este TO"
               />
               <input
@@ -200,7 +205,7 @@ export default function VentanaForm({
                 placeholder="Norte"
                 value={header.norte_to}
                 onChange={(e) => handleCoordinateChange('norte_to', e.target.value)}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
                 title="Norte TO"
               />
               <input
@@ -209,7 +214,7 @@ export default function VentanaForm({
                 placeholder="Cota"
                 value={header.cota_to}
                 onChange={(e) => handleCoordinateChange('cota_to', e.target.value)}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="bg-navy-950 border border-navy-800 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
                 title="Cota TO"
               />
             </div>
@@ -225,7 +230,7 @@ export default function VentanaForm({
                 value={header.altura}
                 id="header-altura"
                 onChange={(e) => handleChange('altura', parseFloat(e.target.value) || 0)}
-                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
               />
             </div>
             <div className="space-y-1">
@@ -234,7 +239,7 @@ export default function VentanaForm({
                 type="number"
                 value={header.dip_talud || 0}
                 onChange={(e) => handleChange('dip_talud', parseFloat(e.target.value) || 0)}
-                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs focus:outline-none"
+                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
               />
             </div>
           </div>
@@ -244,7 +249,7 @@ export default function VentanaForm({
       {/* CARD 3: GEOMECÁNICA DE LA PARED */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest border-b border-navy-800/60 pb-2 flex items-center gap-2">
-          <Compass size={14} className="text-emerald-400" />
+          <Compass size={14} className="text-orange-500" />
           <span>Parámetros de la Pared</span>
         </h3>
 
@@ -254,7 +259,7 @@ export default function VentanaForm({
             <select
               value={header.condicion_agua}
               onChange={(e) => handleChange('condicion_agua', e.target.value)}
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-300 text-xs focus:outline-none"
+              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
             >
               {Object.keys(GROUNDWATER_CATALOG).map(code => (
                 <option key={code} value={code}>
@@ -269,7 +274,7 @@ export default function VentanaForm({
             <select
               value={header.resistencia_ucs}
               onChange={(e) => handleChange('resistencia_ucs', e.target.value)}
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-300 text-xs focus:outline-none"
+              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
             >
               {Object.keys(STRENGTH_CATALOG).map(code => (
                 <option key={code} value={code}>
@@ -292,11 +297,11 @@ export default function VentanaForm({
               </div>
               <div className="space-y-0.5 mt-1 border-t border-navy-850 pt-1">
                 <span className="font-bold text-slate-500 block">DipDir Talud:</span>
-                <span className="text-amber-400 font-bold text-xs">{calculated.dip_dir_talud.toFixed(2)}&deg;</span>
+                <span className="text-orange-400 font-bold text-xs">{calculated.dip_dir_talud.toFixed(2)}&deg;</span>
               </div>
               <div className="space-y-0.5 mt-1 border-t border-navy-850 pt-1">
                 <span className="font-bold text-slate-500 block">RMR R89 Est:</span>
-                <span className="text-emerald-400 font-bold text-xs">{calculated.rmr_89} ({calculated.class_89})</span>
+                <span className="text-orange-400 font-bold text-xs">{calculated.rmr_89} ({calculated.class_89})</span>
               </div>
             </div>
           )}
