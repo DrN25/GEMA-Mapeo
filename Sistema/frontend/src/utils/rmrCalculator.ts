@@ -132,27 +132,22 @@ export function getAberturaRating(val: number | undefined | null): { r76: number
 
 export function getFillingRatingSingle(rellenoCode: string | undefined | null, thicknessMm: number | undefined | null): { r76: number | null; r89: number | null } {
   if (!rellenoCode || rellenoCode === '-1') return { r76: null, r89: null };
-  const item = RELLENO_CATALOG[rellenoCode] || RELLENO_CATALOG['cwf'];
-  
+
+  // Normalizamos el código en minúscula para evitar fallos de mayúsculas/minúsculas
+  const cleanCode = String(rellenoCode).trim().toLowerCase();
+  const item = RELLENO_CATALOG[cleanCode] || RELLENO_CATALOG['cwf'];
+
   // If clean, thickness doesn't matter
   if (item.clase === 3 || thicknessMm === 0 || thicknessMm === undefined || thicknessMm === null || thicknessMm === -1) {
     return { r76: item.rmr76, r89: item.rmr89 };
   }
-  
-  const isBlando = item.clase === 1;
+
   const isMenorA5 = thicknessMm < 5;
 
-  if (!isBlando) { // Duro
-    return {
-      r76: isMenorA5 ? item.rmr76 : item.rmr76_gt5,
-      r89: isMenorA5 ? item.rmr89 : item.rmr89_gt5
-    };
-  } else { // Blando
-    return {
-      r76: isMenorA5 ? item.rmr76 : item.rmr76_gt5,
-      r89: isMenorA5 ? item.rmr89 : item.rmr89_gt5
-    };
-  }
+  return {
+    r76: isMenorA5 ? item.rmr76 : item.rmr76_gt5,
+    r89: isMenorA5 ? item.rmr89 : item.rmr89_gt5
+  };
 }
 
 export function getRqdRating76(rqd: number): number {
@@ -245,7 +240,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     // Relleno (Conservador: toma el menor puntaje entre Relleno 1 y Relleno 2)
     const hasR1 = j.relleno1 && j.relleno1 !== '-1';
     const hasR2 = j.relleno2 && j.relleno2 !== '-1';
-    
+
     const rel1_ratings = hasR1 ? getFillingRatingSingle(j.relleno1, j.espesor) : null;
     const rel2_ratings = hasR2 ? getFillingRatingSingle(j.relleno2, j.espesor) : null;
 
@@ -320,14 +315,15 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   joints.forEach(j => {
     const fam = j.familia;
     const sp = j.espaciamiento;
-    const n = j.n_estructuras || 1;
-    if (sp !== undefined && sp !== -1 && sp > 0 && n !== undefined && n !== -1 && n > 0) {
+
+    // Sumamos de manera simple los valores válidos ingresados de espaciamiento
+    if (sp !== undefined && sp !== -1 && sp > 0) {
       if (!familias_sum_pond[fam]) {
         familias_sum_pond[fam] = 0;
         familias_sum_n[fam] = 0;
       }
-      familias_sum_pond[fam] += n * sp;
-      familias_sum_n[fam] += n;
+      familias_sum_pond[fam] += sp; // Suma acumulada simple
+      familias_sum_n[fam] += 1;     // Contador de elementos simples (máximo 3)
     }
   });
 
@@ -359,7 +355,10 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   calculatedJoints.forEach(cj => {
     const sp = cj.row.espaciamiento;
     if (sp !== undefined && sp !== -1 && sp > 0) {
-      const n = cj.row.n_estructuras || 1;
+      let n = cj.row.n_estructuras;
+      if (n === undefined || n === null || n === -1) {
+        n = (largo > 0) ? (largo / 3) / sp : 1;
+      }
       totalStructures += n;
       spacingWeightedSum += sp * n;
     }
@@ -374,9 +373,14 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   let totalCond89Structures = 0;
   let cond76WeightedSum = 0;
   let cond89WeightedSum = 0;
-  
+
   calculatedJoints.forEach(cj => {
-    const n = cj.row.n_estructuras || 1;
+    let n = cj.row.n_estructuras;
+    const sp = cj.row.espaciamiento;
+    if (n === undefined || n === null || n === -1) {
+      n = (sp !== undefined && sp !== -1 && sp > 0 && largo > 0) ? (largo / 3) / sp : 1;
+    }
+
     if (cj.total_condicion_76 !== null) {
       totalCond76Structures += n;
       cond76WeightedSum += cj.total_condicion_76 * n;
@@ -386,7 +390,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
       cond89WeightedSum += cj.total_condicion_89 * n;
     }
   });
-  
+
   const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 20;
   const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 25;
 

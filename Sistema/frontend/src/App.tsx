@@ -220,24 +220,24 @@ export default function App() {
 
         const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => ({
           id: idx + 1,
-          familia: d.fam || 1,
-          distancia: d.dist !== null && d.dist !== undefined ? d.dist : -1,
-          tipo_estructura: d.tipo || 'JN',
+          familia: d.fam || d.familia_id || 1,
+          distancia: d.dist !== null && d.dist !== undefined ? d.dist : (d.distancia_m !== null && d.distancia_m !== undefined ? d.distancia_m : -1),
+          tipo_estructura: d.tipo || d.tipo_estructura || 'JN',
           dip: d.dip !== null && d.dip !== undefined ? d.dip : -1,
-          dip_dir: d.dipdir !== null && d.dipdir !== undefined ? d.dipdir : -1,
-          n_estructuras: d.nstr !== null && d.nstr !== undefined ? d.nstr : -1,
-          abertura: d.aber !== null && d.aber !== undefined ? d.aber : -1,
-          espesor: d.esp !== null && d.esp !== undefined ? d.esp : -1,
-          continuidad: d.cont !== null && d.cont !== undefined ? d.cont : -1,
-          espaciamiento: d.espac !== null && d.espac !== undefined ? d.espac : -1,
-          extremos_visibles: d.next !== undefined ? d.next : 1,
-          terminacion: d.term !== undefined ? d.term : 0,
-          relleno1: d.r1 || 'cwf',
-          relleno2: d.r2 || undefined,
+          dip_dir: d.dipdir !== null && d.dipdir !== undefined ? d.dipdir : (d.dip_dir !== null && d.dip_dir !== undefined ? d.dip_dir : -1),
+          n_estructuras: d.nstr !== null && d.nstr !== undefined ? d.nstr : (d.n_estructuras !== null && d.n_estructuras !== undefined ? d.n_estructuras : -1),
+          abertura: d.aber !== null && d.aber !== undefined ? d.aber : (d.abertura_mm !== null && d.abertura_mm !== undefined ? d.abertura_mm : -1),
+          espesor: d.esp !== null && d.esp !== undefined ? d.esp : (d.espesor_mm !== null && d.espesor_mm !== undefined ? d.espesor_mm : -1),
+          continuidad: d.cont !== null && d.cont !== undefined ? d.cont : (d.continuidad_m !== null && d.continuidad_m !== undefined ? d.continuidad_m : -1),
+          espaciamiento: d.espac !== null && d.espac !== undefined ? d.espac : (d.espaciamiento_m !== null && d.espaciamiento_m !== undefined ? d.espaciamiento_m : -1),
+          extremos_visibles: d.next !== undefined && d.next !== null ? d.next : (d.n_extremos_visibles !== undefined && d.n_extremos_visibles !== null ? d.n_extremos_visibles : 1),
+          terminacion: d.term !== undefined && d.term !== null ? d.term : (d.terminacion !== undefined && d.terminacion !== null ? d.terminacion : 0),
+          relleno1: d.r1 || d.relleno_1_codigo || 'cwf',
+          relleno2: d.r2 || d.relleno_2_codigo || undefined,
           jrc: d.jrc !== null && d.jrc !== undefined ? d.jrc : -1,
-          rugosidad: d.rug !== null && d.rug !== undefined ? d.rug : -1,
-          forma: d.forma || 'O',
-          alteracion: d.alt || 'd'
+          rugosidad: d.rug !== null && d.rug !== undefined ? d.rug : (d.rugosidad_codigo !== null && d.rugosidad_codigo !== undefined ? d.rugosidad_codigo : -1),
+          forma: d.forma || d.forma_estructura || 'O',
+          alteracion: d.alt || d.alteracion_codigo || 'd'
         }));
 
         setActiveWindow({ header, joints: normalizeJoints(joints) });
@@ -622,22 +622,33 @@ export default function App() {
                 // Extraemos las familias activas únicas del registro para generar la lista dinámica
                 const activeFamiliesList = Array.from(new Set(activeWindow.joints.map(j => j.familia))).sort((a, b) => a - b);
 
+                // Determinamos si el contenedor de familias debe cambiar a diseño de dos columnas
+                const isMultiColumn = activeFamiliesList.length > 3;
+
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none text-left animate-fade-in">
 
                     {/* Panel 1: Promedios Ponderados de Espaciamiento */}
                     <div className="lg:col-span-5 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
-                          <BarChart3 size={16} className="text-orange-400" />
-                          <span>Promedios de Espaciamiento</span>
+                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2">
+                            <BarChart3 size={16} className="text-orange-400" />
+                            <span>Promedios de Espaciamiento</span>
+                          </span>
+                          <span className="text-xs bg-orange-500/20 border border-orange-500/30 text-orange-400 font-bold px-2 py-0.5 rounded-md">
+                            {activeFamiliesList.length} {activeFamiliesList.length === 1 ? 'Familia' : 'Familias'}
+                          </span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Fórmula de promedio ponderado por cantidad de estructuras: <code className="text-orange-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">Σ(n · esp) / Σn</code>
+                          Promedio aritmético simple de los registros por familia: <code className="text-orange-400/80">Σ(esp) / N</code>
                         </p>
                       </div>
 
-                      <div className="space-y-2.5 mt-4 max-h-[175px] overflow-y-auto pr-1">
+                      <div className={`mt-4 overflow-y-auto pr-1 max-h-[175px] ${isMultiColumn
+                        ? 'grid grid-cols-2 gap-2'
+                        : 'space-y-2.5'
+                        }`}>
                         {activeFamiliesList.map((famId) => {
                           const val = calculated?.familias_spacing[famId];
                           const displayVal = val !== undefined && val !== null ? val.toFixed(4) + ' m' : 'Sin datos';
@@ -649,10 +660,10 @@ export default function App() {
                               className={`flex items-center justify-between p-3 rounded-lg hover:brightness-110 transition-all ${style.container}`}
                             >
                               <div className="flex items-center gap-2">
-                                <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
-                                <span className="text-xs font-bold text-slate-300">Familia {famId} (F{famId})</span>
+                                <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} />
+                                <span className="text-xs font-bold text-slate-300">Fam {famId}</span>
                               </div>
-                              <span className={`text-xs font-black font-mono px-3 py-1 rounded-md border ${style.badge}`}>
+                              <span className={`text-xs font-black font-mono px-2 py-0.5 rounded border ${style.badge}`}>
                                 {displayVal}
                               </span>
                             </div>
@@ -661,7 +672,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Panel 2: KPI Índice Volumétrico (Jv) - Diseño de Instrumento Suave */}
+                    {/* Panel 2: KPI Índice Volumétrico (Jv) */}
                     <div className="lg:col-span-3 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-amber-950/5 flex flex-col justify-between shadow-lg relative overflow-hidden group">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
 
@@ -697,29 +708,29 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Panel 3: KPI RQD Estimado - Diseño de Instrumento Suave */}
-                    <div className="lg:col-span-4 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-blue-950/5 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all pointer-events-none" />
+                    {/* Panel 3: KPI RQD Estimado - Mayor presencia y brillo celeste */}
+                    <div className="lg:col-span-4 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-sky-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all pointer-events-none" />
 
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
-                          <Gauge size={16} className="text-blue-400" />
+                          <Gauge size={16} className="text-sky-400" />
                           <span>RQD Estimado</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Cálculo empírico según fórmula de Palmström: <code className="text-blue-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                          Cálculo empírico según fórmula de Palmström: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
                         </p>
                       </div>
 
-                      {/* Contenedor elegante de tono suave semi-transparente con icono geológico integrado */}
-                      <div className="my-4 bg-blue-500/10 border border-blue-500/25 rounded-xl p-4 shadow-[0_0_15px_rgba(56,189,248,0.05)] flex items-center justify-between transition-all hover:bg-blue-500/15">
+                      {/* Contenedor con brillo celeste de mayor opacidad para darle viveza */}
+                      <div className="my-4 bg-sky-500/20 border border-sky-500/40 rounded-xl p-4 shadow-[0_0_15px_rgba(56,189,248,0.1)] flex items-center justify-between transition-all hover:bg-sky-500/25">
                         <div className="flex flex-col text-left">
-                          <span className="text-3xl font-extrabold font-mono tracking-tight text-blue-300">
+                          <span className="text-3xl font-extrabold font-mono tracking-tight text-sky-200">
                             {calculated ? calculated.rqd_est.toFixed(2) : '—'}
                           </span>
-                          <span className="text-xs font-bold uppercase tracking-wider mt-0.5 text-blue-400/80">% de Calidad de Roca</span>
+                          <span className="text-xs font-bold uppercase tracking-wider mt-0.5 text-sky-400">RQD Estimado</span>
                         </div>
-                        <Gauge size={28} className="text-blue-400/30 shrink-0 stroke-[1.5]" />
+                        <Gauge size={28} className="text-sky-400/50 shrink-0 stroke-[1.5]" />
                       </div>
 
                       {/* Barra de Progreso Dinámica */}
@@ -727,11 +738,11 @@ export default function App() {
                         <div className="w-full bg-navy-950 rounded-full h-2.5 border border-navy-900 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${calculated ? (
-                                calculated.rqd_est < 25 ? 'bg-red-500' :
-                                  calculated.rqd_est < 50 ? 'bg-orange-500' :
-                                    calculated.rqd_est < 75 ? 'bg-amber-500' :
-                                      calculated.rqd_est < 90 ? 'bg-blue-500' : 'bg-emerald-500'
-                              ) : 'bg-slate-800'
+                              calculated.rqd_est < 25 ? 'bg-red-500' :
+                                calculated.rqd_est < 50 ? 'bg-orange-500' :
+                                  calculated.rqd_est < 75 ? 'bg-amber-500' :
+                                    calculated.rqd_est < 90 ? 'bg-sky-500' : 'bg-emerald-500'
+                            ) : 'bg-slate-800'
                               }`}
                             style={{ width: `${calculated ? calculated.rqd_est : 0}%` }}
                           />

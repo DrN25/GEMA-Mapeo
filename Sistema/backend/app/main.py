@@ -191,7 +191,7 @@ def get_ventanas(db: Session = Depends(get_db)):
         ))
     return res
 
-@app.get("/api/ventanas/{codigo}", response_model=schemas.VentanaSaveSchema)
+@app.get("/api/ventanas/{codigo}", response_model=schemas.VentanaSaveSchema, response_model_by_alias=False)
 def get_ventana(codigo: str, db: Session = Depends(get_db)):
     v = db.query(models.Ventana).filter_by(codigo=codigo.strip().upper()).first()
     if not v:
@@ -353,6 +353,8 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             forma_estructura=d.forma,
             alteracion_codigo=d.alt
         )
+        db.add(disc)
+        
         if "sqlite" in str(db.bind.url).lower():
             disc.n_estructuras = d.nstr if d.nstr is not None else 1.0
         db.add(disc)

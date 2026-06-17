@@ -23,8 +23,10 @@ class DiscontinuidadBase(BaseModel):
     alt: Optional[str] = Field(None, alias="alteracion_codigo")
 
     class Config:
-        populate_by_name = True
-        from_attributes = True
+        populate_by_name = True               # Pydantic v2
+        allow_population_by_field_name = True # Pydantic v1
+        from_attributes = True               # Pydantic v2
+        orm_mode = True                      # Pydantic v1
 
 class VentanaRmrInputBase(BaseModel):
     agua_codigo: str

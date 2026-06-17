@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { X, FileSpreadsheet, Upload, AlertTriangle, Check, ArrowRight, Info, Filter } from 'lucide-react';
 import type { WindowHeader, JointRow } from '../utils/rmrCalculator';
+import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
 
 interface WindowData {
   header: WindowHeader;
@@ -21,7 +22,7 @@ interface MappingField {
   synonyms: string[];
 }
 
-// Expected fields for mapping a flat "BD" style sheet
+// Campos esperados con sinónimos enriquecidos de tu planilla de Excel real
 const EXPECTED_FIELDS: MappingField[] = [
   { key: 'celda', label: 'Código Celda', required: true, synonyms: ['celda', 'codigocelda', 'codigo', 'window', 'windowid', 'station', 'estacion', 'estaciones'] },
   { key: 'este_from', label: 'Este FROM (X)', required: true, synonyms: ['estefrom', 'este_from', 'east_from', 'eastfrom', 'x_from', 'xfrom', 'esteini'] },
@@ -32,16 +33,24 @@ const EXPECTED_FIELDS: MappingField[] = [
   { key: 'cota_to', label: 'Cota TO (Z)', required: true, synonyms: ['cotato', 'cota_to', 'rl_to', 'rlto', 'z_to', 'zto', 'cotafin'] },
   { key: 'altura', label: 'Altura (m)', required: true, synonyms: ['altura', 'alturam', 'height', 'heightm', 'alturaventanam'] },
   { key: 'dip_talud', label: 'Dip Talud (°)', required: true, synonyms: ['diptalud', 'dip_talud', 'taluddip', 'slope_dip', 'diptaluddeg'] },
+
+  // Nuevos campos de orientación y alteración mapeados con soporte plano
+  { key: 'dipdir_talud', label: 'DipDir Talud (°)', required: false, synonyms: ['dipdir_talud', 'dip_dir_talud', 'dipdir_talud_deg', 'dipdir_talud_deg'] },
+  { key: 'dip_hw', label: 'Dip Hw (Dip Hole) (°)', required: false, synonyms: ['dip_hw', 'dip_hole', 'dip_hole_deg', 'dip_hw_deg'] },
+  { key: 'az_hw', label: 'Az Hw (Az Hole) (°)', required: false, synonyms: ['az_hw', 'az_hole', 'az_hole_deg', 'az_hw_deg', 'azimuth_hole'] },
+  { key: 'alt_zona', label: 'Alt. de Zona', required: false, synonyms: ['alt_zona', 'alteracion_zona', 'alteracion_codigo', 'alt_zona_code', 'alteracionce'] },
+  { key: 'intemperia', label: 'Intemperia / Grado', required: false, synonyms: ['intemperia', 'intemperismo', 'weathering_grade', 'weathering', 'intemp', 'intemperismo_codigo'] },
+
   { key: 'lito_3', label: 'Litología (Lito-3)', required: false, synonyms: ['lito3', 'litologia3', 'lito_3', 'litocm', 'litologia_3'] },
-  { key: 'lito_model', label: 'Lito Modelo', required: false, synonyms: ['litomodel', 'lito_model', 'litologia1', 'lito1', 'lito_1', 'litock'] },
+  { key: 'lito_model', label: 'Lito Modelo', required: false, synonyms: ['litomodel', 'lito_model', 'litologia1', 'lito1', 'lito_1', 'litock', 'lito3modelo', 'lito3_modelo'] },
   { key: 'mapeador', label: 'Geólogo Mapeador', required: false, synonyms: ['mapeador', 'geologo', 'geot', 'mapeado_por', 'logged_by', 'geotecnico'] },
   { key: 'fecha', label: 'Fecha Mapeo', required: false, synonyms: ['fecha', 'fechamapeo', 'fecha_mapeo', 'date', 'fechabg'] },
   { key: 'condicion_agua', label: 'Agua Subterránea', required: false, synonyms: ['condicionagua', 'condicion_agua', 'aguasubterranea', 'agua', 'water', 'aguacode', 'aguadeobs'] },
   { key: 'resistencia_ucs', label: 'Resistencia UCS', required: false, synonyms: ['resistenciaucs', 'resistencia_ucs', 'ucs', 'dureza', 'strength', 'rescode'] },
-  
+
   // Joint / Discontinuity properties
   { key: 'familia', label: 'Familia', required: true, synonyms: ['familia', 'fam', 'family', 'set'] },
-  { key: 'distancia', label: 'Distancia (m)', required: true, synonyms: ['distancia', 'distanciam', 'distance', 'dist', 'distanciambk'] },
+  { key: 'distancia', label: 'Distancia (m)', required: true, synonyms: ['distancia', 'distanciam', 'distance', 'dist', 'distanciambk', 'distdeestr', 'dist_de_estr'] },
   { key: 'tipo_estructura', label: 'Tipo Estructura', required: true, synonyms: ['tipoestructura', 'tipo_estructura', 'tipo', 'type', 'structure_type', 'tipoestructurabq'] },
   { key: 'dip', label: 'Dip / Buzamiento (°)', required: true, synonyms: ['dip', 'inclinacion', 'dipdeg', 'buzamiento', 'buzamientobr'] },
   { key: 'dip_dir', label: 'DipDir / Dirección (°)', required: true, synonyms: ['dipdir', 'dip_dir', 'direction', 'azimut', 'azimuth', 'direccionbs'] },
@@ -52,8 +61,8 @@ const EXPECTED_FIELDS: MappingField[] = [
   { key: 'espaciamiento', label: 'Espaciamiento (m)', required: false, synonyms: ['espaciamiento', 'espaciamientom', 'spacing', 'espaciamientobx'] },
   { key: 'extremos_visibles', label: 'Extremos Visibles', required: false, synonyms: ['extremosvisibles', 'extremos', 'ext_vis', 'visible', 'numextremosvisibles', 'extremosby'] },
   { key: 'terminacion', label: 'Terminación', required: false, synonyms: ['terminacion', 'termination'] },
-  { key: 'relleno1', label: 'Relleno 1', required: false, synonyms: ['relleno1', 'relleno_1', 'relleno', 'tiporelleno1', 'tipoderelleno1bz'] },
-  { key: 'relleno2', label: 'Relleno 2', required: false, synonyms: ['relleno2', 'relleno_2', 'tiporelleno2', 'tipoderelleno2ca'] },
+  { key: 'relleno1', label: 'Relleno 1', required: false, synonyms: ['relleno1', 'relleno_1', 'relleno', 'tiporelleno1', 'tipoderelleno1bz', 'tipoderelleno1', 'tipo_de_relleno_1'] },
+  { key: 'relleno2', label: 'Relleno 2', required: false, synonyms: ['relleno2', 'relleno_2', 'tiporelleno2', 'tipoderelleno2ca', 'tipoderelleno2', 'tipo_de_relleno_2'] },
   { key: 'jrc', label: 'JRC', required: false, synonyms: ['jrc', 'jrc10', 'jrc_10', 'jrccb'] },
   { key: 'rugosidad', label: 'Rugosidad', required: false, synonyms: ['rugosidad', 'rug', 'rugosidadcc'] },
   { key: 'forma', label: 'Forma', required: false, synonyms: ['forma', 'shape', 'formacd'] },
@@ -71,8 +80,6 @@ export default function ExcelImportModal({
   const [sheets, setSheets] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
-  
-  // Sheet type auto-detected
   const [isStackedTemplate, setIsStackedTemplate] = useState<boolean>(true);
 
   // MAPPED MODE STATE (For flat tables like "BD")
@@ -121,7 +128,6 @@ export default function ExcelImportModal({
         setWorkbook(wb);
         setSheets(wb.SheetNames);
 
-        // Find primary target sheet (ventana or BD)
         const defaultSheet = wb.SheetNames.find(name => {
           const upper = name.toUpperCase();
           return upper.includes('VENTANA') || upper.includes('BD') || upper.includes('ESTACION') || upper.includes('DATA');
@@ -170,7 +176,60 @@ export default function ExcelImportModal({
     }
   };
 
-  // 1. Parser for standard vertical stacked cards template ("ventana" tab)
+  // Función inteligente de detección y autocompletado en cascada para Litologías
+  const detectLithology = (rawLitoModel: string, rawLito3: string) => {
+    const code = String(rawLitoModel || '').trim().toUpperCase();
+    const group = String(rawLito3 || '').trim().toUpperCase();
+
+    // 1. Buscamos coincidencia exacta por código detallado (lito_2)
+    let match = LITHOLOGY_CLASSIFICATION.find(item => item.codigo.toUpperCase() === code);
+
+    // 2. Si no, buscamos coincidencia por unidad base (unidad_litologica)
+    if (!match) {
+      match = LITHOLOGY_CLASSIFICATION.find(item => item.unidad.toUpperCase() === code);
+    }
+
+    // 3. Si no, buscamos por grupo
+    if (!match && group) {
+      match = LITHOLOGY_CLASSIFICATION.find(item => item.grupo.toUpperCase() === group);
+    }
+
+    if (match) {
+      return {
+        lito_1: match.litologia,
+        lito_2: match.codigo,
+        lito_3: match.grupo,
+        unidad_litologica: match.unidad
+      };
+    }
+
+    return {
+      lito_1: rawLitoModel || '',
+      lito_2: '',
+      lito_3: rawLito3 || '',
+      unidad_litologica: rawLitoModel || ''
+    };
+  };
+
+  // Convertidor de fechas seriales de Excel a formato de fecha ISO
+  const parseDateStr = (val: any): string => {
+    if (!val) return new Date().toISOString().split('T')[0];
+    if (val instanceof Date) {
+      const offset = val.getTimezoneOffset();
+      const corrected = new Date(val.getTime() - offset * 60 * 1000);
+      return corrected.toISOString().split('T')[0];
+    }
+    // Conversión de formato serie numérico de Excel
+    const num = parseFloat(String(val));
+    if (!isNaN(num) && num > 30000 && num < 60000) {
+      const jsDate = new Date((num - 25569) * 86400 * 1000);
+      return jsDate.toISOString().split('T')[0];
+    }
+    const str = String(val).trim();
+    return str.substring(0, 10);
+  };
+
+  // 1. Parser para pestañas apiladas verticalmente cada 30 filas ("ventana")
   const parseStackedTemplate = (grid: any[][]) => {
     const cellsFound: Record<string, WindowData> = {};
 
@@ -184,13 +243,6 @@ export default function ExcelImportModal({
     const getStr = (r: number, c: number) => {
       const val = grid[r]?.[c];
       return val !== null && val !== undefined ? String(val).trim() : "";
-    };
-
-    const parseDateStr = (val: any): string => {
-      if (!val) return new Date().toISOString().split('T')[0];
-      if (val instanceof Date) return val.toISOString().split('T')[0];
-      const str = String(val).trim();
-      return str.substring(0, 10);
     };
 
     for (let start = 2; start < grid.length; start += 30) {
@@ -208,23 +260,34 @@ export default function ExcelImportModal({
       const norte_to = getNum(start + 3, 3);
       const cota_to = getNum(start + 3, 5);
       const altura = getNum(start + 3, 10);
-      const dip_talud = getNum(start + 2, 13);
 
-      const lito_3 = getStr(start + 1, 15);
+      // Orientación del Talud y del Agujero mapeadas de la Columna N (index 13)
+      const dip_talud = getNum(start + 2, 13);
+      const dipdir_talud = getNum(start + 3, 13);
+      const dip_hw = getNum(start + 4, 13); // Admite valores negativos sin clamping
+      const az_hw = getNum(start + 5, 13);
+
+      const lito_3 = getStr(start + 1, 15); // Col P (index 15)
+      const alt_zona = getStr(start + 2, 15);
+      const intemperia = getStr(start + 3, 15);
       const lito_model = getStr(start + 4, 15);
       const mapeador = getStr(start + 5, 15);
-      const sector = getStr(start + 1, 19);
-      const fase = String(Math.round(getNum(start + 2, 20)) || 5);
+
+      const sector = getStr(start + 1, 19); // Col T (index 19)
+      const fase = String(Math.round(getNum(start + 2, 20)) || 5); // Col U (index 20)
       const nivel = String(getNum(start + 3, 20) || 3960);
       const sect_geot = getStr(start + 4, 20);
-      const fecha = parseDateStr(grid[start + 1]?.[36]);
+      const fecha = parseDateStr(grid[start + 1]?.[36]); // Col AK (index 36)
 
-      const condicion_agua = getStr(start + 8, 35) || 'C';
-      const resistencia_ucs = getStr(start + 8, 37) || 'R4';
+      const condicion_agua = getStr(start + 8, 35) || 'C'; // Col AJ (index 35)
+      const resistencia_ucs = getStr(start + 8, 37) || 'R4'; // Col AL (index 37)
+
+      // Ejecuta la clasificación de roca inteligente
+      const litoDetails = detectLithology(lito_model, lito_3);
 
       const joints: JointRow[] = [];
       let jId = 1;
-      
+
       for (let r = start + 12; r <= start + 25; r++) {
         const famVal = grid[r]?.[0];
         if (famVal === null || famVal === undefined || String(famVal).trim() === "") continue;
@@ -245,12 +308,12 @@ export default function ExcelImportModal({
           espaciamiento: getNum(r, 9),
           extremos_visibles: getNum(r, 10),
           terminacion: getNum(r, 11),
-          relleno1: getStr(r, 12) || 'cwf',
-          relleno2: getStr(r, 13) || undefined,
+          relleno1: getStr(r, 12).toLowerCase() || 'cwf',
+          relleno2: getStr(r, 13).toLowerCase() || undefined,
           jrc: getNum(r, 18) || 10,
           rugosidad: getNum(r, 19) || 2,
           forma: getStr(r, 20) || 'O',
-          alteracion: getStr(r, 21) || 'd'
+          alteracion: getStr(r, 21).toLowerCase() || 'd'
         });
       }
 
@@ -259,13 +322,11 @@ export default function ExcelImportModal({
           celda: codigo,
           este_from, norte_from, cota_from,
           este_to, norte_to, cota_to,
-          altura, dip_talud,
-          lito_1: lito_model || '',
-          lito_2: '',
-          lito_3: lito_3 || '',
-          unidad_litologica: lito_model || '',
+          altura, dip_talud, dipdir_talud, dip_hw, az_hw,
+          ...litoDetails,
           mapeador, sector, fase, nivel, sect_geot,
-          fecha, condicion_agua, resistencia_ucs
+          fecha, condicion_agua, resistencia_ucs,
+          intemperia, alt_zona
         },
         joints
       };
@@ -280,15 +341,14 @@ export default function ExcelImportModal({
     }
   };
 
-  // 2. Advanced Generic Parser for Flat database layouts ("BD" tab) with mappings
+  // 2. Parser para tablas planas ("BD") con mapeo dinámico
   const parseFlatTable = (grid: any[][]) => {
     setRawGrid(grid);
 
-    // Find header row indices by checking synapses
     let bestRowIdx = 0;
     let maxMatches = -1;
     const maxScan = Math.min(15, grid.length);
-    
+
     const normalize = (val: any): string => {
       if (val === null || val === undefined) return '';
       return String(val)
@@ -304,7 +364,7 @@ export default function ExcelImportModal({
       if (!row) continue;
       let matches = 0;
       const normalizedCells = row.map(c => normalize(c));
-      
+
       EXPECTED_FIELDS.forEach(f => {
         const hasMatch = f.synonyms.some(s => normalizedCells.includes(s));
         if (hasMatch) matches++;
@@ -322,16 +382,14 @@ export default function ExcelImportModal({
     const formattedHeaders = headerRow.map((h, i) => {
       const letter = XLSX.utils.encode_col(i);
       const label = h !== null && h !== undefined ? String(h).trim() : '';
-      return label ? `${letter}: ${label}` : `${letter}: [Vacio]`;
+      return label ? `${letter}: ${label}` : `${letter}: [Vacío]`;
     });
     setExcelHeaders(formattedHeaders);
 
-    // Initial suggested mappings
     const suggested: Record<string, number> = {};
     const normalizedHeaders = headerRow.map(h => normalize(h));
     const used = new Set<number>();
 
-    // Exact key matches first
     EXPECTED_FIELDS.forEach(f => {
       for (let i = 0; i < normalizedHeaders.length; i++) {
         if (used.has(i)) continue;
@@ -343,7 +401,6 @@ export default function ExcelImportModal({
       }
     });
 
-    // Synonyms match next
     EXPECTED_FIELDS.forEach(f => {
       if (suggested[f.key] !== undefined) return;
       for (const syn of f.synonyms) {
@@ -365,7 +422,6 @@ export default function ExcelImportModal({
     runGrouping(grid, bestRowIdx, suggested);
   };
 
-  // Group rows of the flat grid into separate celdas using current mappings
   const runGrouping = (grid: any[][], headerRowIndex: number, currentMappings: Record<string, number>) => {
     const celdasData: Record<string, WindowData> = {};
 
@@ -386,13 +442,6 @@ export default function ExcelImportModal({
       return val !== null && val !== undefined ? String(val).trim() : fallback;
     };
 
-    const parseDateStr = (val: any): string => {
-      if (!val) return new Date().toISOString().split('T')[0];
-      if (val instanceof Date) return val.toISOString().split('T')[0];
-      const str = String(val).trim();
-      return str.substring(0, 10);
-    };
-
     for (let r = headerRowIndex + 1; r < grid.length; r++) {
       const row = grid[r];
       if (!row || row.length === 0) continue;
@@ -401,6 +450,10 @@ export default function ExcelImportModal({
       if (!celdaCode) continue;
 
       if (!celdasData[celdaCode]) {
+        const rawLitoModel = getStr(row, 'lito_model');
+        const rawLito3 = getStr(row, 'lito_3');
+        const litoDetails = detectLithology(rawLitoModel, rawLito3);
+
         celdasData[celdaCode] = {
           header: {
             celda: celdaCode,
@@ -412,10 +465,13 @@ export default function ExcelImportModal({
             cota_to: getNum(row, 'cota_to', 0),
             altura: getNum(row, 'altura', 15.0),
             dip_talud: getNum(row, 'dip_talud', 64.0),
-            lito_1: getStr(row, 'lito_model', 'MZQ_M'),
-            lito_2: '',
-            lito_3: getStr(row, 'lito_3', 'MZQ'),
-            unidad_litologica: getStr(row, 'lito_model', 'MZQ_M'),
+
+            // Orientaciones y alteraciones mapeadas dinámicamente de la planilla plana
+            dipdir_talud: getNum(row, 'dipdir_talud', 247.0),
+            dip_hw: getNum(row, 'dip_hw', 0.0),
+            az_hw: getNum(row, 'az_hw', 0.0),
+
+            ...litoDetails,
             mapeador: getStr(row, 'mapeador', 'AS-HM'),
             sector: getStr(row, 'sector', 'E1'),
             fase: getStr(row, 'fase', '5'),
@@ -423,13 +479,14 @@ export default function ExcelImportModal({
             sect_geot: getStr(row, 'sect_geot', 'E1'),
             fecha: parseDateStr(getVal(row, 'fecha')),
             condicion_agua: getStr(row, 'condicion_agua', 'C'),
-            resistencia_ucs: getStr(row, 'resistencia_ucs', 'R4')
+            resistencia_ucs: getStr(row, 'resistencia_ucs', 'R4'),
+            alt_zona: getStr(row, 'alt_zona', ''),
+            intemperia: getStr(row, 'intemperia', '')
           },
           joints: []
         };
       }
 
-      // Check if this row contains valid joint structure details (require set / set-distancia)
       const famVal = getVal(row, 'familia');
       if (famVal !== null && famVal !== undefined && String(famVal).trim() !== "") {
         const fam = parseInt(famVal);
@@ -448,12 +505,12 @@ export default function ExcelImportModal({
             espaciamiento: getNum(row, 'espaciamiento', 0.5),
             extremos_visibles: getNum(row, 'extremos_visibles', 1),
             terminacion: getNum(row, 'terminacion', 0),
-            relleno1: getStr(row, 'relleno1', 'cwf'),
-            relleno2: getStr(row, 'relleno2') || undefined,
+            relleno1: getStr(row, 'relleno1').toLowerCase() || 'cwf', // Forzamos minúsculas de seguridad
+            relleno2: getStr(row, 'relleno2').toLowerCase() || undefined,
             jrc: getNum(row, 'jrc', 10),
             rugosidad: getNum(row, 'rugosidad', 2),
             forma: getStr(row, 'forma', 'O'),
-            alteracion: getStr(row, 'alteracion', 'd')
+            alteracion: getStr(row, 'alteracion').toLowerCase() || 'd'
           });
         }
       }
@@ -473,7 +530,6 @@ export default function ExcelImportModal({
     if (!rawGrid) return;
     const updated = { ...mappings };
     if (colIdx !== -1) {
-      // Enforce unique mapping
       Object.keys(updated).forEach(k => {
         if (updated[k] === colIdx && k !== fieldKey) {
           delete updated[k];
@@ -492,8 +548,8 @@ export default function ExcelImportModal({
       alert("Seleccione una celda para importar.");
       return;
     }
-    const targetData = isStackedTemplate 
-      ? detectedTemplateCells[selectedCeldaCode] 
+    const targetData = isStackedTemplate
+      ? detectedTemplateCells[selectedCeldaCode]
       : parsedWindowData[selectedCeldaCode];
 
     if (!targetData) {
@@ -506,18 +562,16 @@ export default function ExcelImportModal({
     resetState();
   };
 
-  const activeDataPreview = isStackedTemplate 
+  const activeDataPreview = isStackedTemplate
     ? detectedTemplateCells[selectedCeldaCode]
     : parsedWindowData[selectedCeldaCode];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
       <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
-        
-        {/* Top colorful gradient border from stable taladros */}
+
         <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-orange-400 to-amber-500 w-full" />
 
-        {/* Head */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
@@ -540,10 +594,8 @@ export default function ExcelImportModal({
           </button>
         </div>
 
-        {/* Scrollable Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-          {/* Upload step */}
           {!file && (
             <div className="space-y-4">
               <div
@@ -569,7 +621,7 @@ export default function ExcelImportModal({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex gap-3.5 p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 text-xs text-slate-300 leading-relaxed shadow-sm">
                 <Info className="text-orange-400 shrink-0 mt-0.5" size={16} />
                 <div>
@@ -583,11 +635,9 @@ export default function ExcelImportModal({
             </div>
           )}
 
-          {/* Active Work Area */}
           {file && (
             <div className="space-y-6">
-              
-              {/* File details banner */}
+
               <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-navy-950/60 border border-navy-850 rounded-xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-orange-500/10 text-orange-400 rounded-lg">
@@ -623,7 +673,6 @@ export default function ExcelImportModal({
                 </div>
               </div>
 
-              {/* Selector de Modo de Importación */}
               <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-navy-950/45 border border-navy-850 rounded-xl">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
@@ -634,39 +683,35 @@ export default function ExcelImportModal({
                   <button
                     type="button"
                     onClick={() => handleToggleMode(true)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                      isStackedTemplate
-                        ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
-                        : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isStackedTemplate
+                      ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
+                      : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
+                      }`}
                   >
                     Plantilla Apilada ("ventana")
                   </button>
                   <button
                     type="button"
                     onClick={() => handleToggleMode(false)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                      !isStackedTemplate
-                        ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
-                        : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${!isStackedTemplate
+                      ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
+                      : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
+                      }`}
                   >
                     Tabla Plana / Mapeable ("BD")
                   </button>
                 </div>
               </div>
 
-              {/* DYNAMIC MAPPING MODE (Flat "BD" layout) */}
               {!isStackedTemplate && rawGrid && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  
-                  {/* Left Column: Mappings panel */}
+
                   <div className="lg:col-span-1 glass-panel p-4 rounded-xl border border-navy-800 space-y-4 max-h-[50vh] overflow-y-auto bg-navy-950/40">
                     <div className="flex items-center gap-2 text-orange-400 border-b border-navy-800 pb-2">
                       <Filter size={16} />
                       <h4 className="text-xs font-black uppercase tracking-wider">Mapear Columnas</h4>
                     </div>
-                    
+
                     <div className="space-y-3.5 text-xs">
                       {EXPECTED_FIELDS.map(f => {
                         const isMapped = mappings[f.key] !== undefined;
@@ -682,13 +727,12 @@ export default function ExcelImportModal({
                                 f.required && <span className="text-xs text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Requerido</span>
                               )}
                             </div>
-                            
+
                             <select
                               value={mappings[f.key] ?? -1}
                               onChange={(e) => handleMappingChange(f.key, parseInt(e.target.value))}
-                              className={`w-full bg-navy-900 border text-xs rounded-lg px-2 py-1.5 focus:outline-none transition-all ${
-                                isMapped ? 'border-orange-500/30 text-orange-300' : 'border-navy-800 text-slate-400 hover:border-navy-700'
-                              }`}
+                              className={`w-full bg-navy-900 border text-xs rounded-lg px-2 py-1.5 focus:outline-none transition-all ${isMapped ? 'border-orange-500/30 text-orange-300' : 'border-navy-800 text-slate-400 hover:border-navy-700'
+                                }`}
                             >
                               <option value={-1}>— No Asignado —</option>
                               {excelHeaders.map((eh, idx) => (
@@ -701,7 +745,6 @@ export default function ExcelImportModal({
                     </div>
                   </div>
 
-                  {/* Right Column: Previews and Celdas found */}
                   <div className="lg:col-span-2 space-y-4">
                     {detectedCeldas.length > 0 ? (
                       <div className="space-y-2">
@@ -716,11 +759,10 @@ export default function ExcelImportModal({
                               <button
                                 key={code}
                                 onClick={() => setSelectedCeldaCode(code)}
-                                className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 ${
-                                  isSelected
-                                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.15)]'
-                                    : 'bg-navy-900/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
-                                }`}
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 ${isSelected
+                                  ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.15)] font-black'
+                                  : 'bg-navy-900/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
+                                  }`}
                               >
                                 <span>{code}</span>
                                 <span className="text-xs text-slate-500 bg-navy-950 px-1 py-0.5 rounded">
@@ -738,13 +780,12 @@ export default function ExcelImportModal({
                       </div>
                     )}
 
-                    {/* Preview Table of joints in the active window */}
                     {activeDataPreview && (
                       <div className="space-y-2">
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                           Vista Previa de Estructuras para {selectedCeldaCode} (Primeros 5 registros):
                         </h4>
-                        
+
                         <div className="overflow-x-auto border border-navy-850 rounded-lg">
                           <table className="w-full text-xs text-left border-collapse text-slate-300">
                             <thead>
@@ -784,7 +825,6 @@ export default function ExcelImportModal({
                 </div>
               )}
 
-              {/* STACKED CARD TEMPLATE MODE ("ventana" sheet) */}
               {isStackedTemplate && (
                 <div className="space-y-4">
                   {Object.keys(detectedTemplateCells).length > 0 ? (
@@ -801,18 +841,17 @@ export default function ExcelImportModal({
                               <div
                                 key={code}
                                 onClick={() => setSelectedCeldaCode(code)}
-                                className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-1.5 ${
-                                  isSelected
-                                    ? 'bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.15)] font-bold'
-                                    : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
-                                }`}
+                                className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-1.5 ${isSelected
+                                  ? 'bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.15)] font-bold'
+                                  : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
+                                  }`}
                               >
                                 <div className="flex justify-between items-center">
                                   <span className="text-sm font-black tracking-wide">{code}</span>
                                   {isSelected && <Check size={14} className="text-orange-400" />}
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-slate-500">
-                                  <span>{cData.header.lito_3}</span>
+                                  <span>{cData.header.lito_2 || cData.header.lito_1}</span>
                                   <span>{cData.joints.length} estruct.</span>
                                 </div>
                               </div>
@@ -821,7 +860,6 @@ export default function ExcelImportModal({
                         </div>
                       </div>
 
-                      {/* Preview table for the template selection */}
                       {activeDataPreview && (
                         <div className="space-y-2 border-t border-navy-850 pt-4">
                           <div className="flex justify-between items-center text-xs text-slate-400">
@@ -830,7 +868,7 @@ export default function ExcelImportModal({
                             </span>
                             <span>Fecha Mapeo: {activeDataPreview.header.fecha} | Geólogo: {activeDataPreview.header.mapeador}</span>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-navy-950/45 border border-navy-850 p-3.5 rounded-xl text-xs text-slate-300">
                             <div><span className="text-slate-500">Desde:</span> {activeDataPreview.header.este_from}, {activeDataPreview.header.norte_from}, {activeDataPreview.header.cota_from}</div>
                             <div><span className="text-slate-500">Hasta:</span> {activeDataPreview.header.este_to}, {activeDataPreview.header.norte_to}, {activeDataPreview.header.cota_to}</div>
@@ -841,7 +879,7 @@ export default function ExcelImportModal({
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2">
                             Discontinuidades de la Celda ({activeDataPreview.joints.length} registros):
                           </h4>
-                          
+
                           <div className="overflow-x-auto border border-navy-850 rounded-xl">
                             <table className="w-full text-xs text-left border-collapse text-slate-300">
                               <thead>
@@ -894,7 +932,6 @@ export default function ExcelImportModal({
 
         </div>
 
-        {/* Footer actions */}
         <div className="flex gap-2 justify-end px-6 py-4 border-t border-navy-800/80 shrink-0 bg-navy-950/40">
           <button
             type="button"

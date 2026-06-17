@@ -41,14 +41,31 @@ export default function VentanaForm({
     }
     let num = parseFloat(val);
     if (isNaN(num)) return;
-    if (num < 0) num = 0;
+
+    // Permitimos buzamientos negativos únicamente para el ángulo del sondaje (dip_hw)
+    if (field !== 'dip_hw' && num < 0) {
+      num = 0;
+    } else if (field === 'dip_hw' && num < -90) {
+      num = -90; // Límite vertical hacia arriba
+    }
+
     if (num > maxVal) num = maxVal;
-    if (maxVal === 360 && num === 360) num = 0; // 360 maps to 0
+    if (maxVal === 360 && num === 360) num = 0;
     handleChange(field, num);
   };
 
-  // Calculate unique unidades for litologia dropdown selection
+  // Extraemos las unidades únicas para el primer selector
   const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
+
+  // Si hay una unidad seleccionada, filtramos las clasificaciones detalladas; si no, permitimos ver todas
+  const filteredClassifications = header.unidad_litologica
+    ? LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.unidad_litologica)
+    : LITHOLOGY_CLASSIFICATION;
+
+  // Generamos el valor de control compuesto para sincronizar el estado del select detallado
+  const currentCombinedValue = header.lito_2 && header.unidad_litologica && header.lito_1
+    ? `${header.lito_2}|${header.unidad_litologica}|${header.lito_1}`
+    : '';
 
   // Cascading autocomplete on litologia change
   const handleUnidadChange = (unidad: string) => {
@@ -62,19 +79,45 @@ export default function VentanaForm({
       });
       return;
     }
-    const match = LITHOLOGY_CLASSIFICATION.find(item => item.unidad === unidad);
+    onChange({
+      ...header,
+      unidad_litologica: unidad,
+      lito_1: '',
+      lito_2: '',
+      lito_3: ''
+    });
+  };
+
+  const handleCombinedClassificationChange = (combinedValue: string) => {
+    if (!combinedValue) {
+      onChange({
+        ...header,
+        unidad_litologica: '',
+        lito_1: '',
+        lito_2: '',
+        lito_3: ''
+      });
+      return;
+    }
+
+    // Desestructuramos la clave compuesta única para encontrar la fila exacta
+    const [codigo, unidad, litologia] = combinedValue.split('|');
+    const match = LITHOLOGY_CLASSIFICATION.find(
+      item => item.codigo === codigo && item.unidad === unidad && item.litologia === litologia
+    );
+
     if (match) {
       onChange({
         ...header,
-        unidad_litologica: unidad,
+        unidad_litologica: match.unidad, // Autocompletado bidireccional
         lito_1: match.litologia,
         lito_2: match.codigo,
         lito_3: match.grupo
       });
-    } else {
-      handleChange('unidad_litologica', unidad);
     }
   };
+
+
 
   // Determine if From/To coordinates are entered to auto-calculate Largo (3D distance)
   const ix = parseFloat(String(header.este_from));
@@ -303,7 +346,7 @@ export default function VentanaForm({
               onChange={(e) => handleUnidadChange(e.target.value)}
               className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal cursor-pointer"
             >
-              <option value="">— Seleccione —</option>
+              <option value="">— Seleccione Unidad —</option>
               {uniqueUnidades.map(u => (
                 <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
               ))}
@@ -315,39 +358,58 @@ export default function VentanaForm({
       {/* SECCIÓN 3: LITOLOGÍA DE DETALLE Y METADATOS COMPLEMENTARIOS */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
         <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
+
+          {/* Litología General - Auto-completado y protegido de escritura */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Litología</label>
             <input
               type="text"
+              readOnly
               value={header.lito_1 || ''}
-              onChange={(e) => handleChange('lito_1', e.target.value)}
-              placeholder="Lito"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              placeholder="Automático"
+              className="w-full bg-navy-950/50 border border-navy-800 text-slate-400 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-not-allowed font-semibold text-center"
             />
           </div>
 
+          {/* Código de clasificación único - Selector inteligente compatible con duplicados */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código</label>
-            <input
-              type="text"
-              value={header.lito_2 || ''}
-              onChange={(e) => handleChange('lito_2', e.target.value)}
-              placeholder="Cod"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
-            />
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código (Lito-3)</label>
+            <select
+              value={currentCombinedValue}
+              onChange={(e) => handleCombinedClassificationChange(e.target.value)}
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-orange-400 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold cursor-pointer"
+            >
+              <option value="">— Seleccione Código —</option>
+              {filteredClassifications.map(item => {
+                // Si el código es genérico ('Varios' o '-'), añadimos la litología entre paréntesis para diferenciarlos
+                const isGeneric = item.codigo === 'Varios' || item.codigo === '-';
+                const label = isGeneric
+                  ? `${item.codigo} - ${item.unidad} (${item.litologia})`
+                  : `${item.codigo} - ${item.unidad}`;
+                const combinedKey = `${item.codigo}|${item.unidad}|${item.litologia}`;
+
+                return (
+                  <option key={combinedKey} value={combinedKey} className="bg-navy-900 text-slate-100 text-xs font-normal">
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
+          {/* Grupo Geotécnico - Auto-completado y protegido de escritura */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Grupo</label>
             <input
               type="text"
+              readOnly
               value={header.lito_3 || ''}
-              onChange={(e) => handleChange('lito_3', e.target.value)}
-              placeholder="Grupo"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              placeholder="Automático"
+              className="w-full bg-navy-950/50 border border-navy-800 text-slate-400 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-not-allowed font-semibold text-center"
             />
           </div>
 
+          {/* Conservamos el resto de tus campos de metadatos (Sector, Fase, Nivel, Fecha, Mapeador) intactos... */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector</label>
             <input
