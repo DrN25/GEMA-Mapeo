@@ -20,6 +20,7 @@ interface DisconTableProps {
   selectedRowIndex: number | null;
   onSelectRow: (index: number | null) => void;
   largoMax: number;
+  onDeleteFamily: (famId: number) => void;
 }
 
 export default function DisconTable({
@@ -27,12 +28,30 @@ export default function DisconTable({
   onChange,
   selectedRowIndex,
   onSelectRow,
-  largoMax
+  largoMax,
+  onDeleteFamily
 }: DisconTableProps) {
 
   // Local state to hold temporary string values of numeric inputs while typing,
   // preventing decimal dot erasure.
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
+
+  // Estado local para seleccionar la familia a borrar en el add-bar
+  const [familyToDelete, setFamilyToDelete] = React.useState<number>(1);
+
+  // Sincroniza la familia por defecto a eliminar al cambiar las familias disponibles
+  const activeFamilies = React.useMemo(() => {
+    return Array.from(new Set(joints.map(j => j.familia))).sort((a, b) => a - b);
+  }, [joints]);
+
+  React.useEffect(() => {
+    const maxEligible = activeFamilies.filter(f => f > 3);
+    if (maxEligible.length > 0) {
+      setFamilyToDelete(maxEligible[maxEligible.length - 1]);
+    } else {
+      setFamilyToDelete(1);
+    }
+  }, [activeFamilies]);
 
   const getFamilyBadgeStyle = (fam: number) => {
     const styles: Record<number, string> = {
@@ -205,26 +224,6 @@ export default function DisconTable({
     onChange(updated);
   };
 
-  const deleteLastFamily = () => {
-    const maxFam = Math.max(0, ...joints.map(j => j.familia));
-    if (maxFam === 0) return;
-    if (maxFam <= 3) {
-      alert("No se pueden eliminar las familias básicas obligatorias (F1, F2, F3).");
-      return;
-    }
-    
-    const confirm1 = confirm(`¿Está seguro de que desea eliminar la Familia ${maxFam}?`);
-    if (!confirm1) return;
-    const confirm2 = confirm(`ATENCIÓN: Se borrarán definitivamente todos los datos cargados en la Familia ${maxFam}. ¿Confirmar eliminación?`);
-    if (!confirm2) return;
-    
-    const updated = joints.filter(j => j.familia !== maxFam);
-    onChange(updated);
-    if (selectedRowIndex !== null && selectedRowIndex >= updated.length) {
-      onSelectRow(updated.length > 0 ? updated.length - 1 : null);
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent, index: number, colName: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -245,13 +244,13 @@ export default function DisconTable({
       </div>
 
       <div className="overflow-x-auto relative rounded-lg border border-navy-900 bg-navy-950/20">
-        <table className="w-full text-left text-sm border-separate border-spacing-0" style={{ minWidth: '2400px' }}>
+        <table className="w-full text-left text-sm border-collapse border-separate border-spacing-0" style={{ minWidth: '2400px' }}>
           <thead>
             <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
               {/* Columnas fijas a la izquierda */}
               <th rowSpan={2} className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-navy-900 w-[52px] min-w-[52px]">Fam</th>
               <th rowSpan={2} className="py-3 px-2 text-center sticky left-[52px] bg-navy-950 z-20 border-r border-navy-900 w-[85px] min-w-[85px]">Dist (m)</th>
-              
+
               {/* Columnas inputs */}
               <th rowSpan={2} className="py-3 px-2 text-center w-20">Dip (&deg;)</th>
               <th rowSpan={2} className="py-3 px-2 text-center w-24">DipDir (&deg;)</th>
@@ -265,7 +264,7 @@ export default function DisconTable({
               <th rowSpan={2} className="py-3 px-2 text-center w-20">Term</th>
               <th rowSpan={2} className="py-3 px-2 w-32 text-center">Relleno 1</th>
               <th rowSpan={2} className="py-3 px-2 w-32 text-center">Relleno 2</th>
-              
+
               {/* Ratings intermedios */}
               <th colSpan={2} className="py-2 px-2 text-center border-l border-navy-900 text-pink-400 bg-pink-950/10 text-xs">Valor Relleno (R89)</th>
               <th colSpan={2} className="py-2 px-2 text-center border-l border-navy-900 text-amber-400 bg-amber-950/10 text-xs">Valor Relleno (R76)</th>
@@ -277,7 +276,7 @@ export default function DisconTable({
 
               {/* Ratings de Condición RMR89 */}
               <th colSpan={6} className="py-2 px-2 text-center bg-pink-900/10 border-l border-navy-900 text-pink-400 text-xs">Condición Discontinuidades (RMR'89)</th>
-              
+
               {/* Ratings de Condición RMR76 */}
               <th colSpan={6} className="py-2 px-2 text-center bg-amber-900/10 border-l border-navy-900 text-amber-400 text-xs">Condición Discontinuidades (RMR'76)</th>
 
@@ -674,23 +673,43 @@ export default function DisconTable({
         </table>
       </div>
 
-      <div className="add-bar flex items-center gap-3 bg-navy-950/30 p-3.5 border-t border-navy-900 rounded-b-xl justify-end">
-        <button
-          onClick={createFamily}
-          className="bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
-          title="Crear un nuevo grupo de 3 registros para la siguiente familia"
-        >
-          <Plus size={14} />
-          <span>Crear Familia</span>
-        </button>
-        <button
-          onClick={deleteLastFamily}
-          className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
-          title="Eliminar el último grupo de 3 registros de la familia"
-        >
-          <Trash2 size={14} />
-          <span>Eliminar Familia</span>
-        </button>
+      <div className="add-bar flex flex-wrap items-center gap-4 bg-navy-950/30 p-3.5 border-t border-navy-900 rounded-b-xl justify-between">
+        <span className="text-xs text-slate-500 italic">
+          * Nota: F1, F2 y F3 son obligatorias para calcular JV y promedios ponderados.
+        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={createFamily}
+            className="bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+            title="Crear un nuevo grupo de 3 registros para la siguiente familia"
+          >
+            <Plus size={14} />
+            <span>Crear Familia</span>
+          </button>
+
+          <div className="flex items-center gap-2 border-l border-navy-800 pl-3">
+            <span className="text-xs text-slate-400 font-bold">Borrar Familia:</span>
+            <select
+              value={familyToDelete}
+              onChange={(e) => setFamilyToDelete(parseInt(e.target.value) || 1)}
+              className="bg-navy-900 border border-navy-700 text-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer font-bold"
+            >
+              {activeFamilies.map(f => (
+                <option key={f} value={f}>
+                  Familia F{f}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => onDeleteFamily(familyToDelete)}
+              className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+              title={`Eliminar Familia F${familyToDelete} y reindexar de manera segura`}
+            >
+              <Trash2 size={14} />
+              <span>Eliminar</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

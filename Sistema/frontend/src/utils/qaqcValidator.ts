@@ -1,9 +1,23 @@
 import type { JointRow, WindowHeader } from './rmrCalculator';
 
 export interface ValidationAlert {
-  fieldId: string; // The ID of the input to highlight
+  fieldId: string; // El ID del input a resaltar
   type: 'ERROR' | 'WARNING';
   message: string;
+}
+
+// Función auxiliar para estimar el perfil de rugosidad teórico según el JRC geomecánico
+function getExpectedProfileFromJRC(jrc: number): number | null {
+  if (jrc < 0 || jrc > 20) return null;
+  if (jrc <= 2) return 9;
+  if (jrc <= 4) return 8;
+  if (jrc <= 6) return 7;
+  if (jrc <= 8) return 6;
+  if (jrc <= 10) return 5;
+  if (jrc <= 12) return 4;
+  if (jrc <= 14) return 3;
+  if (jrc <= 16) return 2;
+  return 1; // JRC entre 16 y 20
 }
 
 export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], largo: number): ValidationAlert[] {
@@ -18,7 +32,7 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     });
   }
 
-  const isCoorsZero = 
+  const isCoorsZero =
     header.este_from === 0 && header.norte_from === 0 && header.cota_from === 0 &&
     header.este_to === 0 && header.norte_to === 0 && header.cota_to === 0;
 
@@ -70,6 +84,10 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     const esp = j.espesor ?? 0;
     const aber = j.abertura ?? 0;
     const ext = j.extremos_visibles;
+    const relleno1 = j.relleno1;
+    const relleno2 = j.relleno2;
+    const jrc = j.jrc;
+    const rugosidad = j.rugosidad;
 
     // Skip validations if any main structural fields are vacant (-1 or undefined)
     if (dist === undefined || dist === -1 || dip === undefined || dip === -1 || dip_dir === undefined || dip_dir === -1) {
@@ -141,6 +159,27 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
         type: "WARNING",
         message: `Fila ${rowNum}: El espesor de relleno (${esp}mm) es mayor que la abertura de junta (${aber}mm).`
       });
+    }
+
+    // Relleno vs Espesor QA/QC Contradiction
+    if (relleno1 === 'cwf' && (!relleno2 || relleno2 === 'cwf') && esp !== -1 && esp > 0) {
+      alerts.push({
+        fieldId: `joint-espesor-${index}`,
+        type: "WARNING",
+        message: `Fila ${rowNum}: Se declaró junta limpia/sin relleno (cwf) pero el espesor de relleno figura con ${esp}mm.`
+      });
+    }
+
+    // JRC vs Rugosidad Correlation Check
+    if (jrc !== -1 && jrc !== undefined && rugosidad !== -1 && rugosidad !== undefined) {
+      const expectedProf = getExpectedProfileFromJRC(jrc);
+      if (expectedProf !== null && Math.abs(expectedProf - rugosidad) > 1) {
+        alerts.push({
+          fieldId: `joint-jrc-${index}`,
+          type: "WARNING",
+          message: `Fila ${rowNum}: Desviación geomecánica entre JRC (${jrc}) y Perfil de Rugosidad (${rugosidad}). Perfil sugerido: ${expectedProf}.`
+        });
+      }
     }
 
     // Terminations and visibility bounds

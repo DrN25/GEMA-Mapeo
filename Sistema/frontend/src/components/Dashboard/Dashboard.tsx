@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar } from 'lucide-react';
+import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
 
 export interface WindowSummary {
   name: string; // matches header.celda
@@ -31,24 +32,24 @@ export default function Dashboard({
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
 
-  // Form state for creating a window celda
+  // Form state for creating a window celda (Defaulted to empty values)
   const [celda, setCelda] = useState('');
-  const [proyecto, setProyecto] = useState('Proyecto A');
-  const [mapeador, setMapeador] = useState('AS-HM');
-  const [sector, setSector] = useState('E1');
-  const [fase, setFase] = useState('5');
-  const [nivel, setNivel] = useState('3960');
-  const [esteFrom, setEsteFrom] = useState(794444.87);
-  const [norteFrom, setNorteFrom] = useState(8440465.91);
-  const [cotaFrom, setCotaFrom] = useState(3960.47);
-  const [esteTo, setEsteTo] = useState(794449.13);
-  const [norteTo, setNorteTo] = useState(8440455.69);
-  const [cotaTo, setCotaTo] = useState(3959.84);
-  const [altura, setAltura] = useState(15.0);
-  const [dipTalud, setDipTalud] = useState(64);
-  const [lito3, setLito3] = useState('MZQ');
-  const [condicionAgua, setCondicionAgua] = useState('C');
-  const [resistenciaUcs, setResistenciaUcs] = useState('R4');
+  const [proyecto, setProyecto] = useState('');
+  const [mapeador, setMapeador] = useState('');
+  const [sector, setSector] = useState('');
+  const [fase, setFase] = useState('');
+  const [nivel, setNivel] = useState('');
+  const [esteFrom, setEsteFrom] = useState<number | ''>('');
+  const [norteFrom, setNorteFrom] = useState<number | ''>('');
+  const [cotaFrom, setCotaFrom] = useState<number | ''>('');
+  const [esteTo, setEsteTo] = useState<number | ''>('');
+  const [norteTo, setNorteTo] = useState<number | ''>('');
+  const [cotaTo, setCotaTo] = useState<number | ''>('');
+  const [altura, setAltura] = useState<number | ''>('');
+  const [dipTalud, setDipTalud] = useState<number | ''>('');
+  const [lito3, setLito3] = useState('');
+  const [condicionAgua, setCondicionAgua] = useState('');
+  const [resistenciaUcs, setResistenciaUcs] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,30 +57,47 @@ export default function Dashboard({
 
     onCreateWindow({
       celda: celda.trim().toUpperCase(),
-      este_from: Number(esteFrom),
-      norte_from: Number(norteFrom),
-      cota_from: Number(cotaFrom),
-      este_to: Number(esteTo),
-      norte_to: Number(norteTo),
-      cota_to: Number(cotaTo),
-      altura: Number(altura),
-      dip_talud: Number(dipTalud),
+      este_from: esteFrom === '' ? 0 : Number(esteFrom),
+      norte_from: norteFrom === '' ? 0 : Number(norteFrom),
+      cota_from: cotaFrom === '' ? 0 : Number(cotaFrom),
+      este_to: esteTo === '' ? 0 : Number(esteTo),
+      norte_to: norteTo === '' ? 0 : Number(norteTo),
+      cota_to: cotaTo === '' ? 0 : Number(cotaTo),
+      altura: altura === '' ? 0 : Number(altura),
+      dip_talud: dipTalud === '' ? 0 : Number(dipTalud),
       lito_3: lito3,
-      lito_model: `${lito3}_M`,
+      lito_model: lito3 ? `${lito3}_M` : '',
       mapeador: mapeador.trim(),
       sector: sector.trim(),
       fase: fase.trim(),
       nivel: nivel.trim(),
       sect_geot: sector.trim(),
       fecha: new Date().toISOString().split('T')[0],
-      condicion_agua: condicionAgua,
-      resistencia_ucs: resistenciaUcs,
+      condicion_agua: condicionAgua || 'C',
+      resistencia_ucs: resistenciaUcs || 'R4',
       joints: [],
       calculated: null
     });
 
+    // Reset all form states to empty on successful submit
     setShowModal(false);
     setCelda('');
+    setProyecto('');
+    setMapeador('');
+    setSector('');
+    setFase('');
+    setNivel('');
+    setEsteFrom('');
+    setNorteFrom('');
+    setCotaFrom('');
+    setEsteTo('');
+    setNorteTo('');
+    setCotaTo('');
+    setAltura('');
+    setDipTalud('');
+    setLito3('');
+    setCondicionAgua('');
+    setResistenciaUcs('');
   };
 
   const totalLargoM = windows.reduce((acc, w) => acc + w.largo, 0);
@@ -108,9 +126,9 @@ export default function Dashboard({
         <div className="flex gap-2">
           <button
             onClick={onOpenImportModal}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-orange-500/30 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95"
           >
-            <FileSpreadsheet size={18} className="text-amber-400" />
+            <FileSpreadsheet size={18} className="text-orange-400" />
             <span>Importar Excel (Local)</span>
           </button>
           <button
@@ -126,17 +144,15 @@ export default function Dashboard({
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Date Card */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between bg-gradient-to-br from-navy-900/40 to-navy-950/20 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-center justify-center bg-cyan-500/10 border border-cyan-500/30 rounded-lg w-12 h-12 shrink-0 shadow-[0_0_10px_rgba(6,182,212,0.1)]">
-              <span className="text-xs font-black text-cyan-400 leading-none">{monthName}</span>
-              <span className="text-lg font-black text-slate-100 leading-none mt-0.5">{dayNum}</span>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Fecha de Hoy</span>
-              <span className="text-xs font-bold text-slate-300 block leading-tight">{capitalizedWeekday}</span>
-            </div>
+        <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Fecha de Hoy</span>
+            <span className="text-2xl font-black text-slate-100 block">
+              {dayNum} {monthName}
+            </span>
+            <span className="text-[10px] font-bold text-slate-400 block leading-none">{capitalizedWeekday}</span>
           </div>
+          <Calendar size={24} className="text-orange-500/40" />
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
@@ -144,7 +160,7 @@ export default function Dashboard({
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Total Celdas</span>
             <span className="text-2xl font-black text-slate-100 block">{windows.length}</span>
           </div>
-          <LayoutGrid size={24} className="text-cyan-500/40" />
+          <LayoutGrid size={24} className="text-orange-500/40" />
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
@@ -152,15 +168,15 @@ export default function Dashboard({
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Avance Escaneado</span>
             <span className="text-2xl font-black text-slate-100 block">{totalLargoM.toFixed(1)} m</span>
           </div>
-          <Map size={24} className="text-cyan-500/40" />
+          <Map size={24} className="text-orange-500/40" />
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">RMR Promedio</span>
-            <span className="text-2xl font-black text-emerald-400 block">{rmrPromedio}</span>
+            <span className="text-2xl font-black text-orange-400 block">{rmrPromedio}</span>
           </div>
-          <TrendingUp size={24} className="text-emerald-500/40" />
+          <TrendingUp size={24} className="text-orange-500/40" />
         </div>
 
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
@@ -170,7 +186,7 @@ export default function Dashboard({
               {windows.length > 0 ? windows[windows.length - 1].geologo : 'N/A'}
             </span>
           </div>
-          <User size={24} className="text-cyan-500/40" />
+          <User size={24} className="text-orange-500/40" />
         </div>
       </div>
 
@@ -218,11 +234,10 @@ export default function Dashboard({
                   </td>
                   <td className="py-3.5 px-4 text-center text-slate-300 font-semibold">{w.rmr_89}</td>
                   <td className="py-3.5 px-4 text-center">
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      w.rmr_89 >= 61 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${w.rmr_89 >= 61 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                       w.rmr_89 >= 41 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                      'bg-red-500/10 text-red-400 border border-red-500/20'
-                    }`}>
+                        'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}>
                       {w.class_89}
                     </span>
                   </td>
@@ -230,7 +245,7 @@ export default function Dashboard({
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => onSelectWindow(w.name)}
-                        className="bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-2.5 py-1 rounded text-xs font-bold transition-all shadow-sm active:scale-95"
+                        className="bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded text-xs font-bold transition-all shadow-sm active:scale-95"
                       >
                         Mapear
                       </button>
@@ -257,10 +272,10 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Modal Registro Nueva Celda */}
+      {/* Modal Registro Nueva Celda (Modificado con un ancho max-w-2xl para mayor holgura) */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="glass-panel w-full max-w-lg p-6 rounded-xl border border-navy-800 space-y-4 text-left shadow-2xl bg-navy-900/95 my-8">
+          <div className="glass-panel w-full max-w-2xl p-6 rounded-xl border border-navy-800 space-y-4 text-left shadow-2xl bg-navy-900/95 my-8">
             <h3 className="text-base font-bold text-slate-100 tracking-wide border-b border-navy-800 pb-2 uppercase flex items-center gap-2">
               <Plus size={18} className="text-orange-400" />
               <span>Nueva Celda de Mapeo Geomecánico</span>
@@ -273,10 +288,10 @@ export default function Dashboard({
                   <input
                     type="text"
                     required
-                    placeholder="ej. TD1"
+                    placeholder="ej. TD2-001"
                     value={celda}
                     onChange={(e) => setCelda(e.target.value.toUpperCase())}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-bold tracking-wider"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-bold tracking-wider"
                   />
                 </div>
                 <div className="space-y-1">
@@ -284,32 +299,39 @@ export default function Dashboard({
                   <input
                     type="text"
                     required
+                    placeholder="ej. AS-HM"
                     value={mapeador}
                     onChange={(e) => setMapeador(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
-                <div className="space-y-1">
+              {/* Distribución optimizada para dar más ancho al selector de Proyecto */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="md:col-span-2 space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Proyecto</label>
-                  <input
-                    type="text"
+                  <select
                     required
                     value={proyecto}
                     onChange={(e) => setProyecto(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
-                  />
+                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${proyecto === '' ? 'text-slate-500' : 'text-slate-100'
+                      }`}
+                  >
+                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
+                    <option value="Proyecto A" className="bg-navy-950 text-slate-100">Proyecto A</option>
+                    <option value="Proyecto B" className="bg-navy-950 text-slate-100">Proyecto B</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector</label>
                   <input
                     type="text"
                     required
+                    placeholder="ej. E1"
                     value={sector}
                     onChange={(e) => setSector(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
                 <div className="space-y-1">
@@ -317,9 +339,10 @@ export default function Dashboard({
                   <input
                     type="text"
                     required
+                    placeholder="ej. 5"
                     value={fase}
                     onChange={(e) => setFase(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
                 <div className="space-y-1">
@@ -327,9 +350,10 @@ export default function Dashboard({
                   <input
                     type="text"
                     required
+                    placeholder="ej. 3960"
                     value={nivel}
                     onChange={(e) => setNivel(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
               </div>
@@ -344,9 +368,10 @@ export default function Dashboard({
                       type="number"
                       step="0.01"
                       required
+                      placeholder="794444.87"
                       value={esteFrom}
-                      onChange={(e) => setEsteFrom(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      onChange={(e) => setEsteFrom(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
@@ -355,9 +380,10 @@ export default function Dashboard({
                       type="number"
                       step="0.01"
                       required
+                      placeholder="8440465.91"
                       value={norteFrom}
-                      onChange={(e) => setNorteFrom(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      onChange={(e) => setNorteFrom(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
@@ -366,9 +392,10 @@ export default function Dashboard({
                       type="number"
                       step="0.01"
                       required
+                      placeholder="3960.47"
                       value={cotaFrom}
-                      onChange={(e) => setCotaFrom(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      onChange={(e) => setCotaFrom(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                 </div>
@@ -384,9 +411,10 @@ export default function Dashboard({
                       type="number"
                       step="0.01"
                       required
+                      placeholder="794449.13"
                       value={esteTo}
-                      onChange={(e) => setEsteTo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      onChange={(e) => setEsteTo(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
@@ -395,9 +423,10 @@ export default function Dashboard({
                       type="number"
                       step="0.01"
                       required
+                      placeholder="8440455.69"
                       value={norteTo}
-                      onChange={(e) => setNorteTo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      onChange={(e) => setNorteTo(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
@@ -406,9 +435,10 @@ export default function Dashboard({
                       type="number"
                       step="0.01"
                       required
+                      placeholder="3959.84"
                       value={cotaTo}
-                      onChange={(e) => setCotaTo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      onChange={(e) => setCotaTo(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                 </div>
@@ -422,9 +452,10 @@ export default function Dashboard({
                     type="number"
                     step="0.5"
                     required
+                    placeholder="15.0"
                     value={altura}
-                    onChange={(e) => setAltura(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none"
+                    onChange={(e) => setAltura(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1">
@@ -432,20 +463,28 @@ export default function Dashboard({
                   <input
                     type="number"
                     required
+                    placeholder="64"
                     value={dipTalud}
-                    onChange={(e) => setDipTalud(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none"
+                    onChange={(e) => setDipTalud(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase block">Litología (Lito-3)</label>
-                  <input
-                    type="text"
+                  <select
                     required
                     value={lito3}
-                    onChange={(e) => setLito3(e.target.value.toUpperCase())}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none font-bold"
-                  />
+                    onChange={(e) => setLito3(e.target.value)}
+                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${lito3 === '' ? 'text-slate-500' : 'text-slate-100'
+                      }`}
+                  >
+                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
+                    {Object.keys(LITHOLOGY_CATALOG).map(code => (
+                      <option key={code} value={code} className="bg-navy-950 text-slate-100">
+                        {code} - {LITHOLOGY_CATALOG[code].name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -453,31 +492,37 @@ export default function Dashboard({
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase block">Agua Subterránea</label>
                   <select
+                    required
                     value={condicionAgua}
                     onChange={(e) => setCondicionAgua(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-slate-300 text-sm focus:outline-none"
+                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${condicionAgua === '' ? 'text-slate-500' : 'text-slate-100'
+                      }`}
                   >
-                    <option value="C">Completamente seco (C)</option>
-                    <option value="H">Húmedo (H)</option>
-                    <option value="M">Mojado (Goteo) (M)</option>
-                    <option value="E">Goteando (E)</option>
-                    <option value="F">Fluyendo (F)</option>
+                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
+                    <option value="C" className="bg-navy-950 text-slate-100">Completamente seco (C)</option>
+                    <option value="H" className="bg-navy-950 text-slate-100">Húmedo (H)</option>
+                    <option value="M" className="bg-navy-950 text-slate-100">Mojado (Goteo) (M)</option>
+                    <option value="E" className="bg-navy-950 text-slate-100">Goteando (E)</option>
+                    <option value="F" className="bg-navy-950 text-slate-100">Fluyendo (F)</option>
                   </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase block">Resistencia UCS</label>
                   <select
+                    required
                     value={resistenciaUcs}
                     onChange={(e) => setResistenciaUcs(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-slate-300 text-sm focus:outline-none"
+                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${resistenciaUcs === '' ? 'text-slate-500' : 'text-slate-100'
+                      }`}
                   >
-                    <option value="R0">R0 — Extremadamente débil (&lt; 1 MPa)</option>
-                    <option value="R1">R1 — Muy débil (1 - 5 MPa)</option>
-                    <option value="R2">R2 — Débil (5 - 25 MPa)</option>
-                    <option value="R3">R3 — Media / Mod. resistente (25 - 50 MPa)</option>
-                    <option value="R4">R4 — Fuerte / Resistente (50 - 100 MPa)</option>
-                    <option value="R5">R5 — Muy fuerte / Muy resistente (100 - 250 MPa)</option>
-                    <option value="R6">R6 — Extremadamente fuerte (&gt; 250 MPa)</option>
+                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
+                    <option value="R0" className="bg-navy-950 text-slate-100">R0 — Extremadamente débil (&lt; 1 MPa)</option>
+                    <option value="R1" className="bg-navy-950 text-slate-100">R1 — Muy débil (1 - 5 MPa)</option>
+                    <option value="R2" className="bg-navy-950 text-slate-100">R2 — Débil (5 - 25 MPa)</option>
+                    <option value="R3" className="bg-navy-950 text-slate-100">R3 — Media / Mod. resistente (25 - 50 MPa)</option>
+                    <option value="R4" className="bg-navy-950 text-slate-100">R4 — Fuerte / Resistente (50 - 100 MPa)</option>
+                    <option value="R5" className="bg-navy-950 text-slate-100">R5 — Muy fuerte / Muy resistente (100 - 250 MPa)</option>
+                    <option value="R6" className="bg-navy-950 text-slate-100">R6 — Extremadamente fuerte (&gt; 250 MPa)</option>
                   </select>
                 </div>
               </div>
@@ -486,13 +531,13 @@ export default function Dashboard({
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-400 px-4 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                  className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-bold transition-all active:scale-95"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 animate-pulse-ring"
+                  className="bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95"
                 >
                   Crear Celda
                 </button>

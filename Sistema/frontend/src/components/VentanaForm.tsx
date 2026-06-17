@@ -100,7 +100,7 @@ export default function VentanaForm({
 
   return (
     <div className="space-y-6 select-none text-left">
-      
+
       {/* SECCIÓN 1: DATOS DE IDENTIFICACIÓN Y COORDENADAS 3D */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2 flex items-center justify-between">
@@ -121,7 +121,7 @@ export default function VentanaForm({
 
         {/* Coordenadas e Identificación */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          
+
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código Celda</label>
             <input
@@ -206,7 +206,12 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between block">
               <span>Largo (m)</span>
               {calculatedLargo !== null && (
-                <span className="text-[10px] bg-orange-950/40 border border-orange-500/30 text-orange-400 font-bold px-1.5 py-0.2 rounded">AUTO</span>
+                <span
+                  className="text-[10px] bg-orange-500/10 border border-orange-500/30 text-orange-400 font-extrabold px-2 py-0.5 rounded cursor-help transition-all hover:bg-orange-500/20"
+                  title={`Distancia Real 3D calculada por Coordenadas: √((X2 - X1)² + (Y2 - Y1)² + (Z2 - Z1)²) = ${calculatedLargo.toFixed(2)} m`}
+                >
+                  AUTO
+                </span>
               )}
             </label>
             <input
@@ -215,9 +220,9 @@ export default function VentanaForm({
               value={header.largo || ''}
               readOnly={calculatedLargo !== null}
               onChange={(e) => handleChange('largo', e.target.value)}
-              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-center ${
-                calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'
-              }`}
+              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'
+                }`}
+              title={calculatedLargo !== null ? `Distancia Euclidiana 3D: √((X2-X1)² + (Y2-Y1)² + (Z2-Z1)²) = ${calculatedLargo.toFixed(2)} m` : "Ingrese longitud manualmente"}
               placeholder="m"
             />
           </div>
@@ -440,7 +445,7 @@ export default function VentanaForm({
           </div>
         </div>
       </div>
-      
+
     </div>
   );
 }

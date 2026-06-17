@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3 } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -283,7 +283,8 @@ export default function App() {
         sect_geot: newWindow.sect_geot,
         fecha: newWindow.fecha,
         condicion_agua: newWindow.condicion_agua,
-        resistencia_ucs: newWindow.resistencia_ucs
+        resistencia_ucs: newWindow.resistencia_ucs,
+        comentario: '' // Forzamos inicialización de comentario para prevenir excepciones de tipo undefined
       },
       joints: normalizeJoints([])
     };
@@ -320,6 +321,58 @@ export default function App() {
       setActiveWindow(null);
     }
     setCurrentView('dashboard');
+  };
+
+  const handleDeleteFamily = (famId: number) => {
+    if (!activeWindow) return;
+
+    if (famId <= 3) {
+      alert("No se pueden eliminar las familias básicas obligatorias (F1, F2, F3).");
+      return;
+    }
+
+    // 1. Obtener las juntas que pertenecen exclusivamente a la familia a eliminar
+    const familyJoints = activeWindow.joints.filter(j => j.familia === famId);
+
+    // 2. Comprobar si contienen datos significativos antes de confirmar
+    const hasData = familyJoints.some(j =>
+      (j.distancia !== -1 && j.distancia !== null) ||
+      (j.dip !== -1 && j.dip !== null) ||
+      (j.dip_dir !== -1 && j.dip_dir !== null) ||
+      (j.espaciamiento !== -1 && j.espaciamiento !== null) ||
+      (j.abertura !== -1 && j.abertura !== null) ||
+      (j.espesor !== -1 && j.espesor !== null) ||
+      (j.jrc !== -1 && j.jrc !== null) ||
+      (j.rugosidad !== -1 && j.rugosidad !== 1 && j.rugosidad !== null) ||
+      j.tipo_estructura !== 'JN' ||
+      j.alteracion !== 'd' ||
+      j.forma !== 'O'
+    );
+
+    if (hasData) {
+      const confirm1 = window.confirm(`¿Está seguro de que desea eliminar la Familia F${famId}? Contiene datos registrados.`);
+      if (!confirm1) return;
+      const confirm2 = window.confirm(`ATENCIÓN: Se perderán definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serán reindexadas automáticamente. ¿Confirmar eliminación?`);
+      if (!confirm2) return;
+    }
+
+    // 3. Filtrar la familia eliminada y desplazar (reindexar) en cascada decreciente todas las familias superiores
+    const remainingJoints = activeWindow.joints.filter(j => j.familia !== famId);
+    const shiftedJoints = remainingJoints.map(j => {
+      if (j.familia > famId) {
+        return { ...j, familia: j.familia - 1 };
+      }
+      return j;
+    });
+
+    // 4. Normalizar el arreglo final de juntas
+    const normalized = normalizeJoints(shiftedJoints);
+
+    setActiveWindow({
+      ...activeWindow,
+      joints: normalized
+    });
+    setSyncStatus('unsaved');
   };
 
   const handleSaveActive = async () => {
@@ -538,72 +591,162 @@ export default function App() {
                 calculated={calculated}
                 onOpenImportModal={() => setIsImportModalOpen(true)}
               />
-              
+
               <DisconTable
                 joints={activeWindow.joints}
                 onChange={(joints) => setActiveWindow({ ...activeWindow, joints })}
                 selectedRowIndex={selectedRowIndex}
                 onSelectRow={setSelectedRowIndex}
                 largoMax={calculated?.largo || 10}
+                onDeleteFamily={handleDeleteFamily}
               />
 
-              {/* Resumen — Promedios RMR y JV */}
-              <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-4 text-left select-none">
-                <h3 className="text-sm md:text-base font-black text-slate-100 uppercase tracking-widest border-b border-navy-800/60 pb-3 flex items-center gap-2">
-                  <BarChart3 size={16} className="text-orange-500" />
-                  <span>Resumen — Promedios RMR y JV</span>
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column: Promedios por Familia */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">
-                      Promedios Ponderados por Familia <span className="text-slate-500 font-medium">(Σ(n · esp) / Σn)</span>
-                    </h4>
-                    <div className="space-y-2">
-                      {[1, 2, 3].map((f) => {
-                        const val = calculated?.familias_spacing[f];
-                        const displayVal = val !== undefined && val !== null ? val.toFixed(4) + ' m' : '—';
-                        return (
-                          <div key={f} className="flex items-center justify-between p-3 bg-navy-950/60 border border-navy-850 rounded-lg">
-                            <span className="text-sm font-bold text-slate-300">Fam {f}:</span>
-                            <span className="text-base font-black text-orange-400 font-mono">{displayVal}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              {/* 📊 CENTRO DE MÉTRICAS GEOMECÁNICAS (KPIs) RE-DISEÑADO */}
+              {(() => {
+                // Función auxiliar para generar estilos de contenedor dinámicos por familia
+                const getFamilyStyle = (fam: number) => {
+                  const styles: Record<number, { dot: string; container: string; badge: string }> = {
+                    1: { dot: 'bg-orange-500', container: 'bg-orange-500/5 border border-orange-500/20 text-orange-400', badge: 'bg-orange-500/20 border border-orange-500/30 text-orange-400' },
+                    2: { dot: 'bg-emerald-500', container: 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400', badge: 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' },
+                    3: { dot: 'bg-indigo-500', container: 'bg-indigo-500/5 border border-indigo-500/20 text-indigo-400', badge: 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-400' },
+                    4: { dot: 'bg-pink-500', container: 'bg-pink-500/5 border border-pink-500/20 text-pink-400', badge: 'bg-pink-500/20 border border-pink-500/30 text-pink-400' },
+                    5: { dot: 'bg-cyan-500', container: 'bg-cyan-500/5 border border-cyan-500/20 text-cyan-400', badge: 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-400' },
+                    6: { dot: 'bg-amber-500', container: 'bg-amber-500/5 border border-amber-500/20 text-amber-400', badge: 'bg-amber-500/20 border border-amber-500/30 text-amber-400' },
+                    7: { dot: 'bg-red-500', container: 'bg-red-500/5 border border-red-500/20 text-red-400', badge: 'bg-red-500/20 border border-red-500/30 text-red-400' },
+                    8: { dot: 'bg-violet-500', container: 'bg-violet-500/5 border border-violet-500/20 text-violet-400', badge: 'bg-violet-500/20 border border-violet-500/30 text-violet-400' },
+                    9: { dot: 'bg-teal-500', container: 'bg-teal-500/5 border border-teal-500/20 text-teal-400', badge: 'bg-teal-500/20 border border-teal-500/30 text-teal-400' },
+                  };
+                  return styles[fam] || { dot: 'bg-slate-500', container: 'bg-slate-500/5 border border-slate-500/20', badge: 'bg-slate-500/20 border border-slate-500/30 text-slate-400' };
+                };
 
-                  {/* Right Column: JV & RQD Summary */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">
-                      Índice Volumétrico y RQD Estimado
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-full">
-                      {/* JV Badge */}
-                      <div className="flex flex-col justify-between p-4 bg-navy-950/60 border border-navy-850 rounded-lg">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Jv (Volumétrico)</span>
-                        <div className="flex items-baseline gap-1 mt-2">
-                          <span className="text-2xl font-black text-amber-400 font-mono">
+                // Extraemos las familias activas únicas del registro para generar la lista dinámica
+                const activeFamiliesList = Array.from(new Set(activeWindow.joints.map(j => j.familia))).sort((a, b) => a - b);
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none text-left animate-fade-in">
+
+                    {/* Panel 1: Promedios Ponderados de Espaciamiento */}
+                    <div className="lg:col-span-5 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
+                          <BarChart3 size={16} className="text-orange-400" />
+                          <span>Promedios de Espaciamiento</span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-2 font-semibold">
+                          Fórmula de promedio ponderado por cantidad de estructuras: <code className="text-orange-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">Σ(n · esp) / Σn</code>
+                        </p>
+                      </div>
+
+                      <div className="space-y-2.5 mt-4 max-h-[175px] overflow-y-auto pr-1">
+                        {activeFamiliesList.map((famId) => {
+                          const val = calculated?.familias_spacing[famId];
+                          const displayVal = val !== undefined && val !== null ? val.toFixed(4) + ' m' : 'Sin datos';
+                          const style = getFamilyStyle(famId);
+
+                          return (
+                            <div
+                              key={famId}
+                              className={`flex items-center justify-between p-3 rounded-lg hover:brightness-110 transition-all ${style.container}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
+                                <span className="text-xs font-bold text-slate-300">Familia {famId} (F{famId})</span>
+                              </div>
+                              <span className={`text-xs font-black font-mono px-3 py-1 rounded-md border ${style.badge}`}>
+                                {displayVal}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Panel 2: KPI Índice Volumétrico (Jv) - Diseño de Instrumento Suave */}
+                    <div className="lg:col-span-3 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-amber-950/5 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+
+                      <div>
+                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
+                          <Layers size={16} className="text-amber-400" />
+                          <span>Índice Volumétrico</span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-2 font-semibold">
+                          Conteo de discontinuidades volumétricas ($Jv$).
+                        </p>
+                      </div>
+
+                      {/* Contenedor elegante de tono suave semi-transparente con icono geológico integrado */}
+                      <div className="my-4 bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 shadow-[0_0_15px_rgba(245,158,11,0.05)] flex items-center justify-between transition-all hover:bg-amber-500/15">
+                        <div className="flex flex-col text-left">
+                          <span className="text-3xl font-extrabold font-mono tracking-tight text-amber-300">
                             {calculated && calculated.jv > 0 ? calculated.jv.toFixed(4) : '—'}
                           </span>
-                          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">jts/m³</span>
+                          <span className="text-xs font-bold uppercase tracking-wider mt-0.5 text-amber-400/80">jts / m³</span>
                         </div>
+                        <Layers size={28} className="text-amber-400/30 shrink-0 stroke-[1.5]" />
                       </div>
-                      {/* RQD Badge */}
-                      <div className="flex flex-col justify-between p-4 bg-navy-950/60 border border-navy-850 rounded-lg">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">RQD Estimado</span>
-                        <div className="flex items-baseline gap-1 mt-2">
-                          <span className="text-2xl font-black text-blue-400 font-mono">
+
+                      <div className="p-2.5 bg-navy-900/60 rounded-lg border border-navy-850 text-center">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                          {calculated && calculated.jv > 0 ? (
+                            calculated.jv <= 1 ? 'Masivo / Excelente Calidad' :
+                              calculated.jv <= 5 ? 'Bajo Fracturamiento' :
+                                calculated.jv <= 15 ? 'Fracturamiento Moderado' : 'Altamente Fracturado'
+                          ) : 'A la espera de registros'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Panel 3: KPI RQD Estimado - Diseño de Instrumento Suave */}
+                    <div className="lg:col-span-4 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-blue-950/5 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all pointer-events-none" />
+
+                      <div>
+                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
+                          <Gauge size={16} className="text-blue-400" />
+                          <span>RQD Estimado</span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-2 font-semibold">
+                          Cálculo empírico según fórmula de Palmström: <code className="text-blue-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                        </p>
+                      </div>
+
+                      {/* Contenedor elegante de tono suave semi-transparente con icono geológico integrado */}
+                      <div className="my-4 bg-blue-500/10 border border-blue-500/25 rounded-xl p-4 shadow-[0_0_15px_rgba(56,189,248,0.05)] flex items-center justify-between transition-all hover:bg-blue-500/15">
+                        <div className="flex flex-col text-left">
+                          <span className="text-3xl font-extrabold font-mono tracking-tight text-blue-300">
                             {calculated ? calculated.rqd_est.toFixed(2) : '—'}
                           </span>
-                          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">%</span>
+                          <span className="text-xs font-bold uppercase tracking-wider mt-0.5 text-blue-400/80">% de Calidad de Roca</span>
+                        </div>
+                        <Gauge size={28} className="text-blue-400/30 shrink-0 stroke-[1.5]" />
+                      </div>
+
+                      {/* Barra de Progreso Dinámica */}
+                      <div className="space-y-2">
+                        <div className="w-full bg-navy-950 rounded-full h-2.5 border border-navy-900 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${calculated ? (
+                                calculated.rqd_est < 25 ? 'bg-red-500' :
+                                  calculated.rqd_est < 50 ? 'bg-orange-500' :
+                                    calculated.rqd_est < 75 ? 'bg-amber-500' :
+                                      calculated.rqd_est < 90 ? 'bg-blue-500' : 'bg-emerald-500'
+                              ) : 'bg-slate-800'
+                              }`}
+                            style={{ width: `${calculated ? calculated.rqd_est : 0}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-400 font-bold uppercase tracking-wider">
+                          <span>Mala</span>
+                          <span>Regular</span>
+                          <span>Excelente</span>
                         </div>
                       </div>
                     </div>
+
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* 💬 Comentarios y Fotografías */}
               <CommentsPhotos
