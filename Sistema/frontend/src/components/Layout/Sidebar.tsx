@@ -4,8 +4,7 @@ import {
   TrendingUp,
   Share2,
   Moon,
-  Sun,
-  BookOpen
+  Sun
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,7 +27,6 @@ export default function Sidebar({
     { id: 'mapeo', label: 'Mapeo por Ventana', icon: Map, category: 'REGISTRO DE CAMPO' },
     { id: 'plt_ensayos', label: 'Ensayos PLT Irregulares', icon: TrendingUp, category: 'ENSAYOS' },
     { id: 'rmr', label: 'Análisis RMR', icon: TrendingUp, category: 'CONTROL Y ANÁLISIS' },
-    { id: 'catalogos', label: 'Catálogos de Referencia', icon: BookOpen, category: 'CONTROL Y ANÁLISIS' },
     { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' }
   ];
 
@@ -72,11 +70,10 @@ export default function Sidebar({
                   <button
                     key={item.id}
                     onClick={() => onViewChange(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-all group relative ${
-                      isActive
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-all group relative ${isActive
                         ? 'bg-orange-600/10 text-orange-600 dark:bg-orange-500/10 dark:text-amber-400 font-bold border-l-2 border-orange-600 dark:border-amber-400 shadow-sm'
                         : 'hover:bg-navy-900/40 hover:text-slate-100 text-slate-400'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3 text-left min-w-0">
                       <Icon

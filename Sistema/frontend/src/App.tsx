@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -89,6 +89,9 @@ export default function App() {
   // Photos & Captions states
   const [photos, setPhotos] = useState<string[]>(['', '', '', '']);
   const [captions, setCaptions] = useState<string[]>(['', '', '', '']);
+
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+
 
   // 1. Initialize Dark Mode Theme
   useEffect(() => {
@@ -631,15 +634,26 @@ export default function App() {
             {currentView !== 'dashboard' && (
               <button
                 onClick={() => setCurrentView('dashboard')}
-                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-800 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
               >
                 <ArrowLeft size={14} />
                 <span>Volver al Panel</span>
               </button>
             )}
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">
+
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest hidden lg:inline pr-3 border-r border-navy-800/80">
               Mapeo de Paredes Geomecánicas 2.0
             </span>
+
+            {/* 🏷️ INDICADOR DE CELDA ACTIVA EN EL TOPBAR */}
+            {activeWindow && (
+              <div className="flex items-center gap-2 animate-fade-in pl-1">
+                <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Celda Activa:</span>
+                <span className="text-xs font-black text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3 py-1 rounded-lg uppercase tracking-wider shadow-[0_0_10px_rgba(249,115,22,0.05)]">
+                  {activeWindow.header.celda}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -650,7 +664,7 @@ export default function App() {
                   syncStatus === 'unsaved' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
                     'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                 }`} />
-              <span className="text-xs text-slate-400 font-semibold" title={syncMessage}>
+              <span className="text-xs text-slate-400 font-semibold hidden md:inline" title={syncMessage}>
                 {syncStatus === 'synced' ? 'SQL Server Conectado' :
                   syncStatus === 'saving' ? 'Guardando...' :
                     syncStatus === 'unsaved' ? 'Cambios pendientes' :
@@ -658,8 +672,19 @@ export default function App() {
               </span>
             </div>
 
-            {/* General Window Actions */}
+            {/* General Topbar Actions */}
             <div className="flex items-center gap-2">
+
+              {/* 📖 BOTÓN FLOTANTE PARA VER CATÁLOGOS */}
+              <button
+                onClick={() => setIsCatalogModalOpen(true)}
+                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                title="Ver Catálogos de Referencia Geomecánica"
+              >
+                <BookOpen size={14} className="text-orange-400" />
+                <span>Catálogos</span>
+              </button>
+
               {activeWindow && (
                 <button
                   onClick={handleSaveActive}
@@ -920,11 +945,6 @@ export default function App() {
             />
           )}
 
-
-          {currentView === 'catalogos' && (
-            <CatalogsView />
-          )}
-
         </main>
 
         {/* 3. QA/QC VALIDATION PANEL (Bottom-Right Floating) */}
@@ -951,6 +971,37 @@ export default function App() {
           setSelectedRowIndex(0);
         }}
       />
+      {isCatalogModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
+          <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
+            <div className="h-1.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-500 w-full" />
+
+            <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-lg">
+                  <BookOpen size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
+                    Catálogos de Referencia Geomecánica
+                  </h3>
+                  <p className="text-xs text-slate-400">Guía de parámetros y ratings para clasificaciones RMR (Bieniawski)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCatalogModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-navy-800 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-navy-950/20">
+              <CatalogsView />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

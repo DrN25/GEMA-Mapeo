@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Table } from 'lucide-react';
+import { Table } from 'lucide-react';
 import {
   STRUCTURE_CATALOG,
   RELLENO_CATALOG,
@@ -23,32 +23,17 @@ export default function CatalogsView() {
   ];
 
   return (
-    <div className="space-y-6 select-none text-left animate-fade-in">
-      
-      {/* Cabecera de Sección */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-500/10 border border-orange-500/20 rounded-lg flex items-center justify-center text-orange-500 shadow-md">
-            <BookOpen size={20} />
-          </div>
-          <div>
-            <h2 className="text-base md:text-lg font-black text-slate-100 uppercase tracking-widest">Catálogos de Referencia Geomecánica</h2>
-            <p className="text-sm text-slate-400">Guía de parámetros y ratings para clasificaciones RMR'89 y RMR'76 (Bieniawski)</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-4 select-none text-left animate-fade-in">
       {/* Selector de pestañas */}
-      <div className="flex flex-wrap gap-2 border-b border-navy-800 pb-3">
+      <div className="flex flex-wrap gap-1.5 border-b border-navy-850 pb-2.5">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2.5 rounded-lg text-sm font-bold tracking-wide transition-all ${
-              activeTab === t.id
-                ? 'bg-orange-500 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${activeTab === t.id
+                ? 'bg-orange-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
                 : 'bg-navy-900/60 border border-navy-800 text-slate-300 hover:bg-navy-800 hover:text-white'
-            }`}
+              }`}
           >
             {t.label}
           </button>
@@ -56,26 +41,26 @@ export default function CatalogsView() {
       </div>
 
       {/* Cuerpo del Catálogo */}
-      <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 min-h-[400px] flex flex-col">
+      <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 min-h-[350px] flex flex-col">
         {activeTab === 'tipos' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Tipos de Estructura</span>
             </h3>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 w-32 border-b border-navy-900">Código</th>
-                    <th className="py-3 px-4 border-b border-navy-900">Descripción Estructura</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 w-32 border-b border-navy-900">Código</th>
+                    <th className="py-2.5 px-4 border-b border-navy-900">Descripción Estructura</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {Object.entries(STRUCTURE_CATALOG).map(([code, desc]) => (
                     <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 text-orange-400 font-black">{code}</td>
-                      <td className="py-3 px-4">{desc}</td>
+                      <td className="py-2.5 px-4 text-orange-400 font-black">{code}</td>
+                      <td className="py-2.5 px-4">{desc}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -85,19 +70,19 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'abertura' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Abertura de Juntas</span>
             </h3>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 border-b border-navy-900">Clase</th>
-                    <th className="py-3 px-4 text-center border-b border-navy-900">Rango Abertura (mm)</th>
-                    <th className="py-3 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
-                    <th className="py-3 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 border-b border-navy-900">Clase</th>
+                    <th className="py-2.5 px-4 text-center border-b border-navy-900">Rango Abertura (mm)</th>
+                    <th className="py-2.5 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
+                    <th className="py-2.5 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
@@ -109,10 +94,10 @@ export default function CatalogsView() {
                     { label: "Extremadamente Abierta", range: "> 5.0 mm", r89: 0, r76: 0 }
                   ].map((item, idx) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 font-bold">{item.label}</td>
-                      <td className="py-3 px-4 text-center font-mono">{item.range}</td>
-                      <td className="py-3 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
-                      <td className="py-3 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
+                      <td className="py-2.5 px-4 font-bold">{item.label}</td>
+                      <td className="py-2.5 px-4 text-center font-mono">{item.range}</td>
+                      <td className="py-2.5 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
+                      <td className="py-2.5 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -122,18 +107,18 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'continuidad' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Continuidad / Persistencia (m)</span>
             </h3>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 border-b border-navy-900">Rango de Persistencia</th>
-                    <th className="py-3 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
-                    <th className="py-3 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 border-b border-navy-900">Rango de Persistencia</th>
+                    <th className="py-2.5 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
+                    <th className="py-2.5 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
@@ -145,9 +130,9 @@ export default function CatalogsView() {
                     { range: "> 20 m", r89: 0, r76: 0 }
                   ].map((item, idx) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 font-bold font-mono">{item.range}</td>
-                      <td className="py-3 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
-                      <td className="py-3 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
+                      <td className="py-2.5 px-4 font-bold font-mono">{item.range}</td>
+                      <td className="py-2.5 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
+                      <td className="py-2.5 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -157,48 +142,46 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'relleno' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Código Relleno y Ratings de Espesor</span>
             </h3>
-            <p className="text-sm text-slate-400">El espesor determina si se asigna columna de espesor &lt; 5mm o &gt; 5mm. El puntaje final toma el mínimo de Relleno 1 y Relleno 2.</p>
+            <p className="text-xs text-slate-400">El espesor determina si se asigna columna de espesor &lt; 5mm o &gt; 5mm.</p>
             <div className="overflow-x-auto rounded-lg border border-navy-900">
-              <table className="w-full text-left text-sm border-collapse" style={{ minWidth: '900px' }}>
+              <table className="w-full text-left text-xs border-collapse" style={{ minWidth: '900px' }}>
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-3 border-b border-navy-900">Relleno</th>
-                    <th className="py-3 px-2 text-center border-b border-navy-900">Tipo</th>
-                    <th className="py-3 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Sin (89)</th>
-                    <th className="py-3 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Duro &lt;5 (89)</th>
-                    <th className="py-3 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Duro &gt;5 (89)</th>
-                    <th className="py-3 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Blando &lt;5 (89)</th>
-                    <th className="py-3 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Blando &gt;5 (89)</th>
-                    
-                    <th className="py-3 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Sin (76)</th>
-                    <th className="py-3 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &lt;5 (76)</th>
-                    <th className="py-3 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &gt;5 (76)</th>
-                    <th className="py-3 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Blando &lt;5 (76)</th>
-                    <th className="py-3 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Blando &gt;5 (76)</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-3 border-b border-navy-900">Relleno</th>
+                    <th className="py-2.5 px-2 text-center border-b border-navy-900">Tipo</th>
+                    <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Sin (89)</th>
+                    <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Duro &lt;5 (89)</th>
+                    <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Duro &gt;5 (89)</th>
+                    <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Blando &lt;5 (89)</th>
+                    <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Blando &gt;5 (89)</th>
+                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Sin (76)</th>
+                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &lt;5 (76)</th>
+                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &gt;5 (76)</th>
+                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Blando &lt;5 (76)</th>
+                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Blando &gt;5 (76)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {Object.entries(RELLENO_CATALOG).map(([code, item]) => {
                     return (
                       <tr key={code} className="hover:bg-navy-900/20">
-                        <td className="py-3 px-3 font-bold text-orange-400">{code} - {item.name.replace(/\([^)]+\)/g, '')}</td>
-                        <td className="py-3 px-2 text-center text-xs text-slate-400">{item.tipo}</td>
-                        <td className="py-3 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 3 ? item.rmr89 : ''}</td>
-                        <td className="py-3 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 2 ? item.rmr89 : ''}</td>
-                        <td className="py-3 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 2 ? item.rmr89_gt5 : ''}</td>
-                        <td className="py-3 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 1 ? item.rmr89 : ''}</td>
-                        <td className="py-3 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 1 ? item.rmr89_gt5 : ''}</td>
-                        
-                        <td className="py-3 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 3 ? item.rmr76 : ''}</td>
-                        <td className="py-3 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76 : ''}</td>
-                        <td className="py-3 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76_gt5 : ''}</td>
-                        <td className="py-3 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76 : ''}</td>
-                        <td className="py-3 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76_gt5 : ''}</td>
+                        <td className="py-2.5 px-3 font-bold text-orange-400">{code} - {item.name.replace(/\([^)]+\)/g, '')}</td>
+                        <td className="py-2.5 px-2 text-center text-[10px] text-slate-400">{item.tipo}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 3 ? item.rmr89 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 2 ? item.rmr89 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 2 ? item.rmr89_gt5 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 1 ? item.rmr89 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 bg-pink-950/5">{item.clase === 1 ? item.rmr89_gt5 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 3 ? item.rmr76 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76_gt5 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76 : ''}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76_gt5 : ''}</td>
                       </tr>
                     );
                   })}
@@ -209,28 +192,28 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'rugosidad' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Rugosidad Estructural</span>
             </h3>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-4xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 border-b border-navy-900 w-16 text-center">Perfil</th>
-                    <th className="py-3 px-4 border-b border-navy-900">Descripción Perfil</th>
-                    <th className="py-3 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
-                    <th className="py-3 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 border-b border-navy-900 w-16 text-center">Perfil</th>
+                    <th className="py-2.5 px-4 border-b border-navy-900">Descripción Perfil</th>
+                    <th className="py-2.5 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
+                    <th className="py-2.5 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {Object.entries(RUGOSIDAD_CATALOG).map(([numStr, item]) => (
                     <tr key={numStr} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 text-center font-bold text-orange-400">{numStr}</td>
-                      <td className="py-3 px-4">{item.desc.replace(/^\d\s*—\s*/, '')}</td>
-                      <td className="py-3 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
-                      <td className="py-3 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-orange-400">{numStr}</td>
+                      <td className="py-2.5 px-4">{item.desc.replace(/^\d\s*—\s*/, '')}</td>
+                      <td className="py-2.5 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
+                      <td className="py-2.5 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -240,24 +223,24 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'forma' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Forma de Discontinuidades</span>
             </h3>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 w-32 border-b border-navy-900">Código</th>
-                    <th className="py-3 px-4 border-b border-navy-900">Descripción Forma</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 w-32 border-b border-navy-900">Código</th>
+                    <th className="py-2.5 px-4 border-b border-navy-900">Descripción Forma</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {Object.entries(FORMA_CATALOG).map(([code, desc]) => (
                     <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 text-orange-400 font-black">{code}</td>
-                      <td className="py-3 px-4">{desc}</td>
+                      <td className="py-2.5 px-4 text-orange-400 font-black">{code}</td>
+                      <td className="py-2.5 px-4">{desc}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -267,28 +250,28 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'alteracion' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Meteorización / Alteración de Pared</span>
             </h3>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-4xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 w-24 border-b border-navy-900">Código</th>
-                    <th className="py-3 px-4 border-b border-navy-900">Grado de Meteorización</th>
-                    <th className="py-3 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
-                    <th className="py-3 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 w-24 border-b border-navy-900">Código</th>
+                    <th className="py-2.5 px-4 border-b border-navy-900">Grado de Meteorización</th>
+                    <th className="py-2.5 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
+                    <th className="py-2.5 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {Object.entries(ALTERACION_CATALOG).map(([code, item]) => (
                     <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 font-black text-orange-400">{code}</td>
-                      <td className="py-3 px-4">{item.name.replace(/^[a-z]\s*—\s*/i, '')}</td>
-                      <td className="py-3 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
-                      <td className="py-3 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
+                      <td className="py-2.5 px-4 font-black text-orange-400">{code}</td>
+                      <td className="py-2.5 px-4">{item.name.replace(/^[a-z]\s*—\s*/i, '')}</td>
+                      <td className="py-2.5 px-4 text-center text-pink-300 bg-pink-950/5 font-black">{item.r89}</td>
+                      <td className="py-2.5 px-4 text-center text-amber-300 bg-amber-950/5 font-black">{item.r76}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -298,18 +281,18 @@ export default function CatalogsView() {
         )}
 
         {activeTab === 'jrc' && (
-          <div className="space-y-4">
-            <h3 className="text-sm md:text-base font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Table size={16} className="text-orange-500" />
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
               <span>Matriz JRC vs Perfil de Rugosidad</span>
             </h3>
-            <p className="text-sm text-slate-400">Permite comparar visualmente los coeficientes de rugosidad de junta (JRC) con los perfiles numéricos 1 al 9.</p>
+            <p className="text-xs text-slate-400">Coeficientes de rugosidad de junta (JRC) vs perfiles del 1 al 9.</p>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-xl">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-                    <th className="py-3 px-4 border-b border-navy-900">Rango Coeficiente JRC</th>
-                    <th className="py-3 px-4 text-center border-b border-navy-900 w-36">N&deg; Perfil Rugosidad</th>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 border-b border-navy-900">Rango Coeficiente JRC</th>
+                    <th className="py-2.5 px-4 text-center border-b border-navy-900 w-36">N&deg; Perfil Rugosidad</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
@@ -326,8 +309,8 @@ export default function CatalogsView() {
                     { range: "18 - 20", profile: 1 }
                   ].map((item, idx) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
-                      <td className="py-3 px-4 font-semibold">{item.range}</td>
-                      <td className="py-3 px-4 text-center font-bold text-orange-400">{item.profile}</td>
+                      <td className="py-2.5 px-4 font-semibold">{item.range}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-orange-400">{item.profile}</td>
                     </tr>
                   ))}
                 </tbody>
