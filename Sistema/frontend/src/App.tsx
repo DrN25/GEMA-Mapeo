@@ -163,10 +163,10 @@ export default function App() {
         // Convert to WindowSummary shape
         const summaries: WindowSummary[] = data.map((v: any) => ({
           name: v.codigo,
-          proyecto: "Proyecto A", // Default values
+          proyecto: "Proyecto A",
           geologo: v.mapeador || "N/A",
-          largo: 5.0, // placeholder, updated in select
-          altura: 15.0,
+          largo: v.largo_m !== null && v.largo_m !== undefined ? Math.round(v.largo_m) : 5, // Largo entero redondeado
+          altura: v.altura_m || 15.0,
           fecha_registro: v.fecha_mapeo || new Date().toISOString().split('T')[0],
           rmr_76: 60,
           rmr_89: 65,
@@ -216,21 +216,34 @@ export default function App() {
       const res = await fetch(`${API_BASE}/api/ventanas/${name}`);
       if (res.ok) {
         const v = await res.json();
+        const roundDec = (val: any, decs: number): number => {
+          if (val === null || val === undefined) return 0;
+          const num = parseFloat(val);
+          if (isNaN(num)) return 0;
+          const factor = Math.pow(10, decs);
+          return Math.round(num * factor) / factor;
+        };
+
+        const getFieldVal = (d: any, aliasKey: string, snakeKey: string, fallback: any = -1) => {
+          const val = d[aliasKey] !== undefined && d[aliasKey] !== null ? d[aliasKey] : d[snakeKey];
+          return val !== undefined && val !== null ? val : fallback;
+        };
+
         const header: WindowHeader = {
           celda: v.codigo,
-          este_from: v.este_ini,
-          norte_from: v.norte_ini,
-          cota_from: v.cota_ini,
-          este_to: v.este_fin,
-          norte_to: v.norte_fin,
-          cota_to: v.cota_fin,
-          altura: v.altura_m || 15.0,
-          dip_talud: v.dip_talud || 64.0,
+          // Saneamiento estricto de coordenadas al cargar
+          este_from: roundDec(v.este_ini, 2),
+          norte_from: roundDec(v.norte_ini, 2),
+          cota_from: roundDec(v.cota_ini, 2),
+          este_to: roundDec(v.este_fin, 2),
+          norte_to: roundDec(v.norte_fin, 2),
+          cota_to: roundDec(v.cota_fin, 2),
+          altura: roundDec(v.altura_m, 1) || 15.0,
+          dip_talud: roundDec(v.dip_talud, 2) || 64.0,
 
-          // MAPEO EXPLICITO DE ORIENTACIONES PARA SU RECUPERACION EN LA WEB:
-          dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? v.dipdir_talud : undefined,
-          dip_hw: v.dip_hw !== null && v.dip_hw !== undefined ? v.dip_hw : undefined,
-          az_hw: v.az_hw !== null && v.az_hw !== undefined ? v.az_hw : undefined,
+          dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
+          dip_hw: v.dip_hw !== null && v.dip_hw !== undefined ? roundDec(v.dip_hw, 2) : undefined,
+          az_hw: v.az_hw !== null && v.az_hw !== undefined ? roundDec(v.az_hw, 2) : undefined,
 
           unidad_litologica: v.unidad_litologica || '',
           lito_1: v.lito_1 || '',
@@ -239,7 +252,7 @@ export default function App() {
           mapeador: v.mapeador || 'AS-HM',
           sector: v.sector || 'E1',
           fase: String(v.fase || '5'),
-          nivel: String(v.nivel || '3960'),
+          nivel: String(roundDec(v.nivel, 2) || '3960'), // Nivel con 2 decimales
           sect_geot: v.sector_geotecnico || 'E1',
           intemperia: v.intemperismo_codigo || '',
           alt_zona: v.alteracion_codigo || '',
@@ -251,27 +264,49 @@ export default function App() {
           turno: v.turno || 'Día'
         };
 
-        const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => ({
-          id: idx + 1,
-          familia: d.fam || d.familia_id || 1,
-          distancia: d.dist !== null && d.dist !== undefined ? d.dist : (d.distancia_m !== null && d.distancia_m !== undefined ? d.distancia_m : -1),
-          tipo_estructura: d.tipo || d.tipo_estructura || 'JN',
-          dip: d.dip !== null && d.dip !== undefined ? d.dip : -1,
-          dip_dir: d.dipdir !== null && d.dipdir !== undefined ? d.dipdir : (d.dip_dir !== null && d.dip_dir !== undefined ? d.dip_dir : -1),
-          n_estructuras: d.nstr !== null && d.nstr !== undefined ? d.nstr : (d.n_estructuras !== null && d.n_estructuras !== undefined ? d.n_estructuras : -1),
-          abertura: d.aber !== null && d.aber !== undefined ? d.aber : (d.abertura_mm !== null && d.abertura_mm !== undefined ? d.abertura_mm : -1),
-          espesor: d.esp !== null && d.esp !== undefined ? d.esp : (d.espesor_mm !== null && d.espesor_mm !== undefined ? d.espesor_mm : -1),
-          continuidad: d.cont !== null && d.cont !== undefined ? d.cont : (d.continuidad_m !== null && d.continuidad_m !== undefined ? d.continuidad_m : -1),
-          espaciamiento: d.espac !== null && d.espac !== undefined ? d.espac : (d.espaciamiento_m !== null && d.espaciamiento_m !== undefined ? d.espaciamiento_m : -1),
-          extremos_visibles: d.next !== undefined && d.next !== null ? d.next : (d.n_extremos_visibles !== undefined && d.n_extremos_visibles !== null ? d.n_extremos_visibles : 1),
-          terminacion: d.term !== undefined && d.term !== null ? d.term : (d.terminacion !== undefined && d.terminacion !== null ? d.terminacion : 0),
-          relleno1: d.r1 || d.relleno_1_codigo || 'cwf',
-          relleno2: d.r2 || d.relleno_2_codigo || undefined,
-          jrc: d.jrc !== null && d.jrc !== undefined ? d.jrc : -1,
-          rugosidad: d.rug !== null && d.rug !== undefined ? d.rug : (d.rugosidad_codigo !== null && d.rugosidad_codigo !== undefined ? d.rugosidad_codigo : -1),
-          forma: d.forma || d.forma_estructura || 'O',
-          alteracion: d.alt || d.alteracion_codigo || 'd'
-        }));
+        const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => {
+          const dist = getFieldVal(d, 'dist', 'distancia_m', -1);
+          const nstr = getFieldVal(d, 'nstr', 'n_estructuras', -1);
+          const aber = getFieldVal(d, 'aber', 'abertura_mm', -1);
+          const esp = getFieldVal(d, 'esp', 'espesor_mm', -1);
+          const cont = getFieldVal(d, 'cont', 'continuidad_m', -1);
+          const espac = getFieldVal(d, 'espac', 'espaciamiento_m', -1);
+
+          const dip_val = d.dip !== undefined && d.dip !== null ? d.dip : -1;
+          const dip_dir_val = getFieldVal(d, 'dipdir', 'dip_dir', -1);
+
+          const rug_val = getFieldVal(d, 'rug', 'rugosidad_codigo', -1);
+          const ext_val = getFieldVal(d, 'next', 'n_extremos_visibles', 1);
+          const term_val = getFieldVal(d, 'term', 'terminacion', 0);
+          const r1_val = getFieldVal(d, 'r1', 'relleno_1_codigo', 'cwf');
+          const r2_val = getFieldVal(d, 'r2', 'relleno_2_codigo', undefined);
+
+          return {
+            id: idx + 1,
+            familia: d.fam || d.familia_id || 1,
+            distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1, // Entero positivo
+            tipo_estructura: d.tipo || d.tipo_estructura || 'JN',
+            dip: dip_val !== -1 ? roundDec(dip_val, 2) : -1,
+            dip_dir: dip_dir_val !== -1 ? roundDec(dip_dir_val, 2) : -1,
+
+            // Cant (n): Solo enteros positivos o -1
+            n_estructuras: nstr !== -1 ? (Math.round(nstr) > 0 ? Math.round(nstr) : -1) : -1,
+
+            abertura: aber !== -1 ? roundDec(aber, 1) : -1, // 1 decimal
+            espesor: esp !== -1 ? roundDec(esp, 1) : -1,   // 1 decimal
+            continuidad: cont !== -1 ? roundDec(cont, 2) : -1,
+            espaciamiento: espac !== -1 ? roundDec(espac, 2) : -1, // 2 decimales
+
+            extremos_visibles: Math.min(2, Math.max(0, ext_val)), // 0 a 2 (removido 3)
+            terminacion: Math.min(3, Math.max(0, term_val)),     // 0 a 3 (removido 4 y 5)
+            relleno1: r1_val === '-1' ? 'cwf' : r1_val,
+            relleno2: r2_val === '-1' ? undefined : r2_val,
+            jrc: d.jrc !== null && d.jrc !== undefined ? Math.min(20, Math.max(0, d.jrc)) : -1,
+            rugosidad: rug_val !== -1 ? Math.min(9, Math.max(0, rug_val)) : -1, // Rango 0-9
+            forma: d.forma || d.forma_estructura || 'O',
+            alteracion: d.alt || d.alteracion_codigo || 'd'
+          };
+        });
 
         setActiveWindow({ header, joints: normalizeJoints(joints) });
         setSyncStatus('synced');

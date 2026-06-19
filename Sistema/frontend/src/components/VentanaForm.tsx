@@ -10,12 +10,35 @@ interface VentanaFormProps {
   onOpenImportModal: () => void;
 }
 
+// Función helper para limitar estrictamente la edición de enteros y decimales en inputs de texto
+const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length > 2) return cleaned.slice(0, -1);
+
+  let integerPart = parts[0];
+  let decimalPart = parts[1];
+
+  if (integerPart.length > intDigits) {
+    integerPart = integerPart.slice(0, intDigits);
+  }
+  if (decimalPart !== undefined && decimalPart.length > decDigits) {
+    decimalPart = decimalPart.slice(0, decDigits);
+  }
+
+  return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+};
+
 export default function VentanaForm({
   header,
   onChange,
   calculated: _calculated,
   onOpenImportModal
 }: VentanaFormProps) {
+
+  // Estado local para conservar la edición en texto de coordenadas y evitar deformar los puntos decimales mientras se tipea
+  const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
+
   const handleChange = (field: keyof WindowHeader, val: any) => {
     onChange({
       ...header,
@@ -23,24 +46,38 @@ export default function VentanaForm({
     });
   };
 
-  // Función de sanitización y control de precisión a 6 decimales
-  const limitPrecision = (val: number, decimals = 6): number => {
-    const factor = Math.pow(10, decimals);
-    return Math.round(val * factor) / factor;
+  const getInputValue = (field: keyof WindowHeader, stateVal: any): string => {
+    if (localValues[field as string] !== undefined) return localValues[field as string];
+    if (stateVal === undefined || stateVal === null) return '';
+    return String(stateVal);
   };
 
-  // Safe coordinate numeric formatting a 6 decimales
-  const handleCoordinateChange = (field: keyof WindowHeader, val: string) => {
-    if (val === '' || val === '-') {
-      handleChange(field, val);
-      return;
+  const handleCoordinateInputChange = (field: keyof WindowHeader, val: string, intDigits: number, decDigits: number) => {
+    const restricted = handleNumberInputLimit(val, intDigits, decDigits);
+    setLocalValues(prev => ({ ...prev, [field as string]: restricted }));
+
+    const num = parseFloat(restricted);
+    if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
+      handleChange(field, num);
+    } else if (restricted === '') {
+      handleChange(field, 0);
     }
-    let num = parseFloat(val);
-    if (isNaN(num)) num = 0;
-    handleChange(field, limitPrecision(num, 6));
   };
 
-  // Enforces degree limits (0-90 or 0-359) con precisión de 6 decimales
+  const handleCoordinateInputBlur = (field: keyof WindowHeader, val: string) => {
+    setLocalValues(prev => {
+      const copy = { ...prev };
+      delete copy[field as string];
+      return copy;
+    });
+    const num = parseFloat(val);
+    if (isNaN(num)) {
+      handleChange(field, 0);
+    } else {
+      handleChange(field, num);
+    }
+  };
+
   const handleDegreeChange = (field: keyof WindowHeader, val: string, maxVal: number) => {
     if (val === '') {
       handleChange(field, '');
@@ -49,32 +86,27 @@ export default function VentanaForm({
     let num = parseFloat(val);
     if (isNaN(num)) return;
 
-    // Permitimos buzamientos negativos únicamente para el ángulo del sondaje (dip_hw)
     if (field !== 'dip_hw' && num < 0) {
       num = 0;
     } else if (field === 'dip_hw' && num < -90) {
-      num = -90; // Límite vertical hacia arriba
+      num = -90;
     }
 
     if (num > maxVal) num = maxVal;
     if (maxVal === 360 && num === 360) num = 0;
-    handleChange(field, limitPrecision(num, 6));
+    handleChange(field, Math.round(num * 100) / 100);
   };
 
-  // Extraemos las unidades únicas para el primer selector
+  // Litologías
   const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
-
-  // Si hay una unidad seleccionada, filtramos las clasificaciones detalladas; si no, permitimos ver todas
   const filteredClassifications = header.unidad_litologica
     ? LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.unidad_litologica)
     : LITHOLOGY_CLASSIFICATION;
 
-  // Generamos el valor de control compuesto para sincronizar el estado del select detallado
   const currentCombinedValue = header.lito_2 && header.unidad_litologica && header.lito_1
     ? `${header.lito_2}|${header.unidad_litologica}|${header.lito_1}`
     : '';
 
-  // Cascading autocomplete on litologia change
   const handleUnidadChange = (unidad: string) => {
     if (!unidad) {
       onChange({
@@ -107,7 +139,6 @@ export default function VentanaForm({
       return;
     }
 
-    // Desestructuramos la clave compuesta única para encontrar la fila exacta
     const [codigo, unidad, litologia] = combinedValue.split('|');
     const match = LITHOLOGY_CLASSIFICATION.find(
       item => item.codigo === codigo && item.unidad === unidad && item.litologia === litologia
@@ -116,7 +147,7 @@ export default function VentanaForm({
     if (match) {
       onChange({
         ...header,
-        unidad_litologica: match.unidad, // Autocompletado bidireccional
+        unidad_litologica: match.unidad,
         lito_1: match.litologia,
         lito_2: match.codigo,
         lito_3: match.grupo
@@ -124,7 +155,7 @@ export default function VentanaForm({
     }
   };
 
-  // Determine if From/To coordinates are entered to auto-calculate Largo (3D distance)
+  // Cálculo de largo automático redondeado estrictamente a entero
   const ix = parseFloat(String(header.este_from));
   const iy = parseFloat(String(header.norte_from));
   const ic = parseFloat(String(header.cota_from));
@@ -134,22 +165,19 @@ export default function VentanaForm({
 
   const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
   const calculatedLargo = hasCoords
-    ? Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2))
+    ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
     : null;
 
-  // Sincronizamos la distancia real 3D con un límite de 6 decimales de precisión
   React.useEffect(() => {
     if (calculatedLargo !== null) {
-      const roundedLargo = calculatedLargo.toFixed(6); // Sincronizado a 6 decimales
-      if (parseFloat(String(header.largo)) !== parseFloat(roundedLargo)) {
-        handleChange('largo', roundedLargo);
+      if (Number(header.largo) !== calculatedLargo) {
+        handleChange('largo', calculatedLargo);
       }
     }
   }, [calculatedLargo]);
 
   return (
     <div className="space-y-6 select-none text-left">
-
       {/* SECCIÓN 1: DATOS DE IDENTIFICACIÓN Y COORDENADAS 3D */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2 flex items-center justify-between">
@@ -161,16 +189,13 @@ export default function VentanaForm({
             type="button"
             onClick={onOpenImportModal}
             className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-blue-500/30 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
-            title="Importar y sobrescribir con Excel"
           >
             <FileSpreadsheet size={14} className="text-blue-500" />
             <span>Importar Excel</span>
           </button>
         </h3>
 
-        {/* Coordenadas e Identificación */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código Celda</label>
             <input
@@ -187,32 +212,34 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas INICIALES (From)</label>
             <div className="grid grid-cols-3 gap-2">
               <input
-                type="number"
-                step="0.000001" // Modificado a millonésima (6 decimales)
+                type="text"
                 placeholder="Este"
-                value={header.este_from}
+                value={getInputValue('este_from', header.este_from)}
                 id="header-este_from"
-                onChange={(e) => handleCoordinateChange('este_from', e.target.value)}
+                onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 2)}
+                onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Este FROM"
+                title="Este FROM (Máx. 6 enteros, 2 dec.)"
               />
               <input
-                type="number"
-                step="0.000001" // Modificado a millonésima
+                type="text"
                 placeholder="Norte"
-                value={header.norte_from}
-                onChange={(e) => handleCoordinateChange('norte_from', e.target.value)}
+                value={getInputValue('norte_from', header.norte_from)}
+                id="header-norte_from"
+                onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 2)}
+                onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Norte FROM"
+                title="Norte FROM (Máx. 7 enteros, 2 dec.)"
               />
               <input
-                type="number"
-                step="0.000001" // Modificado a millonésima
+                type="text"
                 placeholder="Cota"
-                value={header.cota_from}
-                onChange={(e) => handleCoordinateChange('cota_from', e.target.value)}
+                value={getInputValue('cota_from', header.cota_from)}
+                id="header-cota_from"
+                onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, 4, 2)}
+                onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Cota FROM"
+                title="Cota FROM (Máx. 4 enteros, 2 dec.)"
               />
             </div>
           </div>
@@ -221,32 +248,34 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas FINALES (To)</label>
             <div className="grid grid-cols-3 gap-2">
               <input
-                type="number"
-                step="0.000001" // Modificado a millonésima
+                type="text"
                 placeholder="Este"
-                value={header.este_to}
+                value={getInputValue('este_to', header.este_to)}
                 id="header-este_to"
-                onChange={(e) => handleCoordinateChange('este_to', e.target.value)}
+                onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 2)}
+                onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Este TO"
+                title="Este TO (Máx. 6 enteros, 2 dec.)"
               />
               <input
-                type="number"
-                step="0.000001" // Modificado a millonésima
+                type="text"
                 placeholder="Norte"
-                value={header.norte_to}
-                onChange={(e) => handleCoordinateChange('norte_to', e.target.value)}
+                value={getInputValue('norte_to', header.norte_to)}
+                id="header-norte_to"
+                onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 2)}
+                onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Norte TO"
+                title="Norte TO (Máx. 7 enteros, 2 dec.)"
               />
               <input
-                type="number"
-                step="0.000001" // Modificado a millonésima
+                type="text"
                 placeholder="Cota"
-                value={header.cota_to}
-                onChange={(e) => handleCoordinateChange('cota_to', e.target.value)}
+                value={getInputValue('cota_to', header.cota_to)}
+                id="header-cota_to"
+                onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, 4, 2)}
+                onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Cota TO"
+                title="Cota TO (Máx. 4 enteros, 2 dec.)"
               />
             </div>
           </div>
@@ -255,10 +284,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between block">
               <span>Largo (m)</span>
               {calculatedLargo !== null && (
-                <span
-                  className="text-[10px] bg-orange-500/10 border border-orange-500/30 text-orange-400 font-extrabold px-2 py-0.5 rounded cursor-help transition-all hover:bg-orange-500/20"
-                  title={`Distancia Real 3D calculada por Coordenadas: √((X2 - X1)² + (Y2 - Y1)² + (Z2 - Z1)²) = ${calculatedLargo.toFixed(6)} m`}
-                >
+                <span className="text-[10px] bg-orange-500/10 border border-orange-500/30 text-orange-400 font-extrabold px-2 py-0.5 rounded cursor-help">
                   AUTO
                 </span>
               )}
@@ -268,11 +294,18 @@ export default function VentanaForm({
               id="header-largo"
               value={header.largo || ''}
               readOnly={calculatedLargo !== null}
-              onChange={(e) => handleChange('largo', e.target.value)}
-              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'
-                }`}
-              title={calculatedLargo !== null ? `Distancia Euclidiana 3D: √((X2-X1)² + (Y2-Y1)² + (Z2-Z1)²) = ${calculatedLargo.toFixed(6)} m` : "Ingrese longitud manualmente"}
-              placeholder="m"
+              onChange={(e) => {
+                const cleaned = e.target.value.replace(/\D/g, '');
+                handleChange('largo', cleaned === '' ? '' : parseInt(cleaned, 10));
+              }}
+              onBlur={(e) => {
+                const val = e.target.value;
+                if (val !== '') {
+                  handleChange('largo', Math.round(parseFloat(val)));
+                }
+              }}
+              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'}`}
+              placeholder="m (Entero)"
             />
           </div>
         </div>
@@ -297,7 +330,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Dip Talud&deg;</label>
             <input
               type="number"
-              step="0.000001" // Modificado a millonésima
+              step="0.01"
               min="0"
               max="90"
               placeholder="0-90"
@@ -311,7 +344,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">DipDir Talud&deg;</label>
             <input
               type="number"
-              step="0.000001" // Modificado a millonésima
+              step="0.01"
               min="0"
               max="359"
               placeholder="0-359"
@@ -325,8 +358,8 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Dip Hw&deg;</label>
             <input
               type="number"
-              step="0.000001" // Modificado a millonésima
-              min="-90" // Permitimos valores negativos por inclinaciones de sondaje ascendentes
+              step="0.01"
+              min="-90"
               max="90"
               placeholder="-90 a 90"
               value={header.dip_hw !== undefined ? header.dip_hw : ''}
@@ -339,7 +372,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Az Hw&deg;</label>
             <input
               type="number"
-              step="0.000001" // Modificado a millonésima
+              step="0.01"
               min="0"
               max="359"
               placeholder="0-359"
@@ -368,8 +401,6 @@ export default function VentanaForm({
       {/* SECCIÓN 3: LITOLOGÍA DE DETALLE Y METADATOS COMPLEMENTARIOS */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
         <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
-
-          {/* Litología General - Auto-completado y protegido de escritura */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Litología</label>
             <input
@@ -381,7 +412,6 @@ export default function VentanaForm({
             />
           </div>
 
-          {/* Código de clasificación único - Selector inteligente compatible con duplicados */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código (Lito-3)</label>
             <select
@@ -391,7 +421,6 @@ export default function VentanaForm({
             >
               <option value="">— Seleccione Código —</option>
               {filteredClassifications.map(item => {
-                // Si el código es genérico ('Varios' o '-'), añadimos la litología entre paréntesis para diferenciarlos
                 const isGeneric = item.codigo === 'Varios' || item.codigo === '-';
                 const label = isGeneric
                   ? `${item.codigo} - ${item.unidad} (${item.litologia})`
@@ -407,7 +436,6 @@ export default function VentanaForm({
             </select>
           </div>
 
-          {/* Grupo Geotécnico - Auto-completado y protegido de escritura */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Grupo</label>
             <input
@@ -419,7 +447,6 @@ export default function VentanaForm({
             />
           </div>
 
-          {/* Conservamos el resto de tus campos de metadatos (Sector, Fase, Nivel, Fecha, Mapeador) intactos... */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector</label>
             <input
@@ -447,9 +474,10 @@ export default function VentanaForm({
             <input
               type="text"
               value={header.nivel || ''}
-              onChange={(e) => handleChange('nivel', e.target.value)}
+              onChange={(e) => handleChange('nivel', handleNumberInputLimit(e.target.value, 4, 2))}
               placeholder="Nivel"
               className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              title="Nivel (Máx. 4 enteros, 2 dec.)"
             />
           </div>
 
@@ -517,7 +545,6 @@ export default function VentanaForm({
           </div>
         </div>
       </div>
-
     </div>
   );
 }

@@ -185,6 +185,10 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
     
     largo = header.get("largo_m")
     
+    # 1. Asegurar redondeo estricto del largo en Python
+    if largo is not None:
+        largo = int(round(float(largo)))
+    
     # Vector unitario 3D de la línea de detalle
     has_coords = all(v is not None for v in [h_ini_x, h_ini_y, h_ini_z, h_fin_x, h_fin_y, h_fin_z])
     dx, dy, dz = 0.0, 0.0, 0.0
@@ -213,8 +217,10 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
     
     for row in discontinuidades:
         fam = row.get("fam")
-        espac = row.get("espac")
-        nstr = row.get("nstr") or 1
+        espac = row.get("espac")        
+        nstr = row.get("nstr")
+        if nstr is None or nstr == -1:
+            nstr = 0
         
         # Calculate row-level ratings
         alt_code = row.get("alt")
@@ -296,20 +302,34 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
     rqd_ratings = get_rqd_rating(rqd_pct)
     
     # 4. Spacing rating
-    # Spacing Promedio Global (weighted by nstr)
-    all_spacings = [(row.get("espac"), row.get("nstr") or 1) for row in discontinuidades if row.get("espac") is not None]
+    all_spacings = []
+    for row in discontinuidades:
+        esp = row.get("espac")
+        if esp is not None and esp > 0:
+            n = row.get("nstr")
+            if n is None or n == -1:
+                n = 0
+            all_spacings.append((esp, n))
+
     sum_espac = sum(sp * n for sp, n in all_spacings)
     sum_n_espac = sum(n for sp, n in all_spacings)
-    espac_prom = sum_espac / sum_n_espac if sum_n_espac > 0 else 0.0
+    espac_prom = sum_espac / sum_n_espac if sum_n_espac > 0 else 0.5 # fallback default
     spacing_ratings = get_spacing_rating(espac_prom)
     
     # 5. Condition average rating (weighted by nstr)
-    sum_v89 = sum(r["v89"] * (r["row"].get("nstr") or 1) for r in rows_calculated)
-    sum_v76 = sum(r["v76"] * (r["row"].get("nstr") or 1) for r in rows_calculated)
-    sum_n_cond = sum((r["row"].get("nstr") or 1) for r in rows_calculated)
+    sum_v89 = 0.0
+    sum_v76 = 0.0
+    sum_n_cond = 0.0
+    for r in rows_calculated:
+        n = r["row"].get("nstr")
+        if n is None or n == -1:
+            n = 0
+        sum_v89 += r["v89"] * n
+        sum_v76 += r["v76"] * n
+        sum_n_cond += n
     
-    condisc_r89 = sum_v89 / sum_n_cond if sum_n_cond > 0 else 0.0
-    condisc_r76 = sum_v76 / sum_n_cond if sum_n_cond > 0 else 0.0
+    condisc_r89 = sum_v89 / sum_n_cond if sum_n_cond > 0 else 25.0
+    condisc_r76 = sum_v76 / sum_n_cond if sum_n_cond > 0 else 20.0
 
     # 6. Global Water and UCS Ratings
     w_code = rmr_input.get("agua_codigo", "C")

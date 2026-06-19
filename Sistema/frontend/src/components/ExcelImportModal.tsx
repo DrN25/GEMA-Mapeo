@@ -22,7 +22,7 @@ interface MappingField {
   synonyms: string[];
 }
 
-// Campos esperados con sinónimos enriquecidos de tu planilla de Excel real
+// Campos esperados con sinónimos enriquecidos
 const EXPECTED_FIELDS: MappingField[] = [
   { key: 'celda', label: 'Código Celda', required: true, synonyms: ['celda', 'codigocelda', 'codigo', 'window', 'windowid', 'station', 'estacion', 'estaciones'] },
   { key: 'este_from', label: 'Este FROM (X)', required: true, synonyms: ['estefrom', 'este_from', 'east_from', 'eastfrom', 'x_from', 'xfrom', 'esteini'] },
@@ -34,7 +34,6 @@ const EXPECTED_FIELDS: MappingField[] = [
   { key: 'altura', label: 'Altura (m)', required: true, synonyms: ['altura', 'alturam', 'height', 'heightm', 'alturaventanam'] },
   { key: 'dip_talud', label: 'Dip Talud (°)', required: true, synonyms: ['diptalud', 'dip_talud', 'taluddip', 'slope_dip', 'diptaluddeg'] },
 
-  // Nuevos campos de orientación y alteración mapeados con soporte plano
   { key: 'dipdir_talud', label: 'DipDir Talud (°)', required: false, synonyms: ['dipdir_talud', 'dip_dir_talud', 'dipdir_talud_deg', 'dipdir_talud_deg'] },
   { key: 'dip_hw', label: 'Dip Hw (Dip Hole) (°)', required: false, synonyms: ['dip_hw', 'dip_hole', 'dip_hole_deg', 'dip_hw_deg'] },
   { key: 'az_hw', label: 'Az Hw (Az Hole) (°)', required: false, synonyms: ['az_hw', 'az_hole', 'az_hole_deg', 'az_hw_deg', 'azimuth_hole'] },
@@ -82,7 +81,7 @@ export default function ExcelImportModal({
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [isStackedTemplate, setIsStackedTemplate] = useState<boolean>(true);
 
-  // MAPPED MODE STATE (For flat tables like "BD")
+  // MAPPED MODE STATE
   const [rawGrid, setRawGrid] = useState<any[][] | null>(null);
   const [headerRowIdx, setHeaderRowIdx] = useState<number>(0);
   const [excelHeaders, setExcelHeaders] = useState<string[]>([]);
@@ -91,7 +90,7 @@ export default function ExcelImportModal({
   const [selectedCeldaCode, setSelectedCeldaCode] = useState<string>('');
   const [parsedWindowData, setParsedWindowData] = useState<Record<string, WindowData>>({});
 
-  // STACKED MODE STATE (For template tab "ventana")
+  // STACKED MODE STATE
   const [detectedTemplateCells, setDetectedTemplateCells] = useState<Record<string, WindowData>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -176,20 +175,16 @@ export default function ExcelImportModal({
     }
   };
 
-  // Función inteligente de detección y autocompletado en cascada para Litologías
   const detectLithology = (rawLitoModel: string, rawLito3: string) => {
     const code = String(rawLitoModel || '').trim().toUpperCase();
     const group = String(rawLito3 || '').trim().toUpperCase();
 
-    // 1. Buscamos coincidencia exacta por código detallado (lito_2)
     let match = LITHOLOGY_CLASSIFICATION.find(item => item.codigo.toUpperCase() === code);
 
-    // 2. Si no, buscamos coincidencia por unidad base (unidad_litologica)
     if (!match) {
       match = LITHOLOGY_CLASSIFICATION.find(item => item.unidad.toUpperCase() === code);
     }
 
-    // 3. Si no, buscamos por grupo
     if (!match && group) {
       match = LITHOLOGY_CLASSIFICATION.find(item => item.grupo.toUpperCase() === group);
     }
@@ -211,7 +206,6 @@ export default function ExcelImportModal({
     };
   };
 
-  // Convertidor de fechas seriales de Excel a formato de fecha ISO
   const parseDateStr = (val: any): string => {
     if (!val) return new Date().toISOString().split('T')[0];
     if (val instanceof Date) {
@@ -219,7 +213,6 @@ export default function ExcelImportModal({
       const corrected = new Date(val.getTime() - offset * 60 * 1000);
       return corrected.toISOString().split('T')[0];
     }
-    // Conversión de formato serie numérico de Excel
     const num = parseFloat(String(val));
     if (!isNaN(num) && num > 30000 && num < 60000) {
       const jsDate = new Date((num - 25569) * 86400 * 1000);
@@ -227,6 +220,12 @@ export default function ExcelImportModal({
     }
     const str = String(val).trim();
     return str.substring(0, 10);
+  };
+
+  // Función helper matemática central de redondeo estricto
+  const roundDec = (val: number, decs: number): number => {
+    const factor = Math.pow(10, decs);
+    return Math.round(val * factor) / factor;
   };
 
   // 1. Parser para pestañas apiladas verticalmente cada 30 filas ("ventana")
@@ -246,42 +245,42 @@ export default function ExcelImportModal({
     };
 
     for (let start = 2; start < grid.length; start += 30) {
-      let celdaVal = grid[start + 1]?.[0]; // Row 4 Col A
+      let celdaVal = grid[start + 1]?.[0];
       if (!celdaVal) {
-        celdaVal = grid[start]?.[50]; // Row 3 Col AY (index 50)
+        celdaVal = grid[start]?.[50];
       }
       if (!celdaVal || !String(celdaVal).trim()) continue;
       const codigo = String(celdaVal).trim().toUpperCase();
 
-      const este_from = Math.round(getNum(start + 2, 1) * 1000000) / 1000000;
-      const norte_from = Math.round(getNum(start + 2, 3) * 1000000) / 1000000;
-      const cota_from = Math.round(getNum(start + 2, 5) * 1000000) / 1000000;
-      const este_to = Math.round(getNum(start + 3, 1) * 1000000) / 1000000;
-      const norte_to = Math.round(getNum(start + 3, 3) * 1000000) / 1000000;
-      const cota_to = Math.round(getNum(start + 3, 5) * 1000000) / 1000000;
-      const altura = Math.round(getNum(start + 3, 10) * 1000000) / 1000000;
+      // Saneamiento y redondeo estricto de coordenadas en la importación (X: 2 dec, Y: 2 dec, Z: 2 dec, Nivel: 2 dec)
+      const este_from = roundDec(getNum(start + 2, 1), 2);
+      const norte_from = roundDec(getNum(start + 2, 3), 2);
+      const cota_from = roundDec(getNum(start + 2, 5), 2);
+      const este_to = roundDec(getNum(start + 3, 1), 2);
+      const norte_to = roundDec(getNum(start + 3, 3), 2);
+      const cota_to = roundDec(getNum(start + 3, 5), 2);
 
-      const dip_talud = Math.round(getNum(start + 2, 13) * 1000000) / 1000000;
-      const dipdir_talud = Math.round(getNum(start + 3, 13) * 1000000) / 1000000;
-      const dip_hw = Math.round(getNum(start + 4, 13) * 1000000) / 1000000;
-      const az_hw = Math.round(getNum(start + 5, 13) * 1000000) / 1000000;
+      const altura = roundDec(getNum(start + 3, 10), 1);
+      const dip_talud = roundDec(getNum(start + 2, 13), 2);
+      const dipdir_talud = roundDec(getNum(start + 3, 13), 2);
+      const dip_hw = roundDec(getNum(start + 4, 13), 2);
+      const az_hw = roundDec(getNum(start + 5, 13), 2);
 
-      const lito_3 = getStr(start + 1, 15); // Col P (index 15)
+      const lito_3 = getStr(start + 1, 15);
       const alt_zona = getStr(start + 2, 15);
       const intemperia = getStr(start + 3, 15);
       const lito_model = getStr(start + 4, 15);
       const mapeador = getStr(start + 5, 15);
 
-      const sector = getStr(start + 1, 19); // Col T (index 19)
-      const fase = String(Math.round(getNum(start + 2, 20)) || 5); // Col U (index 20)
-      const nivel = String(getNum(start + 3, 20) || 3960);
+      const sector = getStr(start + 1, 19);
+      const fase = String(Math.round(getNum(start + 2, 20)) || 5);
+      const nivel = String(roundDec(getNum(start + 3, 20), 2) || 3960);
       const sect_geot = getStr(start + 4, 20);
-      const fecha = parseDateStr(grid[start + 1]?.[36]); // Col AK (index 36)
+      const fecha = parseDateStr(grid[start + 1]?.[36]);
 
-      const condicion_agua = getStr(start + 8, 35) || 'C'; // Col AJ (index 35)
-      const resistencia_ucs = getStr(start + 8, 37) || 'R4'; // Col AL (index 37)
+      const condicion_agua = getStr(start + 8, 35) || 'C';
+      const resistencia_ucs = getStr(start + 8, 37) || 'R4';
 
-      // Ejecuta la clasificación de roca inteligente
       const litoDetails = detectLithology(lito_model, lito_3);
 
       const joints: JointRow[] = [];
@@ -293,32 +292,53 @@ export default function ExcelImportModal({
         const fam = parseInt(famVal);
         if (isNaN(fam)) continue;
 
-        // Sanitización estricta bajo límites físicos
-        const dip = Math.min(90, Math.max(0, getNum(r, 3))); // 0-90
-        const dip_dir = Math.min(359, Math.max(0, getNum(r, 4))); // 0-359
-        const jrc = sanitizeRange(getNum(r, 18), 0, 20); // 0-20 o vacío
-        const rugosidad = sanitizeRange(getNum(r, 19), 1, 9); // 1-9 o vacío (el 11 se hará -1)
-        const extremos_visibles = sanitizeRange(getNum(r, 10), 0, 3); // 0-3 o vacío
-        const terminacion = sanitizeRange(getNum(r, 11), 0, 5); // 0-5 o vacío
+        // Saneamiento de discontinuidades según reglas
+        const dip = Math.min(90, Math.max(0, roundDec(getNum(r, 3), 2)));
+        const dip_dir = Math.min(359, Math.max(0, roundDec(getNum(r, 4), 2)));
+
+        // Cant (n): Solo enteros positivos o -1
+        const raw_nstr = Math.round(getNum(r, 5));
+        const n_estructuras = raw_nstr > 0 ? raw_nstr : -1;
+
+        // Dist (m): Solo entero positivo desde 0 en adelante
+        const distancia = Math.max(0, Math.round(getNum(r, 1)));
+
+        // Abert (mm): Max 1 decimal
+        const abertura = roundDec(getNum(r, 6), 1);
+
+        // Espes (mm): Max 1 decimal
+        const espesor = roundDec(getNum(r, 7), 1);
+
+        // Espac (m): Max 2 decimales
+        const espaciamiento = roundDec(getNum(r, 9), 2);
+
+        const jrc = sanitizeRange(getNum(r, 18), 0, 20);
+
+        // Rugosidad: convertida a rango 0 a 9 (como JRC)
+        const rugosidad = sanitizeRange(getNum(r, 19), 0, 9);
+
+        // Ext Vis y Term limitados por las nuevas reglas
+        const extremos_visibles = sanitizeRange(getNum(r, 10), 0, 2); // 0-2 (removido 3)
+        const terminacion = sanitizeRange(getNum(r, 11), 0, 3); // 0-3 (removido 4 y 5)
 
         joints.push({
           id: jId++,
           familia: fam,
-          distancia: getNum(r, 1),
+          distancia,
           tipo_estructura: getStr(r, 2) || 'J',
           dip: dip !== -1 ? dip : undefined,
           dip_dir: dip_dir !== -1 ? dip_dir : undefined,
-          n_estructuras: getNum(r, 5) || 1,
-          abertura: getNum(r, 6),
-          espesor: getNum(r, 7),
-          continuidad: getNum(r, 8),
-          espaciamiento: getNum(r, 9),
+          n_estructuras,
+          abertura,
+          espesor,
+          continuidad: roundDec(getNum(r, 8), 2),
+          espaciamiento,
           extremos_visibles,
           terminacion,
           relleno1: getStr(r, 12).toLowerCase() || 'cwf',
           relleno2: getStr(r, 13).toLowerCase() || undefined,
           jrc: jrc !== -1 ? jrc : undefined,
-          rugosidad: rugosidad !== -1 ? rugosidad : -1, // Si es inválido se carga como vacío (-1)
+          rugosidad: rugosidad !== -1 ? rugosidad : -1,
           forma: getStr(r, 20) || 'O',
           alteracion: getStr(r, 21).toLowerCase() || 'd'
         });
@@ -464,24 +484,24 @@ export default function ExcelImportModal({
         celdasData[celdaCode] = {
           header: {
             celda: celdaCode,
-            este_from: Math.round(getNum(row, 'este_from', 0) * 1000000) / 1000000,
-            norte_from: Math.round(getNum(row, 'norte_from', 0) * 1000000) / 1000000,
-            cota_from: Math.round(getNum(row, 'cota_from', 0) * 1000000) / 1000000,
-            este_to: Math.round(getNum(row, 'este_to', 0) * 1000000) / 1000000,
-            norte_to: Math.round(getNum(row, 'norte_to', 0) * 1000000) / 1000000,
-            cota_to: Math.round(getNum(row, 'cota_to', 0) * 1000000) / 1000000,
-            altura: Math.round(getNum(row, 'altura', 15.0) * 1000000) / 1000000,
-            dip_talud: Math.round(getNum(row, 'dip_talud', 64.0) * 1000000) / 1000000,
+            este_from: roundDec(getNum(row, 'este_from', 0), 2),
+            norte_from: roundDec(getNum(row, 'norte_from', 0), 2),
+            cota_from: roundDec(getNum(row, 'cota_from', 0), 2),
+            este_to: roundDec(getNum(row, 'este_to', 0), 2),
+            norte_to: roundDec(getNum(row, 'norte_to', 0), 2),
+            cota_to: roundDec(getNum(row, 'cota_to', 0), 2),
+            altura: roundDec(getNum(row, 'altura', 15.0), 1),
+            dip_talud: roundDec(getNum(row, 'dip_talud', 64.0), 2),
 
-            dipdir_talud: Math.round(getNum(row, 'dipdir_talud', 247.0) * 1000000) / 1000000,
-            dip_hw: Math.round(getNum(row, 'dip_hw', 0.0) * 1000000) / 1000000,
-            az_hw: Math.round(getNum(row, 'az_hw', 0.0) * 1000000) / 1000000,
+            dipdir_talud: roundDec(getNum(row, 'dipdir_talud', 247.0), 2),
+            dip_hw: roundDec(getNum(row, 'dip_hw', 0.0), 2),
+            az_hw: roundDec(getNum(row, 'az_hw', 0.0), 2),
 
             ...litoDetails,
             mapeador: getStr(row, 'mapeador', 'AS-HM'),
             sector: getStr(row, 'sector', 'E1'),
             fase: getStr(row, 'fase', '5'),
-            nivel: getStr(row, 'nivel', '3960'),
+            nivel: String(roundDec(getNum(row, 'nivel', 3960), 2)),
             sect_geot: getStr(row, 'sect_geot', 'E1'),
             fecha: parseDateStr(getVal(row, 'fecha')),
             condicion_agua: getStr(row, 'condicion_agua', 'C'),
@@ -497,32 +517,50 @@ export default function ExcelImportModal({
       if (famVal !== null && famVal !== undefined && String(famVal).trim() !== "") {
         const fam = parseInt(famVal);
         if (!isNaN(fam)) {
-          // Sanitización estricta
-          const dip = Math.min(90, Math.max(0, getNum(row, 'dip', 45)));
-          const dip_dir = Math.min(359, Math.max(0, getNum(row, 'dip_dir', 180)));
+          const dip = Math.min(90, Math.max(0, roundDec(getNum(row, 'dip', 45), 2)));
+          const dip_dir = Math.min(359, Math.max(0, roundDec(getNum(row, 'dip_dir', 180), 2)));
+
+          // Cant (n) - Solo enteros positivos o -1
+          const raw_nstr = Math.round(getNum(row, 'n_estructuras', 1));
+          const n_estructuras = raw_nstr > 0 ? raw_nstr : -1;
+
+          // Dist (m) - Solo enteros desde 0 en adelante
+          const distancia = Math.max(0, Math.round(getNum(row, 'distancia', 0)));
+
+          // Abert (mm) y Espes (mm) - Max 1 decimal
+          const abertura = roundDec(getNum(row, 'abertura', 0.1), 1);
+          const espesor = roundDec(getNum(row, 'espesor', 0), 1);
+
+          // Espac (m) - Max 2 decimales
+          const espaciamiento = roundDec(getNum(row, 'espaciamiento', 0.5), 2);
+
           const jrc = sanitizeRange(getNum(row, 'jrc'), 0, 20);
-          const rugosidad = sanitizeRange(getNum(row, 'rugosidad'), 1, 9);
-          const extremos_visibles = sanitizeRange(getNum(row, 'extremos_visibles'), 0, 3);
-          const terminacion = sanitizeRange(getNum(row, 'terminacion'), 0, 5);
+
+          // Rugosidad - Rango 0-9
+          const rugosidad = sanitizeRange(getNum(row, 'rugosidad'), 0, 9);
+
+          // Ext Vis y Term limitados por las nuevas reglas
+          const extremos_visibles = sanitizeRange(getNum(row, 'extremos_visibles'), 0, 2); // 0-2 (removido 3)
+          const terminacion = sanitizeRange(getNum(row, 'terminacion'), 0, 3); // 0-3 (removido 4 y 5)
 
           celdasData[celdaCode].joints.push({
             id: celdasData[celdaCode].joints.length + 1,
             familia: fam,
-            distancia: getNum(row, 'distancia', 0),
+            distancia,
             tipo_estructura: getStr(row, 'tipo_estructura', 'J'),
             dip: dip !== -1 ? dip : undefined,
             dip_dir: dip_dir !== -1 ? dip_dir : undefined,
-            n_estructuras: getNum(row, 'n_estructuras', 1),
-            abertura: getNum(row, 'abertura', 0.1),
-            espesor: getNum(row, 'espesor', 0),
-            continuidad: getNum(row, 'continuidad', 1.5),
-            espaciamiento: getNum(row, 'espaciamiento', 0.5),
+            n_estructuras,
+            abertura,
+            espesor,
+            continuidad: roundDec(getNum(row, 'continuidad', 1.5), 2),
+            espaciamiento,
             extremos_visibles,
             terminacion,
             relleno1: getStr(row, 'relleno1').toLowerCase() || 'cwf',
             relleno2: getStr(row, 'relleno2').toLowerCase() || undefined,
             jrc: jrc !== -1 ? jrc : undefined,
-            rugosidad: rugosidad !== -1 ? rugosidad : -1, // Si es inválido se carga como vacío (-1)
+            rugosidad: rugosidad !== -1 ? rugosidad : -1,
             forma: getStr(row, 'forma', 'O'),
             alteracion: getStr(row, 'alteracion').toLowerCase() || 'd'
           });
@@ -543,9 +581,7 @@ export default function ExcelImportModal({
   const sanitizeRange = (val: number, min: number, max: number, fallback = -1): number => {
     if (isNaN(val) || val === null || val === undefined) return fallback;
     if (val < min || val > max) return fallback;
-
-    // Limita la precisión del valor numérico procesado a un máximo de 6 decimales
-    return Math.round(val * 1000000) / 1000000;
+    return Math.round(val);
   };
 
   const handleMappingChange = (fieldKey: string, colIdx: number) => {
@@ -604,7 +640,7 @@ export default function ExcelImportModal({
                 Importación Avanzada desde Excel
               </h3>
               <p className="text-xs text-slate-400">
-                Procesamiento local 100% offline (sin conexión a base de datos requerida)
+                Procesamiento local 100% offline con saneamiento y redondeo estricto de decimales
               </p>
             </div>
           </div>
@@ -824,7 +860,7 @@ export default function ExcelImportModal({
                               {activeDataPreview.joints.slice(0, 5).map((j, i) => (
                                 <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
                                   <td className="py-2 px-3 font-semibold text-slate-200">F{j.familia}</td>
-                                  <td className="py-2 px-3 text-center">{j.distancia?.toFixed(2) ?? '—'}</td>
+                                  <td className="py-2 px-3 text-center">{j.distancia}</td>
                                   <td className="py-2 px-3 text-center">{j.tipo_estructura}</td>
                                   <td className="py-2 px-3 text-center">{j.dip}</td>
                                   <td className="py-2 px-3 text-center">{j.dip_dir}</td>
@@ -919,7 +955,7 @@ export default function ExcelImportModal({
                                 {activeDataPreview.joints.slice(0, 5).map((j, i) => (
                                   <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
                                     <td className="py-2.5 px-3 font-semibold text-slate-200">F{j.familia}</td>
-                                    <td className="py-2.5 px-3 text-center">{j.distancia?.toFixed(2) ?? '—'}</td>
+                                    <td className="py-2.5 px-3 text-center">{j.distancia}</td>
                                     <td className="py-2.5 px-3 text-center">{j.tipo_estructura}</td>
                                     <td className="py-2.5 px-3 text-center">{j.dip}</td>
                                     <td className="py-2.5 px-3 text-center">{j.dip_dir}</td>

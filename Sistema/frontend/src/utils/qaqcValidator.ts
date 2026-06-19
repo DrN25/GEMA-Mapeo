@@ -183,11 +183,20 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     }
 
     // Terminations and visibility bounds
-    if (ext < 0 || ext > 3) {
+    if (ext < 0 || ext > 2) {
       alerts.push({
         fieldId: `joint-extremos_visibles-${index}`,
         type: "ERROR",
-        message: `Fila ${rowNum}: Cantidad de extremos visibles debe estar entre 0 y 3.`
+        message: `Fila ${rowNum}: Cantidad de extremos visibles debe estar entre 0 y 2 (opción 3 removida).`
+      });
+    }
+
+    const term = j.terminacion;
+    if (term !== undefined && term !== -1 && (term < 0 || term > 3)) {
+      alerts.push({
+        fieldId: `joint-terminacion-${index}`,
+        type: "ERROR",
+        message: `Fila ${rowNum}: El valor de terminación debe estar entre 0 y 3 (opciones 4 y 5 removidas).`
       });
     }
   });

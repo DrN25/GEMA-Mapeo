@@ -60,7 +60,7 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
             "esp": float(d.espesor_mm) if d.espesor_mm is not None else None,
             "cont": float(d.continuidad_m) if d.continuidad_m is not None else None,
             "espac": float(d.espaciamiento_m),
-            "nstr": float(d.n_estructuras) if d.n_estructuras is not None else 1,
+            "nstr": float(d.n_estructuras) if d.n_estructuras is not None else None,
             "next": d.n_extremos_visibles,
             "term": d.terminacion,
             "r1": d.relleno_1_codigo,
@@ -84,6 +84,9 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
         "comentario": v.rmr_input.comentario if v.rmr_input else ""
     }
     
+    # Asegurar redondeo estricto a entero de largo_m
+    largo_entero = int(round(float(v.largo_m))) if v.largo_m is not None else None
+
     header_data = {
         "este_ini": v.este_ini,
         "norte_ini": v.norte_ini,
@@ -91,7 +94,7 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
         "este_fin": v.este_fin,
         "norte_fin": v.norte_fin,
         "cota_fin": v.cota_fin,
-        "largo_m": v.largo_m
+        "largo_m": largo_entero
     }
     
     res = calculator.calculate_geomechanics(header_data, rows_data, rmr_data)
@@ -100,14 +103,17 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
     db.query(models.VentanasFinal).filter_by(celda=v.codigo).delete()
     db.flush()
     
-    # Query current max id to manually assign in case SQL Server column lacks IDENTITY property
-    from sqlalchemy import text
+    # Query current max id to manually assign
     max_id = db.execute(text("SELECT MAX(id) FROM ventanas_final")).scalar()
     next_id = (max_id or 0) + 1
     
     # Insert flat rows
     for r_idx, r_calc in enumerate(res["rows"]):
         row_norm = r_calc["row"]
+        
+        # nstr guardado como None si es -1
+        final_nstr = int(row_norm["nstr"]) if (row_norm["nstr"] is not None and row_norm["nstr"] != -1) else None
+
         final_row = models.VentanasFinal(
             id=next_id,
             celda=v.codigo,
@@ -117,7 +123,7 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
             este_to=float(v.este_fin),
             norte_to=float(v.norte_fin),
             cota_to=float(v.cota_fin),
-            dist_celda=float(v.largo_m) if v.largo_m is not None else None,
+            dist_celda=largo_entero,
             altura=float(v.altura_m) if v.altura_m is not None else None,
             dip=float(v.dip_hw) if v.dip_hw is not None else (r_calc["alfa"] * 180 / math.pi if r_calc["alfa"] else None),  
             az_hole=float(v.az_hw) if v.az_hw is not None else (r_calc["teta"] * 180 / math.pi if r_calc["teta"] else None),
@@ -133,7 +139,7 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
             efectos_voladura_76=v.rmr_input.efectos_voladura if v.rmr_input else 3,
             rqd_valor_76=res["rqd_r76"],
             rqd_76=res["rqd_pct"],
-            freq_fractura_m_76=res["jv"], # Excel maps freq as jv
+            freq_fractura_m_76=res["jv"],
             tam_bloques_m3_76=res["espac_prom"]**3 if res["espac_prom"] else None,
             espaciamiento_prom_76=res["espac_prom"],
             espaciamiento_valor_76=res["spacing_r76"],
@@ -167,7 +173,7 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
             tipo_estructura=row_norm["tipo"],
             dip_estructura=row_norm["dip"],
             dip_dir_estructura=row_norm["dipdir"],
-            num_estructuras=int(row_norm["nstr"]),
+            num_estructuras=final_nstr,
             abertura_mm=row_norm["aber"] if row_norm["aber"] is not None else 0.0,
             espesor_mm=row_norm["esp"] if row_norm["esp"] is not None else 0.0,
             continuidad_m=row_norm["cont"] if row_norm["cont"] is not None else 0.0,
@@ -192,7 +198,6 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
         db.add(final_row)
         next_id += 1
     db.flush()
-
 
 # API ENDPOINTS
 
@@ -230,7 +235,7 @@ def get_ventana(codigo: str, db: Session = Depends(get_db)):
             espesor_mm=float(d.espesor_mm) if d.espesor_mm is not None else None,
             continuidad_m=float(d.continuidad_m) if d.continuidad_m is not None else None,
             espaciamiento_m=float(d.espaciamiento_m),
-            n_estructuras=float(d.n_estructuras) if d.n_estructuras is not None else 1.0,
+            n_estructuras=float(d.n_estructuras) if d.n_estructuras is not None else -1.0, # Retornar -1.0 si es NULL
             n_extremos_visibles=d.n_extremos_visibles,
             terminacion=d.terminacion,
             relleno_1_codigo=d.relleno_1_codigo,
@@ -267,7 +272,7 @@ def get_ventana(codigo: str, db: Session = Depends(get_db)):
         este_fin=float(v.este_fin),
         norte_fin=float(v.norte_fin),
         cota_fin=float(v.cota_fin),
-        largo_m=v.largo_m,
+        largo_m=int(round(float(v.largo_m))) if v.largo_m is not None else None, # Retornar como entero
         altura_m=float(v.altura_m) if v.altura_m is not None else None,
         dip_talud=float(v.dip_talud),
         dipdir_talud=float(v.dipdir_talud) if v.dipdir_talud is not None else None,
@@ -381,17 +386,16 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             espesor_mm=clean_null_val(d.esp),
             continuidad_m=clean_null_val(d.cont),
             espaciamiento_m=clean_null_val(d.espac),
+            n_estructuras=clean_null_val(d.nstr), # Guardar en SQL Server / SQLite de forma libre
             n_extremos_visibles=clean_null_val(d.next),
             terminacion=clean_null_val(d.term),
             relleno_1_codigo=d.r1 if d.r1 != "-1" else None,
             relleno_2_codigo=d.r2 if d.r2 != "-1" else None,
             jrc=clean_null_val(d.jrc),
-            rugosidad_codigo=clean_null_val(d.rug), # Si es -1, SQL Server guardará un NULL válido que no viola la restricción CHECK
+            rugosidad_codigo=clean_null_val(d.rug),
             forma_estructura=d.forma if d.forma != "-1" else None,
             alteracion_codigo=d.alt if d.alt != "-1" else None
-        )
-        if "sqlite" in str(db.bind.url).lower():
-            disc.n_estructuras = d.nstr if d.nstr is not None else 1.0
+           )
         db.add(disc)
 
     db.flush()
@@ -481,6 +485,7 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             else:
                 fecha_mapeo = date.today()
                 
+            # Redondeo seguro para el parser de Python
             def get_num(r, c):
                 val = ws.cell(row=r, column=c).value
                 if val is None:
@@ -489,27 +494,26 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                     return float(val)
                 except:
                     return 0.0
-            
-            def get_str(r, c):
-                val = ws.cell(row=r, column=c).value
-                return str(val).strip() if val is not None else ""
 
-            este_ini = get_num(start+2, 2) # Row 5 Col B
-            norte_ini = get_num(start+2, 4) # Row 5 Col D
-            cota_ini = get_num(start+2, 6) # Row 5 Col F
-            este_fin = get_num(start+3, 2) # Row 6 Col B
-            norte_fin = get_num(start+3, 4) # Row 6 Col D
-            cota_fin = get_num(start+3, 6) # Row 6 Col F
-            largo = get_num(start+2, 11) # Row 5 Col K
-            altura = get_num(start+3, 11) # Row 6 Col K
-            dip_talud = get_num(start+2, 14) # Row 5 Col N
+            # Coordenadas: 6 enteros y 2 dec para Este, 7 y 2 dec para Norte, 4 y 2 dec para Cota
+            este_ini = round(get_num(start+2, 2), 2)
+            norte_ini = round(get_num(start+2, 4), 2)
+            cota_ini = round(get_num(start+2, 6), 2)
+            este_fin = round(get_num(start+3, 2), 2)
+            norte_fin = round(get_num(start+3, 4), 2)
+            cota_fin = round(get_num(start+3, 6), 2)
             
-            lito_3 = get_str(start+1, 16) # Row 4 Col P
-            lito_model = get_str(start+4, 16) # Row 7 Col P
-            mapeador = get_str(start+5, 16) # Row 8 Col P
-            sector = get_str(start+1, 20) # Row 4 Col T
-            fase = int(get_num(start+2, 21)) # Row 5 Col U
-            nivel = get_num(start+3, 21) # Row 6 Col U
+            # Largo como entero redondeado
+            largo = int(round(get_num(start+2, 11)))
+            altura = round(get_num(start+3, 11), 1)
+            dip_talud = round(get_num(start+2, 14), 2)
+            
+            lito_3 = get_str(start+1, 16)
+            lito_model = get_str(start+4, 16)
+            mapeador = get_str(start+5, 16)
+            sector = get_str(start+1, 20)
+            fase = int(get_num(start+2, 21))
+            nivel = round(get_num(start+3, 21), 2) # Nivel a 2 decimales
             sect_geot = get_str(start+4, 21) # Row 7 Col U
             intemp = get_str(start+3, 16) # Row 6 Col P
             
@@ -528,33 +532,37 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             # Parse structures rows (Row 15-28: start+12 to start+25)
             discs = []
             for r_idx in range(start+12, start+26):
-                fam_val = ws.cell(row=r_idx, column=1).value # Col A
+                fam_val = ws.cell(row=r_idx, column=1).value
                 if fam_val is None or str(fam_val).strip() == "":
                     continue
                 try:
                     fam_id = int(fam_val)
                 except:
                     continue
-                    
+                
+                # Saneamiento de juntas en el Backend
+                raw_nstr = int(round(get_num(r_idx, 6)))
+                nstr = raw_nstr if raw_nstr > 0 else -1 # -1 indica vacío
+
                 discs.append(schemas.DiscontinuidadBase(
                     familia_id=fam_id,
-                    distancia_m=get_num(r_idx, 2), # Col B
-                    tipo_estructura=get_str(r_idx, 3), # Col C
-                    dip=get_num(r_idx, 4), # Col D
-                    dip_dir=get_num(r_idx, 5), # Col E
-                    n_estructuras=get_num(r_idx, 6), # Col F
-                    abertura_mm=get_num(r_idx, 7), # Col G
-                    espesor_mm=get_num(r_idx, 8), # Col H
-                    continuidad_m=get_num(r_idx, 9), # Col I
-                    espaciamiento_m=get_num(r_idx, 10), # Col J
-                    n_extremos_visibles=int(get_num(r_idx, 11)) if ws.cell(row=r_idx, column=11).value is not None else None,
-                    terminacion=int(get_num(r_idx, 12)) if ws.cell(row=r_idx, column=12).value is not None else None,
-                    relleno_1_codigo=get_str(r_idx, 13), # Col M
-                    relleno_2_codigo=get_str(r_idx, 14), # Col N
-                    jrc=int(get_num(r_idx, 19)) if ws.cell(row=r_idx, column=19).value is not None else None, # Col S
-                    rugosidad_codigo=int(get_num(r_idx, 20)) if ws.cell(row=r_idx, column=20).value is not None else None, # Col T
-                    forma_estructura=get_str(r_idx, 21), # Col U
-                    alteracion_codigo=get_str(r_idx, 22) # Col V
+                    distancia_m=int(round(get_num(r_idx, 2))), # Dist como entero desde 0
+                    tipo_estructura=get_str(r_idx, 3),
+                    dip=round(get_num(r_idx, 4), 2),
+                    dip_dir=round(get_num(r_idx, 5), 2),
+                    n_estructuras=nstr,
+                    abertura_mm=round(get_num(r_idx, 7), 1), # Max 1 decimal
+                    espesor_mm=round(get_num(r_idx, 8), 1), # Max 1 decimal
+                    continuidad_m=round(get_num(r_idx, 9), 2),
+                    espaciamiento_m=round(get_num(r_idx, 10), 2), # Max 2 dec
+                    n_extremos_visibles=min(2, max(0, int(get_num(r_idx, 11)))) if ws.cell(row=r_idx, column=11).value is not None else None,
+                    terminacion=min(3, max(0, int(get_num(r_idx, 12)))) if ws.cell(row=r_idx, column=12).value is not None else None,
+                    relleno_1_codigo=get_str(r_idx, 13),
+                    relleno_2_codigo=get_str(r_idx, 14),
+                    jrc=min(20, max(0, int(get_num(r_idx, 19)))) if ws.cell(row=r_idx, column=19).value is not None else None,
+                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 20)))) if ws.cell(row=r_idx, column=20).value is not None else None, # Rugosidad limitada 0-9
+                    forma_estructura=get_str(r_idx, 21),
+                    alteracion_codigo=get_str(r_idx, 22)
                 ))
                 
             # Compile save schema
@@ -634,25 +642,25 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 val = ws.cell(row=r, column=c).value
                 return str(val).strip() if val is not None else ""
                 
-            este_from = get_num(f_row, 6) # Col F
-            norte_from = get_num(f_row, 7) # Col G
-            cota_from = get_num(f_row, 8) # Col H
-            este_to = get_num(f_row, 10) # Col J
-            norte_to = get_num(f_row, 11) # Col K
-            cota_to = get_num(f_row, 12) # Col L
-            dist_celda = get_num(f_row, 13) # Col M
-            altura = get_num(f_row, 14) # Col N
-            dip_talud = get_num(f_row, 20) # Col T
-            intemp = get_str(f_row, 23) # Col W
+            este_from = round(get_num(f_row, 6), 2)
+            norte_from = round(get_num(f_row, 7), 2)
+            cota_from = round(get_num(f_row, 8), 2)
+            este_to = round(get_num(f_row, 10), 2)
+            norte_to = round(get_num(f_row, 11), 2)
+            cota_to = round(get_num(f_row, 12), 2)
+            dist_celda = int(round(get_num(f_row, 13))) # Largo a entero
+            altura = round(get_num(f_row, 14), 1)
+            dip_talud = round(get_num(f_row, 20), 2)
+            intemp = get_str(f_row, 23)
             
-            agua_code = get_str(f_row, 43) # Col AQ (Agua '89)
-            res_code = get_str(f_row, 45) # Col AS (Dureza '89)
-            gsi_vis = int(get_num(f_row, 47)) # Col AU (GSI '89)
-            ctrl = int(get_num(f_row, 48)) # Col AV (Ctrl '89)
-            vol = int(get_num(f_row, 49)) # Col AW (Vol '89)
-            ucs = get_num(f_row, 40) # Col AN (UCS MPa)
-            is50 = get_num(f_row, 41) # Col AO (is50 MPa)
-            fecha_val = ws.cell(row=f_row, column=59).value # Col BG (Fecha)
+            agua_code = get_str(f_row, 43)
+            res_code = get_str(f_row, 45)
+            gsi_vis = int(get_num(f_row, 47))
+            ctrl = int(get_num(f_row, 48))
+            vol = int(get_num(f_row, 49))
+            ucs = get_num(f_row, 40)
+            is50 = get_num(f_row, 41)
+            fecha_val = ws.cell(row=f_row, column=59).value
             if isinstance(fecha_val, str):
                 try:
                     fecha_mapeo = datetime.strptime(fecha_val[:10], "%Y-%m-%d").date()
@@ -665,7 +673,7 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 
             comentario = get_str(f_row, 61) # Col BI (Comentario)
             geot = get_str(f_row, 85) # Col CG (Geotecnico)
-            nivel = get_num(f_row, 95) # Col CQ (Nivel)
+            nivel = round(get_num(f_row, 95), 2) # Nivel a 2 decimales
             lito_1 = get_str(f_row, 73) # Col BU? Or check where lito_1 is in BD headers (Lito_1 is in Col 73? Wait, earlier inspect showed Col 89, 91 for litologies)
             # Let's read litology fields
             l1 = get_str(f_row, 89) # Col CK (LITO3_MODELO or LITO1)
@@ -674,27 +682,30 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             
             discs = []
             for r_idx in rows_indices:
-                fam_val = ws.cell(row=r_idx, column=1).value or 1 # Col A (ID)
-                # If there's structures data
+                fam_val = ws.cell(row=r_idx, column=1).value or 1
+                
+                raw_nstr = int(round(get_num(r_idx, 72)))
+                nstr = raw_nstr if raw_nstr > 0 else -1
+
                 discs.append(schemas.DiscontinuidadBase(
                     familia_id=int(fam_val),
-                    distancia_m=get_num(r_idx, 63), # Col BK (Dist. de estr.)
-                    tipo_estructura=get_str(r_idx, 69), # Col BQ (Tipo)
-                    dip=get_num(r_idx, 70), # Col BR (Dip)
-                    dip_dir=get_num(r_idx, 71), # Col BS (DipDir)
-                    n_estructuras=get_num(r_idx, 72), # Col BT (Num structures)
-                    abertura_mm=get_num(r_idx, 73), # Col BU (Abertura mm)
-                    espesor_mm=get_num(r_idx, 74), # Col BV (Espesor mm)
-                    continuidad_m=get_num(r_idx, 75), # Col BW (Continuidad m)
-                    espaciamiento_m=get_num(r_idx, 76), # Col BX (Espaciamiento m)
-                    n_extremos_visibles=int(get_num(r_idx, 77)) if ws.cell(row=r_idx, column=77).value is not None else None, # Col BY
+                    distancia_m=int(round(get_num(r_idx, 63))), # Distancia como entero
+                    tipo_estructura=get_str(r_idx, 69),
+                    dip=round(get_num(r_idx, 70), 2),
+                    dip_dir=round(get_num(r_idx, 71), 2),
+                    n_estructuras=nstr,
+                    abertura_mm=round(get_num(r_idx, 73), 1), # Max 1 decimal
+                    espesor_mm=round(get_num(r_idx, 74), 1), # Max 1 decimal
+                    continuidad_m=round(get_num(r_idx, 75), 2),
+                    espaciamiento_m=round(get_num(r_idx, 76), 2), # Max 2 dec
+                    n_extremos_visibles=min(2, max(0, int(get_num(r_idx, 77)))) if ws.cell(row=r_idx, column=77).value is not None else None,
                     terminacion=3, # default
-                    relleno_1_codigo=get_str(r_idx, 78), # Col BZ (Relleno 1)
-                    relleno_2_codigo=get_str(r_idx, 79), # Col CA (Relleno 2)
-                    jrc=int(get_num(r_idx, 80)) if ws.cell(row=r_idx, column=80).value is not None else None, # Col CB
-                    rugosidad_codigo=int(get_num(r_idx, 81)) if ws.cell(row=r_idx, column=81).value is not None else None, # Col CC
-                    forma_estructura=get_str(r_idx, 82), # Col CD (Forma)
-                    alteracion_codigo=get_str(r_idx, 83) # Col CE (Alteracion)
+                    relleno_1_codigo=get_str(r_idx, 78),
+                    relleno_2_codigo=get_str(r_idx, 79),
+                    jrc=min(20, max(0, int(get_num(r_idx, 80)))) if ws.cell(row=r_idx, column=80).value is not None else None,
+                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 81)))) if ws.cell(row=r_idx, column=81).value is not None else None, # Rugosidad limitada 0-9
+                    forma_estructura=get_str(r_idx, 82),
+                    alteracion_codigo=get_str(r_idx, 83)
                 ))
                 
             ri_schema = schemas.VentanaRmrInputBase(

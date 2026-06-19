@@ -53,7 +53,7 @@ class Discontinuidad(Base):
     espesor_mm = Column(Numeric(18, 6), nullable=True)
     continuidad_m = Column(Numeric(18, 6), nullable=True)
     espaciamiento_m = Column(Numeric(18, 6), nullable=False)
-    n_estructuras = Column(Numeric(18, 6), FetchedValue(), nullable=True)
+    n_estructuras = Column(Numeric(18, 6), nullable=True)
     n_extremos_visibles = Column(Integer, nullable=True)
     terminacion = Column(Integer, nullable=True)
     relleno_1_codigo = Column(String(50), nullable=True)

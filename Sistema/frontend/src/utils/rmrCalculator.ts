@@ -207,6 +207,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     largo = typeof header.largo === 'string' ? parseFloat(header.largo) : (header.largo || 0.0);
     if (isNaN(largo)) largo = 0;
   }
+  largo = Math.round(largo);
 
   // Inclinacion (Dip hole)
   const dip_hole = largo > 0 && isCoordsValid ? Math.asin((header.cota_from - header.cota_to) / largo) * (180 / Math.PI) : 0;
@@ -366,13 +367,13 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     if (sp !== undefined && sp !== -1 && sp > 0) {
       let n = cj.row.n_estructuras;
       if (n === undefined || n === null || n === -1) {
-        n = (largo > 0) ? (largo / 3) / sp : 1;
+        n = 0; // -1 indica nulidad, no aporta a la ponderación
       }
       totalStructures += n;
       spacingWeightedSum += sp * n;
     }
   });
-  const global_spacing = totalStructures > 0 ? spacingWeightedSum / totalStructures : 0.5; // default if none
+  const global_spacing = totalStructures > 0 ? spacingWeightedSum / totalStructures : 0.5;
 
   const spacing_rating_76 = getSpacingRating76(global_spacing);
   const spacing_rating_89 = getSpacingRating89(global_spacing);
@@ -385,9 +386,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
 
   calculatedJoints.forEach(cj => {
     let n = cj.row.n_estructuras;
-    const sp = cj.row.espaciamiento;
     if (n === undefined || n === null || n === -1) {
-      n = (sp !== undefined && sp !== -1 && sp > 0 && largo > 0) ? (largo / 3) / sp : 1;
+      n = 0; // -1 indica nulidad
     }
 
     if (cj.total_condicion_76 !== null) {
