@@ -832,7 +832,7 @@ export default function App() {
                           <span>Índice Volumétrico</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Conteo de discontinuidades volumétricas ($Jv$).
+                          Conteo de discontinuidades volumétricas <code className="text-amber-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">Jv</code>
                         </p>
                       </div>
 
@@ -868,7 +868,7 @@ export default function App() {
                           <span>RQD Estimado</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Cálculo empírico según fórmula de Palmström: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                          Cálculo empírico según fórmula: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
                         </p>
                       </div>
 

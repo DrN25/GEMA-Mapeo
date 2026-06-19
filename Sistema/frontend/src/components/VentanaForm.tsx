@@ -10,7 +10,6 @@ interface VentanaFormProps {
   onOpenImportModal: () => void;
 }
 
-// Función helper para limitar estrictamente la edición de enteros y decimales en inputs de texto
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
   const cleaned = value.replace(/[^0-9.]/g, '');
   const parts = cleaned.split('.');
@@ -36,7 +35,6 @@ export default function VentanaForm({
   onOpenImportModal
 }: VentanaFormProps) {
 
-  // Estado local para conservar la edición en texto de coordenadas y evitar deformar los puntos decimales mientras se tipea
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
 
   const handleChange = (field: keyof WindowHeader, val: any) => {
@@ -97,7 +95,6 @@ export default function VentanaForm({
     handleChange(field, Math.round(num * 100) / 100);
   };
 
-  // Litologías
   const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
   const filteredClassifications = header.unidad_litologica
     ? LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.unidad_litologica)
@@ -155,7 +152,6 @@ export default function VentanaForm({
     }
   };
 
-  // Cálculo de largo automático redondeado estrictamente a entero
   const ix = parseFloat(String(header.este_from));
   const iy = parseFloat(String(header.norte_from));
   const ic = parseFloat(String(header.cota_from));
@@ -182,15 +178,15 @@ export default function VentanaForm({
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2 flex items-center justify-between">
           <span className="flex items-center gap-2 text-xs md:text-sm">
-            <AlignLeft size={14} className="text-blue-500" />
+            <AlignLeft size={14} className="text-emerald-500" />
             <span>Datos de Registro — Identificación de la ventana</span>
           </span>
           <button
             type="button"
             onClick={onOpenImportModal}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-blue-500/30 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-emerald-500/30 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
           >
-            <FileSpreadsheet size={14} className="text-blue-500" />
+            <FileSpreadsheet size={14} className="text-emerald-500" />
             <span>Importar Excel</span>
           </button>
         </h3>
