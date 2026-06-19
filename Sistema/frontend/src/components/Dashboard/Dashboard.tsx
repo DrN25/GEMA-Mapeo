@@ -149,7 +149,7 @@ export default function Dashboard({
       {/* Welcome Banner */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-black text-slate-100 tracking-wide bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Mapeo Geomecánico de Paredes</h2>
+          <h2 className="text-2xl font-black text-slate-100 tracking-wide bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Mapeo Geomecánico de Ventanas</h2>
           <p className="text-slate-400 text-xs mt-1">Registra, audita y calcula el RMR en ventanas de escaneo estructural en tiempo real.</p>
         </div>
         <div className="flex gap-2">

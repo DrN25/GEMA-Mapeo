@@ -656,7 +656,7 @@ export default function App() {
             )}
 
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest hidden lg:inline pr-3 border-r border-navy-800/80">
-              Mapeo de Paredes Geomecánicas 2.0
+              Mapeo de Ventanas Geomecánicas 2.0
             </span>
 
             {/* 🏷️ INDICADOR DE CELDA ACTIVA EN EL TOPBAR */}

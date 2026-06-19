@@ -561,7 +561,7 @@ export default function VentanaForm({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Intemperia / Grado</label>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Intemperismo / Meteorización</label>
             <input
               type="text"
               value={header.intemperia || ''}
