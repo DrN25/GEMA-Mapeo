@@ -12,7 +12,6 @@ import {
   getAberturaRating,
   getFillingRatingSingle
 } from '../utils/rmrCalculator';
-import { ShieldAlert, Plus, Trash2 } from 'lucide-react';
 
 interface DisconTableProps {
   joints: JointRow[];
@@ -258,9 +257,8 @@ export default function DisconTable({
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-4 select-none">
       <div className="flex justify-between items-center border-b border-navy-800 pb-3">
-        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-          <ShieldAlert size={16} className="text-orange-500" />
-          <span>Registro de Discontinuidades</span>
+        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest">
+          Registro de Discontinuidades
         </h3>
       </div>
 
@@ -290,7 +288,7 @@ export default function DisconTable({
               <th rowSpan={2} className="py-3 px-2 w-32 text-center">Alteración</th>
               <th colSpan={6} className="py-2 px-2 text-center bg-pink-900/10 border-l border-navy-900 text-pink-400 text-xs">Condición Discontinuidades (RMR'89)</th>
               <th colSpan={6} className="py-2 px-2 text-center bg-amber-900/10 border-l border-navy-900 text-amber-400 text-xs">Condición Discontinuidades (RMR'76)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-navy-900 w-[60px] min-w-[60px]">Acción</th>
+              <th rowSpan={2} className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-navy-900 w-[70px] min-w-[70px]">Acción</th>
             </tr>
             <tr className="bg-navy-950 text-slate-500 font-bold uppercase tracking-wider text-xs border-b border-navy-900">
               <th className="py-1 px-2 text-center border-l border-navy-900 text-pink-400/80 bg-pink-950/5">V. R1</th>
@@ -370,7 +368,7 @@ export default function DisconTable({
                 <tr
                   key={idx}
                   onClick={() => onSelectRow(idx)}
-                  className={`hover:bg-navy-900/20 border-b border-navy-900/60 transition-colors ${rowBg} ${isSelected ? 'bg-orange-500/10 hover:bg-orange-500/15' : ''}`}
+                  className={`hover:bg-navy-900/20 border-b border-navy-900/60 transition-colors ${rowBg} ${isSelected ? 'bg-indigo-500/10 hover:bg-indigo-500/15' : ''}`}
                 >
                   <td className="py-2 px-1 text-center sticky left-0 z-10 border-r border-navy-900 bg-navy-950 font-normal">
                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${getFamilyBadgeStyle(j.familia)}`}>
@@ -765,16 +763,16 @@ export default function DisconTable({
                     {fmtRating(totalR76)}
                   </td>
 
-                  <td className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-10 border-l border-navy-900 w-[60px] min-w-[60px] max-w-[60px]">
+                  <td className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-10 border-l border-navy-900 w-[70px] min-w-[70px] max-w-[70px]">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         clearRow(idx);
                       }}
-                      className="p-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors mx-auto flex items-center justify-center active:scale-95"
+                      className="px-2 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors text-[10px] font-bold active:scale-95"
                       title="Limpiar fila"
                     >
-                      <Trash2 size={12} />
+                      Limpiar
                     </button>
                   </td>
                 </tr>
@@ -798,9 +796,8 @@ export default function DisconTable({
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={createFamily}
-            className="bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+            className="bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
           >
-            <Plus size={14} />
             <span>Crear Familia</span>
           </button>
 
@@ -821,7 +818,6 @@ export default function DisconTable({
               onClick={() => onDeleteFamily(familyToDelete)}
               className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
             >
-              <Trash2 size={14} />
               <span>Eliminar</span>
             </button>
           </div>

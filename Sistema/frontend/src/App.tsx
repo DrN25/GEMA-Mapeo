@@ -648,7 +648,7 @@ export default function App() {
             {activeWindow && (
               <div className="flex items-center gap-2 animate-fade-in pl-1">
                 <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Celda Activa:</span>
-                <span className="text-xs font-black text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3 py-1 rounded-lg uppercase tracking-wider shadow-[0_0_10px_rgba(249,115,22,0.05)]">
+                <span className="text-xs font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1 rounded-lg uppercase tracking-wider shadow-[0_0_10px_rgba(99,102,241,0.05)]">
                   {activeWindow.header.celda}
                 </span>
               </div>
@@ -659,7 +659,7 @@ export default function App() {
             {/* Server Connectivity Indicator */}
             <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
               <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'synced' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' :
-                syncStatus === 'saving' ? 'bg-orange-500 animate-pulse' :
+                syncStatus === 'saving' ? 'bg-indigo-500 animate-pulse' :
                   syncStatus === 'unsaved' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
                     'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                 }`} />
@@ -680,7 +680,7 @@ export default function App() {
                 className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                 title="Ver Catálogos de Referencia Geomecánica"
               >
-                <BookOpen size={14} className="text-orange-400" />
+                <BookOpen size={14} className="text-indigo-400" />
                 <span>Catálogos</span>
               </button>
 
@@ -691,7 +691,7 @@ export default function App() {
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 border ${syncStatus === 'unsaved'
                     ? 'bg-amber-500 hover:bg-amber-600 text-slate-900 border-amber-400/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse-ring'
                     : syncStatus === 'saving'
-                      ? 'bg-orange-600 text-white border-orange-500/30 cursor-wait'
+                      ? 'bg-indigo-600 text-white border-indigo-500/30 cursor-wait'
                       : syncStatus === 'synced'
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold'
                         : 'bg-navy-900 hover:bg-navy-850 text-slate-300 border-navy-800'

@@ -9,9 +9,9 @@
   --navy-200: 51, 65, 85;
   --navy-300: 71, 85, 105;
   --navy-400: 100, 116, 139;
-  --navy-500: 249, 115, 22;   /* Premium orange as accent */
-  --navy-600: 234, 88, 12;    /* Darker orange */
-  --navy-700: 194, 65, 12;    /* Darkest orange */
+  --navy-500: 99, 102, 241;   /* Premium Indigo as accent */
+  --navy-600: 79, 70, 229;    /* Darker Indigo */
+  --navy-700: 67, 56, 202;    /* Darkest Indigo */
   --navy-800: 203, 213, 225;   /* Borders in light mode */
   --navy-850: 226, 232, 240;   /* Secondary card background */
   --navy-900: 241, 245, 249;   /* Section/table-header background */
@@ -36,19 +36,19 @@
 }
 
 .dark {
-  /* Premium Deep Obsidian Orange Palette - High Tech, Glowing Accent, Sleek Dark Mode */
+  /* Premium Deep High-Tech Navy Palette - Glowing Accent, Sleek Dark Mode */
   --navy-50: 245, 245, 244;
   --navy-100: 231, 229, 228;
   --navy-200: 214, 211, 209;
-  --navy-300: 194, 120, 3;
-  --navy-400: 217, 119, 6;
-  --navy-500: 249, 115, 22;   /* Premium orange */
-  --navy-600: 234, 88, 12;    /* Accent orange */
-  --navy-700: 194, 65, 12;
-  --navy-800: 41, 37, 36;     /* Borders */
-  --navy-850: 28, 25, 23;     /* Secondary background */
-  --navy-900: 18, 16, 15;     /* Warm dark obsidian */
-  --navy-950: 12, 10, 9;      /* Deep obsidian */
+  --navy-300: 129, 140, 248;  /* Light Indigo */
+  --navy-400: 99, 102, 241;   /* Medium Indigo */
+  --navy-500: 79, 70, 229;    /* Accent Indigo */
+  --navy-600: 67, 56, 202;    /* Darker Indigo */
+  --navy-700: 55, 48, 163;
+  --navy-800: 30, 41, 59;     /* Slate/Navy Borders */
+  --navy-850: 19, 30, 49;     /* Secondary dark navy background */
+  --navy-900: 15, 23, 42;     /* Slate-900 dark background */
+  --navy-950: 10, 15, 26;     /* Deep navy black */
 
   --slate-50: 248, 250, 252;
   --slate-100: 241, 245, 249;
@@ -60,9 +60,9 @@
   --slate-700: 51, 65, 85;
   --slate-800: 30, 41, 59;
   --slate-900: 15, 23, 42;
-  --slate-950: 12, 10, 9;
+  --slate-950: 10, 15, 26;
 
-  --bg-app: #0c0a09;
+  --bg-app: #080c14;
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
   --scrollbar-track: rgba(255, 255, 255, 0.02);
@@ -78,7 +78,7 @@
 
 /* Glassmorphism custom classes */
 .glass-panel {
-  background-color: rgba(18, 16, 15, 0.75);
+  background-color: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -112,13 +112,13 @@
 /* Animaciones */
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(249, 115, 22, 0);
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
   }
 }
 
@@ -143,9 +143,9 @@ input[type=number] {
  * regardless of light/dark mode toggle
  * ================================================================ */
 .chrome-dark {
-  background-color: rgba(18, 16, 15, 0.97) !important;
+  background-color: rgba(10, 15, 26, 0.97) !important;
   backdrop-filter: blur(14px) !important;
-  border-color: rgba(41, 37, 36, 0.9) !important;
+  border-color: rgba(30, 41, 59, 0.9) !important;
   color: #cbd5e1; /* slate-300 equivalent */
 }
 
@@ -155,13 +155,13 @@ input[type=number] {
 
 /* Force border color to remain navy-800-like in light mode */
 .light .chrome-dark {
-  background-color: rgba(18, 16, 15, 0.98) !important;
-  border-color: rgba(41, 37, 36, 0.95) !important;
+  background-color: rgba(10, 15, 26, 0.98) !important;
+  border-color: rgba(30, 41, 59, 0.95) !important;
 }
 
 /* Scrollbar in chrome-dark areas */
 .chrome-dark ::-webkit-scrollbar-track {
-  background: rgba(12, 10, 9, 0.6);
+  background: rgba(10, 15, 26, 0.6);
 }
 
 .chrome-dark ::-webkit-scrollbar-thumb {
