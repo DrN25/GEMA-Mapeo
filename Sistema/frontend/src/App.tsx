@@ -13,6 +13,7 @@ import ExcelImportModal from './components/ExcelImportModal';
 
 import CatalogsView from './components/CatalogsView';
 import CommentsPhotos from './components/CommentsPhotos';
+import PltEnsayosView from './components/PltEnsayosView';
 
 import {
   calculateWindowGeomec,
@@ -69,6 +70,8 @@ export default function App() {
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [windows, setWindows] = useState<WindowSummary[]>([]);
   const [activeWindow, setActiveWindow] = useState<WindowData | null>(null);
+  const [pltEnsayos, setPltEnsayos] = useState<any[]>([]);
+
 
   // UI & Theme
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -99,9 +102,10 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // 2. Fetch window summaries on mount
+  // 2. Fetch window summaries and PLT trials on mount
   useEffect(() => {
     fetchWindows();
+    fetchPltEnsayos();
   }, []);
 
   // 3. Keep RMR calculations and QA/QC validation updated in real-time
@@ -185,6 +189,27 @@ export default function App() {
     }
   };
 
+  const fetchPltEnsayos = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/ensayos-plt`);
+      if (res.ok) {
+        const data = await res.json();
+        setPltEnsayos(data);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch PLT trials from database, checking localStorage.");
+      const cached = localStorage.getItem('plt_ensayos_v2');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setPltEnsayos(parsed.rows || parsed || []);
+        } catch (err) {
+          setPltEnsayos([]);
+        }
+      }
+    }
+  };
+
   const handleSelectWindow = async (name: string) => {
     setSyncStatus('saving');
     try {
@@ -201,6 +226,12 @@ export default function App() {
           cota_to: v.cota_fin,
           altura: v.altura_m || 15.0,
           dip_talud: v.dip_talud || 64.0,
+
+          // MAPEO EXPLICITO DE ORIENTACIONES PARA SU RECUPERACION EN LA WEB:
+          dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? v.dipdir_talud : undefined,
+          dip_hw: v.dip_hw !== null && v.dip_hw !== undefined ? v.dip_hw : undefined,
+          az_hw: v.az_hw !== null && v.az_hw !== undefined ? v.az_hw : undefined,
+
           unidad_litologica: v.unidad_litologica || '',
           lito_1: v.lito_1 || '',
           lito_2: v.lito_2 || '',
@@ -215,7 +246,9 @@ export default function App() {
           fecha: v.fecha_mapeo || new Date().toISOString().split('T')[0],
           condicion_agua: v.rmr_input?.agua_codigo || 'C',
           resistencia_ucs: v.rmr_input?.resistencia_codigo || 'R4',
-          comentario: v.rmr_input?.comentario || ''
+          comentario: v.rmr_input?.comentario || '',
+          campania: v.campania !== null && v.campania !== undefined ? v.campania : 2026,
+          turno: v.turno || 'Día'
         };
 
         const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => ({
@@ -272,6 +305,12 @@ export default function App() {
         cota_to: newWindow.cota_to,
         altura: newWindow.altura,
         dip_talud: newWindow.dip_talud,
+
+        // Sincronizamos las orientaciones iniciales en la creación
+        dipdir_talud: newWindow.dipdir_talud,
+        dip_hw: newWindow.dip_hw,
+        az_hw: newWindow.az_hw,
+
         unidad_litologica: newWindow.lito_model || '',
         lito_1: newWindow.lito_model || '',
         lito_2: '',
@@ -282,9 +321,11 @@ export default function App() {
         nivel: newWindow.nivel,
         sect_geot: newWindow.sect_geot,
         fecha: newWindow.fecha,
-        condicion_agua: newWindow.condicion_agua,
-        resistencia_ucs: newWindow.resistencia_ucs,
-        comentario: '' // Forzamos inicialización de comentario para prevenir excepciones de tipo undefined
+        condicion_agua: newWindow.condicion_agua || 'C',
+        resistencia_ucs: newWindow.resistencia_ucs || 'R4',
+        comentario: '', // Forzamos inicialización de comentario para prevenir excepciones de tipo undefined
+        campania: newWindow.campania,
+        turno: newWindow.turno
       },
       joints: normalizeJoints([])
     };
@@ -388,7 +429,7 @@ export default function App() {
       codigo: activeWindow.header.celda,
       fecha_mapeo: activeWindow.header.fecha,
       mapeador: activeWindow.header.mapeador,
-      campania: 2026,
+      campania: parseInt(String(activeWindow.header.campania)) || 2026,
       este_ini: activeWindow.header.este_from,
       norte_ini: activeWindow.header.norte_from,
       cota_ini: activeWindow.header.cota_from,
@@ -398,6 +439,9 @@ export default function App() {
       largo_m: calculated.largo,
       altura_m: activeWindow.header.altura,
       dip_talud: activeWindow.header.dip_talud,
+      dipdir_talud: activeWindow.header.dipdir_talud,
+      dip_hw: activeWindow.header.dip_hw,
+      az_hw: activeWindow.header.az_hw,
       alteracion_codigo: activeWindow.header.alt_zona || 'd',
       intemperismo_codigo: activeWindow.header.intemperia || 'd',
       lito_1: activeWindow.header.lito_1 || '',
@@ -408,6 +452,7 @@ export default function App() {
       fase: parseInt(activeWindow.header.fase || '') || 5,
       nivel: parseFloat(activeWindow.header.nivel || '') || 3960.0,
       sector_geotecnico: activeWindow.header.sect_geot,
+      turno: activeWindow.header.turno,
       discontinuidades: nonVacantJoints.map(j => ({
         fam: j.familia,
         dist: j.distancia,
@@ -449,9 +494,16 @@ export default function App() {
         body: JSON.stringify(payload)
       });
 
-      if (res.ok) {
+      // Also save PLT trials
+      const resPlt = await fetch(`${API_BASE}/api/ensayos-plt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pltEnsayos)
+      });
+
+      if (res.ok && resPlt.ok) {
         setSyncStatus('synced');
-        setSyncMessage(`Mapeo Celda ${activeWindow.header.celda} guardado con éxito.`);
+        setSyncMessage(`Mapeo Celda ${activeWindow.header.celda} y Ensayos PLT guardados con éxito.`);
         fetchWindows();
       } else {
         throw new Error();
@@ -459,6 +511,7 @@ export default function App() {
     } catch (e) {
       console.warn("Save database failed, saving locally in cache.");
       localStorage.setItem(`geolog_window_${activeWindow.header.celda}`, JSON.stringify(activeWindow));
+      localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
 
       // Update local summaries list
       const summary: WindowSummary = {
@@ -479,6 +532,29 @@ export default function App() {
 
       setSyncStatus('offline');
       setSyncMessage("Cambios resguardados en almacenamiento local temporal.");
+    }
+  };
+
+  const handleSaveActivePlt = async () => {
+    setSyncStatus('saving');
+    setSyncMessage("Sincronizando ensayos PLT con la base de datos...");
+    try {
+      const resPlt = await fetch(`${API_BASE}/api/ensayos-plt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pltEnsayos)
+      });
+      if (resPlt.ok) {
+        setSyncStatus('synced');
+        setSyncMessage("Ensayos PLT guardados con éxito en la base de datos.");
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      console.warn("Save PLT failed, saving locally.");
+      localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
+      setSyncStatus('offline');
+      setSyncMessage("No se pudo conectar al servidor. Ensayos PLT guardados localmente.");
     }
   };
 
@@ -791,6 +867,21 @@ export default function App() {
               header={activeWindow.header}
               calculatedJoints={calculated.joints}
               largo={calculated.largo}
+            />
+          )}
+
+          {currentView === 'plt_ensayos' && (
+            <PltEnsayosView
+              pltEnsayos={pltEnsayos}
+              onChange={(newRows) => {
+                setPltEnsayos(newRows);
+                setSyncStatus('unsaved');
+                setSyncMessage('Ensayos PLT modificados localmente. Presione "Guardar Cambios" para sincronizar.');
+              }}
+              activeWindowCelda={activeWindow?.header.celda || null}
+              onSave={handleSaveActivePlt}
+              syncStatus={syncStatus}
+              syncMessage={syncMessage}
             />
           )}
 

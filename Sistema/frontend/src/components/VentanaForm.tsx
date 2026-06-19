@@ -23,17 +23,24 @@ export default function VentanaForm({
     });
   };
 
-  // Safe coordinate numeric formatting
+  // Función de sanitización y control de precisión a 6 decimales
+  const limitPrecision = (val: number, decimals = 6): number => {
+    const factor = Math.pow(10, decimals);
+    return Math.round(val * factor) / factor;
+  };
+
+  // Safe coordinate numeric formatting a 6 decimales
   const handleCoordinateChange = (field: keyof WindowHeader, val: string) => {
     if (val === '' || val === '-') {
       handleChange(field, val);
       return;
     }
-    const num = parseFloat(val);
-    handleChange(field, isNaN(num) ? 0 : num);
+    let num = parseFloat(val);
+    if (isNaN(num)) num = 0;
+    handleChange(field, limitPrecision(num, 6));
   };
 
-  // Enforces degree limits (0-90 or 0-359) just like validarGrados in HTML
+  // Enforces degree limits (0-90 or 0-359) con precisión de 6 decimales
   const handleDegreeChange = (field: keyof WindowHeader, val: string, maxVal: number) => {
     if (val === '') {
       handleChange(field, '');
@@ -51,7 +58,7 @@ export default function VentanaForm({
 
     if (num > maxVal) num = maxVal;
     if (maxVal === 360 && num === 360) num = 0;
-    handleChange(field, num);
+    handleChange(field, limitPrecision(num, 6));
   };
 
   // Extraemos las unidades únicas para el primer selector
@@ -117,8 +124,6 @@ export default function VentanaForm({
     }
   };
 
-
-
   // Determine if From/To coordinates are entered to auto-calculate Largo (3D distance)
   const ix = parseFloat(String(header.este_from));
   const iy = parseFloat(String(header.norte_from));
@@ -132,11 +137,12 @@ export default function VentanaForm({
     ? Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2))
     : null;
 
-  // Sync auto length calculation to state if coords change
+  // Sincronizamos la distancia real 3D con un límite de 6 decimales de precisión
   React.useEffect(() => {
     if (calculatedLargo !== null) {
-      if (parseFloat(String(header.largo)) !== parseFloat(calculatedLargo.toFixed(2))) {
-        handleChange('largo', calculatedLargo.toFixed(2));
+      const roundedLargo = calculatedLargo.toFixed(6); // Sincronizado a 6 decimales
+      if (parseFloat(String(header.largo)) !== parseFloat(roundedLargo)) {
+        handleChange('largo', roundedLargo);
       }
     }
   }, [calculatedLargo]);
@@ -182,7 +188,7 @@ export default function VentanaForm({
             <div className="grid grid-cols-3 gap-2">
               <input
                 type="number"
-                step="0.01"
+                step="0.000001" // Modificado a millonésima (6 decimales)
                 placeholder="Este"
                 value={header.este_from}
                 id="header-este_from"
@@ -192,7 +198,7 @@ export default function VentanaForm({
               />
               <input
                 type="number"
-                step="0.01"
+                step="0.000001" // Modificado a millonésima
                 placeholder="Norte"
                 value={header.norte_from}
                 onChange={(e) => handleCoordinateChange('norte_from', e.target.value)}
@@ -201,7 +207,7 @@ export default function VentanaForm({
               />
               <input
                 type="number"
-                step="0.01"
+                step="0.000001" // Modificado a millonésima
                 placeholder="Cota"
                 value={header.cota_from}
                 onChange={(e) => handleCoordinateChange('cota_from', e.target.value)}
@@ -216,7 +222,7 @@ export default function VentanaForm({
             <div className="grid grid-cols-3 gap-2">
               <input
                 type="number"
-                step="0.01"
+                step="0.000001" // Modificado a millonésima
                 placeholder="Este"
                 value={header.este_to}
                 id="header-este_to"
@@ -226,7 +232,7 @@ export default function VentanaForm({
               />
               <input
                 type="number"
-                step="0.01"
+                step="0.000001" // Modificado a millonésima
                 placeholder="Norte"
                 value={header.norte_to}
                 onChange={(e) => handleCoordinateChange('norte_to', e.target.value)}
@@ -235,7 +241,7 @@ export default function VentanaForm({
               />
               <input
                 type="number"
-                step="0.01"
+                step="0.000001" // Modificado a millonésima
                 placeholder="Cota"
                 value={header.cota_to}
                 onChange={(e) => handleCoordinateChange('cota_to', e.target.value)}
@@ -251,7 +257,7 @@ export default function VentanaForm({
               {calculatedLargo !== null && (
                 <span
                   className="text-[10px] bg-orange-500/10 border border-orange-500/30 text-orange-400 font-extrabold px-2 py-0.5 rounded cursor-help transition-all hover:bg-orange-500/20"
-                  title={`Distancia Real 3D calculada por Coordenadas: √((X2 - X1)² + (Y2 - Y1)² + (Z2 - Z1)²) = ${calculatedLargo.toFixed(2)} m`}
+                  title={`Distancia Real 3D calculada por Coordenadas: √((X2 - X1)² + (Y2 - Y1)² + (Z2 - Z1)²) = ${calculatedLargo.toFixed(6)} m`}
                 >
                   AUTO
                 </span>
@@ -265,7 +271,7 @@ export default function VentanaForm({
               onChange={(e) => handleChange('largo', e.target.value)}
               className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'
                 }`}
-              title={calculatedLargo !== null ? `Distancia Euclidiana 3D: √((X2-X1)² + (Y2-Y1)² + (Z2-Z1)²) = ${calculatedLargo.toFixed(2)} m` : "Ingrese longitud manualmente"}
+              title={calculatedLargo !== null ? `Distancia Euclidiana 3D: √((X2-X1)² + (Y2-Y1)² + (Z2-Z1)²) = ${calculatedLargo.toFixed(6)} m` : "Ingrese longitud manualmente"}
               placeholder="m"
             />
           </div>
@@ -291,6 +297,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Dip Talud&deg;</label>
             <input
               type="number"
+              step="0.000001" // Modificado a millonésima
               min="0"
               max="90"
               placeholder="0-90"
@@ -304,6 +311,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">DipDir Talud&deg;</label>
             <input
               type="number"
+              step="0.000001" // Modificado a millonésima
               min="0"
               max="359"
               placeholder="0-359"
@@ -317,9 +325,10 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Dip Hw&deg;</label>
             <input
               type="number"
-              min="0"
+              step="0.000001" // Modificado a millonésima
+              min="-90" // Permitimos valores negativos por inclinaciones de sondaje ascendentes
               max="90"
-              placeholder="0-90"
+              placeholder="-90 a 90"
               value={header.dip_hw !== undefined ? header.dip_hw : ''}
               onChange={(e) => handleDegreeChange('dip_hw', e.target.value, 90)}
               className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
@@ -330,6 +339,7 @@ export default function VentanaForm({
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Az Hw&deg;</label>
             <input
               type="number"
+              step="0.000001" // Modificado a millonésima
               min="0"
               max="359"
               placeholder="0-359"

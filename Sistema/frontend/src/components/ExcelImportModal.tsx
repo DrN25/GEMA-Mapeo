@@ -253,19 +253,18 @@ export default function ExcelImportModal({
       if (!celdaVal || !String(celdaVal).trim()) continue;
       const codigo = String(celdaVal).trim().toUpperCase();
 
-      const este_from = getNum(start + 2, 1);
-      const norte_from = getNum(start + 2, 3);
-      const cota_from = getNum(start + 2, 5);
-      const este_to = getNum(start + 3, 1);
-      const norte_to = getNum(start + 3, 3);
-      const cota_to = getNum(start + 3, 5);
-      const altura = getNum(start + 3, 10);
+      const este_from = Math.round(getNum(start + 2, 1) * 1000000) / 1000000;
+      const norte_from = Math.round(getNum(start + 2, 3) * 1000000) / 1000000;
+      const cota_from = Math.round(getNum(start + 2, 5) * 1000000) / 1000000;
+      const este_to = Math.round(getNum(start + 3, 1) * 1000000) / 1000000;
+      const norte_to = Math.round(getNum(start + 3, 3) * 1000000) / 1000000;
+      const cota_to = Math.round(getNum(start + 3, 5) * 1000000) / 1000000;
+      const altura = Math.round(getNum(start + 3, 10) * 1000000) / 1000000;
 
-      // Orientación del Talud y del Agujero mapeadas de la Columna N (index 13)
-      const dip_talud = getNum(start + 2, 13);
-      const dipdir_talud = getNum(start + 3, 13);
-      const dip_hw = getNum(start + 4, 13); // Admite valores negativos sin clamping
-      const az_hw = getNum(start + 5, 13);
+      const dip_talud = Math.round(getNum(start + 2, 13) * 1000000) / 1000000;
+      const dipdir_talud = Math.round(getNum(start + 3, 13) * 1000000) / 1000000;
+      const dip_hw = Math.round(getNum(start + 4, 13) * 1000000) / 1000000;
+      const az_hw = Math.round(getNum(start + 5, 13) * 1000000) / 1000000;
 
       const lito_3 = getStr(start + 1, 15); // Col P (index 15)
       const alt_zona = getStr(start + 2, 15);
@@ -294,24 +293,32 @@ export default function ExcelImportModal({
         const fam = parseInt(famVal);
         if (isNaN(fam)) continue;
 
+        // Sanitización estricta bajo límites físicos
+        const dip = Math.min(90, Math.max(0, getNum(r, 3))); // 0-90
+        const dip_dir = Math.min(359, Math.max(0, getNum(r, 4))); // 0-359
+        const jrc = sanitizeRange(getNum(r, 18), 0, 20); // 0-20 o vacío
+        const rugosidad = sanitizeRange(getNum(r, 19), 1, 9); // 1-9 o vacío (el 11 se hará -1)
+        const extremos_visibles = sanitizeRange(getNum(r, 10), 0, 3); // 0-3 o vacío
+        const terminacion = sanitizeRange(getNum(r, 11), 0, 5); // 0-5 o vacío
+
         joints.push({
           id: jId++,
           familia: fam,
           distancia: getNum(r, 1),
           tipo_estructura: getStr(r, 2) || 'J',
-          dip: getNum(r, 3),
-          dip_dir: getNum(r, 4),
+          dip: dip !== -1 ? dip : undefined,
+          dip_dir: dip_dir !== -1 ? dip_dir : undefined,
           n_estructuras: getNum(r, 5) || 1,
           abertura: getNum(r, 6),
           espesor: getNum(r, 7),
           continuidad: getNum(r, 8),
           espaciamiento: getNum(r, 9),
-          extremos_visibles: getNum(r, 10),
-          terminacion: getNum(r, 11),
+          extremos_visibles,
+          terminacion,
           relleno1: getStr(r, 12).toLowerCase() || 'cwf',
           relleno2: getStr(r, 13).toLowerCase() || undefined,
-          jrc: getNum(r, 18) || 10,
-          rugosidad: getNum(r, 19) || 2,
+          jrc: jrc !== -1 ? jrc : undefined,
+          rugosidad: rugosidad !== -1 ? rugosidad : -1, // Si es inválido se carga como vacío (-1)
           forma: getStr(r, 20) || 'O',
           alteracion: getStr(r, 21).toLowerCase() || 'd'
         });
@@ -457,19 +464,18 @@ export default function ExcelImportModal({
         celdasData[celdaCode] = {
           header: {
             celda: celdaCode,
-            este_from: getNum(row, 'este_from', 0),
-            norte_from: getNum(row, 'norte_from', 0),
-            cota_from: getNum(row, 'cota_from', 0),
-            este_to: getNum(row, 'este_to', 0),
-            norte_to: getNum(row, 'norte_to', 0),
-            cota_to: getNum(row, 'cota_to', 0),
-            altura: getNum(row, 'altura', 15.0),
-            dip_talud: getNum(row, 'dip_talud', 64.0),
+            este_from: Math.round(getNum(row, 'este_from', 0) * 1000000) / 1000000,
+            norte_from: Math.round(getNum(row, 'norte_from', 0) * 1000000) / 1000000,
+            cota_from: Math.round(getNum(row, 'cota_from', 0) * 1000000) / 1000000,
+            este_to: Math.round(getNum(row, 'este_to', 0) * 1000000) / 1000000,
+            norte_to: Math.round(getNum(row, 'norte_to', 0) * 1000000) / 1000000,
+            cota_to: Math.round(getNum(row, 'cota_to', 0) * 1000000) / 1000000,
+            altura: Math.round(getNum(row, 'altura', 15.0) * 1000000) / 1000000,
+            dip_talud: Math.round(getNum(row, 'dip_talud', 64.0) * 1000000) / 1000000,
 
-            // Orientaciones y alteraciones mapeadas dinámicamente de la planilla plana
-            dipdir_talud: getNum(row, 'dipdir_talud', 247.0),
-            dip_hw: getNum(row, 'dip_hw', 0.0),
-            az_hw: getNum(row, 'az_hw', 0.0),
+            dipdir_talud: Math.round(getNum(row, 'dipdir_talud', 247.0) * 1000000) / 1000000,
+            dip_hw: Math.round(getNum(row, 'dip_hw', 0.0) * 1000000) / 1000000,
+            az_hw: Math.round(getNum(row, 'az_hw', 0.0) * 1000000) / 1000000,
 
             ...litoDetails,
             mapeador: getStr(row, 'mapeador', 'AS-HM'),
@@ -491,24 +497,32 @@ export default function ExcelImportModal({
       if (famVal !== null && famVal !== undefined && String(famVal).trim() !== "") {
         const fam = parseInt(famVal);
         if (!isNaN(fam)) {
+          // Sanitización estricta
+          const dip = Math.min(90, Math.max(0, getNum(row, 'dip', 45)));
+          const dip_dir = Math.min(359, Math.max(0, getNum(row, 'dip_dir', 180)));
+          const jrc = sanitizeRange(getNum(row, 'jrc'), 0, 20);
+          const rugosidad = sanitizeRange(getNum(row, 'rugosidad'), 1, 9);
+          const extremos_visibles = sanitizeRange(getNum(row, 'extremos_visibles'), 0, 3);
+          const terminacion = sanitizeRange(getNum(row, 'terminacion'), 0, 5);
+
           celdasData[celdaCode].joints.push({
             id: celdasData[celdaCode].joints.length + 1,
             familia: fam,
             distancia: getNum(row, 'distancia', 0),
             tipo_estructura: getStr(row, 'tipo_estructura', 'J'),
-            dip: getNum(row, 'dip', 45),
-            dip_dir: getNum(row, 'dip_dir', 180),
+            dip: dip !== -1 ? dip : undefined,
+            dip_dir: dip_dir !== -1 ? dip_dir : undefined,
             n_estructuras: getNum(row, 'n_estructuras', 1),
             abertura: getNum(row, 'abertura', 0.1),
             espesor: getNum(row, 'espesor', 0),
             continuidad: getNum(row, 'continuidad', 1.5),
             espaciamiento: getNum(row, 'espaciamiento', 0.5),
-            extremos_visibles: getNum(row, 'extremos_visibles', 1),
-            terminacion: getNum(row, 'terminacion', 0),
-            relleno1: getStr(row, 'relleno1').toLowerCase() || 'cwf', // Forzamos minúsculas de seguridad
+            extremos_visibles,
+            terminacion,
+            relleno1: getStr(row, 'relleno1').toLowerCase() || 'cwf',
             relleno2: getStr(row, 'relleno2').toLowerCase() || undefined,
-            jrc: getNum(row, 'jrc', 10),
-            rugosidad: getNum(row, 'rugosidad', 2),
+            jrc: jrc !== -1 ? jrc : undefined,
+            rugosidad: rugosidad !== -1 ? rugosidad : -1, // Si es inválido se carga como vacío (-1)
             forma: getStr(row, 'forma', 'O'),
             alteracion: getStr(row, 'alteracion').toLowerCase() || 'd'
           });
@@ -524,6 +538,14 @@ export default function ExcelImportModal({
     } else {
       setSelectedCeldaCode('');
     }
+  };
+
+  const sanitizeRange = (val: number, min: number, max: number, fallback = -1): number => {
+    if (isNaN(val) || val === null || val === undefined) return fallback;
+    if (val < min || val > max) return fallback;
+
+    // Limita la precisión del valor numérico procesado a un máximo de 6 decimales
+    return Math.round(val * 1000000) / 1000000;
   };
 
   const handleMappingChange = (fieldKey: string, colIdx: number) => {

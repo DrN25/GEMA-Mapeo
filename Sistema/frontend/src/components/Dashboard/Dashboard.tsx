@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar } from 'lucide-react';
-import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
 
 export interface WindowSummary {
   name: string; // matches header.celda
@@ -34,22 +33,51 @@ export default function Dashboard({
 
   // Form state for creating a window celda (Defaulted to empty values)
   const [celda, setCelda] = useState('');
-  const [proyecto, setProyecto] = useState('');
+  const [proyecto, setProyecto] = useState('Proyecto A');
   const [mapeador, setMapeador] = useState('');
   const [sector, setSector] = useState('');
   const [fase, setFase] = useState('');
   const [nivel, setNivel] = useState('');
-  const [esteFrom, setEsteFrom] = useState<number | ''>('');
-  const [norteFrom, setNorteFrom] = useState<number | ''>('');
-  const [cotaFrom, setCotaFrom] = useState<number | ''>('');
-  const [esteTo, setEsteTo] = useState<number | ''>('');
-  const [norteTo, setNorteTo] = useState<number | ''>('');
-  const [cotaTo, setCotaTo] = useState<number | ''>('');
+  const [esteFrom, setEsteFrom] = useState('');
+  const [norteFrom, setNorteFrom] = useState('');
+  const [cotaFrom, setCotaFrom] = useState('');
+  const [esteTo, setEsteTo] = useState('');
+  const [norteTo, setNorteTo] = useState('');
+  const [cotaTo, setCotaTo] = useState('');
   const [altura, setAltura] = useState<number | ''>('');
-  const [dipTalud, setDipTalud] = useState<number | ''>('');
-  const [lito3, setLito3] = useState('');
-  const [condicionAgua, setCondicionAgua] = useState('');
-  const [resistenciaUcs, setResistenciaUcs] = useState('');
+  const [campania, setCampania] = useState(new Date().getFullYear().toString());
+  const [turno, setTurno] = useState('Día');
+
+  const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
+    // Keep only numbers and dot
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return cleaned.slice(0, -1);
+
+    let integerPart = parts[0];
+    let decimalPart = parts[1];
+
+    if (integerPart.length > intDigits) {
+      integerPart = integerPart.slice(0, intDigits);
+    }
+    if (decimalPart !== undefined && decimalPart.length > decDigits) {
+      decimalPart = decimalPart.slice(0, decDigits);
+    }
+
+    return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+  };
+
+  const ix = parseFloat(esteFrom);
+  const iy = parseFloat(norteFrom);
+  const ic = parseFloat(cotaFrom);
+  const fx = parseFloat(esteTo);
+  const fy = parseFloat(norteTo);
+  const fc = parseFloat(cotaTo);
+
+  const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
+  const calculatedLargo = hasCoords
+    ? Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2))
+    : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,18 +91,21 @@ export default function Dashboard({
       este_to: esteTo === '' ? 0 : Number(esteTo),
       norte_to: norteTo === '' ? 0 : Number(norteTo),
       cota_to: cotaTo === '' ? 0 : Number(cotaTo),
+      largo_m: calculatedLargo !== null ? calculatedLargo : 0,
       altura: altura === '' ? 0 : Number(altura),
-      dip_talud: dipTalud === '' ? 0 : Number(dipTalud),
-      lito_3: lito3,
-      lito_model: lito3 ? `${lito3}_M` : '',
+      dip_talud: 64.0, // default
+      lito_3: '', // default
+      lito_model: '', // default
       mapeador: mapeador.trim(),
       sector: sector.trim(),
       fase: fase.trim(),
       nivel: nivel.trim(),
       sect_geot: sector.trim(),
       fecha: new Date().toISOString().split('T')[0],
-      condicion_agua: condicionAgua || 'C',
-      resistencia_ucs: resistenciaUcs || 'R4',
+      condicion_agua: 'C', // default
+      resistencia_ucs: 'R4', // default
+      campania: parseInt(campania) || 2026,
+      turno,
       joints: [],
       calculated: null
     });
@@ -82,7 +113,7 @@ export default function Dashboard({
     // Reset all form states to empty on successful submit
     setShowModal(false);
     setCelda('');
-    setProyecto('');
+    setProyecto('Proyecto A');
     setMapeador('');
     setSector('');
     setFase('');
@@ -94,10 +125,8 @@ export default function Dashboard({
     setNorteTo('');
     setCotaTo('');
     setAltura('');
-    setDipTalud('');
-    setLito3('');
-    setCondicionAgua('');
-    setResistenciaUcs('');
+    setCampania(new Date().getFullYear().toString());
+    setTurno('Día');
   };
 
   const totalLargoM = windows.reduce((acc, w) => acc + w.largo, 0);
@@ -307,8 +336,8 @@ export default function Dashboard({
                 </div>
               </div>
 
-              {/* Distribución optimizada para dar más ancho al selector de Proyecto */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {/* Distribución optimizada con Proyecto, Campaña y Turno */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Proyecto</label>
                   <select
@@ -318,11 +347,37 @@ export default function Dashboard({
                     className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${proyecto === '' ? 'text-slate-500' : 'text-slate-100'
                       }`}
                   >
-                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
                     <option value="Proyecto A" className="bg-navy-950 text-slate-100">Proyecto A</option>
                     <option value="Proyecto B" className="bg-navy-950 text-slate-100">Proyecto B</option>
                   </select>
                 </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Campaña (Año)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej. 2026"
+                    value={campania}
+                    onChange={(e) => setCampania(handleNumberInputLimit(e.target.value, 4, 0))}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Turno</label>
+                  <select
+                    required
+                    value={turno}
+                    onChange={(e) => setTurno(e.target.value)}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer"
+                  >
+                    <option value="Día" className="bg-navy-950 text-slate-100">Día</option>
+                    <option value="Noche" className="bg-navy-950 text-slate-100">Noche</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fila con Sector, Fase, Nivel */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector</label>
                   <input
@@ -352,7 +407,7 @@ export default function Dashboard({
                     required
                     placeholder="ej. 3960"
                     value={nivel}
-                    onChange={(e) => setNivel(e.target.value)}
+                    onChange={(e) => setNivel(handleNumberInputLimit(e.target.value, 4, 2))}
                     className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
                   />
                 </div>
@@ -365,36 +420,33 @@ export default function Dashboard({
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 block">Este (X)</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       required
                       placeholder="794444.87"
                       value={esteFrom}
-                      onChange={(e) => setEsteFrom(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      onChange={(e) => setEsteFrom(handleNumberInputLimit(e.target.value, 6, 2))}
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 block">Norte (Y)</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       required
                       placeholder="8440465.91"
                       value={norteFrom}
-                      onChange={(e) => setNorteFrom(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      onChange={(e) => setNorteFrom(handleNumberInputLimit(e.target.value, 7, 2))}
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 block">Cota (Z)</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       required
                       placeholder="3960.47"
                       value={cotaFrom}
-                      onChange={(e) => setCotaFrom(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      onChange={(e) => setCotaFrom(handleNumberInputLimit(e.target.value, 4, 2))}
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
@@ -408,44 +460,41 @@ export default function Dashboard({
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 block">Este (X)</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       required
                       placeholder="794449.13"
                       value={esteTo}
-                      onChange={(e) => setEsteTo(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      onChange={(e) => setEsteTo(handleNumberInputLimit(e.target.value, 6, 2))}
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 block">Norte (Y)</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       required
                       placeholder="8440455.69"
                       value={norteTo}
-                      onChange={(e) => setNorteTo(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      onChange={(e) => setNorteTo(handleNumberInputLimit(e.target.value, 7, 2))}
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 block">Cota (Z)</label>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
                       required
                       placeholder="3959.84"
                       value={cotaTo}
-                      onChange={(e) => setCotaTo(e.target.value !== '' ? parseFloat(e.target.value) : '')}
+                      onChange={(e) => setCotaTo(handleNumberInputLimit(e.target.value, 4, 2))}
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Physical Parameters & Geomec parameters */}
-              <div className="border-t border-navy-800/60 pt-3 grid grid-cols-3 gap-3">
+              {/* Physical Parameters */}
+              <div className="border-t border-navy-800/60 pt-3 grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-400 uppercase block">Altura Ventana (m)</label>
                   <input
@@ -455,75 +504,14 @@ export default function Dashboard({
                     placeholder="15.0"
                     value={altura}
                     onChange={(e) => setAltura(e.target.value !== '' ? parseFloat(e.target.value) : '')}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none"
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase block">Dip Talud (&deg;)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="64"
-                    value={dipTalud}
-                    onChange={(e) => setDipTalud(e.target.value !== '' ? parseFloat(e.target.value) : '')}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm placeholder-slate-600 focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase block">Litología (Lito-3)</label>
-                  <select
-                    required
-                    value={lito3}
-                    onChange={(e) => setLito3(e.target.value)}
-                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${lito3 === '' ? 'text-slate-500' : 'text-slate-100'
-                      }`}
-                  >
-                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
-                    {Object.keys(LITHOLOGY_CATALOG).map(code => (
-                      <option key={code} value={code} className="bg-navy-950 text-slate-100">
-                        {code} - {LITHOLOGY_CATALOG[code].name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase block">Agua Subterránea</label>
-                  <select
-                    required
-                    value={condicionAgua}
-                    onChange={(e) => setCondicionAgua(e.target.value)}
-                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${condicionAgua === '' ? 'text-slate-500' : 'text-slate-100'
-                      }`}
-                  >
-                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
-                    <option value="C" className="bg-navy-950 text-slate-100">Completamente seco (C)</option>
-                    <option value="H" className="bg-navy-950 text-slate-100">Húmedo (H)</option>
-                    <option value="M" className="bg-navy-950 text-slate-100">Mojado (Goteo) (M)</option>
-                    <option value="E" className="bg-navy-950 text-slate-100">Goteando (E)</option>
-                    <option value="F" className="bg-navy-950 text-slate-100">Fluyendo (F)</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase block">Resistencia UCS</label>
-                  <select
-                    required
-                    value={resistenciaUcs}
-                    onChange={(e) => setResistenciaUcs(e.target.value)}
-                    className={`w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold cursor-pointer ${resistenciaUcs === '' ? 'text-slate-500' : 'text-slate-100'
-                      }`}
-                  >
-                    <option value="" disabled className="text-slate-500 bg-navy-950">— Seleccione —</option>
-                    <option value="R0" className="bg-navy-950 text-slate-100">R0 — Extremadamente débil (&lt; 1 MPa)</option>
-                    <option value="R1" className="bg-navy-950 text-slate-100">R1 — Muy débil (1 - 5 MPa)</option>
-                    <option value="R2" className="bg-navy-950 text-slate-100">R2 — Débil (5 - 25 MPa)</option>
-                    <option value="R3" className="bg-navy-950 text-slate-100">R3 — Media / Mod. resistente (25 - 50 MPa)</option>
-                    <option value="R4" className="bg-navy-950 text-slate-100">R4 — Fuerte / Resistente (50 - 100 MPa)</option>
-                    <option value="R5" className="bg-navy-950 text-slate-100">R5 — Muy fuerte / Muy resistente (100 - 250 MPa)</option>
-                    <option value="R6" className="bg-navy-950 text-slate-100">R6 — Extremadamente fuerte (&gt; 250 MPa)</option>
-                  </select>
+                  <label className="text-xs font-semibold text-slate-400 uppercase block">Largo (m)</label>
+                  <div className="w-full bg-navy-900/60 border border-navy-800 rounded-lg px-3 py-2 text-orange-400 text-sm font-bold flex items-center justify-center min-h-[38px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
+                    {calculatedLargo !== null ? `${Math.round(calculatedLargo)}` : '—'}
+                  </div>
                 </div>
               </div>
 

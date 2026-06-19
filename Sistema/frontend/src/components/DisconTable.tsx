@@ -68,11 +68,30 @@ export default function DisconTable({
     return styles[fam] || 'text-slate-400 bg-slate-500/10 border border-slate-500/20';
   };
 
+  // Función auxiliar de redondeo y truncado seguro de discontinuidades
+  const limitPrecision = (val: number, decimals = 6): number => {
+    const factor = Math.pow(10, decimals);
+    return Math.round(val * factor) / factor;
+  };
+
+  // Remueve ceros a la derecha innecesarios al renderizar números complejos de hasta 6 decimales
+  const formatNumber6 = (val: number | undefined | null): string => {
+    if (val === undefined || val === null || val === -1 || isNaN(val)) return '';
+    return String(limitPrecision(val, 6));
+  };
+
   const handleRowChange = (index: number, field: keyof JointRow, val: any) => {
     const updated = [...joints];
+    let cleanedVal = val;
+
+    // Si el valor editado es numérico, lo forzamos a una precisión máxima de 6 decimales
+    if (typeof val === 'number' && val !== -1) {
+      cleanedVal = limitPrecision(val, 6);
+    }
+
     updated[index] = {
       ...updated[index],
-      [field]: val
+      [field]: cleanedVal
     };
     onChange(updated);
   };
@@ -143,8 +162,8 @@ export default function DisconTable({
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: 1,
-        terminacion: 0,
+        extremos_visibles: -1,
+        terminacion: -1,
         relleno1: 'cwf',
         relleno2: undefined,
         jrc: -1,
@@ -164,8 +183,8 @@ export default function DisconTable({
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: 1,
-        terminacion: 0,
+        extremos_visibles: -1,
+        terminacion: -1,
         relleno1: 'cwf',
         relleno2: undefined,
         jrc: -1,
@@ -185,8 +204,8 @@ export default function DisconTable({
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: 1,
-        terminacion: 0,
+        extremos_visibles: -1,
+        terminacion: -1,
         relleno1: 'cwf',
         relleno2: undefined,
         jrc: -1,
@@ -212,8 +231,8 @@ export default function DisconTable({
       espesor: -1,
       continuidad: -1,
       espaciamiento: -1,
-      extremos_visibles: 1,
-      terminacion: 0,
+      extremos_visibles: -1,
+      terminacion: -1,
       relleno1: 'cwf',
       relleno2: undefined,
       jrc: -1,
@@ -379,7 +398,7 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center sticky left-[52px] z-10 border-r border-navy-900 bg-navy-950">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.000001" // Modificado de 0.01 a step de millonésima
                       id={`joint-distancia-${idx}`}
                       value={getInputValue(idx, 'distancia', j.distancia)}
                       onChange={(e) => handleInputChange(idx, 'distancia', e.target.value)}
@@ -393,6 +412,7 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center">
                     <input
                       type="number"
+                      step="0.000001"
                       id={`joint-dip-${idx}`}
                       value={getInputValue(idx, 'dip', j.dip)}
                       onChange={(e) => handleInputChange(idx, 'dip', e.target.value)}
@@ -404,10 +424,11 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center">
                     <input
                       type="number"
+                      step="0.000001"
                       id={`joint-dip_dir-${idx}`}
                       value={getInputValue(idx, 'dip_dir', j.dip_dir)}
                       onChange={(e) => handleInputChange(idx, 'dip_dir', e.target.value)}
-                      onBlur={(e) => handleInputBlur(idx, 'dip_dir', e.target.value, 360)}
+                      onBlur={(e) => handleInputBlur(idx, 'dip_dir', e.target.value, 359)}
                       onKeyDown={(e) => handleKeyDown(e, idx, 'dip_dir')}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
@@ -418,6 +439,7 @@ export default function DisconTable({
                       onChange={(e) => handleRowChange(idx, 'tipo_estructura', e.target.value)}
                       className="w-full bg-transparent text-slate-200 font-normal focus:outline-none text-center cursor-pointer text-xs"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {Object.keys(STRUCTURE_CATALOG).map(code => (
                         <option key={code} value={code} className="bg-navy-950 text-slate-200">
                           {code}
@@ -425,21 +447,20 @@ export default function DisconTable({
                       ))}
                     </select>
                   </td>
-                  <td className="py-2 px-1 text-center">
-                    <input
-                      type="number"
-                      id={`joint-n_estructuras-${idx}`}
-                      value={getInputValue(idx, 'n_estructuras', j.n_estructuras)}
-                      onChange={(e) => handleInputChange(idx, 'n_estructuras', e.target.value)}
-                      onBlur={(e) => handleInputBlur(idx, 'n_estructuras', e.target.value, 20)}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'n_estructuras')}
-                      className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
-                    />
+
+                  {/* Cant (N) - Autocalculada con formato inteligente a 6 decimales */}
+                  <td className="py-2 px-1 text-center bg-navy-950/40 border-r border-navy-900/30">
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      {j.espaciamiento && j.espaciamiento > 0 && largoMax > 0
+                        ? formatNumber6((largoMax / 3) / j.espaciamiento)
+                        : '—'}
+                    </span>
                   </td>
+
                   <td className="py-2 px-1 text-center">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.000001"
                       id={`joint-abertura-${idx}`}
                       value={getInputValue(idx, 'abertura', j.abertura)}
                       onChange={(e) => handleInputChange(idx, 'abertura', e.target.value)}
@@ -451,7 +472,7 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.000001"
                       id={`joint-espesor-${idx}`}
                       value={getInputValue(idx, 'espesor', j.espesor)}
                       onChange={(e) => handleInputChange(idx, 'espesor', e.target.value)}
@@ -463,7 +484,7 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center">
                     <input
                       type="number"
-                      step="0.1"
+                      step="0.000001"
                       id={`joint-continuidad-${idx}`}
                       value={getInputValue(idx, 'continuidad', j.continuidad)}
                       onChange={(e) => handleInputChange(idx, 'continuidad', e.target.value)}
@@ -475,7 +496,7 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.000001"
                       id={`joint-espaciamiento-${idx}`}
                       value={getInputValue(idx, 'espaciamiento', j.espaciamiento)}
                       onChange={(e) => handleInputChange(idx, 'espaciamiento', e.target.value)}
@@ -487,21 +508,23 @@ export default function DisconTable({
                   <td className="py-2 px-1 text-center">
                     <select
                       value={j.extremos_visibles}
-                      onChange={(e) => handleRowChange(idx, 'extremos_visibles', parseInt(e.target.value) || 0)}
+                      onChange={(e) => handleRowChange(idx, 'extremos_visibles', parseInt(e.target.value) ?? -1)}
                       className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       <option value="0" className="bg-navy-950">0</option>
                       <option value="1" className="bg-navy-950">1</option>
                       <option value="2" className="bg-navy-950">2</option>
                       <option value="3" className="bg-navy-950">3</option>
                     </select>
                   </td>
-                  <td className="py-2 px-1 text-center">
+                  <td className="py-2 px-1 text-center font-normal text-xs">
                     <select
                       value={j.terminacion}
-                      onChange={(e) => handleRowChange(idx, 'terminacion', parseInt(e.target.value) || 0)}
+                      onChange={(e) => handleRowChange(idx, 'terminacion', parseInt(e.target.value) ?? -1)}
                       className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {[0, 1, 2, 3, 4, 5].map(num => (
                         <option key={num} value={num} className="bg-navy-950">
                           {num}
@@ -515,6 +538,7 @@ export default function DisconTable({
                       onChange={(e) => handleRowChange(idx, 'relleno1', e.target.value)}
                       className="bg-transparent text-slate-300 focus:outline-none text-xs font-normal cursor-pointer w-full text-center"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {Object.keys(RELLENO_CATALOG).map(code => (
                         <option key={code} value={code} className="bg-navy-950">
                           {code}
@@ -566,9 +590,10 @@ export default function DisconTable({
                   <td className="py-2 px-1">
                     <select
                       value={j.rugosidad}
-                      onChange={(e) => handleRowChange(idx, 'rugosidad', parseInt(e.target.value) || 1)}
+                      onChange={(e) => handleRowChange(idx, 'rugosidad', parseInt(e.target.value) ?? -1)}
                       className="bg-transparent text-slate-300 focus:outline-none text-xs text-center cursor-pointer w-full"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {Object.keys(RUGOSIDAD_CATALOG).map(numStr => {
                         const num = parseInt(numStr);
                         return (
@@ -585,6 +610,7 @@ export default function DisconTable({
                       onChange={(e) => handleRowChange(idx, 'forma', e.target.value)}
                       className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {Object.keys(FORMA_CATALOG).map(code => (
                         <option key={code} value={code} className="bg-navy-950 text-xs">
                           {code}
@@ -598,6 +624,7 @@ export default function DisconTable({
                       onChange={(e) => handleRowChange(idx, 'alteracion', e.target.value)}
                       className="bg-transparent text-slate-300 focus:outline-none text-xs font-normal cursor-pointer w-full text-center"
                     >
+                      <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {Object.keys(ALTERACION_CATALOG).map(code => (
                         <option key={code} value={code} className="bg-navy-950 text-xs">
                           {code}

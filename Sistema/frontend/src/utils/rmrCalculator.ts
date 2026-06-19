@@ -57,6 +57,8 @@ export interface WindowHeader {
   condicion_agua: string; // C, H, M, E, F
   resistencia_ucs: string; // R0 to R6
   comentario?: string;
+  campania?: number;
+  turno?: string;
 }
 
 export interface CalculatedJoint {
@@ -64,6 +66,9 @@ export interface CalculatedJoint {
   x: number;
   y: number;
   z: number;
+  theta: number; // Ángulo teta en grados (azimut proyectado de celda)
+  alpha: number; // Ángulo alfa en grados (inclinación de celda)
+  inBounds: boolean; // Indica si se encuentra dentro de la longitud física de la celda
   // Ratings (can be null if parameters are vacant)
   alteracion_76: number | null;
   alteracion_89: number | null;
@@ -89,7 +94,7 @@ export interface CalculatorResult {
   az_hole: number;
   dip_dir_talud: number;
   // Averages
-  familias_spacing: Record<number, number>; // weighted average spacing per family
+  familias_spacing: Record<number, number>; // simple average spacing per family
   jv: number;
   rqd_est: number;
   rqd_rating_76: number;
@@ -133,11 +138,9 @@ export function getAberturaRating(val: number | undefined | null): { r76: number
 export function getFillingRatingSingle(rellenoCode: string | undefined | null, thicknessMm: number | undefined | null): { r76: number | null; r89: number | null } {
   if (!rellenoCode || rellenoCode === '-1') return { r76: null, r89: null };
 
-  // Normalizamos el código en minúscula para evitar fallos de mayúsculas/minúsculas
   const cleanCode = String(rellenoCode).trim().toLowerCase();
   const item = RELLENO_CATALOG[cleanCode] || RELLENO_CATALOG['cwf'];
 
-  // If clean, thickness doesn't matter
   if (item.clase === 3 || thicknessMm === 0 || thicknessMm === undefined || thicknessMm === null || thicknessMm === -1) {
     return { r76: item.rmr76, r89: item.rmr89 };
   }
@@ -217,19 +220,25 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     ? header.dipdir_talud
     : (az_hole + 90) % 360;
 
-  // 3D Direction Cosenes Unit Vectors
-  const vx = largo > 0 && isCoordsValid ? dx / largo : 0;
-  const vy = largo > 0 && isCoordsValid ? dy / largo : 0;
-  const vz = largo > 0 && isCoordsValid ? dz / largo : 0;
+  // Fórmulas matemáticas de proyección angular del Excel (ACOT)
+  const acot = (val: number) => val === 0 ? Math.PI / 2 : Math.atan(1 / val);
+  const theta_rad = dy === 0 ? 0 : acot(dx / dy);
+  const alpha_rad = dz === 0 ? 0 : acot(dx / dz);
+
+  const theta_deg = (theta_rad * 180) / Math.PI;
+  const alpha_deg = (alpha_rad * 180) / Math.PI;
 
   // Calculate each joint coordinates and ratings
   const calculatedJoints: CalculatedJoint[] = joints.map(j => {
-    // Spatial coordinates projection
     const hasDist = j.distancia !== undefined && j.distancia !== -1 && j.distancia >= 0;
     const dist = hasDist ? j.distancia! : 0.0;
-    const x = header.este_from + dist * vx;
-    const y = header.norte_from + dist * vy;
-    const z = header.cota_from + dist * vz;
+
+    // Proyecciones espaciales exactas del Excel (BN, BO y BP en la pestaña 'BD')
+    const x = dist * Math.cos(theta_rad) + header.este_from;
+    const y = dist * Math.sin(theta_rad) + header.norte_from;
+    const z = dist * Math.cos(theta_rad) * Math.sin(alpha_rad) + header.cota_from;
+
+    const inBounds = dist >= 0 && dist <= largo;
 
     // Alteracion
     const hasAlt = j.alteracion && j.alteracion !== '-1';
@@ -285,9 +294,10 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
 
     return {
       row: j,
-      x,
-      y,
-      z,
+      x, y, z,
+      theta: theta_deg,
+      alpha: alpha_deg,
+      inBounds,
       alteracion_76: alt76,
       alteracion_89: alt89,
       relleno_76: rel76,
@@ -307,7 +317,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     };
   });
 
-  // Weighted Average per family: Σ(nStr_i * espac_i) / Σ(nStr_i)
+  // Simple Average per family: Σ(espac_i) / N (Mapea exactamente "=AVERAGE(J15:J17)" del Excel)
   const familias_spacing: Record<number, number> = {};
   const familias_sum_pond: Record<number, number> = {};
   const familias_sum_n: Record<number, number> = {};
@@ -316,14 +326,13 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     const fam = j.familia;
     const sp = j.espaciamiento;
 
-    // Sumamos de manera simple los valores válidos ingresados de espaciamiento
     if (sp !== undefined && sp !== -1 && sp > 0) {
       if (!familias_sum_pond[fam]) {
         familias_sum_pond[fam] = 0;
         familias_sum_n[fam] = 0;
       }
-      familias_sum_pond[fam] += sp; // Suma acumulada simple
-      familias_sum_n[fam] += 1;     // Contador de elementos simples (máximo 3)
+      familias_sum_pond[fam] += sp; // Suma acumulada simple de espaciamientos
+      familias_sum_n[fam] += 1;     // Contador simple de registros válidos
     }
   });
 
@@ -349,7 +358,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const rqd_rating_76 = getRqdRating76(rqd_est);
   const rqd_rating_89 = getRqdRating89(rqd_est);
 
-  // Global Spacing (weighted average by number of structures of each row)
+  // Global Spacing (weighted average by number of structures of each row - Column AW in Excel)
   let totalStructures = 0;
   let spacingWeightedSum = 0;
   calculatedJoints.forEach(cj => {
@@ -368,7 +377,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const spacing_rating_76 = getSpacingRating76(global_spacing);
   const spacing_rating_89 = getSpacingRating89(global_spacing);
 
-  // Global Condition Rating (weighted average by number of structures, skipping nulls)
+  // Global Condition Rating (weighted average by number of structures)
   let totalCond76Structures = 0;
   let totalCond89Structures = 0;
   let cond76WeightedSum = 0;

@@ -9,6 +9,25 @@ import math
 
 from app.database import get_db, Base, engine
 from app import models, schemas, calculator
+from sqlalchemy import text
+
+# Auto-migrate database tables to add missing columns on startup
+try:
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE ventana ADD turno VARCHAR(50) NULL"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE ventanas_final ADD turno VARCHAR(50) NULL"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE ventanas_final ADD campania INT NULL"))
+        except Exception:
+            pass
+except Exception as e:
+    print(f"Error checking/adding database columns: {e}")
 
 app = FastAPI(title="Geomechanical Window Mapping API", version="1.0")
 
@@ -100,10 +119,10 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
             cota_to=float(v.cota_fin),
             dist_celda=float(v.largo_m) if v.largo_m is not None else None,
             altura=float(v.altura_m) if v.altura_m is not None else None,
-            dip=float(v.rmr_input.ucs_mpa) if v.rmr_input else 74.0, # Excel has UCS or Talud Dip?
-            az_hole=r_calc["teta"] * 180 / math.pi if r_calc["teta"] else None,
+            dip=float(v.dip_hw) if v.dip_hw is not None else (r_calc["alfa"] * 180 / math.pi if r_calc["alfa"] else None),  
+            az_hole=float(v.az_hw) if v.az_hw is not None else (r_calc["teta"] * 180 / math.pi if r_calc["teta"] else None),
             dip_talud=float(v.dip_talud),
-            dip_dir_talud=v.dip_talud + 90, # default perpendicular
+            dip_dir_talud=float(v.dipdir_talud) if v.dipdir_talud is not None else (float(v.dip_talud) + 90) % 360,
             intemperismo=v.intemperismo_codigo,
             cond_agua_76=v.rmr_input.agua_codigo if v.rmr_input else "C",
             cond_agua_valor_76=res["agua_r76"],
@@ -167,7 +186,8 @@ def sync_to_ventanas_final(db: Session, ventana_id: int):
             lito_3=v.lito_3,
             unidad_litologica=v.unidad_litologica,
             sector_geotecnico=v.sector_geotecnico if v.sector_geotecnico else "E1",
-            campania=v.campania if v.campania is not None else 2026
+            campania=v.campania if v.campania is not None else 2026,
+            turno=v.turno
         )
         db.add(final_row)
         next_id += 1
@@ -250,6 +270,9 @@ def get_ventana(codigo: str, db: Session = Depends(get_db)):
         largo_m=v.largo_m,
         altura_m=float(v.altura_m) if v.altura_m is not None else None,
         dip_talud=float(v.dip_talud),
+        dipdir_talud=float(v.dipdir_talud) if v.dipdir_talud is not None else None,
+        dip_hw=float(v.dip_hw) if v.dip_hw is not None else None,
+        az_hw=float(v.az_hw) if v.az_hw is not None else None,
         alteracion_codigo=v.alteracion_codigo,
         intemperismo_codigo=v.intemperismo_codigo,
         lito_1=v.lito_1,
@@ -260,6 +283,7 @@ def get_ventana(codigo: str, db: Session = Depends(get_db)):
         fase=v.fase,
         nivel=v.nivel,
         sector_geotecnico=v.sector_geotecnico,
+        turno=v.turno,
         discontinuidades=discs,
         rmr_input=rmr
     )
@@ -268,6 +292,11 @@ def get_ventana(codigo: str, db: Session = Depends(get_db)):
 def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db)):
     code_up = data.codigo.strip().upper()
     v = db.query(models.Ventana).filter_by(codigo=code_up).first()
+
+    def clean_null_val(val):
+        if val == -1 or val == -1.0 or val == "-1" or val == "":
+            return None
+        return val
     
     if v:
         # Update header details
@@ -284,6 +313,9 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             v.largo_m = data.largo_m
         v.altura_m = data.altura_m
         v.dip_talud = data.dip_talud
+        v.dipdir_talud = data.dipdir_talud
+        v.dip_hw = data.dip_hw
+        v.az_hw = data.az_hw
         v.alteracion_codigo = data.alteracion_codigo
         v.intemperismo_codigo = data.intemperismo_codigo
         v.lito_1 = data.lito_1
@@ -294,6 +326,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.fase = data.fase
         v.nivel = data.nivel
         v.sector_geotecnico = data.sector_geotecnico
+        v.turno = data.turno
         
         # Delete old dependent children
         db.query(models.Discontinuidad).filter_by(ventana_id=v.ventana_id).delete()
@@ -314,6 +347,9 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             cota_fin=data.cota_fin,
             altura_m=data.altura_m,
             dip_talud=data.dip_talud,
+            dipdir_talud=data.dipdir_talud,
+            dip_hw=data.dip_hw,
+            az_hw=data.az_hw,
             alteracion_codigo=data.alteracion_codigo,
             intemperismo_codigo=data.intemperismo_codigo,
             lito_1=data.lito_1,
@@ -323,7 +359,8 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             sector=data.sector,
             fase=data.fase,
             nivel=data.nivel,
-            sector_geotecnico=data.sector_geotecnico
+            sector_geotecnico=data.sector_geotecnico,
+            turno=data.turno
         )
         if "sqlite" in str(db.bind.url).lower():
             v.largo_m = data.largo_m
@@ -336,28 +373,28 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             ventana_id=v.ventana_id,
             familia_id=d.fam,
             orden_en_familia=idx + 1,
-            distancia_m=d.dist,
+            distancia_m=clean_null_val(d.dist),
             tipo_estructura=d.tipo,
-            dip=d.dip,
-            dip_dir=d.dipdir,
-            abertura_mm=d.aber,
-            espesor_mm=d.esp,
-            continuidad_m=d.cont,
-            espaciamiento_m=d.espac,
-            n_extremos_visibles=d.next,
-            terminacion=d.term,
-            relleno_1_codigo=d.r1,
-            relleno_2_codigo=d.r2,
-            jrc=d.jrc,
-            rugosidad_codigo=d.rug,
-            forma_estructura=d.forma,
-            alteracion_codigo=d.alt
+            dip=clean_null_val(d.dip),
+            dip_dir=clean_null_val(d.dipdir),
+            abertura_mm=clean_null_val(d.aber),
+            espesor_mm=clean_null_val(d.esp),
+            continuidad_m=clean_null_val(d.cont),
+            espaciamiento_m=clean_null_val(d.espac),
+            n_extremos_visibles=clean_null_val(d.next),
+            terminacion=clean_null_val(d.term),
+            relleno_1_codigo=d.r1 if d.r1 != "-1" else None,
+            relleno_2_codigo=d.r2 if d.r2 != "-1" else None,
+            jrc=clean_null_val(d.jrc),
+            rugosidad_codigo=clean_null_val(d.rug), # Si es -1, SQL Server guardará un NULL válido que no viola la restricción CHECK
+            forma_estructura=d.forma if d.forma != "-1" else None,
+            alteracion_codigo=d.alt if d.alt != "-1" else None
         )
-        db.add(disc)
-        
         if "sqlite" in str(db.bind.url).lower():
             disc.n_estructuras = d.nstr if d.nstr is not None else 1.0
         db.add(disc)
+
+    db.flush()
         
     # Add rmr_input
     if data.rmr_input:
@@ -705,3 +742,83 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             imported_count += 1
             
     return {"status": "success", "message": f"Importación completada. {imported_count} ventanas importadas con éxito."}
+
+@app.get("/api/ensayos-plt", response_model=List[schemas.EnsayoPLTSaveSchema])
+def get_ensayos_plt(db: Session = Depends(get_db)):
+    res = db.query(models.EnsayoPLTIrregular).all()
+    return res
+
+@app.post("/api/ensayos-plt")
+def save_ensayos_plt(data: List[schemas.EnsayoPLTSaveSchema], db: Session = Depends(get_db)):
+    existing = {r.id: r for r in db.query(models.EnsayoPLTIrregular).all()}
+    incoming_ids = {d.id for d in data if d.id is not None}
+    
+    # 1. Delete rows not in incoming data
+    for rid, row in list(existing.items()):
+        if rid not in incoming_ids:
+            db.delete(row)
+            
+    # 2. Insert or update incoming rows
+    for d in data:
+        if d.id is not None and d.id in existing:
+            # Update
+            row = existing[d.id]
+            row.campana = d.campana
+            row.fecha_ensayo = d.fecha_ensayo
+            row.sector_geotecnico = d.sector_geotecnico
+            row.ejecutado_por = d.ejecutado_por
+            row.zona_mapeo = d.zona_mapeo
+            row.nivel = d.nivel
+            row.celda_mapeo = d.celda_mapeo.strip().upper()
+            row.muestra = d.muestra
+            row.codigo_muestra = d.codigo_muestra
+            row.litologia_1 = d.litologia_1
+            row.litologia_2 = d.litologia_2
+            row.litologia_3 = d.litologia_3
+            row.tipo_litologico = d.tipo_litologico
+            row.este = d.este
+            row.norte = d.norte
+            row.elevacion = d.elevacion
+            row.espesor_d = d.espesor_d
+            row.longitud_l = d.longitud_l
+            row.ancho_w1 = d.ancho_w1
+            row.ancho_w2 = d.ancho_w2
+            row.fuerza_p = d.fuerza_p
+            row.direccion_rotura = d.direccion_rotura
+            row.tipo_fractura = d.tipo_fractura
+            row.factor_conversion_k = d.factor_conversion_k
+            row.observaciones = d.observaciones
+        else:
+            # Insert new
+            row = models.EnsayoPLTIrregular(
+                campana=d.campana,
+                fecha_ensayo=d.fecha_ensayo,
+                sector_geotecnico=d.sector_geotecnico,
+                ejecutado_por=d.ejecutado_por,
+                zona_mapeo=d.zona_mapeo,
+                nivel=d.nivel,
+                celda_mapeo=d.celda_mapeo.strip().upper(),
+                muestra=d.muestra,
+                codigo_muestra=d.codigo_muestra,
+                litologia_1=d.litologia_1,
+                litologia_2=d.litologia_2,
+                litologia_3=d.litologia_3,
+                tipo_litologico=d.tipo_litologico,
+                este=d.este,
+                norte=d.norte,
+                elevacion=d.elevacion,
+                espesor_d=d.espesor_d,
+                longitud_l=d.longitud_l,
+                ancho_w1=d.ancho_w1,
+                ancho_w2=d.ancho_w2,
+                fuerza_p=d.fuerza_p,
+                direccion_rotura=d.direccion_rotura,
+                tipo_fractura=d.tipo_fractura,
+                factor_conversion_k=d.factor_conversion_k,
+                observaciones=d.observaciones
+            )
+            db.add(row)
+            
+    db.commit()
+    return {"status": "success", "message": "Ensayos PLT guardados con éxito"}
+

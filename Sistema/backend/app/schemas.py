@@ -57,6 +57,9 @@ class VentanaSaveSchema(BaseModel):
     largo_m: Optional[float] = None
     altura_m: Optional[float] = None
     dip_talud: float
+    dipdir_talud: Optional[float] = None
+    dip_hw: Optional[float] = None
+    az_hw: Optional[float] = None
     alteracion_codigo: Optional[str] = None
     intemperismo_codigo: Optional[str] = None
     lito_1: Optional[str] = None
@@ -67,6 +70,7 @@ class VentanaSaveSchema(BaseModel):
     fase: Optional[int] = None
     nivel: Optional[float] = None
     sector_geotecnico: Optional[str] = None
+    turno: Optional[str] = None
 
     discontinuidades: List[DiscontinuidadBase] = []
     rmr_input: Optional[VentanaRmrInputBase] = None
@@ -84,3 +88,37 @@ class VentanaSummarySchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+class EnsayoPLTSaveSchema(BaseModel):
+    id: Optional[int] = None
+    campana: int
+    fecha_ensayo: date
+    sector_geotecnico: Optional[str] = None
+    ejecutado_por: str
+    zona_mapeo: str
+    nivel: float
+    celda_mapeo: str
+    muestra: str
+    codigo_muestra: str
+    litologia_1: str
+    litologia_2: Optional[str] = None
+    litologia_3: Optional[str] = None
+    tipo_litologico: str
+    este: Optional[float] = None
+    norte: Optional[float] = None
+    elevacion: Optional[float] = None
+    espesor_d: Optional[float] = None
+    longitud_l: Optional[float] = None
+    ancho_w1: Optional[float] = None
+    ancho_w2: Optional[float] = None
+    fuerza_p: Optional[float] = None
+    direccion_rotura: Optional[str] = None
+    tipo_fractura: Optional[str] = None
+    factor_conversion_k: Optional[float] = None
+    observaciones: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+        allow_population_by_field_name = True
+
