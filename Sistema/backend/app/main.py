@@ -557,7 +557,7 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 discs.append(schemas.DiscontinuidadBase(
                     familia_id=fam_id,
                     distancia_m=int(round(get_num(r_idx, 2))), # Dist como entero desde 0
-                    tipo_estructura=get_str(r_idx, 3),
+                    tipo_estructura=get_str(r_idx, 3) if get_str(r_idx, 3) else "JN",
                     dip=round(get_num(r_idx, 4), 2),
                     dip_dir=round(get_num(r_idx, 5), 2),
                     n_estructuras=nstr,
@@ -700,7 +700,7 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 discs.append(schemas.DiscontinuidadBase(
                     familia_id=int(fam_val),
                     distancia_m=int(round(get_num(r_idx, 63))), # Distancia como entero
-                    tipo_estructura=get_str(r_idx, 69),
+                    tipo_estructura=get_str(r_idx, 69) if get_str(r_idx, 69) else "JN",
                     dip=round(get_num(r_idx, 70), 2),
                     dip_dir=round(get_num(r_idx, 71), 2),
                     n_estructuras=nstr,

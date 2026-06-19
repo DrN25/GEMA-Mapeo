@@ -280,6 +280,13 @@ export default function ExcelImportModal({
 
       const condicion_agua = getStr(start + 8, 35) || 'C';
       const resistencia_ucs = getStr(start + 8, 37) || 'R4';
+      const gsi_superficie = getStr(start + 8, 39) || 'G';
+      const gsi_estructura = getStr(start + 8, 40) || 'VB';
+      const gsi_visual = Math.round(getNum(start + 8, 41)) || 56;
+      const control_estructural = Math.round(getNum(start + 8, 42)) || 3;
+      const efectos_voladura = Math.round(getNum(start + 8, 43)) || 3;
+      const ucs_mpa = getNum(start + 8, 52) || 73;
+      const is50_mpa = getNum(start + 8, 53) || 5;
 
       const litoDetails = detectLithology(lito_model, lito_3);
 
@@ -325,7 +332,7 @@ export default function ExcelImportModal({
           id: jId++,
           familia: fam,
           distancia,
-          tipo_estructura: getStr(r, 2) || 'J',
+          tipo_estructura: getStr(r, 2) || 'JN',
           dip: dip !== -1 ? dip : undefined,
           dip_dir: dip_dir !== -1 ? dip_dir : undefined,
           n_estructuras,
@@ -353,7 +360,10 @@ export default function ExcelImportModal({
           ...litoDetails,
           mapeador, sector, fase, nivel, sect_geot,
           fecha, condicion_agua, resistencia_ucs,
-          intemperia, alt_zona
+          intemperia, alt_zona,
+          gsi_superficie, gsi_estructura, gsi_visual,
+          control_estructural, efectos_voladura,
+          ucs_mpa, is50_mpa
         },
         joints
       };
@@ -547,7 +557,7 @@ export default function ExcelImportModal({
             id: celdasData[celdaCode].joints.length + 1,
             familia: fam,
             distancia,
-            tipo_estructura: getStr(row, 'tipo_estructura', 'J'),
+            tipo_estructura: getStr(row, 'tipo_estructura', 'JN'),
             dip: dip !== -1 ? dip : undefined,
             dip_dir: dip_dir !== -1 ? dip_dir : undefined,
             n_estructuras,

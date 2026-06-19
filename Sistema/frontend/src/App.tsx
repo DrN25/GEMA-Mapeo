@@ -92,6 +92,7 @@ export default function App() {
   const [captions, setCaptions] = useState<string[]>(['', '', '', '']);
 
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+  const [isRmrExpanded, setIsRmrExpanded] = useState<boolean>(true);
 
 
   // 1. Initialize Dark Mode Theme
@@ -263,7 +264,14 @@ export default function App() {
           resistencia_ucs: v.rmr_input?.resistencia_codigo || 'R4',
           comentario: v.rmr_input?.comentario || '',
           campania: v.campania !== null && v.campania !== undefined ? v.campania : 2026,
-          turno: v.turno || 'Día'
+          turno: v.turno || 'Día',
+          gsi_estructura: v.rmr_input?.gsi_estructura || 'VB',
+          gsi_superficie: v.rmr_input?.gsi_superficie || 'G',
+          gsi_visual: v.rmr_input?.gsi_visual !== null && v.rmr_input?.gsi_visual !== undefined ? v.rmr_input.gsi_visual : 56,
+          control_estructural: v.rmr_input?.control_estructural !== null && v.rmr_input?.control_estructural !== undefined ? v.rmr_input.control_estructural : 3,
+          efectos_voladura: v.rmr_input?.efectos_voladura !== null && v.rmr_input?.efectos_voladura !== undefined ? v.rmr_input.efectos_voladura : 3,
+          ucs_mpa: v.rmr_input?.ucs_mpa !== null && v.rmr_input?.ucs_mpa !== undefined ? parseFloat(v.rmr_input.ucs_mpa) : 73,
+          is50_mpa: v.rmr_input?.is50_mpa !== null && v.rmr_input?.is50_mpa !== undefined ? parseFloat(v.rmr_input.is50_mpa) : 5
         };
 
         const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => {
@@ -360,9 +368,16 @@ export default function App() {
         fecha: newWindow.fecha,
         condicion_agua: newWindow.condicion_agua || 'C',
         resistencia_ucs: newWindow.resistencia_ucs || 'R4',
-        comentario: '', // Forzamos inicialización de comentario para prevenir excepciones de tipo undefined
+        comentario: '',
         campania: newWindow.campania,
-        turno: newWindow.turno
+        turno: newWindow.turno,
+        gsi_estructura: 'VB',
+        gsi_superficie: 'G',
+        gsi_visual: 56,
+        control_estructural: 3,
+        efectos_voladura: 3,
+        ucs_mpa: 73,
+        is50_mpa: 5
       },
       joints: normalizeJoints([])
     };
@@ -513,13 +528,13 @@ export default function App() {
       rmr_input: {
         agua_codigo: activeWindow.header.condicion_agua,
         resistencia_codigo: activeWindow.header.resistencia_ucs,
-        gsi_estructura: "VB",
-        gsi_superficie: "G",
-        gsi_visual: 50,
-        control_estructural: 4,
-        efectos_voladura: 3,
-        ucs_mpa: 74.0,
-        is50_mpa: 5.0,
+        gsi_estructura: activeWindow.header.gsi_estructura || 'VB',
+        gsi_superficie: activeWindow.header.gsi_superficie || 'G',
+        gsi_visual: activeWindow.header.gsi_visual !== undefined ? activeWindow.header.gsi_visual : 56,
+        control_estructural: activeWindow.header.control_estructural !== undefined ? activeWindow.header.control_estructural : 3,
+        efectos_voladura: activeWindow.header.efectos_voladura !== undefined ? activeWindow.header.efectos_voladura : 3,
+        ucs_mpa: activeWindow.header.ucs_mpa !== undefined ? activeWindow.header.ucs_mpa : 73,
+        is50_mpa: activeWindow.header.is50_mpa !== undefined ? activeWindow.header.is50_mpa : 5,
         comentario: activeWindow.header.comentario || ""
       }
     };
@@ -894,6 +909,39 @@ export default function App() {
                 );
               })()}
 
+              {/* Sección de Análisis Geomecánico RMR Colapsable */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-navy-950/40 p-4 rounded-xl border border-navy-800/80">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg">
+                      <Layers size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">
+                        Análisis Geomecánico RMR
+                      </h4>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                        Cálculo interactivo de ratings RMR76 y RMR89
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsRmrExpanded(!isRmrExpanded)}
+                    className="px-3 py-1.5 rounded-lg bg-navy-900 border border-navy-700/60 hover:bg-navy-850 text-slate-300 text-xs font-bold transition-all active:scale-95"
+                  >
+                    {isRmrExpanded ? 'Ocultar Detalle' : 'Mostrar Detalle'}
+                  </button>
+                </div>
+
+                {isRmrExpanded && (
+                  <RmrAnalysis
+                    header={activeWindow.header}
+                    onChange={(header) => setActiveWindow({ ...activeWindow, header })}
+                    calculated={calculated}
+                  />
+                )}
+              </div>
+
               {/* Comentarios y Fotografías */}
               <CommentsPhotos
                 celda={activeWindow.header.celda}
@@ -913,14 +961,6 @@ export default function App() {
                 apiBase={RESOLVED_API_BASE}
               />
             </div>
-          )}
-
-          {currentView === 'rmr' && (
-            <RmrAnalysis
-              calculated={calculated}
-              condicionAgua={activeWindow?.header.condicion_agua || 'C'}
-              resistenciaUcs={activeWindow?.header.resistencia_ucs || 'R4'}
-            />
           )}
 
           {currentView === 'grafico' && activeWindow && calculated && (

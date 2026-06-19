@@ -80,7 +80,7 @@ export const STRENGTH_CATALOG: Record<string, StrengthItem> = {
 };
 
 export const STRUCTURE_CATALOG: Record<string, string> = {
-  J: "Junta (J)",
+  J: "Junta (JS)",
   BED: "Estratos (BED)",
   F: "Falla (F)",
   SZ: "Zona de Cizalla (SZ)",

@@ -59,6 +59,13 @@ export interface WindowHeader {
   comentario?: string;
   campania?: number;
   turno?: string;
+  gsi_estructura?: string;
+  gsi_superficie?: string;
+  gsi_visual?: number;
+  control_estructural?: number;
+  efectos_voladura?: number;
+  ucs_mpa?: number;
+  is50_mpa?: number;
 }
 
 export interface CalculatedJoint {
@@ -409,9 +416,26 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const water_rating_89 = waterItem.rmr89;
 
   // UCS Strength Ratings
-  const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
-  const ucs_rating_76 = strengthItem.score;
-  const ucs_rating_89 = strengthItem.score;
+  let ucs_rating_76 = 5;
+  let ucs_rating_89 = 7;
+  if (header.ucs_mpa !== undefined && header.ucs_mpa !== null && !isNaN(header.ucs_mpa)) {
+    const ucs = header.ucs_mpa;
+    if (ucs > 250) { ucs_rating_89 = 15; ucs_rating_76 = 10; }
+    else if (ucs > 100) { ucs_rating_89 = 12; ucs_rating_76 = 8; }
+    else if (ucs > 50) { ucs_rating_89 = 7; ucs_rating_76 = 5; }
+    else if (ucs > 25) { ucs_rating_89 = 4; ucs_rating_76 = 2; }
+    else if (ucs > 5) { ucs_rating_89 = 2; ucs_rating_76 = 1; }
+    else { ucs_rating_89 = 1; ucs_rating_76 = 0; }
+  } else {
+    const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
+    ucs_rating_89 = strengthItem.score;
+    if (header.resistencia_ucs === 'R6') ucs_rating_76 = 10;
+    else if (header.resistencia_ucs === 'R5') ucs_rating_76 = 8;
+    else if (header.resistencia_ucs === 'R4') ucs_rating_76 = 5;
+    else if (header.resistencia_ucs === 'R3') ucs_rating_76 = 2;
+    else if (header.resistencia_ucs === 'R2') ucs_rating_76 = 1;
+    else ucs_rating_76 = 0;
+  }
 
   // RMR Finals
   const rmr_76 = ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;

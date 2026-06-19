@@ -26,11 +26,10 @@ export default function Sidebar({
     { id: 'dashboard', label: 'Home / Dashboard', icon: Home, category: 'GENERAL' },
     { id: 'mapeo', label: 'Mapeo por Ventana', icon: Map, category: 'REGISTRO DE CAMPO' },
     { id: 'plt_ensayos', label: 'Ensayos PLT Irregulares', icon: TrendingUp, category: 'ENSAYOS' },
-    { id: 'rmr', label: 'Análisis RMR', icon: TrendingUp, category: 'CONTROL Y ANÁLISIS' },
     { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' }
   ];
 
-  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'ENSAYOS', 'CONTROL Y ANÁLISIS', 'VISUALIZACIÓN'];
+  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'ENSAYOS', 'VISUALIZACIÓN'];
 
   return (
     <aside className="w-64 glass-panel chrome-dark border-r border-navy-800 flex flex-col h-screen text-slate-300 select-none">
