@@ -10,6 +10,7 @@ interface VentanaFormProps {
   onOpenImportModal: () => void;
 }
 
+// Función helper para limitar la edición de enteros y decimales en inputs de texto
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
   const cleaned = value.replace(/[^0-9.]/g, '');
   const parts = cleaned.split('.');
@@ -95,63 +96,105 @@ export default function VentanaForm({
     handleChange(field, Math.round(num * 100) / 100);
   };
 
-  const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
-  const filteredClassifications = header.unidad_litologica
-    ? LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.unidad_litologica)
-    : LITHOLOGY_CLASSIFICATION;
+  // 🧪 LÓGICA DE FILTRADO Y CASCADA INTELIGENTE DE LITOLOGÍAS NATIVAS
+  const uniqueLito1 = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
+  const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.grupo))).sort(); // unidad_litologica es grupo
 
-  const currentCombinedValue = header.lito_2 && header.unidad_litologica && header.lito_1
-    ? `${header.lito_2}|${header.unidad_litologica}|${header.lito_1}`
-    : '';
+  const filteredLito2Options = header.lito_1
+    ? Array.from(new Set(LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.lito_1).map(item => item.litologia))).sort()
+    : Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.litologia))).sort();
 
-  const handleUnidadChange = (unidad: string) => {
-    if (!unidad) {
+  const filteredLito3Options = header.lito_1 && header.lito_2
+    ? Array.from(new Set(LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.lito_1 && item.litologia === header.lito_2).map(item => item.codigo))).sort()
+    : Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.codigo))).sort();
+
+  const handleLito1Change = (val: string) => {
+    if (!val) {
       onChange({
         ...header,
-        unidad_litologica: '',
         lito_1: '',
         lito_2: '',
-        lito_3: ''
+        lito_3: '',
+        unidad_litologica: ''
       });
       return;
     }
-    onChange({
-      ...header,
-      unidad_litologica: unidad,
-      lito_1: '',
-      lito_2: '',
-      lito_3: ''
-    });
+    const matches = LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === val);
+    if (matches.length === 1) {
+      onChange({
+        ...header,
+        lito_1: val,
+        lito_2: matches[0].litologia,
+        lito_3: matches[0].codigo,
+        unidad_litologica: matches[0].grupo
+      });
+    } else {
+      const uniqueL2 = Array.from(new Set(matches.map(m => m.litologia)));
+      const uniqueGrup = Array.from(new Set(matches.map(m => m.grupo)));
+      onChange({
+        ...header,
+        lito_1: val,
+        lito_2: uniqueL2.length === 1 ? uniqueL2[0] : '',
+        lito_3: '',
+        unidad_litologica: uniqueGrup.length === 1 ? uniqueGrup[0] : ''
+      });
+    }
   };
 
-  const handleCombinedClassificationChange = (combinedValue: string) => {
-    if (!combinedValue) {
+  const handleLito2Change = (val: string) => {
+    if (!val) {
       onChange({
         ...header,
-        unidad_litologica: '',
-        lito_1: '',
         lito_2: '',
-        lito_3: ''
+        lito_3: '',
+        unidad_litologica: ''
       });
       return;
     }
-
-    const [codigo, unidad, litologia] = combinedValue.split('|');
-    const match = LITHOLOGY_CLASSIFICATION.find(
-      item => item.codigo === codigo && item.unidad === unidad && item.litologia === litologia
+    const matches = LITHOLOGY_CLASSIFICATION.filter(
+      item => item.unidad === header.lito_1 && item.litologia === val
     );
+    if (matches.length === 1) {
+      onChange({
+        ...header,
+        lito_2: val,
+        lito_3: matches[0].codigo,
+        unidad_litologica: matches[0].grupo
+      });
+    } else {
+      onChange({
+        ...header,
+        lito_2: val,
+        lito_3: ''
+      });
+    }
+  };
+
+  const handleLito3Change = (val: string) => {
+    if (!val) {
+      onChange({ ...header, lito_3: '' });
+      return;
+    }
+    const match = LITHOLOGY_CLASSIFICATION.find(
+      item => item.unidad === header.lito_1 && item.litologia === header.lito_2 && item.codigo === val
+    ) || LITHOLOGY_CLASSIFICATION.find(item => item.codigo === val);
 
     if (match) {
       onChange({
         ...header,
-        unidad_litologica: match.unidad,
-        lito_1: match.litologia,
-        lito_2: match.codigo,
-        lito_3: match.grupo
+        lito_1: match.unidad,
+        lito_2: match.litologia,
+        lito_3: match.codigo,
+        unidad_litologica: match.grupo
       });
     }
   };
 
+  const handleUnidadChange = (val: string) => {
+    handleChange('unidad_litologica', val);
+  };
+
+  // Cálculo de largo automático redondeado estrictamente a entero
   const ix = parseFloat(String(header.este_from));
   const iy = parseFloat(String(header.norte_from));
   const ic = parseFloat(String(header.cota_from));
@@ -173,8 +216,8 @@ export default function VentanaForm({
   }, [calculatedLargo]);
 
   return (
-    <div className="space-y-6 select-none text-left">
-      {/* SECCIÓN 1: DATOS DE IDENTIFICACIÓN Y COORDENADAS 3D */}
+    <div className="space-y-4 select-none text-left">
+      {/* SECCIÓN 1: DATOS DE IDENTIFICACIÓN Y COORDENADAS 3D APILADAS VERTICALMENTE */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2 flex items-center justify-between">
           <span className="flex items-center gap-2 text-xs md:text-sm">
@@ -192,90 +235,88 @@ export default function VentanaForm({
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* CELDA */}
           <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código Celda</label>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Celda</label>
             <input
               type="text"
               id="header-celda"
               value={header.celda}
               onChange={(e) => handleChange('celda', e.target.value.toUpperCase())}
               placeholder="TD2-001"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 tracking-wider text-xs"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 tracking-wider text-xs"
             />
           </div>
 
+          {/* COORDENADAS INICIALES (FROM) - APILADAS */}
           <div className="md:col-span-4 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas INICIALES (From)</label>
-            <div className="grid grid-cols-3 gap-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas Iniciales (From)</label>
+            <div className="flex flex-col gap-1.5">
               <input
                 type="text"
-                placeholder="Este"
+                placeholder="Este (X)"
                 value={getInputValue('este_from', header.este_from)}
                 id="header-este_from"
                 onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 2)}
                 onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Este FROM (Máx. 6 enteros, 2 dec.)"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
               <input
                 type="text"
-                placeholder="Norte"
+                placeholder="Norte (Y)"
                 value={getInputValue('norte_from', header.norte_from)}
                 id="header-norte_from"
                 onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 2)}
                 onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Norte FROM (Máx. 7 enteros, 2 dec.)"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
               <input
                 type="text"
-                placeholder="Cota"
+                placeholder="Cota (Z)"
                 value={getInputValue('cota_from', header.cota_from)}
                 id="header-cota_from"
                 onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, 4, 2)}
                 onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Cota FROM (Máx. 4 enteros, 2 dec.)"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
             </div>
           </div>
 
+          {/* COORDENADAS FINALES (TO) - APILADAS */}
           <div className="md:col-span-4 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas FINALES (To)</label>
-            <div className="grid grid-cols-3 gap-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas Finales (To)</label>
+            <div className="flex flex-col gap-1.5">
               <input
                 type="text"
-                placeholder="Este"
+                placeholder="Este (X)"
                 value={getInputValue('este_to', header.este_to)}
                 id="header-este_to"
                 onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 2)}
                 onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Este TO (Máx. 6 enteros, 2 dec.)"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
               <input
                 type="text"
-                placeholder="Norte"
+                placeholder="Norte (Y)"
                 value={getInputValue('norte_to', header.norte_to)}
                 id="header-norte_to"
                 onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 2)}
                 onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Norte TO (Máx. 7 enteros, 2 dec.)"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
               <input
                 type="text"
-                placeholder="Cota"
+                placeholder="Cota (Z)"
                 value={getInputValue('cota_to', header.cota_to)}
                 id="header-cota_to"
                 onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, 4, 2)}
                 onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
-                title="Cota TO (Máx. 4 enteros, 2 dec.)"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
             </div>
           </div>
 
+          {/* LARGO (M) AUTO */}
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between block">
               <span>Largo (m)</span>
@@ -294,22 +335,16 @@ export default function VentanaForm({
                 const cleaned = e.target.value.replace(/\D/g, '');
                 handleChange('largo', cleaned === '' ? '' : parseInt(cleaned, 10));
               }}
-              onBlur={(e) => {
-                const val = e.target.value;
-                if (val !== '') {
-                  handleChange('largo', Math.round(parseFloat(val)));
-                }
-              }}
-              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'}`}
-              placeholder="m (Entero)"
+              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'}`}
+              placeholder="m"
             />
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN 2: DIMENSIONES, ORIENTACIÓN Y LITOLOGÍA BASE */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      {/* SECCIÓN 2: DIMENSIONES Y ORIENTACIONES (Fila horizontal de 5 campos) */}
+      <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-900/10">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Altura (m)</label>
             <input
@@ -318,7 +353,7 @@ export default function VentanaForm({
               value={header.altura}
               id="header-altura"
               onChange={(e) => handleChange('altura', parseFloat(e.target.value) || 0)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
 
@@ -332,7 +367,7 @@ export default function VentanaForm({
               placeholder="0-90"
               value={header.dip_talud !== undefined ? header.dip_talud : ''}
               onChange={(e) => handleDegreeChange('dip_talud', e.target.value, 90)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
 
@@ -346,7 +381,7 @@ export default function VentanaForm({
               placeholder="0-359"
               value={header.dipdir_talud !== undefined ? header.dipdir_talud : ''}
               onChange={(e) => handleDegreeChange('dipdir_talud', e.target.value, 360)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
 
@@ -357,10 +392,10 @@ export default function VentanaForm({
               step="0.01"
               min="-90"
               max="90"
-              placeholder="-90 a 90"
+              placeholder="0-90"
               value={header.dip_hw !== undefined ? header.dip_hw : ''}
               onChange={(e) => handleDegreeChange('dip_hw', e.target.value, 90)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
 
@@ -374,138 +409,145 @@ export default function VentanaForm({
               placeholder="0-359"
               value={header.az_hw !== undefined ? header.az_hw : ''}
               onChange={(e) => handleDegreeChange('az_hw', e.target.value, 360)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-center font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
+        </div>
+      </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Unidad Litológica</label>
+      {/* SECCIÓN 3: LITOLOGÍAS DESPLEGABLES CON CASCADA Y METADATOS COMPLEMENTARIOS (En una sola fila de 9 columnas) */}
+      <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-5 bg-navy-900/10">
+
+        {/* Fila Horizontal Unificada de 9 campos */}
+        <div className="grid grid-cols-3 md:grid-cols-9 gap-3 pb-3">
+          {/* Lito 1 */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lito 1</label>
+            <select
+              value={header.lito_1 || ''}
+              onChange={(e) => handleLito1Change(e.target.value)}
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
+            >
+              <option value="">— Lito 1 —</option>
+              {uniqueLito1.map(l => (
+                <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Lito 2 */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lito 2</label>
+            <select
+              value={header.lito_2 || '-1'}
+              onChange={(e) => handleLito2Change(e.target.value)}
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-orange-400 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
+            >
+              <option value="-1">— Lito 2 —</option>
+              {filteredLito2Options.map(l => (
+                <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Lito 3 */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lito 3</label>
+            <select
+              value={header.lito_3 || '-1'}
+              onChange={(e) => handleLito3Change(e.target.value)}
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
+            >
+              <option value="-1">— Lito 3 —</option>
+              {filteredLito3Options.map(l => (
+                <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Unidad Litológica al costado de las litos */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Unidad Litológica</label>
             <select
               value={header.unidad_litologica || ''}
               onChange={(e) => handleUnidadChange(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal cursor-pointer"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
             >
-              <option value="">— Seleccione Unidad —</option>
+              <option value="">— Unidad —</option>
               {uniqueUnidades.map(u => (
                 <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
               ))}
             </select>
           </div>
-        </div>
-      </div>
 
-      {/* SECCIÓN 3: LITOLOGÍA DE DETALLE Y METADATOS COMPLEMENTARIOS */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
-        <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Litología</label>
-            <input
-              type="text"
-              readOnly
-              value={header.lito_1 || ''}
-              placeholder="Automático"
-              className="w-full bg-navy-950/50 border border-navy-800 text-slate-400 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-not-allowed font-semibold text-center"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Código (Lito-3)</label>
-            <select
-              value={currentCombinedValue}
-              onChange={(e) => handleCombinedClassificationChange(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-orange-400 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold cursor-pointer"
-            >
-              <option value="">— Seleccione Código —</option>
-              {filteredClassifications.map(item => {
-                const isGeneric = item.codigo === 'Varios' || item.codigo === '-';
-                const label = isGeneric
-                  ? `${item.codigo} - ${item.unidad} (${item.litologia})`
-                  : `${item.codigo} - ${item.unidad}`;
-                const combinedKey = `${item.codigo}|${item.unidad}|${item.litologia}`;
-
-                return (
-                  <option key={combinedKey} value={combinedKey} className="bg-navy-900 text-slate-100 text-xs font-normal">
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Grupo</label>
-            <input
-              type="text"
-              readOnly
-              value={header.lito_3 || ''}
-              placeholder="Automático"
-              className="w-full bg-navy-950/50 border border-navy-800 text-slate-400 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-not-allowed font-semibold text-center"
-            />
-          </div>
-
-          <div className="space-y-1.5">
+          {/* Sector */}
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector</label>
             <input
               type="text"
               value={header.sector || ''}
               onChange={(e) => handleChange('sector', e.target.value)}
               placeholder="Sector"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
 
-          <div className="space-y-1.5">
+          {/* Fase */}
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Fase</label>
             <input
               type="text"
               value={header.fase || ''}
               onChange={(e) => handleChange('fase', e.target.value)}
               placeholder="Fase"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
             />
           </div>
 
-          <div className="space-y-1.5">
+          {/* Nivel */}
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Nivel</label>
             <input
               type="text"
               value={header.nivel || ''}
               onChange={(e) => handleChange('nivel', handleNumberInputLimit(e.target.value, 4, 2))}
               placeholder="Nivel"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2.5 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
-              title="Nivel (Máx. 4 enteros, 2 dec.)"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
+              title="Nivel"
             />
           </div>
 
-          <div className="space-y-1.5">
+          {/* Fecha */}
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Fecha</label>
             <div className="relative">
-              <Calendar size={14} className="absolute left-2.5 top-2 text-slate-500 pointer-events-none" />
+              <Calendar size={12} className="absolute left-2.5 top-2.5 text-slate-500 pointer-events-none" />
               <input
                 type="date"
                 value={header.fecha || ''}
                 onChange={(e) => handleChange('fecha', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg pl-9 pr-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg pl-8 pr-1 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          {/* Mapeador */}
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Mapeador</label>
             <div className="relative">
-              <User size={14} className="absolute left-2.5 top-2 text-slate-500 pointer-events-none" />
+              <User size={12} className="absolute left-2.5 top-2.5 text-slate-500 pointer-events-none" />
               <input
                 type="text"
                 value={header.mapeador || ''}
                 onChange={(e) => handleChange('mapeador', e.target.value)}
                 placeholder="Nombre"
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg pl-9 pr-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+                className="w-full bg-navy-900 border border-navy-700 rounded-lg pl-8 pr-1 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
               />
             </div>
           </div>
         </div>
 
-        {/* Metadatos Geotécnicos de Zona */}
+        {/* Metadatos Geotécnicos de Zona (3 columnas simétricas) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-navy-850 pt-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector Geotécnico</label>
@@ -514,7 +556,7 @@ export default function VentanaForm({
               value={header.sect_geot || ''}
               onChange={(e) => handleChange('sect_geot', e.target.value)}
               placeholder="Sector Geot."
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal"
             />
           </div>
 
@@ -525,7 +567,7 @@ export default function VentanaForm({
               value={header.intemperia || ''}
               onChange={(e) => handleChange('intemperia', e.target.value)}
               placeholder="Grado de meteorización"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal"
             />
           </div>
 
@@ -536,7 +578,7 @@ export default function VentanaForm({
               value={header.alt_zona || ''}
               onChange={(e) => handleChange('alt_zona', e.target.value)}
               placeholder="Alta / Media / Baja"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal"
             />
           </div>
         </div>

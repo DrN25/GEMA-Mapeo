@@ -460,6 +460,76 @@ def run_calculate(data: Dict[str, Any]):
     res = calculator.calculate_geomechanics(header, discs, rmr_input)
     return res
 
+LITHOLOGY_CLASSIFICATION_DB = [
+    {"grupo": "INTRUSIVOS", "unidad": "MZB", "litologia": "MZB", "codigo": "MZB_EQ"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZB", "litologia": "MZB", "codigo": "MZB_P"},
+    {"grupo": "INTRUSIVOS", "unidad": "MBF1", "litologia": "MBF", "codigo": "MBF1"},
+    {"grupo": "INTRUSIVOS", "unidad": "MBF2", "litologia": "MBF", "codigo": "MBF2"},
+    {"grupo": "INTRUSIVOS", "unidad": "MBF2", "litologia": "MBF", "codigo": "MBF_P"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZM", "litologia": "MZM", "codigo": "MZM_F"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZM", "litologia": "MZM", "codigo": "MZM_M"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZH", "litologia": "MZH", "codigo": "MZH_1"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZH", "litologia": "MZH", "codigo": "MZH_2"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZD", "litologia": "MZD", "codigo": "MZD"},
+    {"grupo": "INTRUSIVOS", "unidad": "MZQ", "litologia": "MZQ", "codigo": "MZQ"},
+    {"grupo": "INTRUSIVOS", "unidad": "AN", "litologia": "LAM", "codigo": "LAM"},
+    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_M"},
+    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_MG"},
+    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_S"},
+    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_C"},
+    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_U"},
+    {"grupo": "SEDIMENTARIOS", "unidad": "SHL", "litologia": "HFL", "codigo": "SHL_MA"},
+    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "GSK", "codigo": "Varios"},
+    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "PSK", "codigo": "Varios"},
+    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "MSK", "codigo": "Varios"},
+    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "ESK", "codigo": "Varios"},
+    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "MBC", "codigo": "Varios"},
+    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "MBL", "codigo": "Varios"},
+    {"grupo": "METAMORFICAS", "unidad": "SHL", "litologia": "HFL", "codigo": "-"},
+    {"grupo": "METAMORFICAS", "unidad": "SND", "litologia": "QZT", "codigo": "-"},
+    {"grupo": "BRECHAS", "unidad": "TBX", "litologia": "TBX", "codigo": "TBX"},
+    {"grupo": "BRECHAS", "unidad": "HBX", "litologia": "HBX", "codigo": "HBX"},
+    {"grupo": "BRECHAS", "unidad": "MBX / varios", "litologia": "MBX", "codigo": "MBX"},
+    {"grupo": "ENDOSKARN", "unidad": "MZM", "litologia": "EPG", "codigo": "-"},
+    {"grupo": "ENDOSKARN", "unidad": "MZM", "litologia": "EGT", "codigo": "-"}
+]
+
+def resolve_lithology(lito3_code: str) -> dict:
+    """
+    Sanea y busca el código de Litología 3 en el catálogo para autocompletar 
+    las 4 variables consistentes en la base de datos de forma autocurativa.
+    """
+    code_clean = str(lito3_code or "").strip().upper().replace(" ", "").replace("-", "")
+    
+    match = None
+    for item in LITHOLOGY_CLASSIFICATION_DB:
+        item_code = item["codigo"].upper().replace(" ", "").replace("-", "")
+        if item_code and item_code == code_clean:
+            match = item
+            break
+            
+    if not match:
+        for item in LITHOLOGY_CLASSIFICATION_DB:
+            if code_clean in item["codigo"].upper() or code_clean in item["litologia"].upper():
+                match = item
+                break
+
+    if match:
+        return {
+            "lito_1": match["unidad"],
+            "lito_2": match["litologia"],
+            "lito_3": match["codigo"],
+            "unidad_litologica": match["grupo"]
+        }
+    
+    # Fallback por defecto si no se encuentra en el catálogo
+    return {
+        "lito_1": lito3_code,
+        "lito_2": "",
+        "lito_3": lito3_code,
+        "unidad_litologica": "INTRUSIVOS"
+    }
+
 @app.post("/api/importar-excel")
 async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
     contents = await file.read()
@@ -467,24 +537,21 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
     
     imported_count = 0
     
-    # CHECK CASE 1: Tabular "ventana" sheet with stacked cards repeating every 30 rows
+    # CASO 1: Pestaña "ventana" estructurada cada 30 filas
     if "ventana" in wb.sheetnames:
         ws = wb["ventana"]
         
-        # Loop every 30 rows starting from row 3 (block headers: 3, 33, 63...)
         for start in range(3, ws.max_row, 30):
-            celda_val = ws.cell(row=start+1, column=1).value # Row 4 Col A
+            celda_val = ws.cell(row=start+1, column=1).value
             if not celda_val:
-                # try alternative cell for Celda name (Row 4 Col AJ / Date? Or check if row contains 'TD')
-                celda_val = ws.cell(row=start, column=51).value # Col AY
+                celda_val = ws.cell(row=start, column=51).value
             
             if not celda_val or not str(celda_val).strip():
                 continue
                 
             codigo = str(celda_val).strip().upper()
             
-            # Read metadatas
-            fecha_val = ws.cell(row=start+1, column=37).value # Row 4 Col AK
+            fecha_val = ws.cell(row=start+1, column=37).value
             if isinstance(fecha_val, str):
                 try:
                     fecha_mapeo = datetime.strptime(fecha_val[:10], "%Y-%m-%d").date()
@@ -495,7 +562,6 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             else:
                 fecha_mapeo = date.today()
                 
-            # Redondeo seguro para el parser de Python
             def get_num(r, c):
                 val = ws.cell(row=r, column=c).value
                 if val is None:
@@ -504,8 +570,11 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                     return float(val)
                 except:
                     return 0.0
+            
+            def get_str(r, c):
+                val = ws.cell(row=r, column=c).value
+                return str(val).strip() if val is not None else ""
 
-            # Coordenadas: 6 enteros y 2 dec para Este, 7 y 2 dec para Norte, 4 y 2 dec para Cota
             este_ini = round(get_num(start+2, 2), 2)
             norte_ini = round(get_num(start+2, 4), 2)
             cota_ini = round(get_num(start+2, 6), 2)
@@ -513,35 +582,36 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             norte_fin = round(get_num(start+3, 4), 2)
             cota_fin = round(get_num(start+3, 6), 2)
             
-            # Largo como entero redondeado
             largo = int(round(get_num(start+2, 11)))
             altura = round(get_num(start+3, 11), 1)
             dip_talud = round(get_num(start+2, 14), 2)
             
-            lito_3 = get_str(start+1, 16)
+            # Recuperamos Lito 3 (codigo) de Row 7 Col P (Lito-Model)
             lito_model = get_str(start+4, 16)
+            
             mapeador = get_str(start+5, 16)
             sector = get_str(start+1, 20)
             fase = int(get_num(start+2, 21))
-            nivel = round(get_num(start+3, 21), 2) # Nivel a 2 decimales
-            sect_geot = get_str(start+4, 21) # Row 7 Col U
-            intemp = get_str(start+3, 16) # Row 6 Col P
+            nivel = round(get_num(start+3, 21), 2)
+            sect_geot = get_str(start+4, 21)
+            intemp = get_str(start+3, 16)
             
-            # Read RMR input row (Row 11: start+8)
-            agua_code = get_str(start+8, 36) # Row 11 Col AJ
-            res_code = get_str(start+8, 38) # Row 11 Col AL
-            gsi_cond = get_str(start+8, 40) # Row 11 Col AN
-            gsi_est = get_str(start+8, 41) # Row 11 Col AO
-            gsi_vis = int(get_num(start+8, 42)) # Row 11 Col AP
-            ctrl = int(get_num(start+8, 43)) # Row 11 Col AQ
-            vol = int(get_num(start+8, 44)) # Row 11 Col AR
-            ucs = get_num(start+8, 53) # Row 11 Col BA
-            is50 = get_num(start+8, 54) # Row 11 Col BB
-            comentario = get_str(start+18, 56) # Row 21 Col BD
+            agua_code = get_str(start+8, 36)
+            res_code = get_str(start+8, 38)
+            gsi_cond = get_str(start+8, 40)
+            gsi_est = get_str(start+8, 41)
+            gsi_vis = int(get_num(start+8, 42))
+            ctrl = int(get_num(start+8, 43))
+            vol = int(get_num(start+8, 44))
+            ucs = get_num(start+8, 53)
+            is50 = get_num(start+8, 54)
+            comentario = get_str(start+18, 56)
             
-            # Parse structures rows (Row 15-28: start+12 to start+25)
+            # Resolución dinámica en cascada de los 4 campos litológicos
+            lito_details = resolve_lithology(lito_model)
+            
             discs = []
-            for r_idx in range(start+12, start+26):
+            for r_idx in range(start+12, start+25):
                 fam_val = ws.cell(row=r_idx, column=1).value
                 if fam_val is None or str(fam_val).strip() == "":
                     continue
@@ -550,32 +620,30 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 except:
                     continue
                 
-                # Saneamiento de juntas en el Backend
                 raw_nstr = int(round(get_num(r_idx, 6)))
-                nstr = raw_nstr if raw_nstr > 0 else -1 # -1 indica vacío
+                nstr = raw_nstr if raw_nstr > 0 else -1
 
                 discs.append(schemas.DiscontinuidadBase(
                     familia_id=fam_id,
-                    distancia_m=int(round(get_num(r_idx, 2))), # Dist como entero desde 0
+                    distancia_m=int(round(get_num(r_idx, 2))),
                     tipo_estructura=get_str(r_idx, 3) if get_str(r_idx, 3) else "JN",
                     dip=round(get_num(r_idx, 4), 2),
                     dip_dir=round(get_num(r_idx, 5), 2),
                     n_estructuras=nstr,
-                    abertura_mm=round(get_num(r_idx, 7), 1), # Max 1 decimal
-                    espesor_mm=round(get_num(r_idx, 8), 1), # Max 1 decimal
+                    abertura_mm=round(get_num(r_idx, 7), 1),
+                    espesor_mm=round(get_num(r_idx, 8), 1),
                     continuidad_m=round(get_num(r_idx, 9), 2),
-                    espaciamiento_m=round(get_num(r_idx, 10), 2), # Max 2 dec
+                    espaciamiento_m=round(get_num(r_idx, 10), 2),
                     n_extremos_visibles=min(2, max(0, int(get_num(r_idx, 11)))) if ws.cell(row=r_idx, column=11).value is not None else None,
                     terminacion=min(3, max(0, int(get_num(r_idx, 12)))) if ws.cell(row=r_idx, column=12).value is not None else None,
                     relleno_1_codigo=get_str(r_idx, 13),
                     relleno_2_codigo=get_str(r_idx, 14),
                     jrc=min(20, max(0, int(get_num(r_idx, 19)))) if ws.cell(row=r_idx, column=19).value is not None else None,
-                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 20)))) if ws.cell(row=r_idx, column=20).value is not None else None, # Rugosidad limitada 0-9
+                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 20)))) if ws.cell(row=r_idx, column=20).value is not None else None,
                     forma_estructura=get_str(r_idx, 21),
                     alteracion_codigo=get_str(r_idx, 22)
                 ))
                 
-            # Compile save schema
             ri_schema = schemas.VentanaRmrInputBase(
                 agua_codigo=agua_code if agua_code else "C",
                 resistencia_codigo=res_code if res_code else "R4",
@@ -603,12 +671,12 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 largo_m=largo,
                 altura_m=altura,
                 dip_talud=dip_talud,
-                alteracion_codigo=intemp, # Alteracion or intemperismo?
+                alteracion_codigo=intemp,
                 intemperismo_codigo=intemp,
-                lito_1=lito_model,
-                lito_2=lito_3,
-                lito_3=lito_3,
-                unidad_litologica=lito_model,
+                lito_1=lito_details["lito_1"],
+                lito_2=lito_details["lito_2"],
+                lito_3=lito_details["lito_3"],
+                unidad_litologica=lito_details["unidad_litologica"],
                 sector=sector,
                 fase=fase,
                 nivel=nivel,
@@ -617,14 +685,12 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 rmr_input=ri_schema
             )
             
-            # Save to Database using the standard save endpoint logic
             save_ventana(ventana_schema, db)
             imported_count += 1
             
-    # CHECK CASE 2: Flat database layout in "BD" tab
+    # CASO 2: Pestaña plana desnormalizada "BD"
     elif "BD" in wb.sheetnames:
         ws = wb["BD"]
-        # Group rows by cell name (CELDA)
         celda_groups = {}
         for r_idx in range(2, ws.max_row + 1):
             celda_val = ws.cell(row=r_idx, column=3).value or ws.cell(row=r_idx, column=4).value
@@ -636,7 +702,6 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             celda_groups[celda_code].append(r_idx)
             
         for celda_code, rows_indices in celda_groups.items():
-            # Get header details from the first row of this celda
             f_row = rows_indices[0]
             
             def get_num(r, c):
@@ -658,7 +723,7 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             este_to = round(get_num(f_row, 10), 2)
             norte_to = round(get_num(f_row, 11), 2)
             cota_to = round(get_num(f_row, 12), 2)
-            dist_celda = int(round(get_num(f_row, 13))) # Largo a entero
+            dist_celda = int(round(get_num(f_row, 13)))
             altura = round(get_num(f_row, 14), 1)
             dip_talud = round(get_num(f_row, 20), 2)
             intemp = get_str(f_row, 23)
@@ -681,14 +746,15 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             else:
                 fecha_mapeo = date.today()
                 
-            comentario = get_str(f_row, 61) # Col BI (Comentario)
-            geot = get_str(f_row, 85) # Col CG (Geotecnico)
-            nivel = round(get_num(f_row, 95), 2) # Nivel a 2 decimales
-            lito_1 = get_str(f_row, 73) # Col BU? Or check where lito_1 is in BD headers (Lito_1 is in Col 73? Wait, earlier inspect showed Col 89, 91 for litologies)
-            # Let's read litology fields
-            l1 = get_str(f_row, 89) # Col CK (LITO3_MODELO or LITO1)
-            l2 = get_str(f_row, 90) or get_str(f_row, 91)
-            l3 = get_str(f_row, 91) # Col CM (LITO-3)
+            comentario = get_str(f_row, 61)
+            geot = get_str(f_row, 85)
+            nivel = round(get_num(f_row, 95), 2)
+            
+            # Leemos Lito 3 (LITO3_MODELO) de Col CK (Index 89)
+            l1 = get_str(f_row, 89)
+            
+            # Resolución dinámica en cascada de los 4 campos litológicos
+            lito_details = resolve_lithology(l1)
             
             discs = []
             for r_idx in rows_indices:
@@ -699,21 +765,21 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
 
                 discs.append(schemas.DiscontinuidadBase(
                     familia_id=int(fam_val),
-                    distancia_m=int(round(get_num(r_idx, 63))), # Distancia como entero
+                    distancia_m=int(round(get_num(r_idx, 63))),
                     tipo_estructura=get_str(r_idx, 69) if get_str(r_idx, 69) else "JN",
                     dip=round(get_num(r_idx, 70), 2),
                     dip_dir=round(get_num(r_idx, 71), 2),
                     n_estructuras=nstr,
-                    abertura_mm=round(get_num(r_idx, 73), 1), # Max 1 decimal
-                    espesor_mm=round(get_num(r_idx, 74), 1), # Max 1 decimal
+                    abertura_mm=round(get_num(r_idx, 73), 1),
+                    espesor_mm=round(get_num(r_idx, 74), 1),
                     continuidad_m=round(get_num(r_idx, 75), 2),
-                    espaciamiento_m=round(get_num(r_idx, 76), 2), # Max 2 dec
+                    espaciamiento_m=round(get_num(r_idx, 76), 2),
                     n_extremos_visibles=min(2, max(0, int(get_num(r_idx, 77)))) if ws.cell(row=r_idx, column=77).value is not None else None,
-                    terminacion=3, # default
+                    terminacion=3,
                     relleno_1_codigo=get_str(r_idx, 78),
                     relleno_2_codigo=get_str(r_idx, 79),
                     jrc=min(20, max(0, int(get_num(r_idx, 80)))) if ws.cell(row=r_idx, column=80).value is not None else None,
-                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 81)))) if ws.cell(row=r_idx, column=81).value is not None else None, # Rugosidad limitada 0-9
+                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 81)))) if ws.cell(row=r_idx, column=81).value is not None else None,
                     forma_estructura=get_str(r_idx, 82),
                     alteracion_codigo=get_str(r_idx, 83)
                 ))
@@ -747,10 +813,10 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 dip_talud=dip_talud,
                 alteracion_codigo=intemp,
                 intemperismo_codigo=intemp,
-                lito_1=l1 if l1 else "MZB",
-                lito_2=l2 if l2 else "MZB",
-                lito_3=l3 if l3 else "MZB_EQ",
-                unidad_litologica=l1 if l1 else "MZB",
+                lito_1=lito_details["lito_1"],
+                lito_2=lito_details["lito_2"],
+                lito_3=lito_details["lito_3"],
+                unidad_litologica=lito_details["unidad_litologica"],
                 sector="E1",
                 fase=5,
                 nivel=nivel,
@@ -763,6 +829,7 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             imported_count += 1
             
     return {"status": "success", "message": f"Importación completada. {imported_count} ventanas importadas con éxito."}
+
 
 @app.get("/api/ensayos-plt", response_model=List[schemas.EnsayoPLTSaveSchema])
 def get_ensayos_plt(db: Session = Depends(get_db)):

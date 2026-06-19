@@ -751,9 +751,9 @@ export default function App() {
                 onDeleteFamily={handleDeleteFamily}
               />
 
-              {/* 📊 CENTRO DE MÉTRICAS GEOMECÁNICAS (KPIs) RE-DISEÑADO */}
+              {/* 📊 CENTRO DE MÉTRICAS GEOMECÁNICAS (KPIs) RE-DISEÑADO CON 50% - 50% SIMÉTRICO */}
               {(() => {
-                // Función auxiliar para generar estilos de contenedor dinámicos por familia
+                // RESTAURACIÓN DE COLORES DE FAMILIA ORIGINALES (regresados)
                 const getFamilyStyle = (fam: number) => {
                   const styles: Record<number, { dot: string; container: string; badge: string }> = {
                     1: { dot: 'bg-orange-500', container: 'bg-orange-500/5 border border-orange-500/20 text-orange-400', badge: 'bg-orange-500/20 border border-orange-500/30 text-orange-400' },
@@ -769,29 +769,26 @@ export default function App() {
                   return styles[fam] || { dot: 'bg-slate-500', container: 'bg-slate-500/5 border border-slate-500/20', badge: 'bg-slate-500/20 border border-slate-500/30 text-slate-400' };
                 };
 
-                // Extraemos las familias activas únicas del registro para generar la lista dinámica
                 const activeFamiliesList = Array.from(new Set(activeWindow.joints.map(j => j.familia))).sort((a, b) => a - b);
-
-                // Determinamos si el contenedor de familias debe cambiar a diseño de dos columnas
                 const isMultiColumn = activeFamiliesList.length > 3;
 
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none text-left animate-fade-in">
 
-                    {/* Panel 1: Promedios Ponderados de Espaciamiento */}
-                    <div className="lg:col-span-5 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
+                    {/* Panel 1: Promedios de Espaciamiento (Ocupa la mitad -> lg:col-span-6) */}
+                    <div className="lg:col-span-6 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center justify-between gap-2">
                           <span className="flex items-center gap-2">
-                            <BarChart3 size={16} className="text-orange-400" />
+                            <BarChart3 size={16} className="text-slate-400" />
                             <span>Promedios de Espaciamiento</span>
                           </span>
-                          <span className="text-xs bg-orange-500/20 border border-orange-500/30 text-orange-400 font-bold px-2 py-0.5 rounded-md">
+                          <span className="text-xs bg-navy-900 border border-navy-850 text-slate-400 font-bold px-2 py-0.5 rounded-md">
                             {activeFamiliesList.length} {activeFamiliesList.length === 1 ? 'Familia' : 'Familias'}
                           </span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Promedio aritmético simple de los registros por familia: <code className="text-orange-400/80">Σ(esp) / N</code>
+                          Promedio aritmético simple de los registros por familia: <code className="text-slate-400/80">Σ(esp) / N</code>
                         </p>
                       </div>
 
@@ -822,44 +819,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Panel 2: KPI Índice Volumétrico (Jv) */}
-                    <div className="lg:col-span-3 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-amber-950/5 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
-
-                      <div>
-                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
-                          <Layers size={16} className="text-amber-400" />
-                          <span>Índice Volumétrico</span>
-                        </h3>
-                        <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Conteo de discontinuidades volumétricas <code className="text-amber-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">Jv</code>
-                        </p>
-                      </div>
-
-                      {/* Contenedor elegante de tono suave semi-transparente con icono geológico integrado */}
-                      <div className="my-4 bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 shadow-[0_0_15px_rgba(245,158,11,0.05)] flex items-center justify-between transition-all hover:bg-amber-500/15">
-                        <div className="flex flex-col text-left">
-                          <span className="text-3xl font-extrabold font-mono tracking-tight text-amber-300">
-                            {calculated && calculated.jv > 0 ? calculated.jv.toFixed(4) : '—'}
-                          </span>
-                          <span className="text-xs font-bold uppercase tracking-wider mt-0.5 text-amber-400/80">jts / m³</span>
-                        </div>
-                        <Layers size={28} className="text-amber-400/30 shrink-0 stroke-[1.5]" />
-                      </div>
-
-                      <div className="p-2.5 bg-navy-900/60 rounded-lg border border-navy-850 text-center">
-                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">
-                          {calculated && calculated.jv > 0 ? (
-                            calculated.jv <= 1 ? 'Masivo / Excelente Calidad' :
-                              calculated.jv <= 5 ? 'Bajo Fracturamiento' :
-                                calculated.jv <= 15 ? 'Fracturamiento Moderado' : 'Altamente Fracturado'
-                          ) : 'A la espera de registros'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Panel 3: KPI RQD Estimado - Mayor presencia y brillo celeste */}
-                    <div className="lg:col-span-4 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-sky-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+                    {/* Panel 2: KPI RQD Estimado (Ocupa la otra mitad -> lg:col-span-6) */}
+                    <div className="lg:col-span-6 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-sky-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all pointer-events-none" />
 
                       <div>
@@ -872,7 +833,6 @@ export default function App() {
                         </p>
                       </div>
 
-                      {/* Contenedor con brillo celeste de mayor opacidad para darle viveza */}
                       <div className="my-4 bg-sky-500/20 border border-sky-500/40 rounded-xl p-4 shadow-[0_0_15px_rgba(56,189,248,0.1)] flex items-center justify-between transition-all hover:bg-sky-500/25">
                         <div className="flex flex-col text-left">
                           <span className="text-3xl font-extrabold font-mono tracking-tight text-sky-200">
@@ -909,9 +869,28 @@ export default function App() {
                 );
               })()}
 
-              {/* Sección de Análisis Geomecánico RMR Colapsable */}
+              {/* 💬 Comentarios y Fotografías */}
+              <CommentsPhotos
+                celda={activeWindow.header.celda}
+                comentario={activeWindow.header.comentario || ''}
+                onComentarioChange={(val) => {
+                  setActiveWindow({
+                    ...activeWindow,
+                    header: {
+                      ...activeWindow.header,
+                      comentario: val
+                    }
+                  });
+                }}
+                photos={photos}
+                captions={captions}
+                onPhotosChange={handlePhotosChange}
+                apiBase={RESOLVED_API_BASE}
+              />
+
+              {/* 📊 ANÁLISIS GEOMECÁNICO RMR COLAPSABLE (Ubicado estratégicamente al final de la pestaña) */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between bg-navy-950/40 p-4 rounded-xl border border-navy-800/80">
+                <div className="flex items-center justify-between bg-navy-950/45 p-4 rounded-xl border border-navy-800/80">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg">
                       <Layers size={18} />
@@ -941,25 +920,6 @@ export default function App() {
                   />
                 )}
               </div>
-
-              {/* Comentarios y Fotografías */}
-              <CommentsPhotos
-                celda={activeWindow.header.celda}
-                comentario={activeWindow.header.comentario || ''}
-                onComentarioChange={(val) => {
-                  setActiveWindow({
-                    ...activeWindow,
-                    header: {
-                      ...activeWindow.header,
-                      comentario: val
-                    }
-                  });
-                }}
-                photos={photos}
-                captions={captions}
-                onPhotosChange={handlePhotosChange}
-                apiBase={RESOLVED_API_BASE}
-              />
             </div>
           )}
 

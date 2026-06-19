@@ -5,13 +5,15 @@ import {
   RELLENO_CATALOG,
   ALTERACION_CATALOG,
   FORMA_CATALOG,
-  RUGOSIDAD_CATALOG
+  RUGOSIDAD_CATALOG,
+  LITHOLOGY_CLASSIFICATION
 } from '../utils/catalogData';
 
 export default function CatalogsView() {
-  const [activeTab, setActiveTab] = useState<string>('tipos');
+  const [activeTab, setActiveTab] = useState<string>('litologia'); // Inicializar con Litología por defecto
 
   const tabs = [
+    { id: 'litologia', label: 'Litología y K' }, // Nueva pestaña
     { id: 'tipos', label: 'Tipos Estr.' },
     { id: 'abertura', label: 'Abertura' },
     { id: 'continuidad', label: 'Continuidad' },
@@ -31,8 +33,8 @@ export default function CatalogsView() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${activeTab === t.id
-                ? 'bg-orange-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-                : 'bg-navy-900/60 border border-navy-800 text-slate-300 hover:bg-navy-800 hover:text-white'
+              ? 'bg-orange-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+              : 'bg-navy-900/60 border border-navy-800 text-slate-300 hover:bg-navy-800 hover:text-white'
               }`}
           >
             {t.label}
@@ -42,6 +44,41 @@ export default function CatalogsView() {
 
       {/* Cuerpo del Catálogo */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 min-h-[350px] flex flex-col">
+
+        {/* 🧪 IMPLEMENTACIÓN DE LA TABLA DE LITOLOGÍAS Y FACTOR K SOLICITADA */}
+        {activeTab === 'litologia' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-orange-500" />
+              <span>Tabla de Correlación de Litologías y Factores K (PLT)</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[380px]">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4">Clase / Grupo</th>
+                    <th className="py-2.5 px-4">Litología 1 (Lito 1)</th>
+                    <th className="py-2.5 px-4">Litología 2 (Lito 2)</th>
+                    <th className="py-2.5 px-4">Litología 3 (Lito 3)</th>
+                    <th className="py-2.5 px-4 text-center text-cyan-400">Factor K</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {LITHOLOGY_CLASSIFICATION.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-bold text-slate-400">{item.grupo}</td>
+                      <td className="py-2.5 px-4 text-slate-300 font-semibold">{item.unidad}</td>
+                      <td className="py-2.5 px-4 text-slate-300">{item.litologia}</td>
+                      <td className="py-2.5 px-4 text-slate-300">{item.codigo}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'tipos' && (
           <div className="space-y-3">
             <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
@@ -161,9 +198,9 @@ export default function CatalogsView() {
                     <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Blando &gt;5 (89)</th>
                     <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Sin (76)</th>
                     <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &lt;5 (76)</th>
-                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &gt;5 (76)</th>
-                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Blando &lt;5 (76)</th>
-                    <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Blando &gt;5 (76)</th>
+                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76_gt5 : ''}</th>
+                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76 : ''}</th>
+                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76_gt5 : ''}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">

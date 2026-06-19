@@ -175,34 +175,26 @@ export default function ExcelImportModal({
     }
   };
 
-  const detectLithology = (rawLitoModel: string, rawLito3: string) => {
-    const code = String(rawLitoModel || '').trim().toUpperCase();
-    const group = String(rawLito3 || '').trim().toUpperCase();
+  const detectLithology = (rawLito3Code: string) => {
+    const code = String(rawLito3Code || '').trim().toUpperCase();
 
-    let match = LITHOLOGY_CLASSIFICATION.find(item => item.codigo.toUpperCase() === code);
-
-    if (!match) {
-      match = LITHOLOGY_CLASSIFICATION.find(item => item.unidad.toUpperCase() === code);
-    }
-
-    if (!match && group) {
-      match = LITHOLOGY_CLASSIFICATION.find(item => item.grupo.toUpperCase() === group);
-    }
+    // lito_3 (codigo) es el campo que define unívocamente la fila geomecánica
+    const match = LITHOLOGY_CLASSIFICATION.find(item => item.codigo.toUpperCase() === code);
 
     if (match) {
       return {
-        lito_1: match.litologia,
-        lito_2: match.codigo,
-        lito_3: match.grupo,
-        unidad_litologica: match.unidad
+        lito_1: match.unidad,             // Litología 1 (unidad)
+        lito_2: match.litologia,          // Litología 2 (litologia)
+        lito_3: match.codigo,             // Litología 3 (codigo)
+        unidad_litologica: match.grupo    // Unidad Litológica (grupo)
       };
     }
 
     return {
-      lito_1: rawLitoModel || '',
+      lito_1: rawLito3Code || '',
       lito_2: '',
-      lito_3: rawLito3 || '',
-      unidad_litologica: rawLitoModel || ''
+      lito_3: rawLito3Code || '',
+      unidad_litologica: 'INTRUSIVOS'
     };
   };
 
