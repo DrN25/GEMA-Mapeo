@@ -31,7 +31,7 @@ interface WindowData {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
-const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
+const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
 const normalizeJoints = (loadedJoints: JointRow[]): JointRow[] => {
   const result: JointRow[] = [...loadedJoints];

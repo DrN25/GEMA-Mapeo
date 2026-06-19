@@ -34,10 +34,12 @@ except Exception as e:
 app = FastAPI(title="Geomechanical Window Mapping API", version="1.0")
 
 # Crear carpeta de uploads física si no existe
-os.makedirs("uploads", exist_ok=True)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+uploads_dir = os.path.join(BASE_DIR, "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
 
 # Servir estáticos de forma pública desde /uploads
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/api/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Enable CORS for Vite frontend
 app.add_middleware(
@@ -844,44 +846,58 @@ def save_ensayos_plt(data: List[schemas.EnsayoPLTSaveSchema], db: Session = Depe
 @app.post("/api/ventanas/{codigo}/fotos")
 async def upload_foto(codigo: str, index: int, file: UploadFile = File(...)):
     code_up = codigo.strip().upper()
-    dir_path = os.path.join("uploads", code_up)
+    dir_path = os.path.join(uploads_dir, code_up)
     os.makedirs(dir_path, exist_ok=True)
     
     # Validar tamaño máximo (5 MB)
-    MAX_SIZE = 5 * 1024 * 1024  # 5 Megabytes
+    MAX_SIZE = 5 * 1024 * 1024
     contents = await file.read()
     if len(contents) > MAX_SIZE:
         raise HTTPException(status_code=400, detail="La fotografía excede el tamaño máximo permitido de 5MB")
         
     # Validar formato de imagen
     ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
-    if ext not in ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]:
+    allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
+    if ext not in allowed_exts:
         raise HTTPException(
             status_code=400, 
             detail="Formato de imagen no soportado. Use JPG, JPEG, PNG, WEBP, BMP, GIF o SVG."
         )
     
-    file_path = os.path.join(dir_path, f"foto_{index}.jpg")
+    # Eliminar cualquier foto previa en este índice con otra extensión para evitar duplicados en disco
+    for e in allowed_exts:
+        old_path = os.path.join(dir_path, f"foto_{index}.{e}")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except:
+                pass
+                
+    # Guardar nueva foto preservando su extensión original
+    file_path = os.path.join(dir_path, f"foto_{index}.{ext}")
     with open(file_path, "wb") as f:
         f.write(contents)
         
-    return {"status": "success", "url": f"/uploads/{code_up}/foto_{index}.jpg"}
+    return {"status": "success", "url": f"/api/uploads/{code_up}/foto_{index}.{ext}"}
 
 @app.delete("/api/ventanas/{codigo}/fotos/{index}")
 def delete_foto(codigo: str, index: int):
     code_up = codigo.strip().upper()
-    file_path = os.path.join("uploads", code_up, f"foto_{index}.jpg")
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {e}")
+    dir_path = os.path.join(uploads_dir, code_up)
+    allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
+    for e in allowed_exts:
+        file_path = os.path.join(dir_path, f"foto_{index}.{e}")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {e}")
     return {"status": "success"}
 
 @app.post("/api/ventanas/{codigo}/fotos/meta")
 def save_metadata(codigo: str, data: Dict[str, Any]):
     code_up = codigo.strip().upper()
-    dir_path = os.path.join("uploads", code_up)
+    dir_path = os.path.join(uploads_dir, code_up)
     os.makedirs(dir_path, exist_ok=True)
     
     meta_path = os.path.join(dir_path, "metadata.json")
@@ -896,7 +912,7 @@ def save_metadata(codigo: str, data: Dict[str, Any]):
 @app.get("/api/ventanas/{codigo}/fotos")
 def get_fotos(codigo: str):
     code_up = codigo.strip().upper()
-    dir_path = os.path.join("uploads", code_up)
+    dir_path = os.path.join(uploads_dir, code_up)
     
     photos = ["", "", "", ""]
     captions = ["", "", "", ""]
@@ -913,12 +929,15 @@ def get_fotos(codigo: str):
             except:
                 pass
                 
-        # 2. Comprobar existencia física de las 4 fotos
+        # 2. Comprobar existencia física de las 4 fotos con cualquier extensión permitida
+        allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
         for i in range(4):
-            file_path = os.path.join(dir_path, f"foto_{i}.jpg")
-            if os.path.exists(file_path):
-                # Usamos una marca de tiempo para evitar problemas de caché en el navegador
-                import time
-                photos[i] = f"/uploads/{code_up}/foto_{i}.jpg?t={int(time.time())}"
+            for e in allowed_exts:
+                file_path = os.path.join(dir_path, f"foto_{i}.{e}")
+                if os.path.exists(file_path):
+                    import time
+                    # Se retorna con el prefijo /api/uploads para ser redirigido por el Proxy
+                    photos[i] = f"/api/uploads/{code_up}/foto_{i}.{e}?t={int(time.time())}"
+                    break
                 
     return {"photos": photos, "captions": captions}
