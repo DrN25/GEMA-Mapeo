@@ -1,45 +1,75 @@
-import React from 'react';
-import { Camera, Trash2, Plus, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { Camera, Trash2, Plus, MessageSquare, X, Maximize2 } from 'lucide-react';
 
 interface CommentsPhotosProps {
+  celda: string;
   comentario: string;
   onComentarioChange: (val: string) => void;
-  photos: string[]; // list of base64 dataUrls
-  captions: string[]; // list of captions corresponding to each photo
+  photos: string[]; // URLs absolutas del backend
+  captions: string[]; // Descripciones de las fotos
   onPhotosChange: (photos: string[], captions: string[]) => void;
+  apiBase: string; // URL base del backend de FastAPI
 }
 
 export default function CommentsPhotos({
+  celda,
   comentario,
   onComentarioChange,
   photos,
   captions,
-  onPhotosChange
+  onPhotosChange,
+  apiBase
 }: CommentsPhotosProps) {
 
   const fileInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  // Estado para la previsualización a pantalla completa (Lightbox)
+  const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      const updatedPhotos = [...photos];
-      const updatedCaptions = [...captions];
+    // Validación estricta de peso de archivo (máximo 5 MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert("La fotografía supera el límite de peso permitido de 5 MB. Reduzca la resolución antes de subirla.");
+      return;
+    }
 
-      updatedPhotos[index] = base64;
-      if (!updatedCaptions[index]) {
-        updatedCaptions[index] = `Fotografía ${index + 1}`;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('index', String(index));
+
+    try {
+      const res = await fetch(`${apiBase}/api/ventanas/${celda}/fotos?index=${index}`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updatedPhotos = [...photos];
+        const updatedCaptions = [...captions];
+
+        // Se concatena una estampa de tiempo para evadir la caché persistente del navegador
+        updatedPhotos[index] = `${apiBase}${data.url}?t=${Date.now()}`;
+        if (!updatedCaptions[index]) {
+          updatedCaptions[index] = `Fotografía ${index + 1}`;
+        }
+
+        onPhotosChange(updatedPhotos, updatedCaptions);
+        saveMetadata(updatedCaptions);
+      } else {
+        const err = await res.json();
+        alert(err.detail || "Error al subir la fotografía.");
       }
-
-      onPhotosChange(updatedPhotos, updatedCaptions);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      alert("Error de conexión con el servidor al subir la fotografía.");
+    }
   };
 
-  const removePhoto = (index: number) => {
+  const removePhoto = async (index: number) => {
     const updatedPhotos = [...photos];
     const updatedCaptions = [...captions];
 
@@ -50,6 +80,27 @@ export default function CommentsPhotos({
 
     if (fileInputRefs.current[index]) {
       fileInputRefs.current[index]!.value = '';
+    }
+
+    try {
+      await fetch(`${apiBase}/api/ventanas/${celda}/fotos/${index}`, {
+        method: 'DELETE'
+      });
+      saveMetadata(updatedCaptions);
+    } catch (err) {
+      console.error("Error al eliminar la foto del servidor: ", err);
+    }
+  };
+
+  const saveMetadata = async (currentCaptions: string[]) => {
+    try {
+      await fetch(`${apiBase}/api/ventanas/${celda}/fotos/meta`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ captions: currentCaptions })
+      });
+    } catch (err) {
+      console.error("Error al sincronizar descripciones: ", err);
     }
   };
 
@@ -71,15 +122,15 @@ export default function CommentsPhotos({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none text-left animate-fade-in">
 
-      {/* 💬 Tarjeta de Observaciones / Comentarios sin hueco muerto */}
-      <div className="lg:col-span-6 glass-panel p-6 rounded-xl border border-navy-800 border-l-4 border-l-orange-500/80 bg-navy-950/10 flex flex-col h-full">
+      {/* 💬 SECCIÓN 1: Comentarios del Registro (Proporción 1/3 -> lg:col-span-4) */}
+      <div className="lg:col-span-4 glass-panel p-6 rounded-xl border border-navy-800 border-l-4 border-l-orange-500/80 bg-navy-950/10 flex flex-col h-full shadow-lg">
         <div className="space-y-2 mb-4">
           <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-3 flex items-center gap-2">
             <MessageSquare size={16} className="text-orange-400" />
             <span>Comentarios del Registro</span>
           </h3>
           <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-            Ingrese anotaciones geomecánicas de la celda de mapeo, condiciones de agua subterránea, fracturamiento local o comentarios del terreno.
+            Ingrese anotaciones geomecánicas de la celda de mapeo, condiciones de agua subterránea o comentarios del terreno.
           </p>
         </div>
 
@@ -93,8 +144,8 @@ export default function CommentsPhotos({
         </div>
       </div>
 
-      {/* 📸 Tarjeta de Fotografías */}
-      <div className="lg:col-span-6 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/10 flex flex-col h-full justify-between">
+      {/* 📸 SECCIÓN 2: Fotografías del Registro (Proporción 2/3 -> lg:col-span-8) */}
+      <div className="lg:col-span-8 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/10 flex flex-col h-full justify-between shadow-lg">
         <div className="flex items-center justify-between border-b border-navy-900 pb-3">
           <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
             <Camera size={16} className="text-orange-400" />
@@ -150,34 +201,44 @@ export default function CommentsPhotos({
                       src={photos[idx]}
                       alt={captions[idx] || `Foto ${idx + 1}`}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      onClick={() => setSelectedFullImage(photos[idx])} // Al hacer clic, abre pantalla completa
                     />
 
-                    {/* Botón de Eliminación Rápida */}
+                    {/* Overlay visual de zoom en hover */}
+                    <div
+                      onClick={() => setSelectedFullImage(photos[idx])}
+                      className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-auto"
+                    >
+                      <Maximize2 className="text-white drop-shadow-md animate-scale-up" size={18} />
+                    </div>
+
+                    {/* Botón de Eliminación Física (stopPropagation evita abrir la pantalla completa) */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         removePhoto(idx);
                       }}
-                      className="absolute top-2 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md active:scale-90"
+                      className="absolute top-2 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md active:scale-90 z-20"
                       title="Eliminar esta foto"
                     >
                       <Trash2 size={13} />
                     </button>
 
-                    {/* Leyenda/Pie de foto editable */}
+                    {/* Pie de foto editable (stopPropagation evita abrir la pantalla completa) */}
                     <input
                       type="text"
                       value={captions[idx] || ''}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => handleCaptionChange(e.target.value, idx)}
+                      onBlur={() => saveMetadata(captions)}
                       placeholder={`Descripción foto ${idx + 1}...`}
-                      className="absolute bottom-0 left-0 right-0 bg-slate-950/90 border-t border-navy-900/60 text-slate-300 text-xs font-bold px-2 py-1.5 focus:outline-none focus:bg-slate-950 text-center"
+                      className="absolute bottom-0 left-0 right-0 bg-slate-950/90 border-t border-navy-900/60 text-slate-300 text-xs font-bold px-2 py-1.5 focus:outline-none focus:bg-slate-950 text-center z-20"
                     />
                   </>
                 ) : (
                   <div className="flex flex-col items-center gap-1.5 text-slate-500 group-hover:text-orange-400/80 transition-colors">
                     <Camera size={20} className="stroke-[1.5]" />
-                    <span className="text-xs font-black tracking-widest uppercase">Subir Foto {idx + 1}</span>
+                    <span className="text-xs font-black tracking-widest uppercase text-[10px]">Subir Foto {idx + 1}</span>
                   </div>
                 )}
               </div>
@@ -185,6 +246,27 @@ export default function CommentsPhotos({
           })}
         </div>
       </div>
+
+      {/* 🖼️ MODAL LIGHTBOX DE PANTALLA COMPLETA */}
+      {selectedFullImage && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-fade-in cursor-zoom-out"
+          onClick={() => setSelectedFullImage(null)}
+        >
+          <button
+            className="absolute top-6 right-6 p-2.5 rounded-full bg-navy-900/80 hover:bg-navy-800 text-slate-300 hover:text-white transition-colors"
+            onClick={() => setSelectedFullImage(null)}
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={selectedFullImage}
+            alt="Vista completa"
+            className="max-w-full max-h-[92vh] object-contain rounded-xl shadow-2xl animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
     </div>
   );

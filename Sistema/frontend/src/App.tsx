@@ -31,6 +31,7 @@ interface WindowData {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
+const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
 
 const normalizeJoints = (loadedJoints: JointRow[]): JointRow[] => {
   const result: JointRow[] = [...loadedJoints];
@@ -127,20 +128,24 @@ export default function App() {
   // 4. Synchronize photo loading from localStorage when the active window celda changes
   useEffect(() => {
     if (activeWindow?.header.celda) {
-      const cached = localStorage.getItem(`geolog_window_photos_${activeWindow.header.celda}`);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          setPhotos(parsed.photos || ['', '', '', '']);
-          setCaptions(parsed.captions || ['', '', '', '']);
-        } catch (e) {
+      fetch(`${API_BASE}/api/ventanas/${activeWindow.header.celda}/fotos`)
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error();
+        })
+        .then(data => {
+          // Reconstruir URLs absolutas con apiBase para visualización nativa
+          const resolvedPhotos = (data.photos || ['', '', '', '']).map((p: string) =>
+            p ? (p.startsWith('http') || p.startsWith('data:') ? p : `${API_BASE}${p}`) : ''
+          );
+          setPhotos(resolvedPhotos);
+          setCaptions(data.captions || ['', '', '', '']);
+        })
+        .catch(() => {
+          // Si el servidor está offline, inicializamos vacíos de forma segura
           setPhotos(['', '', '', '']);
           setCaptions(['', '', '', '']);
-        }
-      } else {
-        setPhotos(['', '', '', '']);
-        setCaptions(['', '', '', '']);
-      }
+        });
     } else {
       setPhotos(['', '', '', '']);
       setCaptions(['', '', '', '']);
@@ -150,12 +155,6 @@ export default function App() {
   const handlePhotosChange = (newPhotos: string[], newCaptions: string[]) => {
     setPhotos(newPhotos);
     setCaptions(newCaptions);
-    if (activeWindow?.header.celda) {
-      localStorage.setItem(
-        `geolog_window_photos_${activeWindow.header.celda}`,
-        JSON.stringify({ photos: newPhotos, captions: newCaptions })
-      );
-    }
   };
 
   const fetchWindows = async () => {
@@ -895,8 +894,9 @@ export default function App() {
                 );
               })()}
 
-              {/* 💬 Comentarios y Fotografías */}
+              {/* Comentarios y Fotografías */}
               <CommentsPhotos
+                celda={activeWindow.header.celda}
                 comentario={activeWindow.header.comentario || ''}
                 onComentarioChange={(val) => {
                   setActiveWindow({
@@ -910,6 +910,7 @@ export default function App() {
                 photos={photos}
                 captions={captions}
                 onPhotosChange={handlePhotosChange}
+                apiBase={RESOLVED_API_BASE}
               />
             </div>
           )}

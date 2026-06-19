@@ -6,6 +6,8 @@ from datetime import date, datetime
 import io
 import openpyxl
 import math
+import os
+from fastapi.staticfiles import StaticFiles
 
 from app.database import get_db, Base, engine
 from app import models, schemas, calculator
@@ -30,6 +32,12 @@ except Exception as e:
     print(f"Error checking/adding database columns: {e}")
 
 app = FastAPI(title="Geomechanical Window Mapping API", version="1.0")
+
+# Crear carpeta de uploads física si no existe
+os.makedirs("uploads", exist_ok=True)
+
+# Servir estáticos de forma pública desde /uploads
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Enable CORS for Vite frontend
 app.add_middleware(
@@ -833,3 +841,84 @@ def save_ensayos_plt(data: List[schemas.EnsayoPLTSaveSchema], db: Session = Depe
     db.commit()
     return {"status": "success", "message": "Ensayos PLT guardados con éxito"}
 
+@app.post("/api/ventanas/{codigo}/fotos")
+async def upload_foto(codigo: str, index: int, file: UploadFile = File(...)):
+    code_up = codigo.strip().upper()
+    dir_path = os.path.join("uploads", code_up)
+    os.makedirs(dir_path, exist_ok=True)
+    
+    # Validar tamaño máximo (5 MB)
+    MAX_SIZE = 5 * 1024 * 1024  # 5 Megabytes
+    contents = await file.read()
+    if len(contents) > MAX_SIZE:
+        raise HTTPException(status_code=400, detail="La fotografía excede el tamaño máximo permitido de 5MB")
+        
+    # Validar formato de imagen
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
+    if ext not in ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]:
+        raise HTTPException(
+            status_code=400, 
+            detail="Formato de imagen no soportado. Use JPG, JPEG, PNG, WEBP, BMP, GIF o SVG."
+        )
+    
+    file_path = os.path.join(dir_path, f"foto_{index}.jpg")
+    with open(file_path, "wb") as f:
+        f.write(contents)
+        
+    return {"status": "success", "url": f"/uploads/{code_up}/foto_{index}.jpg"}
+
+@app.delete("/api/ventanas/{codigo}/fotos/{index}")
+def delete_foto(codigo: str, index: int):
+    code_up = codigo.strip().upper()
+    file_path = os.path.join("uploads", code_up, f"foto_{index}.jpg")
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {e}")
+    return {"status": "success"}
+
+@app.post("/api/ventanas/{codigo}/fotos/meta")
+def save_metadata(codigo: str, data: Dict[str, Any]):
+    code_up = codigo.strip().upper()
+    dir_path = os.path.join("uploads", code_up)
+    os.makedirs(dir_path, exist_ok=True)
+    
+    meta_path = os.path.join(dir_path, "metadata.json")
+    import json
+    try:
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al guardar metadatos: {e}")
+    return {"status": "success"}
+
+@app.get("/api/ventanas/{codigo}/fotos")
+def get_fotos(codigo: str):
+    code_up = codigo.strip().upper()
+    dir_path = os.path.join("uploads", code_up)
+    
+    photos = ["", "", "", ""]
+    captions = ["", "", "", ""]
+    
+    if os.path.exists(dir_path):
+        # 1. Recuperar leyendas si existen en metadata.json
+        meta_path = os.path.join(dir_path, "metadata.json")
+        if os.path.exists(meta_path):
+            try:
+                import json
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    captions = meta.get("captions", ["", "", "", ""])
+            except:
+                pass
+                
+        # 2. Comprobar existencia física de las 4 fotos
+        for i in range(4):
+            file_path = os.path.join(dir_path, f"foto_{i}.jpg")
+            if os.path.exists(file_path):
+                # Usamos una marca de tiempo para evitar problemas de caché en el navegador
+                import time
+                photos[i] = f"/uploads/{code_up}/foto_{i}.jpg?t={int(time.time())}"
+                
+    return {"photos": photos, "captions": captions}
