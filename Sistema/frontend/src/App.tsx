@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Eye } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Eye, FileSpreadsheet } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -217,6 +217,12 @@ export default function App() {
   const handlePhotosChange = (newPhotos: string[], newCaptions: string[]) => {
     setPhotos(newPhotos);
     setCaptions(newCaptions);
+  };
+
+  const handleExportExcel = () => {
+    if (!activeWindow) return;
+    const celda = activeWindow.header.celda;
+    window.location.href = `${API_BASE}/api/ventanas/${celda}/exportar`;
   };
 
   const fetchWindows = async () => {
@@ -758,6 +764,18 @@ export default function App() {
                 <BookOpen size={14} className="text-indigo-400" />
                 <span>Catálogos</span>
               </button>
+
+              {/* NUEVO BOTÓN DE EXPORTACIÓN EXCEL */}
+              {activeWindow && (
+                <button
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                  title="Exportar Mapeo de esta Ventana en Formato Excel DB"
+                >
+                  <FileSpreadsheet size={14} className="text-emerald-500" />
+                  <span>Exportar</span>
+                </button>
+              )}
 
               {activeWindow && (
                 <button

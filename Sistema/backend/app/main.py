@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from datetime import date, datetime
@@ -830,6 +832,193 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
             
     return {"status": "success", "message": f"Importación completada. {imported_count} ventanas importadas con éxito."}
 
+@app.get("/api/ventanas/{codigo}/exportar")
+def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
+    code_up = codigo.strip().upper()
+    
+    # Consultar todas las filas calculadas para esta celda
+    rows = db.query(models.VentanasFinal).filter_by(celda=code_up).order_by(models.VentanasFinal.id).all()
+    if not rows:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No se encontraron datos calculados para la celda {code_up}. Por favor, guarde la celda primero para sincronizar."
+        )
+        
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Mapeo Ventana"
+    
+    # Encabezados de columna idénticos a la maqueta de referencia
+    headers = [
+        "id", "CELDA", "CELDA", "ESTE_FROM", "NORTE_FROM", "COTA", "ESTE_TO", "NORTE_TO", "COTA",
+        "Dist.Celda", "Altura", "DIP", "AZ_HOLE",
+        "DIP_TALUD", "DIP_DIR_TALUD", "INTEMPERISMO",
+        "CONDICION DE AGUA '76", "CONDICION DE AGUA VALOR '76", "DUREZA '76", "RESISTENCIA ESTIMADA VALOR '76",
+        "GSI VISUAL '76", "CONTROL ESTRUCTURAL '76", "EFECTOS DE VOLADURA '76", "RQD - VALOR '76", "RQD '76",
+        "FRECUENCIA DE FRACTURAMIENTO x m '76", "TAMAÑO DE BLOQUES x m3 '76", "ESPACIAMIENTO PROMEDIO '76",
+        "ESPACIAMIENTO - VALOR '76", "CONDICION DE DISCONTINUIDAD - VALOR '76", "RMR '76",
+        "( UCS ) (Mpa)", "is50 (Mpa)",
+        "CONDICION DE AGUA '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89", "RESISTENCIA ESTIMADA VALOR '89",
+        "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89", "EFECTOS DE VOLADURA '89", "RQD - VALOR '89", "RQD '89",
+        "FRECUENCIA DE FRACTURAMIENTO x m '89", "TAMAÑO DE BLOQUES x m3 '89", "ESPACIAMIENTO PROMEDIO '89",
+        "ESPACIAMIENTO - VALOR '89", "CONDICION DE DISCONTINUIDAD - VALOR '89", "RMR '89",
+        "FECHA", "COMENTARIO",
+        "Dist. de estr.", "teta", "alfa", "x", "y", "z",
+        "TIPO DE ESTRUCT", "DIP", "DIP DIR", "NUMERO DE ESTRUCTURAS", "ABERTURA mm", "ESPESOR mm",
+        "CONTINUIDAD m", "ESPACIAMIENTO m", "NUMERO DE EXTREMOS VISIBLES", "TIPO DE RELLENO 1", "TIPO DE RELLENO 2",
+        "JRC", "RUGOSIDAD", "FORMA DE ESTRUCTURA", "ALTERACION", "GEOTECNICO", "Is50_Mpa", "LITO3_MODELO", "Sector", "Nivel"
+    ]
+    
+    ws.append(headers)
+    
+    # Escribir los registros desnormalizados en el mismo orden
+    for r in rows:
+        row_data = [
+            r.id,
+            r.celda,
+            r.celda,  # Duplicado según formato requerido
+            float(r.este_from) if r.este_from is not None else 0.0,
+            float(r.norte_from) if r.norte_from is not None else 0.0,
+            float(r.cota_from) if r.cota_from is not None else 0.0,
+            float(r.este_to) if r.este_to is not None else 0.0,
+            float(r.norte_to) if r.norte_to is not None else 0.0,
+            float(r.cota_to) if r.cota_to is not None else 0.0,
+            r.dist_celda,
+            float(r.altura) if r.altura is not None else None,
+            float(r.dip) if r.dip is not None else None,
+            float(r.az_hole) if r.az_hole is not None else None,
+            float(r.dip_talud) if r.dip_talud is not None else None,
+            float(r.dip_dir_talud) if r.dip_dir_talud is not None else None,
+            r.intemperismo,
+            r.cond_agua_76,
+            r.cond_agua_valor_76,
+            r.dureza_76,
+            r.resistencia_est_valor_76,
+            r.gsi_visual_76,
+            r.control_estructural_76,
+            r.efectos_voladura_76,
+            r.rqd_valor_76,
+            r.rqd_76,
+            r.freq_fractura_m_76,
+            r.tam_bloques_m3_76,
+            r.espaciamiento_prom_76,
+            r.espaciamiento_valor_76,
+            r.cond_discontinuidad_valor_76,
+            r.rmr_76,
+            r.ucs_mpa,
+            r.is50_mpa,
+            r.cond_agua_89,
+            r.cond_agua_valor_89,
+            r.dureza_89,
+            r.resistencia_est_valor_89,
+            r.gsi_visual_89,
+            r.control_estructural_89,
+            r.efecto_voladura_89,
+            r.rqd_valor_89,
+            r.rqd_89,
+            r.freq_fractura_m_89,
+            r.tam_bloques_m3_89,
+            r.espaciamiento_prom_89,
+            r.espaciamiento_valor_89,
+            r.cond_discontinuidad_valor_89,
+            r.rmr_89,
+            r.fecha.strftime("%Y-%m-%d") if r.fecha else "",
+            r.comentario,
+            r.dist_estructura,
+            r.angulo_estruct_teta,
+            r.angulo_estruct_alfa,
+            r.estruct_x,
+            r.struct_y,
+            r.struct_z,
+            r.tipo_estructura,
+            r.dip_estructura,
+            r.dip_dir_estructura,
+            r.num_estructuras,
+            r.abertura_mm,
+            r.espesor_mm,
+            r.continuidad_m,
+            r.espaciamiento_m,
+            r.num_extremos_visibles,
+            r.tipo_relleno_1,
+            r.tipo_relleno_2,
+            r.jrc,
+            r.rugosidad_estructuras,
+            r.forma_estructura,
+            r.alteracion,
+            r.geotecnico,
+            r.is50_mpa, # Duplicada en maqueta
+            r.lito_3,
+            r.sector_geotecnico,
+            r.nivel
+        ]
+        ws.append(row_data)
+
+    # --- ESTILIZACIÓN PREMIUM DE COLUMNAS SEGÚN MAQUETA ---
+    # Fills en formato pastel elegante para no fatigar la lectura de datos
+    fill_red = PatternFill(start_color="F2DCDB", end_color="F2DCDB", fill_type="solid")     # Rojo suave (A-I)
+    fill_blue = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")    # Azul suave (J-M)
+    fill_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # Amarillo suave (N-AE)
+    fill_peach = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")   # Durazno/Salmón (AF-AG)
+    fill_green = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")   # Verde suave (AH-AW)
+    fill_brown = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")   # Gris/Marrón para proyección (BB-BG)
+
+    font_header = Font(name="Arial", size=9, bold=True, color="333333")
+    alignment_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border_thin = Border(
+        left=Side(style='thin', color='BFBFBF'),
+        right=Side(style='thin', color='BFBFBF'),
+        top=Side(style='thin', color='BFBFBF'),
+        bottom=Side(style='thin', color='BFBFBF')
+    )
+
+    # Aplicar diseño agrupado a la fila de cabeceras
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = font_header
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+        # Agrupación por color según rangos de la maqueta
+        if col_idx <= 9:                      # A - I
+            cell.fill = fill_red
+        elif 10 <= col_idx <= 13:             # J - M
+            cell.fill = fill_blue
+        elif 14 <= col_idx <= 31:             # N - AE
+            cell.fill = fill_yellow
+        elif 32 <= col_idx <= 33:             # AF - AG
+            cell.fill = fill_peach
+        elif 34 <= col_idx <= 48:             # AH - AW
+            cell.fill = fill_green
+        elif 51 <= col_idx <= 56:             # BB - BG
+            cell.fill = fill_brown
+        elif col_idx >= 57:                   # BH - Nivel
+            cell.fill = fill_yellow
+
+    # Dar formato limpio de visualización al cuerpo de la tabla
+    font_body = Font(name="Arial", size=9, bold=False)
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(headers)):
+        for cell in row:
+            cell.font = font_body
+            cell.border = border_thin
+            if isinstance(cell.value, float):
+                cell.number_format = '0.00'
+
+    # Autoajustar anchos de columnas
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 11)
+
+    # Transmitir el archivo de regreso
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=mapeo_ventana_{code_up}.xlsx"}
+    )
 
 @app.get("/api/ensayos-plt", response_model=List[schemas.EnsayoPLTSaveSchema])
 def get_ensayos_plt(db: Session = Depends(get_db)):
