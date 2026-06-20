@@ -1,5 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import {
+  FileSpreadsheet,
+  Download,
+  ShieldCheck,
+  Activity,
+  BookOpen,
+  Plus,
+  X,
+  Check,
+  Trash2
+} from 'lucide-react';
 
 // ==========================================
 // CATALOGS & CONFIG
@@ -89,10 +100,10 @@ export function applyPltFormulas(row: any) {
   r.is_mpa = (P !== null && r.diametro_equivalente !== null && r.diametro_equivalente > 0)
     ? Math.round((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2) * 10000) / 10000
     : null;
-  r.is_50 = (r.is_mpa !== null && r.f !== null) ? Math.round(r.is_mpa * r.f * 10000) / 10000 : null;
+  r.is50 = (r.is_mpa !== null && r.f !== null) ? Math.round(r.is_mpa * r.f * 10000) / 10000 : null;
 
   const K = num(r.factor_conversion_k);
-  r.ucs = (r.is_50 !== null && K !== null) ? Math.round(r.is_50 * K * 100) / 100 : null;
+  r.ucs = (r.is50 !== null && K !== null) ? Math.round(r.is50 * K * 100) / 100 : null;
 
   const cls = getIsrmClass(r.ucs);
   r.resistencia_isrm = cls ? cls.indice : null;
@@ -125,7 +136,47 @@ export function applyLitoCascade(key: string, val: any, row: any) {
   return r;
 }
 
-// Group definitions
+// 🧪 ALGORITMO DE NORMALIZACIÓN INTELIGENTE DE CELDAS (Letras y Números por separado)
+export function normalizeCeldaCode(celda: string): string {
+  if (!celda) return "";
+  const raw = celda.trim().toUpperCase();
+
+  // Extraer secuencias continuas de letras y números
+  const matches = raw.match(/[A-Z]+|[0-9]+/g);
+  if (!matches) return raw;
+
+  // Saneamiento de ceros redundantes a la izquierda
+  const normalizedSegments = matches.map(segment => {
+    if (/^[0-9]+$/.test(segment)) {
+      const parsed = parseInt(segment, 10);
+      return isNaN(parsed) ? segment : String(parsed);
+    }
+    return segment;
+  });
+
+  // Reconstrucción del código canónico unificado
+  let result = "";
+  normalizedSegments.forEach((seg, idx) => {
+    if (idx === 0) {
+      result += seg;
+    } else {
+      const prev = normalizedSegments[idx - 1];
+      const isCurrentNum = /^[0-9]+$/.test(seg);
+      const isPrevNum = /^[0-9]+$/.test(prev);
+
+      if (isCurrentNum && isPrevNum) {
+        result += "-" + seg;
+      } else if (!isCurrentNum && isPrevNum) {
+        result += "-" + seg;
+      } else {
+        result += seg;
+      }
+    }
+  });
+
+  return result;
+}
+
 const GROUP_META: Record<number, { label: string; bg: string }> = {
   1: { label: "Información General del Ensayo", bg: "rgba(26,53,96,0.5)" },
   2: { label: "Identificación de Muestra", bg: "rgba(13,58,74,0.5)" },
@@ -137,50 +188,49 @@ const GROUP_META: Record<number, { label: string; bg: string }> = {
   8: { label: "Observaciones", bg: "rgba(42,42,42,0.5)" },
 };
 
-// Column definitions
 const COLS = [
-  { key: "campana", label: "Campaña", type: "int", width: 80, group: 1, required: true },
-  { key: "fecha_ensayo", label: "Fecha de ensayo", type: "date", width: 120, group: 1, required: true },
-  { key: "sector_geotecnico", label: "Sector Geotécnico", type: "text", width: 110, group: 1 },
-  { key: "ejecutado_por", label: "Ejecutado por", type: "text", width: 110, group: 1, required: true },
-  
-  { key: "zona_mapeo", label: "Zona de muestreo", type: "text", width: 130, group: 2, required: true },
-  { key: "nivel", label: "Nivel", type: "decimal", width: 80, group: 2, required: true },
-  { key: "celda_mapeo", label: "Celda de mapeo", type: "text", width: 110, group: 2, required: true },
-  { key: "muestra", label: "Muestra", type: "text", width: 80, group: 2, required: true },
-  { key: "codigo_muestra", label: "Código muestra", type: "text", width: 110, group: 2, required: true },
-  { key: "litologia_1", label: "Litología 1", type: "lito1", width: 90, group: 2, required: true },
-  { key: "litologia_2", label: "Litología 2", type: "lito2", width: 90, group: 2 },
-  { key: "litologia_3", label: "Litología 3", type: "lito3", width: 90, group: 2 },
-  { key: "tipo_litologico", label: "Tipo litológico", type: "select", width: 130, group: 2, required: true, options: CAT_TIPO_LITOLOGICO },
-  
-  { key: "este", label: "Este (m)", type: "decimal", width: 100, group: 3 },
-  { key: "norte", label: "Norte (m)", type: "decimal", width: 110, group: 3 },
-  { key: "elevacion", label: "Elevación (msnm)", type: "decimal", width: 100, group: 3 },
-  
-  { key: "espesor_d", label: "Espesor D (cm)", type: "decimal", width: 90, group: 4 },
-  { key: "longitud_l", label: "Longitud L (cm)", type: "decimal", width: 90, group: 4 },
-  { key: "ancho_w1", label: "Ancho W1 (cm)", type: "decimal", width: 95, group: 4 },
-  { key: "ancho_w2", label: "Ancho W2 (cm)", type: "decimal", width: 95, group: 4 },
-  { key: "ancho_w", label: "Ancho W (cm)", type: "decimal", width: 95, group: 4, computed: true },
-  { key: "muestra_valida_longitud", label: "Muestra válida - L", type: "text", width: 115, group: 4, computed: true },
-  { key: "muestra_valida_ancho", label: "Muestra válida - W", type: "text", width: 115, group: 4, computed: true },
-  
-  { key: "fuerza_p", label: "Fuerza P (kN)", type: "decimal", width: 90, group: 5, important: true },
-  { key: "direccion_rotura", label: "Dirección rotura", type: "select", width: 110, group: 5, options: CAT_DIRECCION_ROTURA },
-  { key: "tipo_fractura", label: "Tipo fractura", type: "select", width: 110, group: 5, options: CAT_TIPO_FRACTURA },
-  
-  { key: "diametro_equivalente", label: "Diám. Equiv De (cm)", type: "decimal", width: 120, group: 6, computed: true },
-  { key: "f", label: "Fact. Correc.", type: "decimal", width: 85, group: 6, computed: true },
-  { key: "is_mpa", label: "Is (MPa)", type: "decimal", width: 80, group: 6, important: true, computed: true },
-  { key: "is_50", label: "Is(50) (MPa)", type: "decimal", width: 85, group: 6, important: true, computed: true },
-  
-  { key: "factor_conversion_k", label: "Factor K", type: "decimal", width: 80, group: 7 },
-  { key: "ucs", label: "UCS (MPa)", type: "decimal", width: 80, group: 7, important: true, computed: true },
-  { key: "resistencia_isrm", label: "Resist. ISRM", type: "text", width: 90, group: 7, computed: true },
-  { key: "denominacion_isrm", label: "Denominación ISRM", type: "text", width: 220, group: 7, computed: true },
-  
-  { key: "observaciones", label: "Observaciones", type: "text", width: 180, group: 8 },
+  { key: "campana", label: "Campaña", type: "int", width: 80, group: 1, required: true, synonyms: ["campana", "campaña", "campana "] },
+  { key: "fecha_ensayo", label: "Fecha de ensayo", type: "date", width: 120, group: 1, required: true, synonyms: ["fecha de ensayo", "fechaensayo", "fecha_ensayo"] },
+  { key: "sector_geotecnico", label: "Sector Geotécnico", type: "text", width: 110, group: 1, synonyms: ["sector geotécnico", "sectorgeotecnico", "sector_geotecnico", "sector"] },
+  { key: "ejecutado_por", label: "Ejecutado por", type: "text", width: 110, group: 1, required: true, synonyms: ["ejecutado por", "ejecutadopor", "ejecución de ensayo", "ejecución de ensayo", "ejecucion de ensayo"] },
+
+  { key: "zona_mapeo", label: "Zona de muestreo", type: "text", width: 130, group: 2, required: true, synonyms: ["zona de muestreo", "zonademuestreo", "zona", "zona_mapeo", "zonamapeo", "zona de muestreo", "identificación de muestra"] },
+  { key: "nivel", label: "Nivel", type: "decimal", width: 80, group: 2, required: true, synonyms: ["nivel"] },
+  { key: "celda_mapeo", label: "Celda de mapeo", type: "text", width: 110, group: 2, required: true, synonyms: ["celda de mapeo", "celdamapeo", "celda_mapeo", "celda"] },
+  { key: "muestra", label: "Muestra", type: "text", width: 80, group: 2, required: true, synonyms: ["muestra"] },
+  { key: "codigo_muestra", label: "Código muestra", type: "text", width: 110, group: 2, required: true, synonyms: ["codigo muestra", "códigomuestra", "codigo_muestra", "codigomuestra"] },
+  { key: "litologia_1", label: "Litología 1", type: "lito1", width: 90, group: 2, required: true, synonyms: ["litologia 1", "litología 1", "litologia_1", "lito1"] },
+  { key: "litologia_2", label: "Litología 2", type: "lito2", width: 90, group: 2, synonyms: ["litologia 2", "litología 2", "litologia_2", "lito2"] },
+  { key: "litologia_3", label: "Litología 3", type: "lito3", width: 90, group: 2, synonyms: ["litologia 3", "litología 3", "litologia_3", "lito3", "litho 3 - modelo2022"] },
+  { key: "tipo_litologico", label: "Tipo litológico", type: "select", width: 130, group: 2, required: true, options: CAT_TIPO_LITOLOGICO, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litológico"] },
+
+  { key: "este", label: "Este (m)", type: "decimal", width: 100, group: 3, synonyms: ["este", "este (m)", "east", "este(m)"] },
+  { key: "norte", label: "Norte (m)", type: "decimal", width: 110, group: 3, synonyms: ["norte", "norte (m)", "north", "norte(m)"] },
+  { key: "elevacion", label: "Elevación (msnm)", type: "decimal", width: 100, group: 3, synonyms: ["elevacion", "elevación", "elevación (msnm)", "elevacion(msnm)", "z"] },
+
+  { key: "espesor_d", label: "Espesor D (cm)", type: "decimal", width: 90, group: 4, synonyms: ["espesor d", "espesord", "espesor d (cm)", "espesord(cm)", "espesor\nd\n(cm)", "espesor d (cm)"] },
+  { key: "longitud_l", label: "Longitud L (cm)", type: "decimal", width: 90, group: 4, synonyms: ["longitud l", "longitudl", "longitud l (cm)", "longitudl(cm)", "longitud\nl\n(cm)", "longitud l (cm)"] },
+  { key: "ancho_w1", label: "Ancho W1 (cm)", type: "decimal", width: 95, group: 4, synonyms: ["ancho w1", "anchow1", "ancho w1 (cm)", "anchow1(cm)", "ancho\nw1\n(cm)"] },
+  { key: "ancho_w2", label: "Ancho W2 (cm)", type: "decimal", width: 95, group: 4, synonyms: ["ancho w2", "anchow2", "ancho w2 (cm)", "anchow2(cm)", "ancho\nw2\n(cm)"] },
+  { key: "ancho_w", label: "Ancho W (cm)", type: "decimal", width: 95, group: 4, computed: true, synonyms: ["ancho w", "anchow", "ancho w (cm)", "anchow(cm)", "ancho\nw\n(cm)"] },
+  { key: "muestra_valida_longitud", label: "Muestra válida - L", type: "text", width: 115, group: 4, computed: true, synonyms: ["muestra valida - longitud", "muestra válida - longitud"] },
+  { key: "muestra_valida_ancho", label: "Muestra válida - W", type: "text", width: 115, group: 4, computed: true, synonyms: ["muestra valida - ancho", "muestra válida - ancho"] },
+
+  { key: "fuerza_p", label: "Fuerza P (kN)", type: "decimal", width: 90, group: 5, important: true, synonyms: ["fuerza p", "fuerzap", "fuerza p (kn)", "fuerzap(kn)", "fuerza\np\n(kn)", "fuerza p (kn)"] },
+  { key: "direccion_rotura", label: "Dirección rotura", type: "select", width: 110, group: 5, options: CAT_DIRECCION_ROTURA, synonyms: ["direccion rotura", "dirección rotura", "dirección de ruptura", "direccion_rotura"] },
+  { key: "tipo_fractura", label: "Tipo fractura", type: "select", width: 110, group: 5, options: CAT_TIPO_FRACTURA, synonyms: ["tipo fractura", "tipo de fractura", "tipo_fractura"] },
+
+  { key: "diametro_equivalente", label: "Diám. Equiv De (cm)", type: "decimal", width: 120, group: 6, computed: true, synonyms: ["diametro equivalente", "diámetro equiv de (cm)", "diametro equivalente\n(cm)"] },
+  { key: "f", label: "Fact. Correc.", type: "decimal", width: 85, group: 6, computed: true, synonyms: ["f", "fact correc", "fact. correc."] },
+  { key: "is_mpa", label: "Is (MPa)", type: "decimal", width: 80, group: 6, important: true, computed: true, synonyms: ["is", "is (mpa)", "is(mpa)"] },
+  { key: "is_50", label: "Is(50) (MPa)", type: "decimal", width: 85, group: 6, important: true, computed: true, synonyms: ["is50", "is(50)", "is(50) (mpa)", "is50(mpa)"] },
+
+  { key: "factor_conversion_k", label: "Factor K", type: "decimal", width: 80, group: 7, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
+  { key: "ucs", label: "UCS (MPa)", type: "decimal", width: 80, group: 7, important: true, computed: true, synonyms: ["ucs", "ucs (mpa)", "ucs(mpa)"] },
+  { key: "resistencia_isrm", label: "Resist. ISRM", type: "text", width: 90, group: 7, computed: true, synonyms: ["resistencia isrm", "resist. isrm"] },
+  { key: "denominacion_isrm", label: "Denominación ISRM", type: "text", width: 220, group: 7, computed: true, synonyms: ["denominacion isrm", "denominación isrm", "denominación isrm de la resistencia de la roca"] },
+
+  { key: "observaciones", label: "Observaciones", type: "text", width: 180, group: 8, synonyms: ["observaciones"] },
 ];
 
 interface PltEnsayosViewProps {
@@ -200,21 +250,18 @@ export default function PltEnsayosView({
   syncStatus,
   syncMessage
 }: PltEnsayosViewProps) {
-  // Toggle filter mode: True = Only active window celda, False = All celdas
   const [filterActiveCell, setFilterActiveCell] = useState(true);
 
-  // Search filter states
   const [fCampana, setFCampana] = useState('');
   const [fZona, setFZona] = useState('');
   const [fLito, setFLito] = useState('');
 
-  // Modals state
   const [activeModal, setActiveModal] = useState<'qaqc' | 'reporte' | 'catalogo' | null>(null);
-
-  // Inline edit state: { id: number, key: string }
   const [editCell, setEditCell] = useState<{ id: number; key: string } | null>(null);
 
-  // Create an empty row
+  // Estado temporal de importación para la confirmación de filtro inteligente
+  const [pendingImportRows, setPendingImportRows] = useState<any[] | null>(null);
+
   const createEmptyRow = (customId?: number, prefillCelda?: string) => {
     return {
       id: customId || Date.now(),
@@ -247,42 +294,39 @@ export default function PltEnsayosView({
     };
   };
 
-  // Add row at the end
   const handleAddRow = () => {
     const newRow = createEmptyRow();
     onChange([...pltEnsayos, newRow]);
   };
 
-  // Add empty row directly below a specific row
   const handleInsertRowBelow = (index: number) => {
     const parentRow = pltEnsayos[index];
-    const newRow = createEmptyRow(Date.now(), parentRow?.celda_mapeo);
+    const newRow = createEmptyRow(Date.now() + index, parentRow?.celda_mapeo);
     const updated = [...pltEnsayos];
     updated.splice(index + 1, 0, newRow);
     onChange(updated);
   };
 
-  // Delete row
   const handleDeleteRow = (id: number) => {
     if (confirm("¿Estás seguro de que deseas eliminar este registro de ensayo PLT?")) {
       onChange(pltEnsayos.filter(r => r.id !== id));
     }
   };
 
-  // Row filtering logic
+  // 🧪 VINCULAMOS FILTRADO INTELIGENTE EN EL GRID PRINCIPAL
   const filteredRows = useMemo(() => {
     return pltEnsayos.filter(r => {
-      // 1. Filter by active window cell if selected
       if (filterActiveCell && activeWindowCelda) {
-        if (r.celda_mapeo.trim().toUpperCase() !== activeWindowCelda.trim().toUpperCase()) {
+        const normRowCell = normalizeCeldaCode(r.celda_mapeo);
+        const normActiveCell = normalizeCeldaCode(activeWindowCelda);
+        if (normRowCell !== normActiveCell) {
           return false;
         }
       }
-      // 2. Search filters
       if (fCampana && !String(r.campana || "").toLowerCase().includes(fCampana.toLowerCase())) return false;
       if (fZona && !String(r.zona_mapeo || "").toLowerCase().includes(fZona.toLowerCase())) return false;
       if (fLito && !String(r.litologia_1 || "").toLowerCase().includes(fLito.toLowerCase())) return false;
-      
+
       return true;
     });
   }, [pltEnsayos, filterActiveCell, activeWindowCelda, fCampana, fZona, fLito]);
@@ -292,7 +336,6 @@ export default function PltEnsayosView({
     return filteredRows.map(r => applyPltFormulas(r));
   }, [filteredRows]);
 
-  // Input editing commit handler
   const handleCommitEdit = (id: number, key: string, rawVal: any) => {
     setEditCell(null);
     const col = COLS.find(c => c.key === key);
@@ -318,7 +361,6 @@ export default function PltEnsayosView({
     onChange(updated);
   };
 
-  // Select dropdown commit handler
   const handleCommitSelect = (id: number, key: string, val: any) => {
     setEditCell(null);
     const updated = pltEnsayos.map(r => {
@@ -331,14 +373,13 @@ export default function PltEnsayosView({
     onChange(updated);
   };
 
-  // Cell rendering style helper
   const getCellClassName = (c: any, val: any) => {
     const base = "border-r border-navy-900/30 text-xs px-2 min-h-[28px] flex items-center select-text font-mono";
     if (c.computed) {
       if (c.key === "muestra_valida_longitud" || c.key === "muestra_valida_ancho") {
         if (val === "SÍ") return `${base} text-emerald-400 font-bold bg-emerald-500/5`;
         if (val === "NO") return `${base} text-rose-400 font-bold bg-rose-500/5`;
-        return `${base} text-slate-500 italic bg-navy-950/20`;
+        return `${base} text-slate-500 italic bg-navy-950/10`;
       }
       if (c.key === "resistencia_isrm" && val) {
         const isrmColors: Record<string, string> = {
@@ -359,7 +400,6 @@ export default function PltEnsayosView({
     return `${base} text-slate-300 font-normal`;
   };
 
-  // Value formatting helper
   const formatCellValue = (val: any, c: any) => {
     if (val === null || val === undefined || val === "") return "";
     if (c.type === "decimal" && typeof val === "number") {
@@ -368,7 +408,6 @@ export default function PltEnsayosView({
     return String(val);
   };
 
-  // EXCEL EXPORT
   const handleExportExcel = () => {
     const dataToExport = computedRows.map((r, idx) => {
       const obj: Record<string, any> = { "#": idx + 1 };
@@ -384,7 +423,36 @@ export default function PltEnsayosView({
     XLSX.writeFile(wb, "plt_ensayos_irregulares.xlsx");
   };
 
-  // EXCEL IMPORT
+  // Función de normalización robusta de cadenas para mapear cabeceras con saltos de línea e inconsistencias de redacción
+  const normalizeHeader = (val: any): string => {
+    if (val === null || val === undefined) return "";
+    return String(val)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\s\n\r_/-]/g, "")
+      .replace(/[()]/g, "")
+      .trim();
+  };
+
+  // 🧪 Saneamiento y autocompletado automático de litologías importadas (Lito 1, Lito 2, Lito 3, Factor K)
+  const resolveImportedLithology = (rowObj: any) => {
+    const code = String(rowObj.litologia_3 || rowObj.litologia_2 || rowObj.litologia_1 || "").trim().toUpperCase();
+    if (!code) return;
+
+    const match = LITO_CATALOG.find(e => e.lito3?.toUpperCase() === code) ||
+      LITO_CATALOG.find(e => e.lito2?.toUpperCase() === code) ||
+      LITO_CATALOG.find(e => e.lito1?.toUpperCase() === code);
+
+    if (match) {
+      rowObj.litologia_1 = match.lito1;
+      rowObj.litologia_2 = match.lito2 || "";
+      rowObj.litologia_3 = match.lito3 || "";
+      rowObj.factor_conversion_k = match.factorK;
+    }
+  };
+
+  // EXCEL IMPORT - IMPLEMENTACIÓN EXACTA DE LA LÓGICA DE TU ARCHIVO OFFLINE DE HTML CON AUTO-DETECCION DE FILA DE CABECERA
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -396,36 +464,102 @@ export default function PltEnsayosView({
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rawJson: any[] = XLSX.utils.sheet_to_json(sheet);
 
-        if (rawJson.length === 0) {
+        // 1. Convertir la hoja de Excel a una matriz bidimensional cruda (Arreglo 2D de filas)
+        const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        if (rawRows.length < 2) {
           alert("El archivo importado no contiene filas de datos.");
           return;
         }
 
-        // Map column headers to schema keys
-        const labelMap: Record<string, string> = {};
-        COLS.forEach(c => {
-          labelMap[c.label.toLowerCase()] = c.key;
+        // 2. Construir mapeador dinámico tolerante de Etiquetas (Labels) y sinónimos a Claves reales de BD (Keys en snake_case)
+        const labelToKey: Record<string, string> = {};
+        COLS.filter(c => !c.computed).forEach(c => {
+          labelToKey[normalizeHeader(c.label)] = c.key;
+          if (c.synonyms) {
+            c.synonyms.forEach(s => {
+              labelToKey[normalizeHeader(s)] = c.key;
+            });
+          }
         });
 
-        const importedRows = rawJson.map((row, idx) => {
-          const newRow: any = createEmptyRow(Date.now() + idx);
-          Object.keys(row).forEach(header => {
-            const cleanHeader = header.trim().toLowerCase();
-            const key = labelMap[cleanHeader];
-            if (key) {
-              const val = row[header];
-              if (val !== undefined && val !== "") {
-                newRow[key] = val;
-              }
+        // 3. Auto-detección dinámica de la fila de cabeceras (Soporta layouts de doble cabecera de tus planillas reales)
+        let bestRowIdx = 0;
+        let maxMatches = -1;
+        const maxScan = Math.min(10, rawRows.length);
+
+        for (let r = 0; r < maxScan; r++) {
+          const row = rawRows[r];
+          if (!row) continue;
+          let matches = 0;
+          row.forEach((cellVal) => {
+            if (cellVal === null || cellVal === undefined) return;
+            const cleanVal = normalizeHeader(cellVal);
+            if (labelToKey[cleanVal]) {
+              matches++;
             }
           });
-          return newRow;
+          if (matches > maxMatches) {
+            maxMatches = matches;
+            bestRowIdx = r;
+          }
+        }
+
+        const headerRow = rawRows[bestRowIdx] || [];
+
+        // 4. Mapear las posiciones de columna del Excel a sus respectivas claves de BD
+        const colMap = headerRow.map(h => {
+          if (h === null || h === undefined) return null;
+          const cleanHeader = normalizeHeader(h);
+          return labelToKey[cleanHeader] || null;
         });
 
-        onChange([...pltEnsayos, ...importedRows]);
-        alert(`Se importaron ${importedRows.length} registros con éxito.`);
+        // 5. Mapear cada fila física a un objeto de Ensayo PLT, saneando tipos numéricos, fechas seriales y litologías
+        const importedRows = rawRows.slice(bestRowIdx + 1).map((r, rowIdx) => {
+          const rowObj: any = createEmptyRow(Date.now() + rowIdx);
+          colMap.forEach((key, colIdx) => {
+            if (key && r[colIdx] !== undefined && r[colIdx] !== null && r[colIdx] !== "") {
+              let cellVal = r[colIdx];
+
+              const colMeta = COLS.find(c => c.key === key);
+              if (colMeta) {
+                if (colMeta.type === "int") {
+                  const parsed = parseInt(String(cellVal), 10);
+                  cellVal = isNaN(parsed) ? null : parsed;
+                } else if (colMeta.type === "decimal") {
+                  const parsed = parseFloat(String(cellVal));
+                  cellVal = isNaN(parsed) ? null : parsed;
+                } else if (colMeta.type === "date") {
+                  if (typeof cellVal === "number") {
+                    // Convertir fecha serial de Excel a string YYYY-MM-DD
+                    const jsDate = new Date((cellVal - 25569) * 86400 * 1000);
+                    cellVal = jsDate.toISOString().split("T")[0];
+                  } else if (cellVal instanceof Date) {
+                    cellVal = cellVal.toISOString().split("T")[0];
+                  } else {
+                    cellVal = String(cellVal).trim().substring(0, 10);
+                  }
+                } else {
+                  cellVal = String(cellVal).trim();
+                }
+              }
+              rowObj[key] = cellVal;
+            }
+          });
+
+          // Autocompletado inteligente de cascada litológica al importar
+          resolveImportedLithology(rowObj);
+
+          return rowObj;
+        });
+
+        // 🛡 FILTRADO INTELIGENTE ANTES DE LA CARGA (Filtra o importa todo según decisión)
+        if (activeWindowCelda) {
+          setPendingImportRows(importedRows);
+        } else {
+          onChange([...pltEnsayos, ...importedRows]);
+          alert(`Se importaron ${importedRows.length} registros con éxito.`);
+        }
       } catch (err) {
         console.error(err);
         alert("Error al importar Excel. Verifique el formato e inténtelo de nuevo.");
@@ -447,7 +581,7 @@ export default function PltEnsayosView({
       const ucsOk = typeof r.ucs === "number" && r.ucs > 0;
       const fracOk = !!r.tipo_fractura;
       const dirOk = !!r.direccion_rotura;
-      
+
       const issues = [];
       if (!camposOk) issues.push("Campos obligatorios incompletos");
       if (longitudOk === false) issues.push("L < D (Longitud inválida)");
@@ -490,12 +624,12 @@ export default function PltEnsayosView({
     const withUcs = rr.filter(r => typeof r.ucs === "number").length;
     const valL = rr.filter(r => r.muestra_valida_longitud === "SÍ").length;
     const valA = rr.filter(r => r.muestra_valida_ancho === "SÍ").length;
-    
+
     const ucsV = rr.filter(r => typeof r.ucs === "number").map(r => r.ucs as number);
     const is50V = rr.filter(r => typeof r.is_50 === "number").map(r => r.is_50 as number);
-    
+
     const avg = (arr: number[]) => arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : 0;
-    
+
     const isrmCnt: Record<string, number> = {};
     ISRM_TABLE.forEach(r => { isrmCnt[r.indice] = 0; });
     rr.forEach(r => {
@@ -523,7 +657,7 @@ export default function PltEnsayosView({
 
   return (
     <div className="space-y-6 select-none animate-fade-in text-left">
-      {/* TOOLBAR */}
+      {/* TOOLBAR RE-ESTILIZADO PARA CONECTARSE DE FORMA COHERENTE CON REGISTRO DE CAMPO */}
       <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest">Ensayos PLT Irregulares</h2>
@@ -569,42 +703,52 @@ export default function PltEnsayosView({
 
           <div className="h-6 w-[1px] bg-navy-800 mx-2" />
 
-          {/* ACTIONS */}
+          {/* ACCIONES DEL TOOLBAR DE ESTILO COHERENTE */}
           <button
             onClick={() => setActiveModal('qaqc')}
-            className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs"
+            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-indigo-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
           >
-            Control QA/QC
-          </button>
-          <button
-            onClick={() => setActiveModal('reporte')}
-            className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs"
-          >
-            Reporte Resumen
-          </button>
-          <button
-            onClick={() => setActiveModal('catalogo')}
-            className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs"
-          >
-            Ver Catálogo
+            <ShieldCheck size={14} className="text-indigo-400" />
+            <span>Control QA/QC</span>
           </button>
 
-          <label className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs cursor-pointer select-none">
-            Importar Excel
+          <button
+            onClick={() => setActiveModal('reporte')}
+            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-cyan-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+          >
+            <Activity size={14} className="text-cyan-400" />
+            <span>Reporte Resumen</span>
+          </button>
+
+          <button
+            onClick={() => setActiveModal('catalogo')}
+            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-amber-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+          >
+            <BookOpen size={14} className="text-amber-400" />
+            <span>Ver Catálogo</span>
+          </button>
+
+          {/* BOTÓN IMPORTAR EXCEL COMPLETAMENTE VERDE */}
+          <label className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-emerald-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer select-none shadow-md">
+            <FileSpreadsheet size={14} className="text-emerald-500" />
+            <span>Importar Excel</span>
             <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
           </label>
+
           <button
             onClick={handleExportExcel}
-            className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs"
+            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-sky-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
           >
-            Exportar Excel
+            <Download size={14} className="text-sky-400" />
+            <span>Exportar Excel</span>
           </button>
 
           <button
             onClick={handleAddRow}
-            className="bg-gradient-to-r from-orange-600 to-amber-500 hover:brightness-110 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-all active:scale-95 shadow-md shadow-orange-950/20"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:brightness-110 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-all active:scale-95 shadow-md shadow-orange-950/20"
           >
-            Nueva Fila
+            <Plus size={14} />
+            <span>Nueva Fila</span>
           </button>
         </div>
       </div>
@@ -615,11 +759,10 @@ export default function PltEnsayosView({
         <button
           onClick={onSave}
           disabled={syncStatus === 'saving'}
-          className={`px-3 py-1 rounded-md font-bold text-xs shadow-md border ${
-            syncStatus === 'synced'
+          className={`px-3 py-1 rounded-md font-bold text-xs shadow-md border ${syncStatus === 'synced'
               ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-400 hover:bg-emerald-500/20'
               : 'bg-orange-500/10 border-orange-500/35 text-orange-400 hover:bg-orange-500/20 animate-pulse'
-          }`}
+            }`}
         >
           {syncStatus === 'saving' ? 'Guardando...' : syncStatus === 'synced' ? 'Guardado' : 'Guardar Cambios'}
         </button>
@@ -656,11 +799,10 @@ export default function PltEnsayosView({
                   <th
                     key={c.key}
                     style={{ width: c.width, minWidth: c.width }}
-                    className={`px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider border-r border-navy-850 select-none ${
-                      c.required ? "text-rose-400/90 after:content-['*'] after:ml-0.5 after:text-rose-400" :
-                      c.important ? "text-orange-400" :
-                      c.computed ? "text-slate-500 italic" : "text-slate-400"
-                    }`}
+                    className={`px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider border-r border-navy-850 select-none ${c.required ? "text-rose-400/90 after:content-['*'] after:ml-0.5 after:text-rose-400" :
+                        c.important ? "text-orange-400" :
+                          c.computed ? "text-slate-500 italic" : "text-slate-400"
+                      }`}
                   >
                     {c.label}
                   </th>
@@ -673,7 +815,7 @@ export default function PltEnsayosView({
               {computedRows.map((row, idx) => {
                 const isEven = idx % 2 === 0;
                 const rowBg = isEven ? "bg-navy-900/5 hover:bg-navy-900/25" : "bg-navy-950/20 hover:bg-navy-900/25";
-                
+
                 return (
                   <tr key={row.id} className={`${rowBg} transition-colors border-b border-navy-900/20`}>
                     {/* Row index column (Sticky Left) */}
@@ -685,7 +827,7 @@ export default function PltEnsayosView({
                     {COLS.map(c => {
                       const val = row[c.key];
                       const isEditing = editCell && editCell.id === row.id && editCell.key === c.key;
-                      
+
                       // Check if celda_mapeo cell should be disabled (when filtering is locked to active cell)
                       const isCellLocked = c.key === "celda_mapeo" && filterActiveCell;
 
@@ -755,21 +897,21 @@ export default function PltEnsayosView({
                     })}
 
                     {/* Actions Column */}
-                    <td className="py-1 px-2 text-center w-[75px]">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="py-1 px-2 text-center w-[75px] border-r border-navy-900/20">
+                      <div className="flex items-center justify-center gap-3">
                         <button
                           onClick={() => handleInsertRowBelow(idx)}
-                          className="text-slate-500 hover:text-emerald-400 font-black text-sm px-1.5 transition-colors"
+                          className="text-slate-500 hover:text-emerald-400 font-black text-sm px-1 transition-colors"
                           title="Insertar fila abajo"
                         >
                           +
                         </button>
                         <button
                           onClick={() => handleDeleteRow(row.id)}
-                          className="text-slate-500 hover:text-rose-400 font-bold text-xs px-1.5 transition-colors"
+                          className="text-slate-400 hover:text-rose-400 font-bold text-xs px-1 transition-colors flex items-center justify-center"
                           title="Eliminar registro"
                         >
-                          ✕
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>
@@ -1032,6 +1174,56 @@ export default function PltEnsayosView({
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🛡 MODAL DE CONFIRMACIÓN DE FILTRADO INTELIGENTE ANTES DE LA CARGA */}
+      {pendingImportRows && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left select-none">
+          <div className="glass-panel w-full max-w-md p-6 rounded-xl border border-navy-800 space-y-4 shadow-2xl bg-navy-900/95">
+            <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-800 pb-2 flex items-center gap-2">
+              <FileSpreadsheet size={16} className="text-orange-400" />
+              <span>Confirmar Filtro de Importación</span>
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+              Se han procesado <span className="text-orange-400 font-bold">{pendingImportRows.length}</span> registros en el archivo Excel.
+            </p>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              ¿Deseas importar **únicamente** los registros que correspondan a la celda activa actual (<span className="text-orange-400 font-black">{activeWindowCelda}</span>) o prefieres importar todos los registros del archivo?
+            </p>
+
+            <div className="flex gap-2 justify-end pt-3 border-t border-navy-800 shrink-0">
+              <button
+                onClick={() => setPendingImportRows(null)}
+                className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-400 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const filtered = pendingImportRows.filter(r =>
+                    normalizeCeldaCode(r.celda_mapeo) === normalizeCeldaCode(activeWindowCelda || "")
+                  );
+                  onChange([...pltEnsayos, ...filtered]);
+                  alert(`Se importaron ${filtered.length} registros que coinciden con ${activeWindowCelda}.`);
+                  setPendingImportRows(null);
+                }}
+                className="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md active:scale-95"
+              >
+                Solo {activeWindowCelda} ({pendingImportRows.filter(r => normalizeCeldaCode(r.celda_mapeo) === normalizeCeldaCode(activeWindowCelda || "")).length})
+              </button>
+              <button
+                onClick={() => {
+                  onChange([...pltEnsayos, ...pendingImportRows]);
+                  alert(`Se importaron todos los ${pendingImportRows.length} registros del archivo.`);
+                  setPendingImportRows(null);
+                }}
+                className="bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/25 text-orange-400 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md active:scale-95"
+              >
+                Importar Todo
+              </button>
             </div>
           </div>
         </div>

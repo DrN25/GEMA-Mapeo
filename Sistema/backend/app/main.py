@@ -931,34 +931,59 @@ async def upload_foto(codigo: str, index: int, file: UploadFile = File(...)):
             detail="Formato de imagen no soportado. Use JPG, JPEG, PNG, WEBP, BMP, GIF o SVG."
         )
     
-    # Eliminar cualquier foto previa en este índice con otra extensión para evitar duplicados en disco
+    # Nueva convención de nombre solicitado: {codigo}-VENTANA-{index + 1}.{ext}
+    new_filename = f"{code_up}-VENTANA-{index + 1}.{ext}"
+    
+    # Eliminar fotos previas en este índice (tanto del formato nuevo como del antiguo)
+    # con otras extensiones para evitar archivos huérfanos duplicados en el disco
     for e in allowed_exts:
+        # Limpiar formato antiguo si existía
         old_path = os.path.join(dir_path, f"foto_{index}.{e}")
         if os.path.exists(old_path):
             try:
                 os.remove(old_path)
             except:
                 pass
+        
+        # Limpiar formato nuevo con otra extensión
+        new_path_diff_ext = os.path.join(dir_path, f"{code_up}-VENTANA-{index + 1}.{e}")
+        if os.path.exists(new_path_diff_ext) and e != ext:
+            try:
+                os.remove(new_path_diff_ext)
+            except:
+                pass
                 
-    # Guardar nueva foto preservando su extensión original
-    file_path = os.path.join(dir_path, f"foto_{index}.{ext}")
+    # Guardar la nueva fotografía con la extensión correspondiente
+    file_path = os.path.join(dir_path, new_filename)
     with open(file_path, "wb") as f:
         f.write(contents)
         
-    return {"status": "success", "url": f"/api/uploads/{code_up}/foto_{index}.{ext}"}
+    return {"status": "success", "url": f"/api/uploads/{code_up}/{new_filename}"}
+
 
 @app.delete("/api/ventanas/{codigo}/fotos/{index}")
 def delete_foto(codigo: str, index: int):
     code_up = codigo.strip().upper()
     dir_path = os.path.join(uploads_dir, code_up)
     allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
+    
     for e in allowed_exts:
-        file_path = os.path.join(dir_path, f"foto_{index}.{e}")
-        if os.path.exists(file_path):
+        # Eliminar del formato nuevo
+        new_path = os.path.join(dir_path, f"{code_up}-VENTANA-{index + 1}.{e}")
+        if os.path.exists(new_path):
             try:
-                os.remove(file_path)
+                os.remove(new_path)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {e}")
+        
+        # Eliminar del formato antiguo (compatibilidad)
+        old_path = os.path.join(dir_path, f"foto_{index}.{e}")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {e}")
+                
     return {"status": "success"}
 
 @app.post("/api/ventanas/{codigo}/fotos/meta")
@@ -990,21 +1015,33 @@ def get_fotos(codigo: str):
         if os.path.exists(meta_path):
             try:
                 import json
-                with open(meta_path, "r", encoding="utf-8") as f:
+                with open(meta_path, 'r') as f: # o lectura estándar compatible
                     meta = json.load(f)
                     captions = meta.get("captions", ["", "", "", ""])
             except:
+                # Si falla por bloqueo o formato, usamos fallback vacío
                 pass
                 
-        # 2. Comprobar existencia física de las 4 fotos con cualquier extensión permitida
+        # 2. Comprobar existencia física de las 4 fotos
         allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
         for i in range(4):
+            found = False
+            # Intentar buscar la foto en el formato nuevo
             for e in allowed_exts:
-                file_path = os.path.join(dir_path, f"foto_{i}.{e}")
+                file_path = os.path.join(dir_path, f"{code_up}-VENTANA-{i+1}.{e}")
                 if os.path.exists(file_path):
                     import time
-                    # Se retorna con el prefijo /api/uploads para ser redirigido por el Proxy
-                    photos[i] = f"/api/uploads/{code_up}/foto_{i}.{e}?t={int(time.time())}"
+                    photos[i] = f"/api/uploads/{code_up}/{code_up}-VENTANA-{i+1}.{e}?t={int(time.time())}"
+                    found = True
                     break
+            
+            # Fallback de compatibilidad por si tenían el formato antiguo foto_{i}.{e}
+            if not found:
+                for e in allowed_exts:
+                    file_path = os.path.join(dir_path, f"foto_{i}.{e}")
+                    if os.path.exists(file_path):
+                        import time
+                        photos[i] = f"/api/uploads/{code_up}/foto_{i}.{e}?t={int(time.time())}"
+                        break
                 
     return {"photos": photos, "captions": captions}

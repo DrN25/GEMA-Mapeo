@@ -80,7 +80,7 @@ export const STRENGTH_CATALOG: Record<string, StrengthItem> = {
 };
 
 export const STRUCTURE_CATALOG: Record<string, string> = {
-  J: "Junta (JS)",
+  JN: "Junta (JS)",
   BED: "Estratos (BED)",
   F: "Falla (F)",
   SZ: "Zona de Cizalla (SZ)",
@@ -172,7 +172,7 @@ export const LITHOLOGY_CLASSIFICATION: LithologyClassificationItem[] = [
   { grupo: "INTRUSIVOS", unidad: "MZQ", litologia: "MZQ", codigo: "MZQ", k: 12.29 },
   { grupo: "INTRUSIVOS", unidad: "AN", litologia: "LAM", codigo: "LAM", k: 9.31 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_M", k: 14.74 },
-  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_Mg", k: 14.25 },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_MG", k: 14.25 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_S", k: 14.84 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_C", k: 16.83 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_U", k: 14.84 },
@@ -188,6 +188,6 @@ export const LITHOLOGY_CLASSIFICATION: LithologyClassificationItem[] = [
   { grupo: "BRECHAS", unidad: "TBX", litologia: "TBX", codigo: "TBX", k: 13.72 },
   { grupo: "BRECHAS", unidad: "HBX", litologia: "HBX", codigo: "HBX", k: 11.41 },
   { grupo: "BRECHAS", unidad: "MBX / varios", litologia: "MBX", codigo: "MBX", k: 11.41 },
-  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EPG", codigo: "-", k: 9.87 },
-  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EGT", codigo: "-", k: 9.87 }
+  { grupo: "ENDOSKARN", unidad: "MZM", litologia: "EPG", codigo: "-", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "MZM", litologia: "EGT", codigo: "-", k: 9.87 }
 ];

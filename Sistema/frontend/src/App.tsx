@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Eye } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -33,9 +33,15 @@ interface WindowData {
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
-const normalizeJoints = (loadedJoints: JointRow[]): JointRow[] => {
-  const result: JointRow[] = [...loadedJoints];
-  const maxFam = Math.max(3, ...loadedJoints.map(j => j.familia));
+const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): JointRow[] => {
+  const mappedJoints = (loadedJoints || []).map(j => ({
+    ...j,
+    tipo_estructura: (j.tipo_estructura && j.tipo_estructura.toUpperCase() === 'J') ? 'JN' : (j.tipo_estructura || 'JN'),
+    alteracion: (j.alteracion && j.alteracion !== '-1') ? j.alteracion : defaultAlt
+  }));
+
+  const result: JointRow[] = [...mappedJoints];
+  const maxFam = Math.max(3, ...mappedJoints.map(j => j.familia));
   for (let fam = 1; fam <= maxFam; fam++) {
     const count = result.filter(j => j.familia === fam).length;
     for (let i = count; i < 3; i++) {
@@ -58,7 +64,7 @@ const normalizeJoints = (loadedJoints: JointRow[]): JointRow[] => {
         jrc: -1,
         rugosidad: -1,
         forma: 'O',
-        alteracion: 'd'
+        alteracion: defaultAlt
       });
     }
   }
@@ -72,7 +78,7 @@ export default function App() {
   const [windows, setWindows] = useState<WindowSummary[]>([]);
   const [activeWindow, setActiveWindow] = useState<WindowData | null>(null);
   const [pltEnsayos, setPltEnsayos] = useState<any[]>([]);
-
+  const [showFormulas, setShowFormulas] = useState<boolean>(true);
 
   // UI & Theme
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -92,8 +98,7 @@ export default function App() {
   const [captions, setCaptions] = useState<string[]>(['', '', '', '']);
 
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
-  const [isRmrExpanded, setIsRmrExpanded] = useState<boolean>(true);
-
+  const [isCommentsExpanded, setIsCommentsExpanded] = useState<boolean>(false);
 
   // 1. Initialize Dark Mode Theme
   useEffect(() => {
@@ -106,6 +111,26 @@ export default function App() {
       root.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // 1.5. Evitar de forma global que el scroll del mouse modifique los valores de inputs numéricos y desplegables sin bloquear el scroll de la página
+  useEffect(() => {
+    const handleGlobalWheel = (e: WheelEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl) {
+        const isInputNumber = activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'number';
+        const isSelect = activeEl.tagName === 'SELECT';
+
+        if (isInputNumber || isSelect) {
+          (activeEl as HTMLElement).blur();
+        }
+      }
+    };
+
+    document.addEventListener('wheel', handleGlobalWheel, { passive: true });
+    return () => {
+      document.removeEventListener('wheel', handleGlobalWheel);
+    };
+  }, []);
 
   // 2. Fetch window summaries and PLT trials on mount
   useEffect(() => {
@@ -126,6 +151,44 @@ export default function App() {
     }
   }, [activeWindow]);
 
+  // 3.5. Reevaluación en cascada de distancias (m) al largo máximo de la celda
+  useEffect(() => {
+    if (!activeWindow) return;
+
+    // Determinamos el largo de referencia más confiable
+    let maxLargo = 0;
+    if (calculated && calculated.largo > 0) {
+      maxLargo = calculated.largo;
+    } else {
+      const ix = parseFloat(String(activeWindow.header.este_from));
+      const iy = parseFloat(String(activeWindow.header.norte_from));
+      const ic = parseFloat(String(activeWindow.header.cota_from));
+      const fx = parseFloat(String(activeWindow.header.este_to));
+      const fy = parseFloat(String(activeWindow.header.norte_to));
+      const fc = parseFloat(String(activeWindow.header.cota_to));
+      const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
+      maxLargo = hasCoords
+        ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
+        : Math.round(Number(activeWindow.header.largo) || 0);
+    }
+
+    if (maxLargo > 0) {
+      const needsAdjustment = activeWindow.joints.some(
+        j => j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo
+      );
+
+      if (needsAdjustment) {
+        const adjustedJoints = activeWindow.joints.map(j => {
+          if (j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
+            return { ...j, distancia: maxLargo };
+          }
+          return j;
+        });
+        setActiveWindow(prev => prev ? { ...prev, joints: adjustedJoints } : null);
+      }
+    }
+  }, [activeWindow?.header, calculated?.largo]);
+
   // 4. Synchronize photo loading from localStorage when the active window celda changes
   useEffect(() => {
     if (activeWindow?.header.celda) {
@@ -135,7 +198,6 @@ export default function App() {
           throw new Error();
         })
         .then(data => {
-          // Reconstruir URLs absolutas con apiBase para visualización nativa
           const resolvedPhotos = (data.photos || ['', '', '', '']).map((p: string) =>
             p ? (p.startsWith('http') || p.startsWith('data:') ? p : `${API_BASE}${p}`) : ''
           );
@@ -143,7 +205,6 @@ export default function App() {
           setCaptions(data.captions || ['', '', '', '']);
         })
         .catch(() => {
-          // Si el servidor está offline, inicializamos vacíos de forma segura
           setPhotos(['', '', '', '']);
           setCaptions(['', '', '', '']);
         });
@@ -163,12 +224,11 @@ export default function App() {
       const res = await fetch(`${API_BASE}/api/ventanas`);
       if (res.ok) {
         const data = await res.json();
-        // Convert to WindowSummary shape
         const summaries: WindowSummary[] = data.map((v: any) => ({
           name: v.codigo,
           proyecto: "Proyecto A",
           geologo: v.mapeador || "N/A",
-          largo: v.largo_m !== null && v.largo_m !== undefined ? Math.round(v.largo_m) : 5, // Largo entero redondeado
+          largo: v.largo_m !== null && v.largo_m !== undefined ? Math.round(v.largo_m) : 5,
           altura: v.altura_m || 15.0,
           fecha_registro: v.fecha_mapeo || new Date().toISOString().split('T')[0],
           rmr_76: 60,
@@ -234,7 +294,6 @@ export default function App() {
 
         const header: WindowHeader = {
           celda: v.codigo,
-          // Saneamiento estricto de coordenadas al cargar
           este_from: roundDec(v.este_ini, 2),
           norte_from: roundDec(v.norte_ini, 2),
           cota_from: roundDec(v.cota_ini, 2),
@@ -255,7 +314,7 @@ export default function App() {
           mapeador: v.mapeador || 'AS-HM',
           sector: v.sector || 'E1',
           fase: String(v.fase || '5'),
-          nivel: String(roundDec(v.nivel, 2) || '3960'), // Nivel con 2 decimales
+          nivel: String(roundDec(v.nivel, 2) || '3960'),
           sect_geot: v.sector_geotecnico || 'E1',
           intemperia: v.intemperismo_codigo || '',
           alt_zona: v.alteracion_codigo || '',
@@ -318,7 +377,7 @@ export default function App() {
           };
         });
 
-        setActiveWindow({ header, joints: normalizeJoints(joints) });
+        setActiveWindow({ header, joints: normalizeJoints(joints, header.intemperia) });
         setSyncStatus('synced');
         setCurrentView('mapeo');
         setSelectedRowIndex(0);
@@ -351,7 +410,6 @@ export default function App() {
         altura: newWindow.altura,
         dip_talud: newWindow.dip_talud,
 
-        // Sincronizamos las orientaciones iniciales en la creación
         dipdir_talud: newWindow.dipdir_talud,
         dip_hw: newWindow.dip_hw,
         az_hw: newWindow.az_hw,
@@ -424,10 +482,8 @@ export default function App() {
       return;
     }
 
-    // 1. Obtener las juntas que pertenecen exclusivamente a la familia a eliminar
     const familyJoints = activeWindow.joints.filter(j => j.familia === famId);
 
-    // 2. Comprobar si contienen datos significativos antes de confirmar
     const hasData = familyJoints.some(j =>
       (j.distancia !== -1 && j.distancia !== null) ||
       (j.dip !== -1 && j.dip !== null) ||
@@ -449,7 +505,6 @@ export default function App() {
       if (!confirm2) return;
     }
 
-    // 3. Filtrar la familia eliminada y desplazar (reindexar) en cascada decreciente todas las familias superiores
     const remainingJoints = activeWindow.joints.filter(j => j.familia !== famId);
     const shiftedJoints = remainingJoints.map(j => {
       if (j.familia > famId) {
@@ -458,7 +513,6 @@ export default function App() {
       return j;
     });
 
-    // 4. Normalizar el arreglo final de juntas
     const normalized = normalizeJoints(shiftedJoints);
 
     setActiveWindow({
@@ -474,7 +528,6 @@ export default function App() {
     setSyncStatus('saving');
     setSyncMessage("Sincronizando con base de datos SQL Server...");
 
-    // Format save payload to match backend schemas, filtering out vacant joints
     const nonVacantJoints = activeWindow.joints.filter(j => !(j.distancia === -1 && j.dip === -1 && j.espaciamiento === -1));
 
     const payload = {
@@ -546,7 +599,6 @@ export default function App() {
         body: JSON.stringify(payload)
       });
 
-      // Also save PLT trials
       const resPlt = await fetch(`${API_BASE}/api/ensayos-plt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -565,7 +617,6 @@ export default function App() {
       localStorage.setItem(`geolog_window_${activeWindow.header.celda}`, JSON.stringify(activeWindow));
       localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
 
-      // Update local summaries list
       const summary: WindowSummary = {
         name: activeWindow.header.celda,
         proyecto: "Proyecto A",
@@ -589,7 +640,7 @@ export default function App() {
 
   const handleSaveActivePlt = async () => {
     setSyncStatus('saving');
-    setSyncMessage("Sincronizando ensayos PLT con la base de datos...");
+    setSyncMessage("Sincronizando sismología y ensayos PLT...");
     try {
       const resPlt = await fetch(`${API_BASE}/api/ensayos-plt`, {
         method: 'POST',
@@ -611,7 +662,6 @@ export default function App() {
   };
 
   const handleFocusField = (fieldId: string) => {
-    // Determine view based on field prefix
     if (fieldId.startsWith('header-')) {
       setCurrentView('mapeo');
     } else if (fieldId.startsWith('joint-')) {
@@ -659,7 +709,6 @@ export default function App() {
               Mapeo de Ventanas Geomecánicas 2.0
             </span>
 
-            {/* 🏷️ INDICADOR DE CELDA ACTIVA EN EL TOPBAR */}
             {activeWindow && (
               <div className="flex items-center gap-2 animate-fade-in pl-1">
                 <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Celda Activa:</span>
@@ -689,7 +738,18 @@ export default function App() {
             {/* General Topbar Actions */}
             <div className="flex items-center gap-2">
 
-              {/* 📖 BOTÓN FLOTANTE PARA VER CATÁLOGOS */}
+              <button
+                onClick={() => setShowFormulas(!showFormulas)}
+                className={`flex items-center gap-1.5 border px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${showFormulas
+                  ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20'
+                  : 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                title="Activar/Desactivar visualización de fórmulas al pasar el mouse"
+              >
+                <Calculator size={14} className={showFormulas ? 'text-indigo-400 animate-pulse' : 'text-slate-400'} />
+                <span>{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
+              </button>
+
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
                 className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
@@ -737,7 +797,19 @@ export default function App() {
             <div className="space-y-6 animate-fade-in">
               <VentanaForm
                 header={activeWindow.header}
-                onChange={(header) => setActiveWindow({ ...activeWindow, header })}
+                onChange={(header) => {
+                  const oldIntemperia = activeWindow.header.intemperia;
+                  const newIntemperia = header.intemperia;
+                  let joints = activeWindow.joints;
+
+                  if (newIntemperia !== oldIntemperia && ['f', 'd', 'm', 'a', 'c', 's'].includes(newIntemperia || '')) {
+                    joints = joints.map(j => ({
+                      ...j,
+                      alteracion: newIntemperia!
+                    }));
+                  }
+                  setActiveWindow({ ...activeWindow, header, joints });
+                }}
                 calculated={calculated}
                 onOpenImportModal={() => setIsImportModalOpen(true)}
               />
@@ -749,11 +821,12 @@ export default function App() {
                 onSelectRow={setSelectedRowIndex}
                 largoMax={calculated?.largo || 10}
                 onDeleteFamily={handleDeleteFamily}
+                intemperia={activeWindow.header.intemperia}
+                showFormulas={showFormulas} // Nueva Prop
               />
 
-              {/* 📊 CENTRO DE MÉTRICAS GEOMECÁNICAS (KPIs) RE-DISEÑADO CON 50% - 50% SIMÉTRICO */}
+              {/* 📊 CENTRO DE MÉTRICAS GEOMECÁNICAS (KPIs) ALINEADOS Y DISEÑADOS SEGÚN LA MAQUETA */}
               {(() => {
-                // RESTAURACIÓN DE COLORES DE FAMILIA ORIGINALES (regresados)
                 const getFamilyStyle = (fam: number) => {
                   const styles: Record<number, { dot: string; container: string; badge: string }> = {
                     1: { dot: 'bg-orange-500', container: 'bg-orange-500/5 border border-orange-500/20 text-orange-400', badge: 'bg-orange-500/20 border border-orange-500/30 text-orange-400' },
@@ -769,22 +842,30 @@ export default function App() {
                   return styles[fam] || { dot: 'bg-slate-500', container: 'bg-slate-500/5 border border-slate-500/20', badge: 'bg-slate-500/20 border border-slate-500/30 text-slate-400' };
                 };
 
+                const getJvClassification = (jv: number): string => {
+                  if (jv < 1) return "FRACTURAMIENTO MUY BAJO";
+                  if (jv <= 3) return "FRACTURAMIENTO BAJO";
+                  if (jv <= 10) return "FRACTURAMIENTO MODERADO";
+                  if (jv <= 30) return "FRACTURAMIENTO ALTO";
+                  if (jv <= 60) return "FRACTURAMIENTO MUY ALTO";
+                  return "MACIZO TRITURADO";
+                };
+
                 const activeFamiliesList = Array.from(new Set(activeWindow.joints.map(j => j.familia))).sort((a, b) => a - b);
-                const isMultiColumn = activeFamiliesList.length > 3;
 
                 return (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none text-left animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 select-none text-left animate-fade-in">
 
-                    {/* Panel 1: Promedios de Espaciamiento (Ocupa la mitad -> lg:col-span-6) */}
-                    <div className="lg:col-span-6 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
+                    {/* Card 1: PROMEDIOS DE ESPACIAMIENTO */}
+                    <div className="lg:col-span-3 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center justify-between gap-2">
                           <span className="flex items-center gap-2">
                             <BarChart3 size={16} className="text-slate-400" />
-                            <span>Promedios de Espaciamiento</span>
+                            <span>PROMEDIOS DE ESPACIAMIENTO</span>
                           </span>
-                          <span className="text-xs bg-navy-900 border border-navy-850 text-slate-400 font-bold px-2 py-0.5 rounded-md">
-                            {activeFamiliesList.length} {activeFamiliesList.length === 1 ? 'Familia' : 'Familias'}
+                          <span className="text-[10px] bg-orange-500/10 border border-orange-500/30 text-orange-400 font-extrabold px-2.5 py-0.5 rounded-lg uppercase tracking-wider">
+                            {activeFamiliesList.length} FAMILIAS
                           </span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
@@ -792,10 +873,7 @@ export default function App() {
                         </p>
                       </div>
 
-                      <div className={`mt-4 overflow-y-auto pr-1 max-h-[175px] ${isMultiColumn
-                        ? 'grid grid-cols-2 gap-2'
-                        : 'space-y-2.5'
-                        }`}>
+                      <div className="mt-4 overflow-y-auto pr-1 max-h-[175px] space-y-2.5">
                         {activeFamiliesList.map((famId) => {
                           const val = calculated?.familias_spacing[famId];
                           const displayVal = val !== undefined && val !== null ? val.toFixed(4) + ' m' : 'Sin datos';
@@ -819,48 +897,64 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Panel 2: KPI RQD Estimado (Ocupa la otra mitad -> lg:col-span-6) */}
-                    <div className="lg:col-span-6 glass-panel p-6 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-sky-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all pointer-events-none" />
-
+                    {/* Card 2: ÍNDICE VOLUMÉTRICO */}
+                    <div className="lg:col-span-2 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
-                          <Gauge size={16} className="text-sky-400" />
-                          <span>RQD Estimado</span>
+                          <Layers size={16} className="text-yellow-500/80" />
+                          <span>ÍNDICE VOLUMÉTRICO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Cálculo empírico según fórmula: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                          Conteo de discontinuidades volumétricas (Jv).
                         </p>
                       </div>
 
-                      <div className="my-4 bg-sky-500/20 border border-sky-500/40 rounded-xl p-4 shadow-[0_0_15px_rgba(56,189,248,0.1)] flex items-center justify-between transition-all hover:bg-sky-500/25">
-                        <div className="flex flex-col text-left">
-                          <span className="text-3xl font-extrabold font-mono tracking-tight text-sky-200">
-                            {calculated ? calculated.rqd_est.toFixed(2) : '—'}
-                          </span>
-                          <span className="text-xs font-bold uppercase tracking-wider mt-0.5 text-sky-400">RQD Estimado</span>
-                        </div>
-                        <Gauge size={28} className="text-sky-400/50 shrink-0 stroke-[1.5]" />
+                      <div className="my-4 border border-yellow-500/30 bg-yellow-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
+                        <span className="text-3xl font-black font-mono tracking-tight text-yellow-500">
+                          {calculated ? calculated.jv.toFixed(4) : '—'}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">JTS / M³</span>
+                        <Layers size={24} className="text-yellow-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
                       </div>
 
-                      {/* Barra de Progreso Dinámica */}
-                      <div className="space-y-2">
+                      <div className="mt-auto border border-yellow-500/20 bg-yellow-500/5 rounded-lg py-2 px-3 text-center">
+                        <span className="text-xs font-extrabold text-yellow-500 uppercase tracking-widest">
+                          {calculated ? getJvClassification(calculated.jv) : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card 3: RQD ESTIMADO */}
+                    <div className="lg:col-span-5 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+                      <div>
+                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
+                          <Gauge size={16} className="text-sky-400" />
+                          <span>RQD ESTIMADO</span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-2 font-semibold">
+                          Cálculo empírico según fórmula de Palmström: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                        </p>
+                      </div>
+
+                      <div className="my-4 border border-sky-500/30 bg-sky-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
+                        <span className="text-3xl font-black font-mono tracking-tight text-sky-400">
+                          {calculated ? calculated.rqd_est.toFixed(2) : '—'}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">RQD ESTIMADO</span>
+                        <Gauge size={24} className="text-sky-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
+                      </div>
+
+                      <div className="space-y-3 mt-auto">
                         <div className="w-full bg-navy-950 rounded-full h-2.5 border border-navy-900 overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all duration-500 ${calculated ? (
-                              calculated.rqd_est < 25 ? 'bg-red-500' :
-                                calculated.rqd_est < 50 ? 'bg-orange-500' :
-                                  calculated.rqd_est < 75 ? 'bg-amber-500' :
-                                    calculated.rqd_est < 90 ? 'bg-sky-500' : 'bg-emerald-500'
-                            ) : 'bg-slate-800'
-                              }`}
+                            className="h-full rounded-full transition-all duration-500 bg-sky-500 shadow-[0_0_10px_rgba(56,189,248,0.4)]"
                             style={{ width: `${calculated ? calculated.rqd_est : 0}%` }}
                           />
                         </div>
-                        <div className="flex justify-between text-xs text-slate-400 font-bold uppercase tracking-wider">
-                          <span>Mala</span>
-                          <span>Regular</span>
-                          <span>Excelente</span>
+                        <div className="flex justify-between text-[10px] text-slate-400 font-extrabold uppercase tracking-wider px-0.5">
+                          <span>MALA</span>
+                          <span>REGULAR</span>
+                          <span>EXCELENTE</span>
                         </div>
                       </div>
                     </div>
@@ -869,57 +963,59 @@ export default function App() {
                 );
               })()}
 
-              {/* 💬 Comentarios y Fotografías */}
-              <CommentsPhotos
-                celda={activeWindow.header.celda}
-                comentario={activeWindow.header.comentario || ''}
-                onComentarioChange={(val) => {
-                  setActiveWindow({
-                    ...activeWindow,
-                    header: {
-                      ...activeWindow.header,
-                      comentario: val
-                    }
-                  });
-                }}
-                photos={photos}
-                captions={captions}
-                onPhotosChange={handlePhotosChange}
-                apiBase={RESOLVED_API_BASE}
-              />
 
-              {/* 📊 ANÁLISIS GEOMECÁNICO RMR COLAPSABLE (Ubicado estratégicamente al final de la pestaña) */}
+              {/* 💬 Comentarios y Fotografías Colapsable (Sincronizado con tono naranja geológico) */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between bg-navy-950/45 p-4 rounded-xl border border-navy-800/80">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg">
-                      <Layers size={18} />
+                    <div className="p-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-lg">
+                      <BookOpen size={18} className="text-orange-400" />
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">
-                        Análisis Geomecánico RMR
+                        Comentarios y Fotografías
                       </h4>
                       <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                        Cálculo interactivo de ratings RMR76 y RMR89
+                        Registro de observaciones visuales y fotos de la celda
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={() => setIsRmrExpanded(!isRmrExpanded)}
-                    className="px-3 py-1.5 rounded-lg bg-navy-900 border border-navy-700/60 hover:bg-navy-850 text-slate-300 text-xs font-bold transition-all active:scale-95"
+                    onClick={() => setIsCommentsExpanded(!isCommentsExpanded)}
+                    className="px-3 py-1.5 rounded-lg bg-navy-900 border border-navy-700/60 hover:bg-navy-850 text-slate-300 hover:text-orange-400 text-xs font-bold transition-all active:scale-95"
                   >
-                    {isRmrExpanded ? 'Ocultar Detalle' : 'Mostrar Detalle'}
+                    {isCommentsExpanded ? 'Ocultar Detalle' : 'Mostrar Detalle'}
                   </button>
                 </div>
 
-                {isRmrExpanded && (
-                  <RmrAnalysis
-                    header={activeWindow.header}
-                    onChange={(header) => setActiveWindow({ ...activeWindow, header })}
-                    calculated={calculated}
+                {isCommentsExpanded && (
+                  <CommentsPhotos
+                    celda={activeWindow.header.celda}
+                    comentario={activeWindow.header.comentario || ''}
+                    onComentarioChange={(val) => {
+                      setActiveWindow({
+                        ...activeWindow,
+                        header: {
+                          ...activeWindow.header,
+                          comentario: val
+                        }
+                      });
+                    }}
+                    photos={photos}
+                    captions={captions}
+                    onPhotosChange={handlePhotosChange}
+                    apiBase={RESOLVED_API_BASE}
                   />
                 )}
               </div>
+
+              {/* 📊 ANÁLISIS GEOMECÁNICO RMR SIEMPRE EXPANDIDO */}
+              <RmrAnalysis
+                header={activeWindow.header}
+                onChange={(header) => setActiveWindow({ ...activeWindow, header })}
+                calculated={calculated}
+                showFormulas={showFormulas} // Nueva Prop
+              />
             </div>
           )}
 
@@ -939,7 +1035,7 @@ export default function App() {
                 setSyncStatus('unsaved');
                 setSyncMessage('Ensayos PLT modificados localmente. Presione "Guardar Cambios" para sincronizar.');
               }}
-              activeWindowCelda={activeWindow?.header.celda || null}
+              activeWindowCellda={activeWindow?.header.celda || null}
               onSave={handleSaveActivePlt}
               syncStatus={syncStatus}
               syncMessage={syncMessage}
@@ -962,9 +1058,10 @@ export default function App() {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={(importedData) => {
+          const defaultAlt = importedData.header?.intemperia || 'd';
           setActiveWindow({
             ...importedData,
-            joints: normalizeJoints(importedData.joints || [])
+            joints: normalizeJoints(importedData.joints || [], defaultAlt)
           });
           setSyncStatus('unsaved');
           setSyncMessage('Datos cargados localmente desde Excel. Presione "Guardar Cambios" para sincronizar.');

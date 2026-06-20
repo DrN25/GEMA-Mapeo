@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import type { JointRow } from '../utils/rmrCalculator';
 import {
   STRUCTURE_CATALOG,
@@ -12,6 +13,7 @@ import {
   getAberturaRating,
   getFillingRatingSingle
 } from '../utils/rmrCalculator';
+import { FormulaTooltipTrigger } from './FormulaTooltip';
 
 interface DisconTableProps {
   joints: JointRow[];
@@ -20,7 +22,19 @@ interface DisconTableProps {
   onSelectRow: (index: number | null) => void;
   largoMax: number;
   onDeleteFamily: (famId: number) => void;
+  intemperia?: string;
+  showFormulas?: boolean; // Nueva Propiedad
 }
+
+// Abreviaciones para optimizar el espacio en la celda de Alteración
+const ALTERACION_ABBR: Record<string, string> = {
+  f: 'Fresca',
+  d: 'Déb. Met.',
+  m: 'Mod. Met.',
+  a: 'Alt. Met.',
+  c: 'Comp. Met.',
+  s: 'Suelo Res.'
+};
 
 const getAberturaClase = (val: number | undefined | null): string => {
   if (val === undefined || val === null || val === -1) return '';
@@ -45,7 +59,9 @@ export default function DisconTable({
   selectedRowIndex,
   onSelectRow,
   largoMax,
-  onDeleteFamily
+  onDeleteFamily,
+  intemperia,
+  showFormulas = true
 }: DisconTableProps) {
 
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
@@ -113,7 +129,12 @@ export default function DisconTable({
 
     const num = parseFloat(val);
     if (!isNaN(num) && val !== '' && !val.endsWith('.') && val !== '-') {
-      handleRowChange(index, field, num);
+      // Si es JRC o Rugosidad y el valor ingresado es 0, lo enviamos como vacío (-1)
+      if ((field === 'jrc' || field === 'rugosidad') && num === 0) {
+        handleRowChange(index, field, -1);
+      } else {
+        handleRowChange(index, field, num);
+      }
     } else if (val === '') {
       handleRowChange(index, field, -1);
     }
@@ -137,12 +158,19 @@ export default function DisconTable({
       return;
     }
 
+    // Si es JRC o Rugosidad y el valor ingresado o por defecto es 0, queda vacío por defecto (-1)
+    if ((field === 'jrc' || field === 'rugosidad') && num === 0) {
+      handleRowChange(index, field, -1);
+      return;
+    }
+
     let min = 0;
     let max = maxVal;
     if (field === 'dip') { min = 0; max = 90; }
     else if (field === 'dip_dir') { min = 0; max = 359; }
-    else if (field === 'jrc') { min = 0; max = 20; }
-    else if (field === 'rugosidad') { min = 0; max = 9; }
+    // Normalizamos rangos mínimos de selección válida a partir de 1
+    else if (field === 'jrc') { min = 1; max = 20; }
+    else if (field === 'rugosidad') { min = 1; max = 9; }
 
     const clamped = Math.min(max, Math.max(min, num));
     handleRowChange(index, field, clamped);
@@ -150,6 +178,7 @@ export default function DisconTable({
 
   const createFamily = () => {
     const nextFam = Math.max(0, ...joints.map(j => j.familia)) + 1;
+    const defaultAlt = (intemperia && ['f', 'd', 'm', 'a', 'c', 's'].includes(intemperia)) ? intemperia : 'd';
     const newRows: JointRow[] = [
       {
         id: joints.length + 1,
@@ -163,14 +192,14 @@ export default function DisconTable({
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: -1,
-        terminacion: -1,
+        extremos_visibles: 1,
+        terminacion: 0,
         relleno1: 'cwf',
         relleno2: undefined,
         jrc: -1,
         rugosidad: -1,
         forma: 'O',
-        alteracion: 'd'
+        alteracion: defaultAlt
       },
       {
         id: joints.length + 2,
@@ -184,14 +213,14 @@ export default function DisconTable({
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: -1,
-        terminacion: -1,
+        extremos_visibles: 1,
+        terminacion: 0,
         relleno1: 'cwf',
         relleno2: undefined,
         jrc: -1,
         rugosidad: -1,
         forma: 'O',
-        alteracion: 'd'
+        alteracion: defaultAlt
       },
       {
         id: joints.length + 3,
@@ -205,14 +234,14 @@ export default function DisconTable({
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: -1,
-        terminacion: -1,
+        extremos_visibles: 1,
+        terminacion: 0,
         relleno1: 'cwf',
         relleno2: undefined,
         jrc: -1,
         rugosidad: -1,
         forma: 'O',
-        alteracion: 'd'
+        alteracion: defaultAlt
       }
     ];
     onChange([...joints, ...newRows]);
@@ -220,6 +249,7 @@ export default function DisconTable({
   };
 
   const clearRow = (index: number) => {
+    const defaultAlt = (intemperia && ['f', 'd', 'm', 'a', 'c', 's'].includes(intemperia)) ? intemperia : 'd';
     const updated = [...joints];
     updated[index] = {
       ...updated[index],
@@ -232,14 +262,14 @@ export default function DisconTable({
       espesor: -1,
       continuidad: -1,
       espaciamiento: -1,
-      extremos_visibles: -1,
-      terminacion: -1,
+      extremos_visibles: 1,
+      terminacion: 0,
       relleno1: 'cwf',
       relleno2: undefined,
       jrc: -1,
       rugosidad: -1,
       forma: 'O',
-      alteracion: 'd'
+      alteracion: defaultAlt
     };
     onChange(updated);
   };
@@ -262,51 +292,51 @@ export default function DisconTable({
         </h3>
       </div>
 
-      <div className="overflow-x-auto relative rounded-lg border border-navy-900 bg-navy-950/20">
+      <div className="overflow-x-auto relative rounded-lg border border-navy-700 bg-navy-950/20">
         <table className="w-full text-left text-sm border-collapse border-separate border-spacing-0" style={{ minWidth: '2400px' }}>
           <thead>
             <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs">
-              <th rowSpan={2} className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-navy-900 w-[52px] min-w-[52px]">Fam</th>
-              <th rowSpan={2} className="py-3 px-2 text-center sticky left-[52px] bg-navy-950 z-20 border-r border-navy-900 w-[85px] min-w-[85px]">Dist (m)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-20">Dip (&deg;)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-24">DipDir (&deg;)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-24">Tipo</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-20">Cant (n)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-36">Abert (mm)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-24">Espes (mm)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-24">Cont (m)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-24">Espac (m)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-24">Ext Vis</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-20">Term</th>
-              <th rowSpan={2} className="py-3 px-2 w-32 text-center">Relleno 1</th>
-              <th rowSpan={2} className="py-3 px-2 w-32 text-center">Relleno 2</th>
-              <th colSpan={2} className="py-2 px-2 text-center border-l border-navy-900 text-pink-400 bg-pink-950/10 text-xs">Valor Relleno (R89)</th>
-              <th colSpan={2} className="py-2 px-2 text-center border-l border-navy-900 text-amber-400 bg-amber-950/10 text-xs">Valor Relleno (R76)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-20">JRC</th>
-              <th rowSpan={2} className="py-3 px-2 w-36 text-center">Rugosidad</th>
-              <th rowSpan={2} className="py-3 px-2 text-center w-20">Forma</th>
-              <th rowSpan={2} className="py-3 px-2 w-32 text-center">Alteración</th>
-              <th colSpan={6} className="py-2 px-2 text-center bg-pink-900/10 border-l border-navy-900 text-pink-400 text-xs">Condición Discontinuidades (RMR'89)</th>
-              <th colSpan={6} className="py-2 px-2 text-center bg-amber-900/10 border-l border-navy-900 text-amber-400 text-xs">Condición Discontinuidades (RMR'76)</th>
-              <th rowSpan={2} className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-navy-900 w-[70px] min-w-[70px]">Acción</th>
+              <th rowSpan={2} className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-b border-navy-800 w-[52px] min-w-[52px]">Fam</th>
+              <th rowSpan={2} className="py-3 px-2 text-center sticky left-[52px] bg-navy-950 z-20 border-r border-b border-navy-800 w-[85px] min-w-[85px]">Dist Est. (m)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-20 border-r border-b border-navy-800">Dip (&deg;)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-24 border-r border-b border-navy-800">DipDir (&deg;)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-24 border-r border-b border-navy-800">Tipo Estruc.</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-20 border-r border-b border-navy-800">Cant (n)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-36 border-r border-b border-navy-800">Abert (mm)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-24 border-r border-b border-navy-800">Espes (mm)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-24 border-r border-b border-navy-800">Cont (m)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-24 border-r border-b border-navy-800">Espac (m)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-24 border-r border-b border-navy-800">Ext Vis</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-20 border-r border-b border-navy-800">Term</th>
+              <th rowSpan={2} className="py-3 px-2 w-32 text-center border-r border-b border-navy-800">Relleno 1</th>
+              <th rowSpan={2} className="py-3 px-2 w-32 text-center border-r border-b border-navy-800">Relleno 2</th>
+              <th colSpan={2} className="py-2 px-2 text-center border-r border-b border-navy-800 text-pink-400 bg-pink-950/10 text-xs">Valor Relleno (R89)</th>
+              <th colSpan={2} className="py-2 px-2 text-center border-r border-b border-navy-800 text-amber-400 bg-amber-950/10 text-xs">Valor Relleno (R76)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-20 border-r border-b border-navy-800">JRC</th>
+              <th rowSpan={2} className="py-3 px-2 w-36 text-center border-r border-b border-navy-800">Rugosidad</th>
+              <th rowSpan={2} className="py-3 px-2 text-center w-20 border-r border-b border-navy-800">Forma</th>
+              <th rowSpan={2} className="py-3 px-2 w-32 text-center border-r border-b border-navy-800">Alteración</th>
+              <th colSpan={6} className="py-2 px-2 text-center bg-pink-900/10 border-r border-b border-navy-800 text-pink-400 text-xs">Condición Discontinuidades (RMR'89)</th>
+              <th colSpan={6} className="py-2 px-2 text-center bg-amber-900/10 border-r border-b border-navy-800 text-amber-400 text-xs">Condición Discontinuidades (RMR'76)</th>
+              <th rowSpan={2} className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-b border-navy-800 w-[70px] min-w-[70px]">Acción</th>
             </tr>
-            <tr className="bg-navy-950 text-slate-500 font-bold uppercase tracking-wider text-xs border-b border-navy-900">
-              <th className="py-1 px-2 text-center border-l border-navy-900 text-pink-400/80 bg-pink-950/5">V. R1</th>
-              <th className="py-1 px-2 text-center text-pink-400/80 bg-pink-950/5">V. R2</th>
-              <th className="py-1 px-2 text-center border-l border-navy-900 text-amber-400/80 bg-amber-950/5">V. R1</th>
-              <th className="py-1 px-2 text-center text-amber-400/80 bg-amber-950/5">V. R2</th>
-              <th className="py-1 px-2 text-center bg-pink-900/5 border-l border-navy-900 text-pink-400/80">Alt</th>
-              <th className="py-1 px-2 text-center bg-pink-900/5 text-pink-400/80">Rel</th>
-              <th className="py-1 px-2 text-center bg-pink-900/5 text-pink-400/80">Cont</th>
-              <th className="py-1 px-2 text-center bg-pink-900/5 text-pink-400/80">Aber</th>
-              <th className="py-1 px-2 text-center bg-pink-900/5 text-pink-400/80">Rug</th>
-              <th className="py-1 px-2 text-center bg-pink-950/20 text-pink-300 font-black">Val</th>
-              <th className="py-1 px-2 text-center bg-amber-900/5 border-l border-navy-900 text-amber-400/80">Alt</th>
-              <th className="py-1 px-2 text-center bg-amber-900/5 text-amber-400/80">Rel</th>
-              <th className="py-1 px-2 text-center bg-amber-900/5 text-amber-400/80">Cont</th>
-              <th className="py-1 px-2 text-center bg-amber-900/5 text-amber-400/80">Aber</th>
-              <th className="py-1 px-2 text-center bg-amber-900/5 text-amber-400/80">Rug</th>
-              <th className="py-1 px-2 text-center bg-amber-950/20 text-amber-300 font-black">Val</th>
+            <tr className="bg-navy-950 text-slate-500 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
+              <th className="py-1 px-2 text-center border-r border-b border-navy-800 text-pink-400/80 bg-pink-950/5">V. R1</th>
+              <th className="py-1 px-2 text-center border-r border-b border-navy-800 text-pink-400/80 bg-pink-950/5">V. R2</th>
+              <th className="py-1 px-2 text-center border-r border-b border-navy-800 text-amber-400/80 bg-amber-950/5">V. R1</th>
+              <th className="py-1 px-2 text-center border-r border-b border-navy-800 text-amber-400/80 bg-amber-950/5">V. R2</th>
+              <th className="py-1 px-2 text-center bg-pink-900/5 border-r border-b border-navy-800 text-pink-400/80">Alt</th>
+              <th className="py-1 px-2 text-center bg-pink-900/5 border-r border-b border-navy-800 text-pink-400/80">Rel</th>
+              <th className="py-1 px-2 text-center bg-pink-900/5 border-r border-b border-navy-800 text-pink-400/80">Cont</th>
+              <th className="py-1 px-2 text-center bg-pink-900/5 border-r border-b border-navy-800 text-pink-400/80">Aber</th>
+              <th className="py-1 px-2 text-center bg-pink-900/5 border-r border-b border-navy-800 text-pink-400/80">Rug</th>
+              <th className="py-1 px-2 text-center bg-pink-950/20 border-r border-b border-navy-800 text-pink-300 font-black">Val</th>
+              <th className="py-1 px-2 text-center bg-amber-900/5 border-r border-b border-navy-800 text-amber-400/80">Alt</th>
+              <th className="py-1 px-2 text-center bg-amber-900/5 border-r border-b border-navy-800 text-amber-400/80">Rel</th>
+              <th className="py-1 px-2 text-center bg-amber-900/5 border-r border-b border-navy-800 text-amber-400/80">Cont</th>
+              <th className="py-1 px-2 text-center bg-amber-900/5 border-r border-b border-navy-800 text-amber-400/80">Aber</th>
+              <th className="py-1 px-2 text-center bg-amber-900/5 border-r border-b border-navy-800 text-amber-400/80">Rug</th>
+              <th className="py-1 px-2 text-center bg-amber-950/20 border-r border-b border-navy-800 text-amber-300 font-black">Val</th>
             </tr>
           </thead>
           <tbody>
@@ -364,27 +394,37 @@ export default function DisconTable({
 
               const fmtRating = (v: number | null) => v !== null ? String(v) : '—';
 
+              // Clase CSS Premium compartida para todos los campos autocalculados del sistema
+              const computedCellClass = "outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35 bg-indigo-500/[0.03] text-indigo-300 font-semibold relative";
+
               return (
                 <tr
                   key={idx}
                   onClick={() => onSelectRow(idx)}
-                  className={`hover:bg-navy-900/20 border-b border-navy-900/60 transition-colors ${rowBg} ${isSelected ? 'bg-indigo-500/10 hover:bg-indigo-500/15' : ''}`}
+                  className={`hover:bg-navy-900/20 border-b border-navy-800 transition-colors ${rowBg} ${isSelected ? 'bg-indigo-500/10 hover:bg-indigo-500/15' : ''}`}
                 >
-                  <td className="py-2 px-1 text-center sticky left-0 z-10 border-r border-navy-900 bg-navy-950 font-normal">
+                  {/* Celda Identificación Familia */}
+                  <td className="py-2 px-1 text-center sticky left-0 z-10 border-r border-b border-navy-800 bg-navy-950 font-normal">
                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${getFamilyBadgeStyle(j.familia)}`}>
                       F{j.familia}
                     </span>
                   </td>
 
-                  {/* Dist (m) - Limitado estrictamente a solo enteros positivos desde 0 */}
-                  <td className="py-2 px-1 text-center sticky left-[52px] z-10 border-r border-navy-900 bg-navy-950">
+                  {/* Dist (m) */}
+                  <td className="py-2 px-1 text-center sticky left-[52px] z-10 border-r border-b border-navy-800 bg-navy-950">
                     <input
                       type="number"
                       id={`joint-distancia-${idx}`}
                       value={getInputValue(idx, 'distancia', j.distancia)}
                       onChange={(e) => {
                         const digits = e.target.value.replace(/\D/g, '');
-                        handleInputChange(idx, 'distancia', digits);
+                        if (digits === '') {
+                          handleInputChange(idx, 'distancia', '');
+                        } else {
+                          const num = parseInt(digits, 10);
+                          const clamped = Math.min(Math.round(largoMax), Math.max(0, num));
+                          handleInputChange(idx, 'distancia', String(clamped));
+                        }
                       }}
                       onBlur={(e) => {
                         const digits = e.target.value.replace(/\D/g, '');
@@ -401,7 +441,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  <td className="py-2 px-1 text-center">
+                  {/* Dip */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="number"
                       step="0.01"
@@ -413,7 +454,9 @@ export default function DisconTable({
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
                   </td>
-                  <td className="py-2 px-1 text-center">
+
+                  {/* DipDir */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="number"
                       step="0.01"
@@ -425,7 +468,9 @@ export default function DisconTable({
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
                   </td>
-                  <td className="py-2 px-1 text-center">
+
+                  {/* Tipo */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <select
                       value={j.tipo_estructura}
                       onChange={(e) => handleRowChange(idx, 'tipo_estructura', e.target.value)}
@@ -440,8 +485,8 @@ export default function DisconTable({
                     </select>
                   </td>
 
-                  {/* Cant (n) - Solo enteros positivos, admite -1 representado como vacío */}
-                  <td className="py-2 px-1 text-center">
+                  {/* Cant (n) */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="text"
                       id={`joint-n_estructuras-${idx}`}
@@ -459,11 +504,7 @@ export default function DisconTable({
                         const val = e.target.value;
                         const num = parseInt(val, 10);
                         if (val === '' || isNaN(num) || num <= 0) {
-                          if (num === -1) {
-                            handleRowChange(idx, 'n_estructuras', -1);
-                          } else {
-                            handleRowChange(idx, 'n_estructuras', -1);
-                          }
+                          handleRowChange(idx, 'n_estructuras', -1);
                         } else {
                           handleRowChange(idx, 'n_estructuras', num);
                         }
@@ -473,8 +514,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  {/* Abert (mm) - Muestra "nn.d (Clase)" al no tener foco, limita a 1 decimal */}
-                  <td className="py-2 px-1 text-center">
+                  {/* Abertura */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="text"
                       id={`joint-abertura-${idx}`}
@@ -512,8 +553,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  {/* Espes (mm) - Limita a 1 decimal */}
-                  <td className="py-2 px-1 text-center">
+                  {/* Espesor */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="text"
                       id={`joint-espesor-${idx}`}
@@ -549,7 +590,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  <td className="py-2 px-1 text-center">
+                  {/* Continuidad */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="number"
                       step="0.01"
@@ -562,8 +604,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  {/* Espac (m) - Limita a 2 decimales */}
-                  <td className="py-2 px-1 text-center">
+                  {/* Espaciamiento */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="text"
                       id={`joint-espaciamiento-${idx}`}
@@ -599,12 +641,12 @@ export default function DisconTable({
                     />
                   </td>
 
-                  {/* Ext Vis - Removida la opción 3 */}
-                  <td className="py-2 px-1 text-center">
+                  {/* Extremos Visibles */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <select
                       value={j.extremos_visibles}
                       onChange={(e) => handleRowChange(idx, 'extremos_visibles', parseInt(e.target.value) ?? -1)}
-                      className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs animate-fade-in"
+                      className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       <option value="0" className="bg-navy-950">0</option>
@@ -613,8 +655,8 @@ export default function DisconTable({
                     </select>
                   </td>
 
-                  {/* Term - Removidas las opciones 4 y 5 */}
-                  <td className="py-2 px-1 text-center font-normal text-xs">
+                  {/* Terminación */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <select
                       value={j.terminacion}
                       onChange={(e) => handleRowChange(idx, 'terminacion', parseInt(e.target.value) ?? -1)}
@@ -629,7 +671,8 @@ export default function DisconTable({
                     </select>
                   </td>
 
-                  <td className="py-2 px-1">
+                  {/* Relleno 1 */}
+                  <td className="py-2 px-1 border-r border-b border-navy-800/80">
                     <select
                       value={j.relleno1}
                       onChange={(e) => handleRowChange(idx, 'relleno1', e.target.value)}
@@ -643,7 +686,9 @@ export default function DisconTable({
                       ))}
                     </select>
                   </td>
-                  <td className="py-2 px-1">
+
+                  {/* Relleno 2 */}
+                  <td className="py-2 px-1 border-r border-b border-navy-800/80">
                     <select
                       value={j.relleno2 || ''}
                       onChange={(e) => handleRowChange(idx, 'relleno2', e.target.value || undefined)}
@@ -658,20 +703,36 @@ export default function DisconTable({
                     </select>
                   </td>
 
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-bold border-l border-navy-900/60 text-xs">
-                    {fmtRating(r1_89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-bold text-xs">
-                    {fmtRating(r2_89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-bold border-l border-navy-900/60 text-xs">
-                    {fmtRating(r1_76)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-bold text-xs">
-                    {fmtRating(r2_76)}
+                  {/* Valor Relleno (R89) V. R1 */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-bold border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rel_single_r89" params={{ code: j.relleno1, thickness: j.espesor, val: r1_89 }} enabled={showFormulas}>
+                      <span>{fmtRating(r1_89)}</span>
+                    </FormulaTooltipTrigger>
                   </td>
 
-                  <td className="py-2 px-1 text-center">
+                  {/* Valor Relleno (R89) V. R2 */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-bold border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rel_single_r89" params={{ code: j.relleno2, thickness: j.espesor, val: r2_89 }} enabled={showFormulas}>
+                      <span>{fmtRating(r2_89)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Valor Relleno (R76) V. R1 */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-bold border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rel_single_r76" params={{ code: j.relleno1, thickness: j.espesor, val: r1_76 }} enabled={showFormulas}>
+                      <span>{fmtRating(r1_76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Valor Relleno (R76) V. R2 */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-bold border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rel_single_r76" params={{ code: j.relleno2, thickness: j.espesor, val: r2_76 }} enabled={showFormulas}>
+                      <span>{fmtRating(r2_76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* JRC */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="number"
                       id={`joint-jrc-${idx}`}
@@ -683,8 +744,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  {/* Rugosidad - Convertido a input numérico del 0 al 9, idéntico a JRC */}
-                  <td className="py-2 px-1 text-center">
+                  {/* Rugosidad */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <input
                       type="number"
                       id={`joint-rugosidad-${idx}`}
@@ -696,7 +757,8 @@ export default function DisconTable({
                     />
                   </td>
 
-                  <td className="py-2 px-1 text-center">
+                  {/* Forma */}
+                  <td className="py-2 px-1 text-center border-r border-b border-navy-800/80">
                     <select
                       value={j.forma}
                       onChange={(e) => handleRowChange(idx, 'forma', e.target.value)}
@@ -710,7 +772,9 @@ export default function DisconTable({
                       ))}
                     </select>
                   </td>
-                  <td className="py-2 px-1">
+
+                  {/* Alteración con Selección Abreviada */}
+                  <td className="py-2 px-1 border-r border-b border-navy-800">
                     <select
                       value={j.alteracion}
                       onChange={(e) => handleRowChange(idx, 'alteracion', e.target.value)}
@@ -718,61 +782,108 @@ export default function DisconTable({
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
                       {Object.keys(ALTERACION_CATALOG).map(code => (
-                        <option key={code} value={code} className="bg-navy-950 text-xs">
-                          {code}
+                        <option key={code} value={code} className="bg-navy-950 text-xs text-left">
+                          {code} ({ALTERACION_ABBR[code] || code})
                         </option>
                       ))}
                     </select>
                   </td>
 
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-normal border-l border-navy-900/60 text-xs">
-                    {fmtRating(altR89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-normal text-xs">
-                    {fmtRating(relR89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-normal text-xs">
-                    {fmtRating(contR89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-normal text-xs">
-                    {fmtRating(abR89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-pink-900/5 text-pink-300 font-normal text-xs">
-                    {fmtRating(rugR89)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-pink-950/20 text-pink-200 font-black text-xs">
-                    {fmtRating(totalR89)}
+                  {/* Condición Discontinuidades (RMR'89) Alt */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="alt_r89" params={{ code: j.alteracion, val: altR89 }} enabled={showFormulas}>
+                      <span>{fmtRating(altR89)}</span>
+                    </FormulaTooltipTrigger>
                   </td>
 
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-normal border-l border-navy-900/60 text-xs">
-                    {fmtRating(altR76)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-normal text-xs">
-                    {fmtRating(relR76)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-normal text-xs">
-                    {fmtRating(contR76)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-normal text-xs">
-                    {fmtRating(abR76)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-900/5 text-amber-300 font-normal text-xs">
-                    {fmtRating(rugR76)}
-                  </td>
-                  <td className="py-2 px-2 text-center bg-amber-950/20 text-amber-200 font-black text-xs">
-                    {fmtRating(totalR76)}
+                  {/* Condición Discontinuidades (RMR'89) Rel */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rel_r89" params={{ r1: r1_89, r2: r2_89 }} enabled={showFormulas}>
+                      <span>{fmtRating(relR89)}</span>
+                    </FormulaTooltipTrigger>
                   </td>
 
-                  <td className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-10 border-l border-navy-900 w-[70px] min-w-[70px] max-w-[70px]">
+                  {/* Condición Discontinuidades (RMR'89) Cont */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="cont_r89" params={{ value: j.continuidad, val: contR89 }} enabled={showFormulas}>
+                      <span>{fmtRating(contR89)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'89) Aber */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="aber_r89" params={{ value: j.abertura, val: abR89 }} enabled={showFormulas}>
+                      <span>{fmtRating(abR89)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'89) Rug */}
+                  <td className={`py-2 px-2 text-center text-pink-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rug_r89" params={{ value: j.rugosidad, val: rugR89 }} enabled={showFormulas}>
+                      <span>{fmtRating(rugR89)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'89) Val (Total) */}
+                  <td className={`py-2 px-2 text-center text-pink-200 font-black border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="total_cond_r89" params={{ alt: altR89, rel: relR89, cont: contR89, aber: abR89, rug: rugR89 }} enabled={showFormulas}>
+                      <span>{fmtRating(totalR89)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'76) Alt */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="alt_r76" params={{ code: j.alteracion, val: altR76 }} enabled={showFormulas}>
+                      <span>{fmtRating(altR76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'76) Rel */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rel_r76" params={{ r1: r1_76, r2: r2_76 }} enabled={showFormulas}>
+                      <span>{fmtRating(relR76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'76) Cont */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="cont_r76" params={{ value: j.continuidad, val: contR76 }} enabled={showFormulas}>
+                      <span>{fmtRating(contR76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'76) Aber */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="aber_r76" params={{ value: j.abertura, val: abR76 }} enabled={showFormulas}>
+                      <span>{fmtRating(abR76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'76) Rug */}
+                  <td className={`py-2 px-2 text-center text-amber-300 font-normal border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="rug_r76" params={{ value: j.rugosidad, val: rugR76 }} enabled={showFormulas}>
+                      <span>{fmtRating(rugR76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Condición Discontinuidades (RMR'76) Val (Total) */}
+                  <td className={`py-2 px-2 text-center text-amber-200 font-black border-r border-b border-navy-800 text-xs ${computedCellClass}`}>
+                    <FormulaTooltipTrigger formulaId="total_cond_r76" params={{ alt: altR76, rel: relR76, cont: contR76, aber: abR76, rug: rugR76 }} enabled={showFormulas}>
+                      <span>{fmtRating(totalR76)}</span>
+                    </FormulaTooltipTrigger>
+                  </td>
+
+                  {/* Acciones de Fila con Icono de Basura Rojo */}
+                  <td className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-10 border-l border-b border-navy-800 w-[70px] min-w-[70px] max-w-[70px]">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         clearRow(idx);
                       }}
-                      className="px-2 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors text-[10px] font-bold active:scale-95"
+                      className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:text-red-400 transition-colors flex items-center justify-center mx-auto active:scale-95"
                       title="Limpiar fila"
                     >
-                      Limpiar
+                      <Trash2 size={14} />
                     </button>
                   </td>
                 </tr>
@@ -780,7 +891,7 @@ export default function DisconTable({
             })}
             {joints.length === 0 && (
               <tr>
-                <td colSpan={35} className="py-8 text-center text-slate-500 text-xs bg-navy-950">
+                <td colSpan={35} className="py-8 text-center text-slate-500 text-xs bg-navy-950 border-b border-navy-800">
                   Ninguna estructura registrada en esta celda. Haz clic en "Crear Familia" para ingresar discontinuidades.
                 </td>
               </tr>
@@ -789,7 +900,7 @@ export default function DisconTable({
         </table>
       </div>
 
-      <div className="add-bar flex flex-wrap items-center gap-4 bg-navy-950/30 p-3.5 border-t border-navy-900 rounded-b-xl justify-between">
+      <div className="add-bar flex flex-wrap items-center gap-4 bg-navy-950/30 p-3.5 border-t border-navy-850 rounded-b-xl justify-between">
         <span className="text-xs text-slate-500 italic">
           * Nota: F1, F2 y F3 son obligatorias para calcular JV y promedios ponderados.
         </span>

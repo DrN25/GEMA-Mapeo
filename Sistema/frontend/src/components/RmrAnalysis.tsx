@@ -1,19 +1,46 @@
+import React, { useState } from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
-import { Compass, Table } from 'lucide-react';
+import { Compass } from 'lucide-react';
+import { FormulaTooltipTrigger } from './FormulaTooltip';
 
 interface RmrAnalysisProps {
   header: WindowHeader;
   onChange: (header: WindowHeader) => void;
   calculated: CalculatorResult | null;
   onClose?: () => void;
+  showFormulas?: boolean; // Nueva Propiedad
 }
+
+// Función helper para limitar la edición de enteros y decimales en inputs de texto
+const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length > 2) return cleaned.slice(0, -1);
+
+  let integerPart = parts[0];
+  let decimalPart = parts[1];
+
+  if (integerPart.length > intDigits) {
+    integerPart = integerPart.slice(0, intDigits);
+  }
+  if (decimalPart !== undefined && decimalPart.length > decDigits) {
+    decimalPart = decimalPart.slice(0, decDigits);
+  }
+
+  return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+};
 
 export default function RmrAnalysis({
   header,
   onChange,
   calculated,
-  onClose
+  onClose,
+  showFormulas = true
 }: RmrAnalysisProps) {
+
+  // Estado local para controlar la escritura en tiempo real de campos numéricos
+  const [localValues, setLocalValues] = useState<Record<string, string>>({});
+
   if (!calculated) {
     return (
       <div className="glass-panel p-8 rounded-xl border border-navy-800 text-center text-slate-500 space-y-2">
@@ -29,30 +56,76 @@ export default function RmrAnalysis({
     });
   };
 
-  const handleUcsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value) || 0;
-    let resistencia_ucs = 'R4';
-    if (val > 250) resistencia_ucs = 'R6';
-    else if (val > 100) resistencia_ucs = 'R5';
-    else if (val > 50) resistencia_ucs = 'R4';
-    else if (val > 25) resistencia_ucs = 'R3';
-    else if (val > 5) resistencia_ucs = 'R2';
-    else if (val > 1) resistencia_ucs = 'R1';
-    else resistencia_ucs = 'R0';
+  const handleNumericInputChange = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', val: string, intDigits: number, decDigits: number) => {
+    const restricted = handleNumberInputLimit(val, intDigits, decDigits);
+    setLocalValues(prev => ({ ...prev, [field]: restricted }));
 
-    onChange({
-      ...header,
-      ucs_mpa: val,
-      resistencia_ucs
-    });
+    const num = parseFloat(restricted);
+    if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
+      if (field === 'ucs_mpa') {
+        let resistencia_ucs = 'R4';
+        if (num > 250) resistencia_ucs = 'R6';
+        else if (num > 100) resistencia_ucs = 'R5';
+        else if (num > 50) resistencia_ucs = 'R4';
+        else if (num > 25) resistencia_ucs = 'R3';
+        else if (num > 5) resistencia_ucs = 'R2';
+        else if (num > 1) resistencia_ucs = 'R1';
+        else resistencia_ucs = 'R0';
+
+        onChange({
+          ...header,
+          ucs_mpa: num,
+          resistencia_ucs
+        });
+      } else {
+        onChange({
+          ...header,
+          [field]: num
+        });
+      }
+    } else if (restricted === '') {
+      onChange({
+        ...header,
+        [field]: 0
+      });
+    }
   };
 
-  const handleIs50Change = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value) || 0;
-    onChange({
-      ...header,
-      is50_mpa: val
+  const handleNumericInputBlur = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', val: string) => {
+    setLocalValues(prev => {
+      const copy = { ...prev };
+      delete copy[field];
+      return copy;
     });
+    const num = parseFloat(val);
+    if (isNaN(num)) {
+      onChange({ ...header, [field]: 0 });
+    } else {
+      if (field === 'ucs_mpa') {
+        let resistencia_ucs = 'R4';
+        if (num > 250) resistencia_ucs = 'R6';
+        else if (num > 100) resistencia_ucs = 'R5';
+        else if (num > 50) resistencia_ucs = 'R4';
+        else if (num > 25) resistencia_ucs = 'R3';
+        else if (num > 5) resistencia_ucs = 'R2';
+        else if (num > 1) resistencia_ucs = 'R1';
+        else resistencia_ucs = 'R0';
+
+        onChange({
+          ...header,
+          ucs_mpa: num,
+          resistencia_ucs
+        });
+      } else {
+        onChange({ ...header, [field]: num });
+      }
+    }
+  };
+
+  const getInputValue = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', stateVal: any): string => {
+    if (localValues[field] !== undefined) return localValues[field];
+    if (stateVal === undefined || stateVal === null) return '';
+    return String(stateVal);
   };
 
   const handleFieldChange = (field: keyof WindowHeader, val: any) => {
@@ -72,9 +145,9 @@ export default function RmrAnalysis({
 
   const resistLetter = ucs > 250 ? 'A' : ucs > 100 ? 'B' : ucs > 50 ? 'C' : 'D';
 
-  const p1 = calculated.familias_spacing[1] ? calculated.familias_spacing[1].toFixed(3) : '0.000';
-  const p2 = calculated.familias_spacing[2] ? calculated.familias_spacing[2].toFixed(3) : '0.000';
-  const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(3) : '0.000';
+  const p1 = calculated.familias_spacing[1] ? calculated.familias_spacing[1].toFixed(2) : '0.00';
+  const p2 = calculated.familias_spacing[2] ? calculated.familias_spacing[2].toFixed(2) : '0.00';
+  const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(2) : '0.00';
 
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 space-y-6 text-left select-none animate-fade-in">
@@ -105,8 +178,8 @@ export default function RmrAnalysis({
         )}
       </div>
 
-      {/* 2. Parameters Grid Inputs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 bg-navy-950/45 p-4 rounded-xl border border-navy-900">
+      {/* 2. Parameters Grid Inputs (Ajustado a 7 columnas estables con inputs controlados de 2 decimales) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 bg-navy-950/45 p-4 rounded-xl border border-navy-900">
         <div className="col-span-2 space-y-1">
           <label className="block text-slate-400 font-bold uppercase tracking-wider text-xs">
             Condición de Agua
@@ -129,10 +202,11 @@ export default function RmrAnalysis({
             UCS (MPa)
           </label>
           <input
-            type="number"
-            value={ucs}
-            onChange={handleUcsChange}
-            min={0}
+            type="text"
+            inputMode="decimal"
+            value={getInputValue('ucs_mpa', ucs)}
+            onChange={(e) => handleNumericInputChange('ucs_mpa', e.target.value, 4, 2)}
+            onBlur={(e) => handleNumericInputBlur('ucs_mpa', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-center font-normal"
           />
         </div>
@@ -142,11 +216,11 @@ export default function RmrAnalysis({
             is50 (MPa)
           </label>
           <input
-            type="number"
-            value={is50}
-            onChange={handleIs50Change}
-            step="0.1"
-            min={0}
+            type="text"
+            inputMode="decimal"
+            value={getInputValue('is50_mpa', is50)}
+            onChange={(e) => handleNumericInputChange('is50_mpa', e.target.value, 4, 2)}
+            onBlur={(e) => handleNumericInputBlur('is50_mpa', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-center font-normal"
           />
         </div>
@@ -180,151 +254,231 @@ export default function RmrAnalysis({
             GSI Vis.
           </label>
           <input
-            type="number"
-            value={gsiVisual}
-            onChange={(e) => handleFieldChange('gsi_visual', parseInt(e.target.value) || 0)}
-            min={0}
+            type="text"
+            inputMode="numeric"
+            value={getInputValue('gsi_visual', gsiVisual)}
+            onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 2)}
+            onBlur={(e) => handleNumericInputBlur('gsi_visual', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-indigo-400 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-center font-semibold"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="block text-slate-400 font-bold uppercase tracking-wider text-xs">
-            Ctrl. Est.
-          </label>
-          <input
-            type="number"
-            value={ctrl}
-            onChange={(e) => handleFieldChange('control_estructural', parseInt(e.target.value) || 0)}
-            min={0}
-            className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-indigo-400 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-center font-semibold"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="block text-slate-400 font-bold uppercase tracking-wider text-xs">
-            Ef. Vol.
-          </label>
-          <input
-            type="number"
-            value={vol}
-            onChange={(e) => handleFieldChange('efectos_voladura', parseInt(e.target.value) || 0)}
-            min={0}
-            className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-center font-normal"
           />
         </div>
       </div>
 
-      {/* 3. Badges Metrics - Rediseñadas con la misma forma geométrica y consistencia de los KPIs superiores */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* RQD Estimado */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-sky-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-24 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all pointer-events-none" />
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-400">RQD Estimado</span>
-            <span className="text-2xl font-extrabold font-mono tracking-tight text-sky-200 mt-1.5">
-              {calculated.rqd_est.toFixed(1)}%
-            </span>
-          </div>
+      {/* 3. Badges Metrics - Híbrido Premium con la adición de GSI Visual */}
+      <div className="flex flex-wrap justify-center items-center gap-4 my-6 select-none animate-fade-in">
+        {/* RQD% Pill - Azul cielo */}
+        <div className="bg-gradient-to-r from-sky-600 to-sky-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-3 shadow-[0_4px_15px_rgba(14,165,233,0.15)] border border-sky-400/30 hover:brightness-105 transition-all duration-300 cursor-default">
+          <span className="text-[10px] font-black uppercase tracking-wider text-sky-100/90">RQD%</span>
+          <span className="text-xl font-black font-sans leading-none">{calculated.rqd_est.toFixed(2)}%</span>
         </div>
 
-        {/* RMR '76 */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-pink-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-24 bg-pink-500/5 rounded-full blur-2xl group-hover:bg-pink-500/10 transition-all pointer-events-none" />
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-bold uppercase tracking-wider text-pink-400">RMR '76 (Bieniawski)</span>
-            <span className="text-2xl font-extrabold font-mono tracking-tight text-pink-200 mt-1.5">
-              {calculated.rmr_76}
-            </span>
-          </div>
+        {/* GSI Visual Pill - Gris / Slate discreto */}
+        <div className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-3 shadow-[0_4px_15px_rgba(71,85,105,0.15)] border border-slate-500/30 hover:brightness-105 transition-all duration-300 cursor-default">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-200/90">GSI VISUAL</span>
+          <span className="text-xl font-black font-sans leading-none">{gsiVisual}</span>
         </div>
 
-        {/* RMR '89 */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-gradient-to-br from-navy-950/30 to-amber-950/10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-400">RMR '89 (Bieniawski)</span>
-            <span className="text-2xl font-extrabold font-mono tracking-tight text-amber-200 mt-1.5">
-              {calculated.rmr_89}
-            </span>
-          </div>
+        {/* RMR'76 Pill - Amarillo/Ámbar */}
+        <div className="bg-gradient-to-r from-amber-600 to-amber-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-3 shadow-[0_4px_15px_rgba(245,158,11,0.15)] border border-amber-400/30 hover:brightness-105 transition-all duration-300 cursor-default">
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-100/90">RMR'76</span>
+          <span className="text-xl font-black font-sans leading-none">{calculated.rmr_76.toFixed(2)}</span>
+        </div>
+
+        {/* RMR'89 Pill - Rosa/Magenta */}
+        <div className="bg-gradient-to-r from-pink-700 to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-3 shadow-[0_4px_15px_rgba(219,39,119,0.15)] border border-pink-500/30 hover:brightness-105 transition-all duration-300 cursor-default">
+          <span className="text-[10px] font-black uppercase tracking-wider text-pink-100/90">RMR'89</span>
+          <span className="text-xl font-black font-sans leading-none">{calculated.rmr_89.toFixed(2)}</span>
         </div>
       </div>
 
-      {/* 4. Table Rating 76 vs 89 - Consistencia idéntica de bordes y spacing de DisconTable */}
-      <div className="overflow-x-auto rounded-lg border border-navy-900 bg-navy-950/20">
+      {/* 4. Table Rating 76 vs 89 - Consistencia idéntica de celdas, bordes e highlights cromáticos específicos */}
+      <div className="overflow-x-auto rounded-lg border border-navy-700 bg-navy-950/20">
         <table className="w-full text-left text-xs border-collapse border-separate border-spacing-0" style={{ minWidth: '1200px' }}>
           <thead>
-            <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-900">
-              <th className="py-3 px-3 text-center sticky left-0 bg-navy-950 z-10 w-20 border-r border-navy-900">RATING</th>
-              <th className="py-3 px-2 text-center text-yellow-400 bg-yellow-500/5">Cond. Agua</th>
-              <th className="py-3 px-2 text-center text-yellow-400 bg-yellow-500/5">Valor Agua</th>
-              <th className="py-3 px-2 text-center text-yellow-400 bg-yellow-500/5">Resistencia</th>
-              <th className="py-3 px-2 text-center text-yellow-400 bg-yellow-500/5">Val Resist.</th>
-              <th className="py-3 px-2 text-center text-indigo-400 bg-indigo-500/5">Cond. SUP</th>
-              <th className="py-3 px-2 text-center text-indigo-400 bg-indigo-500/5">Estruc. GSI</th>
-              <th className="py-3 px-2 text-center text-indigo-400 bg-indigo-500/5">GSI Visual</th>
-              <th className="py-3 px-2 text-center text-slate-300 bg-navy-900/40">Ctrl. Estruc.</th>
-              <th className="py-3 px-2 text-center text-slate-300 bg-navy-900/40">Ef. Voladura</th>
-              <th className="py-3 px-2 text-center text-amber-400 bg-amber-500/5">RQD Valor</th>
-              <th className="py-3 px-2 text-center text-amber-400 bg-amber-500/5">RQD (%)</th>
-              <th className="py-3 px-2 text-center text-sky-400 bg-sky-500/5">Frec. Frac.</th>
-              <th className="py-3 px-2 text-center text-sky-400 bg-sky-500/5">Tam. Bloque</th>
-              <th className="py-3 px-2 text-center text-sky-400 bg-sky-500/5">Espac. Prom</th>
-              <th className="py-3 px-2 text-center text-amber-400 bg-amber-500/5">Espac. Val</th>
-              <th className="py-3 px-2 text-center text-amber-400 bg-amber-500/5">Val ConDisc</th>
-              <th className="py-3 px-3 text-center text-slate-200 bg-navy-900/60 font-black">RMR FINAL</th>
-              <th className="py-3 px-2 text-center text-slate-400">UCS (MPa)</th>
-              <th className="py-3 px-2 text-center text-slate-400">is50 (MPa)</th>
+            <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-navy-800">
+              <th className="py-3 px-3 text-center sticky left-0 bg-navy-950 z-10 w-20 border-r border-b border-navy-800">RATING</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Cond. Agua</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Valor Agua</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Resistencia</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Val Resist.</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Cond. SUP</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Estruc. GSI</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">GSI Visual</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Ctrl. Estruc.</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Ef. Voladura</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">RQD Valor</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">RQD (%)</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Frec. Frac.</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Tam. Bloque</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Espac. Prom</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Espac. Val</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">Val ConDisc</th>
+              <th className="py-3 px-3 text-center border-r border-b border-navy-800 bg-navy-900/40 text-slate-200 font-black">RMR FINAL</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800 bg-navy-900/20 text-slate-300">UCS (MPa)</th>
+              <th className="py-3 px-2 text-center border-b border-navy-800 bg-navy-900/20 text-slate-300">is50 (MPa)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-navy-900/40 text-slate-300 text-xs font-semibold">
-            {/* Row RMR'76 */}
-            <tr className="hover:bg-navy-900/20 border-b border-navy-900/60 transition-colors bg-pink-500/[0.02]">
-              <td className="py-2.5 px-3 text-center font-black text-pink-400 bg-pink-500/10 sticky left-0 z-10 w-20 border-r border-navy-900">{76}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] text-yellow-300/80">{header.condicion_agua}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] font-bold">{calculated.water_rating_76}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] text-yellow-300/80">{resistLetter}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] font-bold">{calculated.ucs_rating_76}</td>
-              <td className="py-2.5 px-2 text-center bg-indigo-500/[0.01] text-indigo-300">{gsiCond}</td>
-              <td className="py-2.5 px-2 text-center bg-indigo-500/[0.01] text-indigo-300">{gsiEstruc}</td>
-              <td className="py-2.5 px-2 text-center bg-indigo-500/[0.01] text-indigo-300">{gsiVisual}</td>
-              <td className="py-2.5 px-2 text-center bg-navy-900/10 text-slate-300">{ctrl}</td>
-              <td className="py-2.5 px-2 text-center bg-navy-900/10 text-slate-300">{vol}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] text-amber-300">{calculated.rqd_rating_76}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] font-mono text-slate-400">{calculated.rqd_est.toFixed(0)}%</td>
-              <td className="py-2.5 px-2 text-center bg-sky-500/[0.01] font-mono text-slate-400">{calculated.jv > 0 ? calculated.jv.toFixed(2) : '—'}</td>
-              <td className="py-2.5 px-2 text-center bg-sky-500/[0.01] font-mono text-slate-400">{calculated.global_spacing > 0 ? Math.pow(calculated.global_spacing, 3).toFixed(2) : '—'}</td>
-              <td className="py-2.5 px-2 text-center bg-sky-500/[0.01] font-mono text-sky-400">{calculated.global_spacing.toFixed(2)}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] text-amber-300">{calculated.spacing_rating_76}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] text-amber-300">{calculated.condicion_rating_76}</td>
-              <td className="py-2.5 px-3 text-center font-black text-pink-400 bg-pink-500/15 text-sm">{calculated.rmr_76}</td>
-              <td className="py-2.5 px-2 text-center text-slate-400">{ucs}</td>
-              <td className="py-2.5 px-2 text-center text-slate-400">{is50}</td>
+            {/* Fila RMR'76 - Resaltado sutil en color Amarillo/Ámbar */}
+            <tr className="hover:bg-navy-900/20 border-b border-navy-800 transition-colors bg-amber-500/[0.02]">
+              <td className="py-2.5 px-3 text-center font-black text-amber-400 bg-amber-500/10 sticky left-0 z-10 w-20 border-r border-b border-navy-800">{(76).toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{header.condicion_agua}</td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-amber-300 bg-amber-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="val_agua_r76" params={{ code: header.condicion_agua, val: calculated.water_rating_76 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.water_rating_76.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: resistLetter }} position="bottom" enabled={showFormulas}>
+                  <span>{resistLetter}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-amber-300 bg-amber-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="val_resist_r76" params={{ ucs, code: header.resistencia_ucs, val: calculated.ucs_rating_76 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.ucs_rating_76.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{gsiCond}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{gsiEstruc}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{gsiVisual.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{ctrl.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{vol.toFixed(2)}</td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-amber-300 bg-amber-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="rqd_rating_r76" params={{ rqd: calculated.rqd_est, val: calculated.rqd_rating_76 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.rqd_rating_76.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-slate-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="rqd_est" params={{ jv: calculated.jv, val: calculated.rqd_est }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.rqd_est.toFixed(2)}%</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-slate-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="jv" params={{ val: calculated.jv }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(2) : '0.00'}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-slate-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="block_size" params={{ global_spacing: calculated.global_spacing, val: Math.pow(calculated.global_spacing, 3) }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.global_spacing > 0 ? Math.pow(calculated.global_spacing, 3).toFixed(2) : '0.00'}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-sky-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="global_spacing" params={{ val: calculated.global_spacing }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.global_spacing.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-amber-300 bg-amber-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="spacing_rating_r76" params={{ spacing: calculated.global_spacing, val: calculated.spacing_rating_76 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.spacing_rating_76.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-amber-300 bg-amber-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="condicion_rating_r76" params={{ val: calculated.condicion_rating_76 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.condicion_rating_76.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-3 text-center border-r border-b border-navy-800 font-black text-amber-400 bg-amber-500/15 text-sm outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="rmr_76" params={{ ucs: calculated.ucs_rating_76, rqd: calculated.rqd_rating_76, spacing: calculated.spacing_rating_76, cond: calculated.condicion_rating_76, water: calculated.water_rating_76 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.rmr_76.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-400">{ucs.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-b border-navy-800 bg-navy-900/10 text-slate-400">{is50.toFixed(2)}</td>
             </tr>
 
-            {/* Row RMR'89 */}
-            <tr className="hover:bg-navy-900/20 border-b border-navy-900/60 transition-colors bg-amber-500/[0.02]">
-              <td className="py-2.5 px-3 text-center font-black text-amber-400 bg-amber-500/10 sticky left-0 z-10 w-20 border-r border-navy-900">{89}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] text-yellow-300/80">{header.condicion_agua}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] font-bold">{calculated.water_rating_89}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] text-yellow-300/80">{resistLetter}</td>
-              <td className="py-2.5 px-2 text-center bg-yellow-500/[0.01] font-bold">{calculated.ucs_rating_89}</td>
-              <td className="py-2.5 px-2 text-center bg-indigo-500/[0.01] text-indigo-300">{gsiCond}</td>
-              <td className="py-2.5 px-2 text-center bg-indigo-500/[0.01] text-indigo-300">{gsiEstruc}</td>
-              <td className="py-2.5 px-2 text-center bg-indigo-500/[0.01] text-indigo-300">{gsiVisual}</td>
-              <td className="py-2.5 px-2 text-center bg-navy-900/10 text-slate-300">{ctrl}</td>
-              <td className="py-2.5 px-2 text-center bg-navy-900/10 text-slate-300">{vol}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] text-amber-300">{calculated.rqd_rating_89}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] font-mono text-slate-400">{calculated.rqd_est.toFixed(0)}%</td>
-              <td className="py-2.5 px-2 text-center bg-sky-500/[0.01] font-mono text-slate-400">{calculated.jv > 0 ? calculated.jv.toFixed(2) : '—'}</td>
-              <td className="py-2.5 px-2 text-center bg-sky-500/[0.01] font-mono text-slate-400">{calculated.global_spacing > 0 ? Math.pow(calculated.global_spacing, 3).toFixed(2) : '—'}</td>
-              <td className="py-2.5 px-2 text-center bg-sky-500/[0.01] font-mono text-sky-400">{calculated.global_spacing.toFixed(2)}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] text-amber-300">{calculated.spacing_rating_89}</td>
-              <td className="py-2.5 px-2 text-center bg-amber-500/[0.01] text-amber-300">{calculated.condicion_rating_89}</td>
-              <td className="py-2.5 px-3 text-center font-black text-amber-400 bg-amber-500/15 text-sm">{calculated.rmr_89}</td>
-              <td className="py-2.5 px-2 text-center text-slate-400">{ucs}</td>
-              <td className="py-2.5 px-2 text-center text-slate-400">{is50}</td>
+            {/* Fila RMR'89 - Resaltado sutil en color Rosa/Magenta */}
+            <tr className="hover:bg-navy-900/20 border-b border-navy-800 transition-colors bg-pink-500/[0.02]">
+              <td className="py-2.5 px-3 text-center font-black text-pink-400 bg-pink-500/10 sticky left-0 z-10 w-20 border-r border-b border-navy-800">{(89).toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{header.condicion_agua}</td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-pink-300 bg-pink-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="val_agua_r89" params={{ code: header.condicion_agua, val: calculated.water_rating_89 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.water_rating_89.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: resistLetter }} position="bottom" enabled={showFormulas}>
+                  <span>{resistLetter}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-pink-300 bg-pink-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="val_resist_r89" params={{ ucs, code: header.resistencia_ucs, val: calculated.ucs_rating_89 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.ucs_rating_89.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{gsiCond}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{gsiEstruc}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{gsiVisual.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{ctrl.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-300">{vol.toFixed(2)}</td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-pink-300 bg-pink-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="rqd_rating_r89" params={{ rqd: calculated.rqd_est, val: calculated.rqd_rating_89 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.rqd_rating_89.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-slate-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="rqd_est" params={{ jv: calculated.jv, val: calculated.rqd_est }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.rqd_est.toFixed(2)}%</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-slate-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="jv" params={{ val: calculated.jv }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(2) : '0.00'}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-slate-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="block_size" params={{ global_spacing: calculated.global_spacing, val: Math.pow(calculated.global_spacing, 3) }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.global_spacing > 0 ? Math.pow(calculated.global_spacing, 3).toFixed(2) : '0.00'}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 font-mono text-sky-400 outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="global_spacing" params={{ val: calculated.global_spacing }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.global_spacing.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-pink-300 bg-pink-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="spacing_rating_r89" params={{ spacing: calculated.global_spacing, val: calculated.spacing_rating_89 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.spacing_rating_89.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 font-bold text-pink-300 bg-pink-500/[0.04] outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="condicion_rating_r89" params={{ val: calculated.condicion_rating_89 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.condicion_rating_89.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-3 text-center border-r border-b border-navy-800 font-black text-pink-400 bg-pink-500/15 text-sm outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35">
+                <FormulaTooltipTrigger formulaId="rmr_89" params={{ ucs: calculated.ucs_rating_89, rqd: calculated.rqd_rating_89, spacing: calculated.spacing_rating_89, cond: calculated.condicion_rating_89, water: calculated.water_rating_89 }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.rmr_89.toFixed(2)}</span>
+                </FormulaTooltipTrigger>
+              </td>
+
+              <td className="py-2.5 px-2 text-center border-r border-b border-navy-800 bg-navy-900/10 text-slate-400">{ucs.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center border-b border-navy-800 bg-navy-900/10 text-slate-400">{is50.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
@@ -332,7 +486,7 @@ export default function RmrAnalysis({
 
       {/* 5. Formula Breakdown Strip */}
       <div className="p-3 bg-navy-950/60 rounded-lg border border-navy-900 font-mono text-xs text-slate-400 text-left border-l-4 border-indigo-500">
-        <strong>Jv</strong> = (1/{p1}) + (1/{p2}) + (1/{p3}) = <strong>{calculated.jv.toFixed(3)}</strong> &nbsp;|&nbsp; <strong>RQD%</strong> = 115 − 3.3 × {calculated.jv.toFixed(2)} = <strong>{calculated.rqd_est.toFixed(1)}%</strong>
+        <strong>Jv</strong> = (1/{p1}) + (1/{p2}) + (1/{p3}) = <strong>{calculated.jv.toFixed(2)}</strong> &nbsp;|&nbsp; <strong>RQD%</strong> = 115 − 3.3 × {calculated.jv.toFixed(2)} = <strong>{calculated.rqd_est.toFixed(2)}%</strong>
       </div>
     </div>
   );

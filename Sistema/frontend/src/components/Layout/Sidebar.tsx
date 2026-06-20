@@ -25,11 +25,11 @@ export default function Sidebar({
   const menuItems = [
     { id: 'dashboard', label: 'Home / Dashboard', icon: Home, category: 'GENERAL' },
     { id: 'mapeo', label: 'Mapeo por Ventana', icon: Map, category: 'REGISTRO DE CAMPO' },
-    { id: 'plt_ensayos', label: 'Ensayos PLT Irregulares', icon: TrendingUp, category: 'ENSAYOS' },
-    { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' }
+    { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' },
+    { id: 'plt_ensayos', label: 'Ensayos PLT Irregulares', icon: TrendingUp, category: 'ENSAYOS' }
   ];
 
-  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'ENSAYOS', 'VISUALIZACIÓN'];
+  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'VISUALIZACIÓN', 'ENSAYOS'];
 
   return (
     <aside className="w-64 glass-panel chrome-dark border-r border-navy-800 flex flex-col h-screen text-slate-300 select-none">
@@ -70,12 +70,12 @@ export default function Sidebar({
                     key={item.id}
                     onClick={() => onViewChange(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-all group relative ${isActive
-                        ? 'bg-indigo-600/10 text-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-300 font-bold border-l-2 border-indigo-600 dark:border-indigo-400 shadow-sm'
-                        : 'hover:bg-navy-900/40 hover:text-slate-100 text-slate-400'
+                      ? 'bg-indigo-600/10 text-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-300 font-bold border-l-2 border-indigo-600 dark:border-indigo-400 shadow-sm'
+                      : 'hover:bg-navy-900/40 hover:text-slate-100 text-slate-400'
                       }`}
                   >
                     <div className="flex items-center gap-3 text-left min-w-0">
-                       <Icon
+                      <Icon
                         size={18}
                         className={`${isActive ? 'text-indigo-400 dark:text-indigo-300' : 'text-slate-500 group-hover:text-indigo-400 dark:group-hover:text-indigo-300'
                           } transition-colors shrink-0`}

@@ -22,7 +22,7 @@ interface MappingField {
   synonyms: string[];
 }
 
-// Campos esperados con sinónimos enriquecidos
+// Campos esperados con sinónimos enriquecidos para la importación
 const EXPECTED_FIELDS: MappingField[] = [
   { key: 'celda', label: 'Código Celda', required: true, synonyms: ['celda', 'codigocelda', 'codigo', 'window', 'windowid', 'station', 'estacion', 'estaciones'] },
   { key: 'este_from', label: 'Este FROM (X)', required: true, synonyms: ['estefrom', 'este_from', 'east_from', 'eastfrom', 'x_from', 'xfrom', 'esteini'] },
@@ -34,7 +34,7 @@ const EXPECTED_FIELDS: MappingField[] = [
   { key: 'altura', label: 'Altura (m)', required: true, synonyms: ['altura', 'alturam', 'height', 'heightm', 'alturaventanam'] },
   { key: 'dip_talud', label: 'Dip Talud (°)', required: true, synonyms: ['diptalud', 'dip_talud', 'taluddip', 'slope_dip', 'diptaluddeg'] },
 
-  { key: 'dipdir_talud', label: 'DipDir Talud (°)', required: false, synonyms: ['dipdir_talud', 'dip_dir_talud', 'dipdir_talud_deg', 'dipdir_talud_deg'] },
+  { key: 'dipdir_talud', label: 'DipDir Talud (°)', required: false, synonyms: ['dipdir_talud', 'dip_dir_talud', 'dipdir_talud_deg'] },
   { key: 'dip_hw', label: 'Dip Hw (Dip Hole) (°)', required: false, synonyms: ['dip_hw', 'dip_hole', 'dip_hole_deg', 'dip_hw_deg'] },
   { key: 'az_hw', label: 'Az Hw (Az Hole) (°)', required: false, synonyms: ['az_hw', 'az_hole', 'az_hole_deg', 'az_hw_deg', 'azimuth_hole'] },
   { key: 'alt_zona', label: 'Alt. de Zona', required: false, synonyms: ['alt_zona', 'alteracion_zona', 'alteracion_codigo', 'alt_zona_code', 'alteracionce'] },
@@ -46,6 +46,15 @@ const EXPECTED_FIELDS: MappingField[] = [
   { key: 'fecha', label: 'Fecha Mapeo', required: false, synonyms: ['fecha', 'fechamapeo', 'fecha_mapeo', 'date', 'fechabg'] },
   { key: 'condicion_agua', label: 'Agua Subterránea', required: false, synonyms: ['condicionagua', 'condicion_agua', 'aguasubterranea', 'agua', 'water', 'aguacode', 'aguadeobs'] },
   { key: 'resistencia_ucs', label: 'Resistencia UCS', required: false, synonyms: ['resistenciaucs', 'resistencia_ucs', 'ucs', 'dureza', 'strength', 'rescode'] },
+
+  // Campos adicionales de validación RMR para tabla plana
+  { key: 'ucs_mpa', label: 'UCS intacto (MPa)', required: false, synonyms: ['ucs_mpa', 'ucsval', 'ucsvalue', 'ucs_val', 'ucs_value', 'ucsrating'] },
+  { key: 'is50_mpa', label: 'is50 intacto (MPa)', required: false, synonyms: ['is50_mpa', 'is50val', 'is50value', 'is50_val', 'is50_value', 'is50'] },
+  { key: 'gsi_visual', label: 'GSI Visual', required: false, synonyms: ['gsi_visual', 'gsivisual', 'gsi', 'gsival', 'gsivalue'] },
+  { key: 'gsi_superficie', label: 'GSI Superficie', required: false, synonyms: ['gsi_superficie', 'gsi_sup', 'gsisurf'] },
+  { key: 'gsi_estructura', label: 'GSI Estructura', required: false, synonyms: ['gsi_estructura', 'gsi_est', 'gsistruc'] },
+  { key: 'control_estructural', label: 'Control Estructural', required: false, synonyms: ['control_estructural', 'control', 'ctrl_est'] },
+  { key: 'efectos_voladura', label: 'Efectos Voladura', required: false, synonyms: ['efectos_voladura', 'voladura', 'blast_effect'] },
 
   // Joint / Discontinuity properties
   { key: 'familia', label: 'Familia', required: true, synonyms: ['familia', 'fam', 'family', 'set'] },
@@ -175,25 +184,24 @@ export default function ExcelImportModal({
     }
   };
 
-  const detectLithology = (rawLito3Code: string) => {
-    const code = String(rawLito3Code || '').trim().toUpperCase();
+  const detectLithology = (rawLito3Code: string, fallbackCode = "") => {
+    const code = String(rawLito3Code || fallbackCode || '').trim().toUpperCase();
 
-    // lito_3 (codigo) es el campo que define unívocamente la fila geomecánica
     const match = LITHOLOGY_CLASSIFICATION.find(item => item.codigo.toUpperCase() === code);
 
     if (match) {
       return {
-        lito_1: match.unidad,             // Litología 1 (unidad)
-        lito_2: match.litologia,          // Litología 2 (litologia)
-        lito_3: match.codigo,             // Litología 3 (codigo)
-        unidad_litologica: match.grupo    // Unidad Litológica (grupo)
+        lito_1: match.unidad,
+        lito_2: match.litologia,
+        lito_3: match.codigo,
+        unidad_litologica: match.grupo
       };
     }
 
     return {
-      lito_1: rawLito3Code || '',
+      lito_1: rawLito3Code || fallbackCode || '',
       lito_2: '',
-      lito_3: rawLito3Code || '',
+      lito_3: rawLito3Code || fallbackCode || '',
       unidad_litologica: 'INTRUSIVOS'
     };
   };
@@ -214,13 +222,12 @@ export default function ExcelImportModal({
     return str.substring(0, 10);
   };
 
-  // Función helper matemática central de redondeo estricto
   const roundDec = (val: number, decs: number): number => {
     const factor = Math.pow(10, decs);
     return Math.round(val * factor) / factor;
   };
 
-  // 1. Parser para pestañas apiladas verticalmente cada 30 filas ("ventana")
+  // 1. Parser para pestañas apiladas verticalmente ("ventana")
   const parseStackedTemplate = (grid: any[][]) => {
     const cellsFound: Record<string, WindowData> = {};
 
@@ -244,7 +251,6 @@ export default function ExcelImportModal({
       if (!celdaVal || !String(celdaVal).trim()) continue;
       const codigo = String(celdaVal).trim().toUpperCase();
 
-      // Saneamiento y redondeo estricto de coordenadas en la importación (X: 2 dec, Y: 2 dec, Z: 2 dec, Nivel: 2 dec)
       const este_from = roundDec(getNum(start + 2, 1), 2);
       const norte_from = roundDec(getNum(start + 2, 3), 2);
       const cota_from = roundDec(getNum(start + 2, 5), 2);
@@ -274,11 +280,13 @@ export default function ExcelImportModal({
       const resistencia_ucs = getStr(start + 8, 37) || 'R4';
       const gsi_superficie = getStr(start + 8, 39) || 'G';
       const gsi_estructura = getStr(start + 8, 40) || 'VB';
-      const gsi_visual = Math.round(getNum(start + 8, 41)) || 56;
+
+      // Aplicación de redondeo estricto a las celdas de validación RMR
+      const gsi_visual = roundDec(getNum(start + 8, 41) || 56, 2);
       const control_estructural = Math.round(getNum(start + 8, 42)) || 3;
       const efectos_voladura = Math.round(getNum(start + 8, 43)) || 3;
-      const ucs_mpa = getNum(start + 8, 52) || 73;
-      const is50_mpa = getNum(start + 8, 53) || 5;
+      const ucs_mpa = roundDec(getNum(start + 8, 52) || 73, 2);
+      const is50_mpa = roundDec(getNum(start + 8, 53) || 5, 2);
 
       const litoDetails = detectLithology(lito_model, lito_3);
 
@@ -291,34 +299,20 @@ export default function ExcelImportModal({
         const fam = parseInt(famVal);
         if (isNaN(fam)) continue;
 
-        // Saneamiento de discontinuidades según reglas
         const dip = Math.min(90, Math.max(0, roundDec(getNum(r, 3), 2)));
         const dip_dir = Math.min(359, Math.max(0, roundDec(getNum(r, 4), 2)));
 
-        // Cant (n): Solo enteros positivos o -1
         const raw_nstr = Math.round(getNum(r, 5));
         const n_estructuras = raw_nstr > 0 ? raw_nstr : -1;
-
-        // Dist (m): Solo entero positivo desde 0 en adelante
         const distancia = Math.max(0, Math.round(getNum(r, 1)));
-
-        // Abert (mm): Max 1 decimal
         const abertura = roundDec(getNum(r, 6), 1);
-
-        // Espes (mm): Max 1 decimal
         const espesor = roundDec(getNum(r, 7), 1);
-
-        // Espac (m): Max 2 decimales
         const espaciamiento = roundDec(getNum(r, 9), 2);
 
         const jrc = sanitizeRange(getNum(r, 18), 0, 20);
-
-        // Rugosidad: convertida a rango 0 a 9 (como JRC)
         const rugosidad = sanitizeRange(getNum(r, 19), 0, 9);
-
-        // Ext Vis y Term limitados por las nuevas reglas
-        const extremos_visibles = sanitizeRange(getNum(r, 10), 0, 2); // 0-2 (removido 3)
-        const terminacion = sanitizeRange(getNum(r, 11), 0, 3); // 0-3 (removido 4 y 5)
+        const extremos_visibles = sanitizeRange(getNum(r, 10), 0, 2);
+        const terminacion = sanitizeRange(getNum(r, 11), 0, 3);
 
         joints.push({
           id: jId++,
@@ -509,7 +503,16 @@ export default function ExcelImportModal({
             condicion_agua: getStr(row, 'condicion_agua', 'C'),
             resistencia_ucs: getStr(row, 'resistencia_ucs', 'R4'),
             alt_zona: getStr(row, 'alt_zona', ''),
-            intemperia: getStr(row, 'intemperia', '')
+            intemperia: getStr(row, 'intemperia', ''),
+
+            // Campos RMR numéricos adicionados con redondeo estricto a 2 decimales
+            ucs_mpa: roundDec(getNum(row, 'ucs_mpa', 73.00), 2),
+            is50_mpa: roundDec(getNum(row, 'is50_mpa', 5.00), 2),
+            gsi_visual: roundDec(getNum(row, 'gsi_visual', 56.00), 2),
+            gsi_superficie: getStr(row, 'gsi_superficie', 'G'),
+            gsi_estructura: getStr(row, 'gsi_estructura', 'VB'),
+            control_estructural: Math.round(getNum(row, 'control_estructural', 3)),
+            efectos_voladura: Math.round(getNum(row, 'efectos_voladura', 3))
           },
           joints: []
         };
@@ -522,28 +525,17 @@ export default function ExcelImportModal({
           const dip = Math.min(90, Math.max(0, roundDec(getNum(row, 'dip', 45), 2)));
           const dip_dir = Math.min(359, Math.max(0, roundDec(getNum(row, 'dip_dir', 180), 2)));
 
-          // Cant (n) - Solo enteros positivos o -1
           const raw_nstr = Math.round(getNum(row, 'n_estructuras', 1));
           const n_estructuras = raw_nstr > 0 ? raw_nstr : -1;
-
-          // Dist (m) - Solo enteros desde 0 en adelante
           const distancia = Math.max(0, Math.round(getNum(row, 'distancia', 0)));
-
-          // Abert (mm) y Espes (mm) - Max 1 decimal
           const abertura = roundDec(getNum(row, 'abertura', 0.1), 1);
           const espesor = roundDec(getNum(row, 'espesor', 0), 1);
-
-          // Espac (m) - Max 2 decimales
           const espaciamiento = roundDec(getNum(row, 'espaciamiento', 0.5), 2);
 
           const jrc = sanitizeRange(getNum(row, 'jrc'), 0, 20);
-
-          // Rugosidad - Rango 0-9
           const rugosidad = sanitizeRange(getNum(row, 'rugosidad'), 0, 9);
-
-          // Ext Vis y Term limitados por las nuevas reglas
-          const extremos_visibles = sanitizeRange(getNum(row, 'extremos_visibles'), 0, 2); // 0-2 (removido 3)
-          const terminacion = sanitizeRange(getNum(row, 'terminacion'), 0, 3); // 0-3 (removido 4 y 5)
+          const extremos_visibles = sanitizeRange(getNum(row, 'extremos_visibles'), 0, 2);
+          const terminacion = sanitizeRange(getNum(row, 'terminacion'), 0, 3);
 
           celdasData[celdaCode].joints.push({
             id: celdasData[celdaCode].joints.length + 1,
@@ -682,70 +674,39 @@ export default function ExcelImportModal({
                 </div>
               </div>
 
-              <div className="flex gap-3.5 p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 text-xs text-slate-300 leading-relaxed shadow-sm">
-                <Info className="text-orange-400 shrink-0 mt-0.5" size={16} />
-                <div>
-                  <span className="font-bold text-slate-200 block mb-0.5">Tipos de Planilla Soportados:</span>
-                  <ul className="list-disc pl-4 space-y-1 mt-1">
-                    <li><strong>Pestaña "ventana":</strong> Tarjetas de celdas apiladas verticalmente cada 30 filas (formato original).</li>
-                    <li><strong>Pestaña "BD":</strong> Formato desnormalizado plano con todas las discontinuidades y columnas geomecánicas. El sistema permite mapear las columnas manualmente si las cabeceras varían.</li>
-                  </ul>
-                </div>
+              <div className="flex gap-3.5 p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 text-orange-400 text-xs font-semibold">
+                * Nota: Formatos admitidos: Pestañas de scanline de detalle ('ventana') o tablas planas estructuradas ('BD').
               </div>
             </div>
           )}
 
           {file && (
             <div className="space-y-6">
-
-              <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-navy-950/60 border border-navy-850 rounded-xl">
+              {/* Selector de Pestañas y Acciones */}
+              <div className="flex flex-wrap items-center justify-between gap-4 bg-navy-950/40 p-4 rounded-xl border border-navy-800">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-500/10 text-orange-400 rounded-lg">
-                    <FileSpreadsheet size={18} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-200 truncate max-w-xs md:max-w-md">{file.name}</p>
-                    <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB | Tipo: {isStackedTemplate ? 'Plantilla Apilada ("ventana")' : 'Tabla Plana ("BD")'}</p>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Hoja de cálculo activa</label>
+                    <select
+                      value={selectedSheet}
+                      onChange={(e) => {
+                        setSelectedSheet(e.target.value);
+                        if (workbook) processSheet(workbook, e.target.value);
+                      }}
+                      className="bg-navy-900 border border-navy-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-bold focus:outline-none cursor-pointer"
+                    >
+                      {sheets.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  {sheets.length > 1 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-400 uppercase">Hoja:</span>
-                      <select
-                        value={selectedSheet}
-                        onChange={(e) => {
-                          setSelectedSheet(e.target.value);
-                          if (workbook) processSheet(workbook, e.target.value);
-                        }}
-                        className="bg-navy-900 border border-navy-800 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none"
-                      >
-                        {sheets.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <button
-                    onClick={resetState}
-                    className="text-xs text-red-400 hover:text-red-300 font-bold px-2 py-1 rounded bg-red-500/10 border border-red-500/20 transition-all active:scale-95"
-                  >
-                    Cambiar archivo
-                  </button>
-                </div>
-              </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-navy-950/45 border border-navy-850 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
-                    Formato de Importación de la Hoja:
-                  </span>
-                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => handleToggleMode(true)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isStackedTemplate
-                      ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
-                      : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all border ${isStackedTemplate
+                      ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 font-extrabold'
+                      : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300'
                       }`}
                   >
                     Plantilla Apilada ("ventana")
@@ -753,9 +714,9 @@ export default function ExcelImportModal({
                   <button
                     type="button"
                     onClick={() => handleToggleMode(false)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${!isStackedTemplate
-                      ? 'bg-orange-500/15 border-orange-500/35 text-orange-400 font-extrabold'
-                      : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300 hover:border-navy-700'
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all border ${!isStackedTemplate
+                      ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 font-extrabold'
+                      : 'bg-navy-900 border-navy-800/80 text-slate-400 hover:text-slate-300'
                       }`}
                   >
                     Tabla Plana / Mapeable ("BD")

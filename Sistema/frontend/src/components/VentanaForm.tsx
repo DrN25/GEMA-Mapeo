@@ -1,6 +1,6 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
-import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
+import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
 import { Calendar, User, AlignLeft, FileSpreadsheet } from 'lucide-react';
 
 interface VentanaFormProps {
@@ -441,7 +441,7 @@ export default function VentanaForm({
             <select
               value={header.lito_2 || '-1'}
               onChange={(e) => handleLito2Change(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-orange-400 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
             >
               <option value="-1">— Lito 2 —</option>
               {filteredLito2Options.map(l => (
@@ -456,7 +456,7 @@ export default function VentanaForm({
             <select
               value={header.lito_3 || '-1'}
               onChange={(e) => handleLito3Change(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-orange-400 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
             >
               <option value="-1">— Lito 3 —</option>
               {filteredLito3Options.map(l => (
@@ -562,13 +562,27 @@ export default function VentanaForm({
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Intemperismo / Meteorización</label>
-            <input
-              type="text"
+            <select
               value={header.intemperia || ''}
               onChange={(e) => handleChange('intemperia', e.target.value)}
-              placeholder="Grado de meteorización"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal"
-            />
+              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal cursor-pointer text-left"
+            >
+              <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
+              {Object.entries(ALTERACION_CATALOG).map(([key, item]) => {
+                const parts = item.name.split(' — ');
+                const desc = parts[1] || item.name;
+                return (
+                  <option key={key} value={key} className="bg-navy-950 text-slate-100 text-xs">
+                    {key} ({desc})
+                  </option>
+                );
+              })}
+              {header.intemperia && !ALTERACION_CATALOG[header.intemperia] && (
+                <option value={header.intemperia} className="bg-navy-950 text-amber-400 text-xs">
+                  {header.intemperia} (Valor no normalizado)
+                </option>
+              )}
+            </select>
           </div>
 
           <div className="space-y-1.5">
