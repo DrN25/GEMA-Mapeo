@@ -251,11 +251,11 @@ export default function ExcelImportModal({
       if (!celdaVal || !String(celdaVal).trim()) continue;
       const codigo = String(celdaVal).trim().toUpperCase();
 
-      const este_from = roundDec(getNum(start + 2, 1), 2);
-      const norte_from = roundDec(getNum(start + 2, 3), 2);
+      const este_from = roundDec(getNum(start + 2, 1), 4); // <- 4 decimales
+      const norte_from = roundDec(getNum(start + 2, 3), 3); // <- 3 decimales
       const cota_from = roundDec(getNum(start + 2, 5), 2);
-      const este_to = roundDec(getNum(start + 3, 1), 2);
-      const norte_to = roundDec(getNum(start + 3, 3), 2);
+      const este_to = roundDec(getNum(start + 3, 1), 4); // <- 4 decimales
+      const norte_to = roundDec(getNum(start + 3, 3), 3); // <- 3 decimales
       const cota_to = roundDec(getNum(start + 3, 5), 2);
 
       const altura = roundDec(getNum(start + 3, 10), 1);
@@ -480,11 +480,11 @@ export default function ExcelImportModal({
         celdasData[celdaCode] = {
           header: {
             celda: celdaCode,
-            este_from: roundDec(getNum(row, 'este_from', 0), 2),
-            norte_from: roundDec(getNum(row, 'norte_from', 0), 2),
+            este_from: roundDec(getNum(row, 'este_from', 0), 4),   // <- 4 decimales
+            norte_from: roundDec(getNum(row, 'norte_from', 0), 3), // <- 3 decimales
             cota_from: roundDec(getNum(row, 'cota_from', 0), 2),
-            este_to: roundDec(getNum(row, 'este_to', 0), 2),
-            norte_to: roundDec(getNum(row, 'norte_to', 0), 2),
+            este_to: roundDec(getNum(row, 'este_to', 0), 4),       // <- 4 decimales
+            norte_to: roundDec(getNum(row, 'norte_to', 0), 3),     // <- 3 decimales
             cota_to: roundDec(getNum(row, 'cota_to', 0), 2),
             altura: roundDec(getNum(row, 'altura', 15.0), 1),
             dip_talud: roundDec(getNum(row, 'dip_talud', 64.0), 2),

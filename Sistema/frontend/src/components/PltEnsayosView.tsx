@@ -197,8 +197,8 @@ export function normalizeCeldaCode(celda: string): string {
 }
 
 function getPltConstraints(key: string): { intDigits: number; decDigits: number } | null {
-  if (key === "este") return { intDigits: 6, decDigits: 2 };
-  if (key === "norte") return { intDigits: 7, decDigits: 2 };
+  if (key === "este") return { intDigits: 6, decDigits: 4 }; // <- 4 decimales
+  if (key === "norte") return { intDigits: 7, decDigits: 3 }; // <- 3 decimales
   if (key === "elevacion") return { intDigits: 4, decDigits: 2 };
   if (key === "espesor_d") return { intDigits: 4, decDigits: 1 };
   if (key === "nivel") return { intDigits: 4, decDigits: 2 };
@@ -226,6 +226,106 @@ const handlePltNumberLimit = (value: string, intDigits: number, decDigits: numbe
   }
 
   return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+};
+
+const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const activeElement = e.currentTarget;
+  const key = e.key;
+
+  const allowedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"];
+  if (!allowedKeys.includes(key)) return;
+
+  const td = activeElement.closest("td");
+  const tr = activeElement.closest("tr");
+  if (!td || !tr) return;
+
+  const cellIndex = td.cellIndex;
+  let targetInput: HTMLInputElement | HTMLSelectElement | null = null;
+
+  if (key === "ArrowUp") {
+    e.preventDefault(); // Detiene el incremento de números y el cambio de opción en selects
+    const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
+    if (prevTr) {
+      const targetTd = prevTr.cells[cellIndex];
+      if (targetDataInput(targetTd)) {
+        targetDataInput(targetTd).focus();
+        if (targetDataInput(targetTd) instanceof HTMLInputElement) {
+          (targetDataInput(targetTd) as HTMLInputElement).select();
+        }
+      }
+    }
+  } else if (key === "ArrowDown" || key === "Enter") {
+    e.preventDefault(); // Detiene el decremento de números, cambio en selects o submit de formulario
+    const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
+    if (nextTr) {
+      const targetTd = nextTr.cells[cellIndex];
+      if (targetDataInput(targetTd)) {
+        targetDataInput(targetTd).focus();
+        if (targetDataInput(targetTd) instanceof HTMLInputElement) {
+          (targetDataInput(targetTd) as HTMLInputElement).select();
+        }
+      }
+    }
+  } else if (key === "ArrowLeft") {
+    let shouldMove = true;
+    if (activeElement instanceof HTMLInputElement) {
+      try {
+        if (activeElement.selectionStart !== null && activeElement.selectionStart > 0) {
+          shouldMove = false;
+        }
+      } catch {
+        // Fallback seguro
+      }
+    }
+    if (shouldMove) {
+      let prevTd = td.previousElementSibling as HTMLTableCellElement | null;
+      while (prevTd) {
+        const input = prevTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
+        if (input) {
+          e.preventDefault(); // <- CRITICAL: Detiene el cambio de opción en selects y movimiento del cursor
+          targetInput = input;
+          break;
+        }
+        prevTd = prevTd.previousElementSibling as HTMLTableCellElement | null;
+      }
+    }
+  } else if (key === "ArrowRight") {
+    let shouldMove = true;
+    if (activeElement instanceof HTMLInputElement) {
+      try {
+        if (activeElement.selectionStart !== null && activeElement.selectionEnd !== activeElement.value.length) {
+          shouldMove = false;
+        }
+      } catch {
+        // Fallback seguro
+      }
+    }
+    if (shouldMove) {
+      let nextTd = td.nextElementSibling as HTMLTableCellElement | null;
+      while (nextTd) {
+        const input = nextTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
+        if (input) {
+          e.preventDefault(); // <- CRITICAL: Detiene el cambio de opción en selects y movimiento del cursor
+          targetInput = input;
+          break;
+        }
+        nextTd = nextTd.nextElementSibling as HTMLTableCellElement | null;
+      }
+    }
+  }
+
+  if (targetInput) {
+    targetInput.focus();
+    if (targetInput instanceof HTMLInputElement && targetInput.type !== "date") {
+      targetInput.select();
+    }
+  }
+};
+
+// Función de apoyo para extraer el input o select de una celda de manera limpia
+const targetDataInput = (td: HTMLTableCellElement | null): HTMLInputElement | HTMLSelectElement | null => {
+  if (!td) return null;
+  return td.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
 };
 
 const GROUP_META: Record<number, { label: string; bg: string }> = {
@@ -628,6 +728,7 @@ export default function PltEnsayosView({
               type="checkbox"
               checked={filterActiveCell}
               onChange={(e) => setFilterActiveCell(e.target.checked)}
+              onKeyDown={handleGridKeyDown}
               disabled={!activeWindowCelda}
               className="accent-orange-500 rounded cursor-pointer"
             />
@@ -641,6 +742,7 @@ export default function PltEnsayosView({
             placeholder="Campaña"
             value={fCampana}
             onChange={(e) => setFCampana(e.target.value)}
+            onKeyDown={handleGridKeyDown}
             className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg w-24 outline-none focus:ring-2 focus:ring-orange-500/20"
           />
           <input
@@ -648,6 +750,7 @@ export default function PltEnsayosView({
             placeholder="Muestreo"
             value={fZona}
             onChange={(e) => setFZona(e.target.value)}
+            onKeyDown={handleGridKeyDown}
             className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg w-28 outline-none focus:ring-2 focus:ring-orange-500/20"
           />
           <input
@@ -655,6 +758,7 @@ export default function PltEnsayosView({
             placeholder="Litología"
             value={fLito}
             onChange={(e) => setFLito(e.target.value)}
+            onKeyDown={handleGridKeyDown}
             className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg w-28 outline-none focus:ring-2 focus:ring-orange-500/20"
           />
 
@@ -829,6 +933,7 @@ export default function PltEnsayosView({
                                 }
                                 handleInputChange(row.id, c.key, inputVal);
                               }}
+                              onKeyDown={handleGridKeyDown}
                               onBlur={(e) => {
                                 handleCommitEdit(row.id, c.key, e.target.value);
                               }}

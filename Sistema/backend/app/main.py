@@ -577,11 +577,11 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 val = ws.cell(row=r, column=c).value
                 return str(val).strip() if val is not None else ""
 
-            este_ini = round(get_num(start+2, 2), 2)
-            norte_ini = round(get_num(start+2, 4), 2)
+            este_ini = round(get_num(start+2, 2), 4)      # <- 4 decimales
+            norte_ini = round(get_num(start+2, 4), 3)     # <- 3 decimales
             cota_ini = round(get_num(start+2, 6), 2)
-            este_fin = round(get_num(start+3, 2), 2)
-            norte_fin = round(get_num(start+3, 4), 2)
+            este_fin = round(get_num(start+3, 2), 4)      # <- 4 decimales
+            norte_fin = round(get_num(start+3, 4), 3)     # <- 3 decimales
             cota_fin = round(get_num(start+3, 6), 2)
             
             largo = int(round(get_num(start+2, 11)))
@@ -719,11 +719,11 @@ async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get
                 val = ws.cell(row=r, column=c).value
                 return str(val).strip() if val is not None else ""
                 
-            este_from = round(get_num(f_row, 6), 2)
-            norte_from = round(get_num(f_row, 7), 2)
+            este_from = round(get_num(f_row, 6), 4)       # <- 4 decimales
+            norte_from = round(get_num(f_row, 7), 3)      # <- 3 decimales
             cota_from = round(get_num(f_row, 8), 2)
-            este_to = round(get_num(f_row, 10), 2)
-            norte_to = round(get_num(f_row, 11), 2)
+            este_to = round(get_num(f_row, 10), 4)        # <- 4 decimales
+            norte_to = round(get_num(f_row, 11), 3)       # <- 3 decimales
             cota_to = round(get_num(f_row, 12), 2)
             dist_celda = int(round(get_num(f_row, 13)))
             altura = round(get_num(f_row, 14), 1)
@@ -996,12 +996,21 @@ def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
 
     # Dar formato limpio de visualización al cuerpo de la tabla
     font_body = Font(name="Arial", size=9, bold=False)
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(headers)):
-        for cell in row:
+    for col_idx in range(1, len(headers) + 1):
+        header_name = headers[col_idx - 1].upper()
+        for row_idx in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
             cell.font = font_body
             cell.border = border_thin
-            if isinstance(cell.value, float):
-                cell.number_format = '0.00'
+            if isinstance(cell.value, (int, float)):
+                if "ESTE" in header_name or header_name == "X":
+                    cell.number_format = '0.0000' # <- Visualizar 4 decimales en Excel
+                elif "NORTE" in header_name or header_name == "Y":
+                    cell.number_format = '0.000'  # <- Visualizar 3 decimales en Excel
+                elif "COTA" in header_name or header_name == "Z" or "ELEVACION" in header_name:
+                    cell.number_format = '0.00'   # <- Visualizar 2 decimales en Excel
+                else:
+                    cell.number_format = '0.00'   # fallback general
 
     # Autoajustar anchos de columnas
     for col in ws.columns:

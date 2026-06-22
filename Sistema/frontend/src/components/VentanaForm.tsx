@@ -257,7 +257,7 @@ export default function VentanaForm({
                 placeholder="Este (X)"
                 value={getInputValue('este_from', header.este_from)}
                 id="header-este_from"
-                onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 2)}
+                onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 4)} // <- Cambiado a 4 decimales
                 onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
@@ -266,7 +266,7 @@ export default function VentanaForm({
                 placeholder="Norte (Y)"
                 value={getInputValue('norte_from', header.norte_from)}
                 id="header-norte_from"
-                onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 2)}
+                onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 3)} // <- Cambiado a 3 decimales
                 onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
@@ -291,7 +291,7 @@ export default function VentanaForm({
                 placeholder="Este (X)"
                 value={getInputValue('este_to', header.este_to)}
                 id="header-este_to"
-                onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 2)}
+                onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 4)} // <- Cambiado a 4 decimales
                 onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />
@@ -300,7 +300,7 @@ export default function VentanaForm({
                 placeholder="Norte (Y)"
                 value={getInputValue('norte_to', header.norte_to)}
                 id="header-norte_to"
-                onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 2)}
+                onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 3)} // <- Cambiado a 3 decimales
                 onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
                 className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
               />

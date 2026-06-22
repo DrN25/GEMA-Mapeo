@@ -168,6 +168,11 @@ def get_rqd_rating(rqd_pct):
         r89 = 0
     return {"r89": r89, "r76": r76}
 
+def acot(val: float) -> float:
+    if val == 0:
+        return math.pi / 2
+    atan_val = math.atan(1.0 / val)
+    return math.pi + atan_val if val < 0 else atan_val
 
 # CALCULATION MAIN FUNCTION
 
@@ -205,9 +210,11 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
             ux = dx / scan_len
             uy = dy / scan_len
             uz = dz / scan_len
-            # teta and alfa matching spreadsheet logic
-            teta = math.atan2(dx, dy) if dy != 0 else (0.0 if dx >= 0 else math.pi)
-            alfa = math.atan2(dx, dz) if dz != 0 else 0.0
+            
+            # Ángulos calculados en base a las funciones ACOT de Excel
+            teta = acot(dy / dx) if dx != 0 else (math.pi / 2 if dy >= 0 else 1.5 * math.pi)
+            alfa = 0.0 if dz == 0 else acot(dx / dz)
+            
         if largo is None or largo == 0:
             largo = scan_len
 
@@ -256,9 +263,9 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
         dist = row.get("dist")
         wx, wy, wz = 0.0, 0.0, 0.0
         if has_coords and dist is not None:
-            wx = float(h_ini_x) + float(dist) * ux
-            wy = float(h_ini_y) + float(dist) * uy
-            wz = float(h_ini_z) + float(dist) * uz
+            wx = float(dist) * math.sin(teta) + float(h_ini_x)
+            wy = float(dist) * math.cos(teta) + float(h_ini_y)
+            wz = float(dist) * math.cos(teta) * math.sin(alfa) + float(h_ini_z)
             
         rows_calculated.append({
             "row": row,

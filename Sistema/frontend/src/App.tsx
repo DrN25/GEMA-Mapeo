@@ -300,11 +300,11 @@ export default function App() {
 
         const header: WindowHeader = {
           celda: v.codigo,
-          este_from: roundDec(v.este_ini, 2),
-          norte_from: roundDec(v.norte_ini, 2),
+          este_from: roundDec(v.este_ini, 4),   // <- 4 decimales
+          norte_from: roundDec(v.norte_ini, 3), // ... 3 decimales
           cota_from: roundDec(v.cota_ini, 2),
-          este_to: roundDec(v.este_fin, 2),
-          norte_to: roundDec(v.norte_fin, 2),
+          este_to: roundDec(v.este_fin, 4),     // <- 4 decimales
+          norte_to: roundDec(v.norte_fin, 3),   // ... 3 decimales
           cota_to: roundDec(v.cota_fin, 2),
           altura: roundDec(v.altura_m, 1) || 15.0,
           dip_talud: roundDec(v.dip_talud, 2) || 64.0,

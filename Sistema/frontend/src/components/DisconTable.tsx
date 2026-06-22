@@ -274,14 +274,104 @@ export default function DisconTable({
     onChange(updated);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number, colName: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (index < joints.length - 1) {
-        const nextEl = document.getElementById(`joint-${colName}-${index + 1}`);
-        if (nextEl) nextEl.focus();
+  const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const activeElement = e.currentTarget;
+    const key = e.key;
+
+    const allowedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"];
+    if (!allowedKeys.includes(key)) return;
+
+    const td = activeElement.closest("td");
+    const tr = activeElement.closest("tr");
+    if (!td || !tr) return;
+
+    const cellIndex = td.cellIndex;
+    let targetInput: HTMLInputElement | HTMLSelectElement | null = null;
+
+    if (key === "ArrowUp") {
+      e.preventDefault(); // Detiene el incremento de números y el cambio de opción en selects
+      const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
+      if (prevTr) {
+        const targetTd = prevTr.cells[cellIndex];
+        if (targetDataInput(targetTd)) {
+          targetDataInput(targetTd).focus();
+          if (targetDataInput(targetTd) instanceof HTMLInputElement) {
+            (targetDataInput(targetTd) as HTMLInputElement).select();
+          }
+        }
+      }
+    } else if (key === "ArrowDown" || key === "Enter") {
+      e.preventDefault(); // Detiene el decremento de números, cambio en selects o submit de formulario
+      const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
+      if (nextTr) {
+        const targetTd = nextTr.cells[cellIndex];
+        if (targetDataInput(targetTd)) {
+          targetDataInput(targetTd).focus();
+          if (targetDataInput(targetTd) instanceof HTMLInputElement) {
+            (targetDataInput(targetTd) as HTMLInputElement).select();
+          }
+        }
+      }
+    } else if (key === "ArrowLeft") {
+      let shouldMove = true;
+      if (activeElement instanceof HTMLInputElement) {
+        try {
+          if (activeElement.selectionStart !== null && activeElement.selectionStart > 0) {
+            shouldMove = false;
+          }
+        } catch {
+          // Fallback seguro
+        }
+      }
+      if (shouldMove) {
+        let prevTd = td.previousElementSibling as HTMLTableCellElement | null;
+        while (prevTd) {
+          const input = prevTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
+          if (input) {
+            e.preventDefault(); // <- CRITICAL: Detiene el cambio de opción en selects y movimiento del cursor
+            targetInput = input;
+            break;
+          }
+          prevTd = prevTd.previousElementSibling as HTMLTableCellElement | null;
+        }
+      }
+    } else if (key === "ArrowRight") {
+      let shouldMove = true;
+      if (activeElement instanceof HTMLInputElement) {
+        try {
+          if (activeElement.selectionStart !== null && activeElement.selectionEnd !== activeElement.value.length) {
+            shouldMove = false;
+          }
+        } catch {
+          // Fallback seguro
+        }
+      }
+      if (shouldMove) {
+        let nextTd = td.nextElementSibling as HTMLTableCellElement | null;
+        while (nextTd) {
+          const input = nextTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
+          if (input) {
+            e.preventDefault(); // <- CRITICAL: Detiene el cambio de opción en selects y movimiento del cursor
+            targetInput = input;
+            break;
+          }
+          nextTd = nextTd.nextElementSibling as HTMLTableCellElement | null;
+        }
       }
     }
+
+    if (targetInput) {
+      targetInput.focus();
+      if (targetInput instanceof HTMLInputElement && targetInput.type !== "date") {
+        targetInput.select();
+      }
+    }
+  };
+
+  // Función de apoyo para extraer el input o select de una celda de manera limpia
+  const targetDataInput = (td: HTMLTableCellElement | null): HTMLInputElement | HTMLSelectElement | null => {
+    if (!td) return null;
+    return td.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
   };
 
   return (
@@ -436,7 +526,7 @@ export default function DisconTable({
                           handleRowChange(idx, 'distancia', clamped);
                         }
                       }}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'distancia')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-100 text-center font-normal focus:outline-none text-xs"
                     />
                   </td>
@@ -450,7 +540,7 @@ export default function DisconTable({
                       value={getInputValue(idx, 'dip', j.dip)}
                       onChange={(e) => handleInputChange(idx, 'dip', e.target.value)}
                       onBlur={(e) => handleInputBlur(idx, 'dip', e.target.value, 90)}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'dip')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
                   </td>
@@ -464,7 +554,7 @@ export default function DisconTable({
                       value={getInputValue(idx, 'dip_dir', j.dip_dir)}
                       onChange={(e) => handleInputChange(idx, 'dip_dir', e.target.value)}
                       onBlur={(e) => handleInputBlur(idx, 'dip_dir', e.target.value, 359)}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'dip_dir')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
                   </td>
@@ -474,6 +564,7 @@ export default function DisconTable({
                     <select
                       value={j.tipo_estructura}
                       onChange={(e) => handleRowChange(idx, 'tipo_estructura', e.target.value)}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 font-normal focus:outline-none text-center cursor-pointer text-xs"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
@@ -509,7 +600,7 @@ export default function DisconTable({
                           handleRowChange(idx, 'n_estructuras', num);
                         }
                       }}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'n_estructuras')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none text-xs font-semibold"
                     />
                   </td>
@@ -548,7 +639,7 @@ export default function DisconTable({
                           handleRowChange(idx, 'abertura', limitPrecision(num, 1));
                         }
                       }}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'abertura')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none text-xs font-semibold"
                     />
                   </td>
@@ -585,7 +676,7 @@ export default function DisconTable({
                           handleRowChange(idx, 'espesor', limitPrecision(num, 1));
                         }
                       }}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'espesor')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none text-xs"
                     />
                   </td>
@@ -599,7 +690,7 @@ export default function DisconTable({
                       value={getInputValue(idx, 'continuidad', j.continuidad)}
                       onChange={(e) => handleInputChange(idx, 'continuidad', e.target.value)}
                       onBlur={(e) => handleInputBlur(idx, 'continuidad', e.target.value, 100)}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'continuidad')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none text-xs"
                     />
                   </td>
@@ -636,7 +727,7 @@ export default function DisconTable({
                           handleRowChange(idx, 'espaciamiento', limitPrecision(num, 2));
                         }
                       }}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'espaciamiento')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none text-xs"
                     />
                   </td>
@@ -646,6 +737,7 @@ export default function DisconTable({
                     <select
                       value={j.extremos_visibles}
                       onChange={(e) => handleRowChange(idx, 'extremos_visibles', parseInt(e.target.value) ?? -1)}
+                      onKeyDown={handleGridKeyDown}
                       className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
@@ -660,6 +752,7 @@ export default function DisconTable({
                     <select
                       value={j.terminacion}
                       onChange={(e) => handleRowChange(idx, 'terminacion', parseInt(e.target.value) ?? -1)}
+                      onKeyDown={handleGridKeyDown}
                       className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
@@ -676,6 +769,7 @@ export default function DisconTable({
                     <select
                       value={j.relleno1}
                       onChange={(e) => handleRowChange(idx, 'relleno1', e.target.value)}
+                      onKeyDown={handleGridKeyDown}
                       className="bg-transparent text-slate-300 focus:outline-none text-xs font-normal cursor-pointer w-full text-center"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
@@ -692,6 +786,7 @@ export default function DisconTable({
                     <select
                       value={j.relleno2 || ''}
                       onChange={(e) => handleRowChange(idx, 'relleno2', e.target.value || undefined)}
+                      onKeyDown={handleGridKeyDown}
                       className="bg-transparent text-slate-300 focus:outline-none text-xs font-normal cursor-pointer w-full text-center"
                     >
                       <option value="" className="bg-navy-950 text-slate-500">-</option>
@@ -739,7 +834,7 @@ export default function DisconTable({
                       value={getInputValue(idx, 'jrc', j.jrc)}
                       onChange={(e) => handleInputChange(idx, 'jrc', e.target.value)}
                       onBlur={(e) => handleInputBlur(idx, 'jrc', e.target.value, 20)}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'jrc')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
                   </td>
@@ -752,7 +847,7 @@ export default function DisconTable({
                       value={getInputValue(idx, 'rugosidad', j.rugosidad)}
                       onChange={(e) => handleInputChange(idx, 'rugosidad', e.target.value)}
                       onBlur={(e) => handleInputBlur(idx, 'rugosidad', e.target.value, 9)}
-                      onKeyDown={(e) => handleKeyDown(e, idx, 'rugosidad')}
+                      onKeyDown={handleGridKeyDown}
                       className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs"
                     />
                   </td>
@@ -762,6 +857,7 @@ export default function DisconTable({
                     <select
                       value={j.forma}
                       onChange={(e) => handleRowChange(idx, 'forma', e.target.value)}
+                      onKeyDown={handleGridKeyDown}
                       className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
@@ -778,6 +874,7 @@ export default function DisconTable({
                     <select
                       value={j.alteracion}
                       onChange={(e) => handleRowChange(idx, 'alteracion', e.target.value)}
+                      onKeyDown={handleGridKeyDown}
                       className="bg-transparent text-slate-300 focus:outline-none text-xs font-normal cursor-pointer w-full text-center"
                     >
                       <option value="-1" className="bg-navy-950 text-slate-500">-</option>
@@ -917,6 +1014,7 @@ export default function DisconTable({
             <select
               value={familyToDelete}
               onChange={(e) => setFamilyToDelete(parseInt(e.target.value) || 1)}
+              onKeyDown={handleGridKeyDown}
               className="bg-navy-900 border border-navy-700 text-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer font-bold"
             >
               {activeFamilies.map(f => (

@@ -72,6 +72,16 @@ export default function StructurePlot({
     return val.toFixed(3);
   };
 
+  const formatNumber4 = (val: number | undefined | null): string => {
+    if (val === undefined || val === null || isNaN(val) || !Number.isFinite(val)) return '—';
+    return val.toFixed(4);
+  };
+
+  const formatNumber2 = (val: number | undefined | null): string => {
+    if (val === undefined || val === null || isNaN(val) || !Number.isFinite(val)) return '—';
+    return val.toFixed(2);
+  };
+
   // Filtramos la leyenda para mostrar ÚNICAMENTE las familias activas registradas de forma dinámica
   const activeFamiliesInPlot = useMemo(() => {
     const jointsList = calculatedJoints || [];
@@ -605,9 +615,9 @@ export default function StructurePlot({
                     <td className="py-2 px-3 font-mono text-slate-500">#{id}</td>
                     <td className="py-2 px-2 text-center font-extrabold" style={{ color }}>F{fam}</td>
                     <td className="py-2 px-2 font-bold text-slate-400">{cj.row.tipo_estructura}</td>
-                    <td className="py-2 px-3 text-center font-mono">{formatNumber3(cj.row.distancia)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber6(cj.x)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber6(cj.y)}</td>
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber3(cj.row.distancia)}</td>
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber4(cj.x)}</td> {/* <- Cambiado a 4 decimales */}
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber2(cj.y)}</td> {/* <- Cambiado a 2 decimales */}
                     <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber6(cj.z)}</td>
                     <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">{formatNumber6(cj.theta)}&deg;</td>
                     <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">{formatNumber6(cj.alpha)}&deg;</td>

@@ -229,9 +229,22 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     : (az_hole + 90) % 360;
 
   // Fórmulas matemáticas de proyección angular del Excel (ACOT)
-  const acot = (val: number) => val === 0 ? Math.PI / 2 : Math.atan(1 / val);
-  const theta_rad = dy === 0 ? 0 : acot(dx / dy);
-  const alpha_rad = dz === 0 ? 0 : acot(dx / dz);
+  // Definición de arccot que coincide exactamente con el comportamiento de Excel (rango [0, PI])
+  const acot = (val: number) => {
+    if (val === 0) return Math.PI / 2;
+    const atanVal = Math.atan(1 / val);
+    return val < 0 ? Math.PI + atanVal : atanVal;
+  };
+
+  // Ángulo Theta (Teta): ACOT((NORTE_TO-NORTE_FROM)/(ESTE_TO-ESTE_FROM))
+  const theta_rad = dx === 0
+    ? (dy >= 0 ? 0 : Math.PI)
+    : acot(dy / dx);
+
+  // Ángulo Alfa (Incl): SI(COTA_TO=COTA_FROM;0;ACOT((ESTE_TO-ESTE_FROM)/(COTA_TO-COTA_FROM)))
+  const alpha_rad = dz === 0
+    ? 0
+    : acot(dx / dz);
 
   const theta_deg = (theta_rad * 180) / Math.PI;
   const alpha_deg = (alpha_rad * 180) / Math.PI;
@@ -241,9 +254,9 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     const hasDist = j.distancia !== undefined && j.distancia !== -1 && j.distancia >= 0;
     const dist = hasDist ? j.distancia! : 0.0;
 
-    // Proyecciones espaciales exactas del Excel (BN, BO y BP en la pestaña 'BD')
-    const x = dist * Math.cos(theta_rad) + header.este_from;
-    const y = dist * Math.sin(theta_rad) + header.norte_from;
+    // Proyecciones espaciales exactas alineadas 100% con las fórmulas de tu Excel
+    const x = dist * Math.sin(theta_rad) + header.este_from;
+    const y = dist * Math.cos(theta_rad) + header.norte_from;
     const z = dist * Math.cos(theta_rad) * Math.sin(alpha_rad) + header.cota_from;
 
     const inBounds = dist >= 0 && dist <= largo;

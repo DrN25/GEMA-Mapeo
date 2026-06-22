@@ -46,8 +46,8 @@ const EXPECTED_FIELDS: MappingField[] = [
 ];
 
 function getPltConstraints(key: string): { intDigits: number; decDigits: number } | null {
-    if (key === "este") return { intDigits: 6, decDigits: 2 };
-    if (key === "norte") return { intDigits: 7, decDigits: 2 };
+    if (key === "este") return { intDigits: 6, decDigits: 4 }; // <- 4 decimales
+    if (key === "norte") return { intDigits: 7, decDigits: 3 }; // <- 3 decimales
     if (key === "elevacion") return { intDigits: 4, decDigits: 2 };
     if (key === "espesor_d") return { intDigits: 4, decDigits: 1 };
     if (key === "nivel") return { intDigits: 4, decDigits: 2 };
@@ -292,8 +292,8 @@ export default function PltExcelImportModal({
                 litologia_2: getStr(row, 'litologia_2'),
                 litologia_3: getStr(row, 'litologia_3'),
                 tipo_litologico: getStr(row, 'tipo_litologico', 'INTRUSIVOS'),
-                este: getVal(row, 'este') !== null && getVal(row, 'este') !== "" ? Math.round(Math.abs(getNum(row, 'este')) * 100) / 100 : null,
-                norte: getVal(row, 'norte') !== null && getVal(row, 'norte') !== "" ? Math.round(Math.abs(getNum(row, 'norte')) * 100) / 100 : null,
+                este: getVal(row, 'este') !== null && getVal(row, 'este') !== "" ? Math.round(Math.abs(getNum(row, 'este')) * 10000) / 10000 : null, // <- Redondeo a 4 decimales
+                norte: getVal(row, 'norte') !== null && getVal(row, 'norte') !== "" ? Math.round(Math.abs(getNum(row, 'norte')) * 1000) / 1000 : null, // <- Redondeo a 3 decimales
                 elevacion: getVal(row, 'elevacion') !== null && getVal(row, 'elevacion') !== "" ? Math.round(Math.abs(getNum(row, 'elevacion')) * 100) / 100 : null,
                 espesor_d: getVal(row, 'espesor_d') !== null && getVal(row, 'espesor_d') !== "" ? Math.round(Math.abs(getNum(row, 'espesor_d')) * 10) / 10 : null,
                 longitud_l: getVal(row, 'longitud_l') !== null && getVal(row, 'longitud_l') !== "" ? Math.round(Math.abs(getNum(row, 'longitud_l')) * 100) / 100 : null,

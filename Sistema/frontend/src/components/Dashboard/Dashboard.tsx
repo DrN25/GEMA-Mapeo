@@ -422,9 +422,9 @@ export default function Dashboard({
                     <input
                       type="text"
                       required
-                      placeholder="794444.87"
+                      placeholder="794444.8700"
                       value={esteFrom}
-                      onChange={(e) => setEsteFrom(handleNumberInputLimit(e.target.value, 6, 2))}
+                      onChange={(e) => setEsteFrom(handleNumberInputLimit(e.target.value, 6, 4))} // <- Cambiado a 4 decimales
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
                     />
                   </div>
@@ -433,20 +433,9 @@ export default function Dashboard({
                     <input
                       type="text"
                       required
-                      placeholder="8440465.91"
+                      placeholder="8440465.910"
                       value={norteFrom}
-                      onChange={(e) => setNorteFrom(handleNumberInputLimit(e.target.value, 7, 2))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 block">Cota (Z)</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="3960.47"
-                      value={cotaFrom}
-                      onChange={(e) => setCotaFrom(handleNumberInputLimit(e.target.value, 4, 2))}
+                      onChange={(e) => setNorteFrom(handleNumberInputLimit(e.target.value, 7, 3))} // <- Cambiado a 3 decimales
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
                     />
                   </div>
@@ -462,9 +451,9 @@ export default function Dashboard({
                     <input
                       type="text"
                       required
-                      placeholder="794449.13"
+                      placeholder="794449.1300"
                       value={esteTo}
-                      onChange={(e) => setEsteTo(handleNumberInputLimit(e.target.value, 6, 2))}
+                      onChange={(e) => setEsteTo(handleNumberInputLimit(e.target.value, 6, 4))} // <- Cambiado a 4 decimales
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
                     />
                   </div>
@@ -473,20 +462,9 @@ export default function Dashboard({
                     <input
                       type="text"
                       required
-                      placeholder="8440455.69"
+                      placeholder="8440455.690"
                       value={norteTo}
-                      onChange={(e) => setNorteTo(handleNumberInputLimit(e.target.value, 7, 2))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 block">Cota (Z)</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="3959.84"
-                      value={cotaTo}
-                      onChange={(e) => setCotaTo(handleNumberInputLimit(e.target.value, 4, 2))}
+                      onChange={(e) => setNorteTo(handleNumberInputLimit(e.target.value, 7, 3))} // <- Cambiado a 3 decimales
                       className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-1.5 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
                     />
                   </div>
