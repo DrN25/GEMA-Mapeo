@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table } from 'lucide-react';
+import { Table, Layers, Compass, Flame, AlignLeft } from 'lucide-react';
 import {
   STRUCTURE_CATALOG,
   RELLENO_CATALOG,
@@ -10,10 +10,10 @@ import {
 } from '../utils/catalogData';
 
 export default function CatalogsView() {
-  const [activeTab, setActiveTab] = useState<string>('litologia'); // Inicializar con Litología por defecto
+  const [activeTab, setActiveTab] = useState<string>('litologia');
 
   const tabs = [
-    { id: 'litologia', label: 'Litología y K' }, // Nueva pestaña
+    { id: 'litologia', label: 'Litología y K' },
     { id: 'tipos', label: 'Tipos Estr.' },
     { id: 'abertura', label: 'Abertura' },
     { id: 'continuidad', label: 'Continuidad' },
@@ -21,7 +21,8 @@ export default function CatalogsView() {
     { id: 'rugosidad', label: 'Rugosidad (1-9)' },
     { id: 'forma', label: 'Forma' },
     { id: 'alteracion', label: 'Meteorización' },
-    { id: 'jrc', label: 'JRC' }
+    { id: 'jrc', label: 'JRC' },
+    { id: 'plt_irregulares', label: 'Ensayos PLT Irreg.' } // Nueva Pestaña
   ];
 
   return (
@@ -45,7 +46,7 @@ export default function CatalogsView() {
       {/* Cuerpo del Catálogo */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 min-h-[350px] flex flex-col">
 
-        {/* 🧪 IMPLEMENTACIÓN DE LA TABLA DE LITOLOGÍAS Y FACTOR K SOLICITADA */}
+        {/* TABLA DE LITOLOGÍAS */}
         {activeTab === 'litologia' && (
           <div className="space-y-3">
             <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
@@ -79,6 +80,195 @@ export default function CatalogsView() {
           </div>
         )}
 
+        {/* TABLA DE ENERO / EN GRIS NUEVAS TABLAS DE ENSAYO PLT */}
+        {activeTab === 'plt_irregulares' && (
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+
+            {/* 1. Clasificación ISRM */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
+                <Table size={12} className="text-cyan-400" />
+                <span>Clasificación de Resistencia ISRM (UCS)</span>
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-navy-900">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
+                      <th className="py-2 px-3">Código</th>
+                      <th className="py-2 px-3 text-center">UCS Mínimo (MPa)</th>
+                      <th className="py-2 px-3 text-center">UCS Máximo (MPa)</th>
+                      <th className="py-2 px-3">Denominación ISRM</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-navy-900/30 text-slate-300">
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-rose-400">R0</td>
+                      <td className="py-2 px-3 text-center font-mono">0.25</td>
+                      <td className="py-2 px-3 text-center font-mono">1.00</td>
+                      <td className="py-2 px-3">Extremadamente débil</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-orange-400">R1</td>
+                      <td className="py-2 px-3 text-center font-mono">1.00</td>
+                      <td className="py-2 px-3 text-center font-mono">5.00</td>
+                      <td className="py-2 px-3">Muy débil</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-amber-400">R2</td>
+                      <td className="py-2 px-3 text-center font-mono">5.00</td>
+                      <td className="py-2 px-3 text-center font-mono">25.00</td>
+                      <td className="py-2 px-3">Débil</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-yellow-400">R3</td>
+                      <td className="py-2 px-3 text-center font-mono">25.00</td>
+                      <td className="py-2 px-3 text-center font-mono">50.00</td>
+                      <td className="py-2 px-3">Moderadamente resistente</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-emerald-400">R4</td>
+                      <td className="py-2 px-3 text-center font-mono">50.00</td>
+                      <td className="py-2 px-3 text-center font-mono">100.00</td>
+                      <td className="py-2 px-3">Resistente</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-cyan-400">R5</td>
+                      <td className="py-2 px-3 text-center font-mono">100.00</td>
+                      <td className="py-2 px-3 text-center font-mono">250.00</td>
+                      <td className="py-2 px-3">Muy resistente</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-bold text-indigo-400">R6</td>
+                      <td className="py-2 px-3 text-center font-mono">250.00</td>
+                      <td className="py-2 px-3 text-center font-mono">&gt; 250.00</td>
+                      <td className="py-2 px-3">Extremadamente resistente</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. Dirección de Rotura */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
+                  <Compass size={12} className="text-emerald-400" />
+                  <span>Dirección de Rotura (ISRM)</span>
+                </h3>
+                <div className="overflow-x-auto rounded-lg border border-navy-900">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
+                        <th className="py-2 px-3">Sigla</th>
+                        <th className="py-2 px-3">Descripción Geológica</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy-900/30 text-slate-300">
+                      <tr className="hover:bg-navy-900/20">
+                        <td className="py-2 px-3 font-bold text-emerald-400">Pa</td>
+                        <td className="py-2 px-3">Paralela a los planos de debilidad (estratificación, foliación)</td>
+                      </tr>
+                      <tr className="hover:bg-navy-900/20">
+                        <td className="py-2 px-3 font-bold text-emerald-400">Pe</td>
+                        <td className="py-2 px-3">Perpendicular a los planos de debilidad (estratificación, foliación)</td>
+                      </tr>
+                      <tr className="hover:bg-navy-900/20">
+                        <td className="py-2 px-3 font-bold text-emerald-400">NA</td>
+                        <td className="py-2 px-3">No aplica (rocas masivas sin planos de debilidad)</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. Tipo de Fractura */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
+                  <Flame size={12} className="text-indigo-400" />
+                  <span>Tipo de Fractura / Rotura</span>
+                </h3>
+                <div className="overflow-x-auto rounded-lg border border-navy-900">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
+                        <th className="py-2 px-3">Tipo</th>
+                        <th className="py-2 px-3">Criterio de Aceptación</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy-900/30 text-slate-300">
+                      <tr className="hover:bg-navy-900/20">
+                        <td className="py-2 px-3 font-bold text-indigo-400">M</td>
+                        <td className="py-2 px-3">Rotura por matriz. Si la muestra no se rompe se considera M.</td>
+                      </tr>
+                      <tr className="hover:bg-navy-900/20">
+                        <td className="py-2 px-3 font-bold text-indigo-400">E</td>
+                        <td className="py-2 px-3">Rotura por estructura preexistente.</td>
+                      </tr>
+                      <tr className="hover:bg-navy-900/20">
+                        <td className="py-2 px-3 font-bold text-indigo-400">C</td>
+                        <td className="py-2 px-3">Rotura combinada (por matriz y estructura en simultáneo).</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Escala de Resistencia RMR Bieniawski */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
+                <AlignLeft size={12} className="text-amber-400" />
+                <span>Valoración de Resistencia de la Roca Intacta (RMR)</span>
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
+                      <th className="py-2 px-3">Rango de Resistencia UCS (MPa)</th>
+                      <th className="py-2 px-3 text-center">Rating RMR'89</th>
+                      <th className="py-2 px-3 text-center">Rating RMR'76</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-navy-900/30 text-slate-300">
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-semibold">&gt; 250 MPa</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">15</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">10</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-semibold">100 - 250 MPa</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">12</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">8</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-semibold">50 - 100 MPa</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">7</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">5</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-semibold">25 - 50 MPa</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">4</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">2</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-semibold">5 - 25 MPa</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">2</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">1</td>
+                    </tr>
+                    <tr className="hover:bg-navy-900/20">
+                      <td className="py-2 px-3 font-semibold">1 - 5 MPa</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">1</td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400">0</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ... TABLAS RESTANTES (tipos, abertura, continuidad, etc) ... */}
         {activeTab === 'tipos' && (
           <div className="space-y-3">
             <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
@@ -198,9 +388,7 @@ export default function CatalogsView() {
                     <th className="py-2.5 px-2 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Blando &gt;5 (89)</th>
                     <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Sin (76)</th>
                     <th className="py-2.5 px-2 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Duro &lt;5 (76)</th>
-                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76_gt5 : ''}</th>
-                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76 : ''}</th>
-                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76_gt5 : ''}</th>
+                    <th className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">Sin relleno</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
@@ -217,8 +405,6 @@ export default function CatalogsView() {
                         <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 3 ? item.rmr76 : ''}</td>
                         <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76 : ''}</td>
                         <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 2 ? item.rmr76_gt5 : ''}</td>
-                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76 : ''}</td>
-                        <td className="py-2.5 px-2 text-center text-amber-300 bg-amber-950/5">{item.clase === 1 ? item.rmr76_gt5 : ''}</td>
                       </tr>
                     );
                   })}
@@ -228,6 +414,7 @@ export default function CatalogsView() {
           </div>
         )}
 
+        {/* ... RESTO DE CASOS ... */}
         {activeTab === 'rugosidad' && (
           <div className="space-y-3">
             <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
@@ -296,7 +483,7 @@ export default function CatalogsView() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-2.5 px-4 w-24 border-b border-navy-900">Código</th>
+                    <th className="py-2.5 px-4 border-b border-navy-900">Código</th>
                     <th className="py-2.5 px-4 border-b border-navy-900">Grado de Meteorización</th>
                     <th className="py-2.5 px-4 text-center text-pink-400 bg-pink-950/10 border-b border-navy-900">Rating R89</th>
                     <th className="py-2.5 px-4 text-center text-amber-400 bg-amber-950/10 border-b border-navy-900">Rating R76</th>
@@ -355,6 +542,7 @@ export default function CatalogsView() {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

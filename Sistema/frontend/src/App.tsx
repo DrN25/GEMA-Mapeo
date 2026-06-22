@@ -777,9 +777,9 @@ export default function App() {
                 </button>
               )}
 
-              {activeWindow && (
+              {(activeWindow || currentView === 'plt_ensayos') && (
                 <button
-                  onClick={handleSaveActive}
+                  onClick={currentView === 'plt_ensayos' ? handleSaveActivePlt : handleSaveActive}
                   disabled={syncStatus === 'saving'}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 border ${syncStatus === 'unsaved'
                     ? 'bg-amber-500 hover:bg-amber-600 text-slate-900 border-amber-400/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse-ring'
@@ -789,7 +789,7 @@ export default function App() {
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold'
                         : 'bg-navy-900 hover:bg-navy-850 text-slate-300 border-navy-800'
                     }`}
-                  title="Guardar todos los cambios en SQL Server"
+                  title={currentView === 'plt_ensayos' ? "Guardar ensayos PLT" : "Guardar todos los cambios en SQL Server"}
                 >
                   <Save size={14} />
                   <span>{syncStatus === 'saving' ? 'Guardando...' : 'Guardar'}</span>
@@ -1053,10 +1053,11 @@ export default function App() {
                 setSyncStatus('unsaved');
                 setSyncMessage('Ensayos PLT modificados localmente. Presione "Guardar Cambios" para sincronizar.');
               }}
-              activeWindowCellda={activeWindow?.header.celda || null}
+              activeWindowCelda={activeWindow?.header.celda || null}
               onSave={handleSaveActivePlt}
               syncStatus={syncStatus}
               syncMessage={syncMessage}
+              showFormulas={showFormulas} // Se propaga la propiedad global
             />
           )}
 

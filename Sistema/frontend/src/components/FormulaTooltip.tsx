@@ -54,7 +54,19 @@ export const COLUMN_NAMES = {
     ucs_mpa: "UCS (MPa)",
     is50_mpa: "is50 (MPa)",
     espac_prom: "Espaciamiento Promedio",
-    espaciamiento: "Espaciamiento de Junta"
+    espaciamiento: "Espaciamiento de Junta",
+
+    // Nuevas columnas de Ensayos PLT
+    ancho_w: "Ancho W (cm)",
+    muestra_valida_longitud: "Muestra Válida - L",
+    muestra_valida_ancho: "Muestra Válida - W",
+    diametro_equivalente: "Diámetro Equivalente De (cm)",
+    f: "Factor de Corrección f",
+    is_mpa: "Is (MPa)",
+    is_50: "Is(50) (MPa)",
+    ucs: "UCS (MPa)",
+    resistencia_isrm: "Resist. ISRM",
+    denominacion_isrm: "Denominación ISRM"
 };
 
 export interface FormulaDef {
@@ -236,7 +248,7 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
     },
     rqd_rating_r89: {
         title: `Rating RQD (R89)`,
-        equation: `Rating = EcuaciónContinua(RQD%)`,
+        equation: `Rating = -0.000006 * RQD^3 + 0.0015 * RQD^2 + 0.0806 * RQD + 3.0282`,
         description: "Ajuste polinómico continuo de la curva Bieniawski para evitar saltos discretos artificiales en los umbrales de RQD.",
         inputs: [COLUMN_NAMES.rqd_est],
         calcExplanation: (params) => `RQD: ${params?.rqd !== undefined ? `${params.rqd.toFixed(2)}%` : '—'} ➔ Rating: ${params?.val ?? '—'}`
@@ -320,6 +332,103 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
             const sum = (ucs || 0) + (rqd || 0) + (spacing || 0) + (cond || 0) + (water || 0);
             return `${ucs || 0} (Resist) + ${rqd || 0} (RQD) + ${spacing || 0} (Espac) + ${cond || 0} (Cond) + ${water || 0} (Agua) = ${sum}`;
         }
+    },
+
+    // Ecuaciones de Ensayos PLT
+    plt_ancho_w: {
+        title: "Ancho W Promedio",
+        equation: "W = (W1 + W2) / 2",
+        description: "Calcula el ancho promedio a partir de las mediciones ortogonales W1 y W2 en centímetros.",
+        inputs: ["Ancho W1 (cm)", "Ancho W2 (cm)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { w1, w2, val } = params;
+            return `(${w1 ?? '—'} + ${w2 ?? '—'}) / 2 = ${val ?? '—'} cm`;
+        }
+    },
+    plt_valida_long: {
+        title: "Validez de Longitud de Muestra",
+        equation: "Validez = (L ≥ D) ➔ SÍ / NO",
+        description: "Estándar ISRM: la longitud L de la muestra debe ser igual o superior al espesor D para un ensayo válido de bloque irregular.",
+        inputs: ["Longitud L (cm)", "Espesor D (cm)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { l, d, val } = params;
+            return `L: ${l ?? '—'} ≥ D: ${d ?? '—'} ➔ ${val ?? '—'}`;
+        }
+    },
+    plt_valida_ancho: {
+        title: "Validez de Ancho de Muestra",
+        equation: "Validez = (0.3 * W < D < W) ➔ SÍ / NO",
+        description: "Estándar ISRM: la relación entre el espesor D y el ancho W de la muestra debe encontrarse en este intervalo óptimo.",
+        inputs: ["Espesor D (cm)", "Ancho W (cm)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { d, w, val } = params;
+            return `0.3 * W: ${(0.3 * (w || 0)).toFixed(2)} < D: ${d ?? '—'} < W: ${w ?? '—'} ➔ ${val ?? '—'}`;
+        }
+    },
+    plt_diam_equiv: {
+        title: "Diámetro Equivalente (De)",
+        equation: "De = √(4 * D * W / π)",
+        description: "Calcula el diámetro de núcleo equivalente para un bloque irregular de sección transversal rectangular.",
+        inputs: ["Espesor D (cm)", "Ancho W (cm)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { d, w, val } = params;
+            return `√(4 * ${d ?? '0'} * ${w ?? '0'} / π) = ${val ?? '—'} cm`;
+        }
+    },
+    plt_f_factor: {
+        title: "Factor de Corrección por Tamaño (f)",
+        equation: "f = (De * 10 / 50) ^ 0.45",
+        description: "Factor de corrección de escala estándar para normalizar el diámetro equivalente a la referencia de 50 mm.",
+        inputs: [COLUMN_NAMES.diametro_equivalente],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { de, val } = params;
+            return `(${de !== undefined ? (de * 10).toFixed(1) : '0'} / 50) ^ 0.45 = ${val ?? '—'}`;
+        }
+    },
+    plt_is_mpa: {
+        title: "Índice Carga Puntual Is (MPa)",
+        equation: "Is = P * 1000 / (De * 10)²",
+        description: "Índice de carga puntual no corregido en MPa calculado a partir de la fuerza de ruptura P (kN) y el diámetro equivalente.",
+        inputs: ["Fuerza P (kN)", COLUMN_NAMES.diametro_equivalente],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { p, de, val } = params;
+            return `${p ?? '0'} * 1000 / (${de !== undefined ? (de * 10).toFixed(1) : '0'})² = ${val ?? '—'} MPa`;
+        }
+    },
+    plt_is50: {
+        title: "Índice Carga Puntual Is(50)",
+        equation: "Is(50) = Is * f",
+        description: "Índice de resistencia corregido a la escala estándar de 50 mm mediante el factor f.",
+        inputs: [COLUMN_NAMES.is_mpa, COLUMN_NAMES.f],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { isVal, f, val } = params;
+            return `${isVal ?? '0'} * ${f ?? '0'} = ${val ?? '—'} MPa`;
+        }
+    },
+    plt_ucs: {
+        title: "UCS Estimado (MPa)",
+        equation: "UCS = Is(50) * K",
+        description: "Estima la resistencia a compresión uniaxial simple de la roca intacta mediante el factor de correlación K.",
+        inputs: [COLUMN_NAMES.is_50, COLUMN_NAMES.factor_conversion_k],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { is50, k, val } = params;
+            return `${is50 ?? '0'} * ${k ?? '0'} = ${val ?? '—'} MPa`;
+        }
+    },
+    plt_isrm: {
+        title: "Clasificación de Resistencia ISRM",
+        equation: "Clasificación = Lookup(ISRM_TABLE, UCS)",
+        description: "Clasifica la resistencia del macizo de roca intacta en los grados normalizados (R0 a R6) según el UCS estimado.",
+        inputs: [COLUMN_NAMES.ucs],
+        calcExplanation: (params) => `UCS: ${params?.ucs !== undefined ? params.ucs.toFixed(2) : '—'} ➔ ISRM: ${params?.val ?? '—'}`
     }
 };
 
@@ -416,10 +525,8 @@ const PortalTooltip: React.FC<PortalTooltipProps> = ({ coords, def, params, posi
     const viewportHeight = window.innerHeight;
     const margin = 16;
 
-    // 1. Centrar horizontalmente sobre el trigger
     let left = coords.left + coords.width / 2;
 
-    // Evitar desbordamiento por los extremos izquierdo y derecho del monitor
     const halfW = tooltipSize.width / 2;
     if (left - halfW < margin) {
         left = halfW + margin;
@@ -427,7 +534,6 @@ const PortalTooltip: React.FC<PortalTooltipProps> = ({ coords, def, params, posi
         left = viewportWidth - halfW - margin;
     }
 
-    // 2. Control vertical inteligente de colisiones (Flipping arriba / abajo)
     let finalPosition = position;
     if (finalPosition === 'top' && coords.top - tooltipSize.height - margin < 0) {
         finalPosition = 'bottom';
