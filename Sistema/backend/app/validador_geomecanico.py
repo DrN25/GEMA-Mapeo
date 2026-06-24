@@ -216,6 +216,17 @@ def validate_bulk_excel(file_path, output_json_path):
         resumen_celdas[celda_padre]["total_hijas"] += 1
         row_has_errors = False
 
+        # Declaramos e inicializamos las variables de forma segura y temprana
+        camp = sanitize_value(get_row_val(row_dict, 'Campaña'), int)
+        if camp:
+            filas_por_campana[str(camp)] = filas_por_campana.get(str(camp), 0) + 1
+            
+        geo = sanitize_value(get_row_val(row_dict, 'GEOTECNICO'), str)
+        if geo:
+            filas_por_geotecnico[geo] = filas_por_geotecnico.get(geo, 0) + 1
+            
+        geo_zone = geo  # Alias temprano para sector geotécnico
+
         def registrar_error(col, val, tipo, msg):
             nonlocal row_has_errors, total_vacios, total_advertencias, total_alertas
             incidencias.append({
@@ -225,7 +236,10 @@ def validate_bulk_excel(file_path, output_json_path):
                 "columna": col,
                 "valor_actual": val,
                 "tipo_incidencia": tipo,
-                "mensaje": msg
+                "mensaje": msg,
+                "campania": str(camp) if camp else "N/A",
+                "geotecnico": geo if geo else "N/A",
+                "sector_geotecnico": geo_zone if geo_zone else "N/A"
             })
             if tipo == "VACIO":
                 total_vacios += 1

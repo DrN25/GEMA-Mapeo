@@ -5,6 +5,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from datetime import date, datetime
+from collections import Counter, defaultdict
 import io
 import openpyxl
 import math
@@ -1262,81 +1263,400 @@ def get_fotos(codigo: str):
                         break
                 
     return {"photos": photos, "captions": captions}
-
-def run_bulk_pipeline(file_path: str):
-    """
-    Background Task: Ejecuta tu validador sobre el Excel subido,
-    escribe el JSON de 200MB y genera el resumen compacto de < 1MB de forma automática.
-    """
-    raw_json_out = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
-    compact_json_out = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
     
-    # 1. Ejecutar tu validador de 79 columnas ya corregido
+
+def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
+    """
+    Background Task: Ejecuta el validador, almacena el diagnóstico masivo 
+    y pre-calcula los KPIs avanzados de las 8 familias geotécnicas.
+    """
+    history_dir = os.path.join(uploads_dir, "history")
+    os.makedirs(history_dir, exist_ok=True)
+    
+    raw_json_out = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
+    compact_json_out = os.path.join(history_dir, f"{audit_id}_compact.json")
+    
+    # 1. Ejecutar el validador de consistencia
     validate_bulk_excel(file_path, raw_json_out)
     
-    # 2. Cargar en memoria y generar la versión compacta (Sinfín de Incidencias)
-    global DIAGNOSTIC_CACHE, COMPACT_CACHE
-    with open(raw_json_out, "r", encoding="utf-8") as f:
-        DIAGNOSTIC_CACHE = json.load(f)
-        
-    # Extraemos todos los KPIs menos el arreglo de 1 millón de incidencias detalladas
-    COMPACT_CACHE = {k: v for k, v in DIAGNOSTIC_CACHE.items() if k != "incidencias"}
+    # Copiar también al path por defecto para mantener compatibilidad
+    shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
     
-    # Guardamos la versión compacta ligera en el disco del servidor
+    # 2. Leer diagnóstico detallado para realizar agregaciones estadísticas
+    with open(raw_json_out, "r", encoding="utf-8") as f:
+        diag = json.load(f)
+        
+    compact = {k: v for k, v in diag.items() if k != "incidencias"}
+    incidencias = diag.get("incidencias", [])
+    total_filas = diag.get("total_filas_procesadas", 0)
+    
+    # --- METRICA 1: Mapeo de Celdas Padre ---
+    resumen_celdas = diag.get("resumen_por_celda_padre", {})
+    num_celdas_padre = len(resumen_celdas)
+    promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
+    
+    # --- METRICA 2: Cantidad de campos totales (77 Columnas Obligatorias) ---
+    total_fields = total_filas * 77
+    total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
+    total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+    total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
+    
+    # --- METRICA 3: Cantidad de discontinuidades (Filas de Excel) ---
+    row_errors = defaultdict(set)
+    for i in incidencias:
+        row_errors[i["fila_excel"]].add(i["tipo_incidencia"])
+        
+    discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
+    discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
+    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
+    discs_correctas = total_filas - len(row_errors)
+    
+    # --- METRICAS 4, 5 y 6: Distribuciones por Campaña, Sector y Geólogo ---
+    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    
+    for i in incidencias:
+        c = i.get("campania", "N/A")
+        g = i.get("geotecnico", "N/A")
+        s = i.get("sector_geotecnico", "N/A")
+        
+        camp_stats[c]["filas"].add(i["fila_excel"])
+        geo_stats[g]["filas"].add(i["fila_excel"])
+        sector_stats[s]["filas"].add(i["fila_excel"])
+        
+        tipo = i.get("tipo_incidencia")
+        if tipo == "VACIO":
+            camp_stats[c]["vacios"] += 1
+            geo_stats[g]["vacios"] += 1
+            sector_stats[s]["vacios"] += 1
+        elif tipo == "ADVERTENCIA":
+            camp_stats[c]["advertencias"] += 1
+            geo_stats[g]["advertencias"] += 1
+            sector_stats[s]["advertencias"] += 1
+        elif tipo == "ALERTA":
+            camp_stats[c]["alertas"] += 1
+            geo_stats[g]["alertas"] += 1
+            sector_stats[s]["alertas"] += 1
+            
+    distribucion_campania = []
+    for c, stats in camp_stats.items():
+        rows_count = len(stats["filas"])
+        total_fields_group = rows_count * 77
+        distribucion_campania.append({
+            "campania": c,
+            "discontinuidades": rows_count,
+            "vacios_cant": stats["vacios"],
+            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+            "advertencias_cant": stats["advertencias"],
+            "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+            "alertas_cant": stats["alertas"],
+            "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100,
+        })
+        
+    distribucion_geotecnico = []
+    for g, stats in geo_stats.items():
+        rows_count = len(stats["filas"])
+        total_fields_group = rows_count * 77
+        distribucion_geotecnico.append({
+            "geotecnico": g,
+            "discontinuidades": rows_count,
+            "vacios_cant": stats["vacios"],
+            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+            "advertencias_cant": stats["advertencias"],
+            "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+            "alertas_cant": stats["alertas"],
+            "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100,
+        })
+        
+    distribucion_sector = []
+    for s, stats in sector_stats.items():
+        rows_count = len(stats["filas"])
+        total_fields_group = rows_count * 77
+        distribucion_sector.append({
+            "sector": s,
+            "discontinuidades": rows_count,
+            "vacios_cant": stats["vacios"],
+            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+            "advertencias_cant": stats["advertencias"],
+            "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+            "alertas_cant": stats["alertas"],
+            "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100,
+        })
+        
+    # --- METRICAS 7 y 8: Top Tipo Alertas e Inconsistencias Frecuentes ---
+    msg_alertas = Counter(i.get("mensaje") for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+    msg_advertencias = Counter(i.get("mensaje") for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    
+    top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
+    lista_detallada_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(20)]
+    lista_detallada_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common(20)]
+    
+    # 4. Consolidar el Metacompacto final
+    compact["audit_id"] = audit_id
+    compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    compact["nombre_archivo"] = os.path.basename(file_path)
+    
+    compact["familia1"] = {
+        "num_celdas_padre": num_celdas_padre,
+        "promedio_hijas": round(promedio_hijas, 2),
+        "total_discontinuidades": total_filas
+    }
+    compact["familia2"] = {
+        "total_fields": total_fields,
+        "total_vacios": total_vacios,
+        "total_advertencias": total_advertencias,
+        "total_alertas": total_alertas,
+        "total_correctos": total_correctos
+    }
+    compact["familia3"] = {
+        "total_discontinuidades": total_filas,
+        "discontinuidades_alertas": discs_con_alerta,
+        "discontinuidades_advertencias": discs_con_advertencia,
+        "discontinuidades_vacios": discs_con_vacio,
+        "discontinuidades_correctas": discs_correctas
+    }
+    compact["distribucion_campania"] = distribucion_campania
+    compact["distribucion_sector"] = distribucion_sector
+    compact["distribucion_geotecnico"] = distribucion_geotecnico
+    compact["top_5_alertas"] = top_5_alertas
+    compact["error_types_detailed"] = {
+        "alertas": lista_detallada_alertas,
+        "advertencias": lista_detallada_advertencias
+    }
+    
+    # Worst Cells
+    sorted_worst = sorted(
+        resumen_celdas.items(),
+        key=lambda x: (
+            x[1].get("alertas", 0),
+            x[1].get("vacios", 0),
+            x[1].get("advertencias", 0)
+        ),
+        reverse=True
+    )[:20]
+    worst_cells = [{"celda": k, **v} for k, v in sorted_worst] # <-- Definida de manera correcta
+    
+    col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
+    compact["top_column_errors"] = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
+    compact["worst_cells"] = worst_cells
+    
     with open(compact_json_out, "w", encoding="utf-8") as f:
-        json.dump(COMPACT_CACHE, f, ensure_ascii=False)
-
-@app.post("/api/geomecanica/importar-excel-bulk")
-async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Recibe la planilla Excel bulk y ejecuta la auditoría en segundo plano."""
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="El archivo provisto no es una planilla Excel valida.")
+        json.dump(compact, f, ensure_ascii=False)
         
-    file_path = os.path.join(uploads_dir, "bulk_raw.xlsx")
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    background_tasks.add_task(run_bulk_pipeline, file_path)
-    return {"status": "procesando"}
+    # Copiar al default para compatibilidad
+    shutil.copyfile(compact_json_out, os.path.join(uploads_dir, "resumen_geomecanico_ligero.json"))
 
-@app.get("/api/geomecanica/resumen-ligero")
-def obtener_resumen_ligero():
-    """Retorna los KPIs ligeros (<1MB) de forma instantánea para la web."""
-    global COMPACT_CACHE
-    if COMPACT_CACHE is None:
-        compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
-        if os.path.exists(compact_file):
-            with open(compact_file, "r", encoding="utf-8") as f:
-                COMPACT_CACHE = json.load(f)
-        else:
-            return JSONResponse(status_code=202, content={"status": "procesando", "message": "Los datos aun se estan procesando en el servidor."})
-    return COMPACT_CACHE
 
 @app.get("/api/geomecanica/incidencias-paginadas")
 def obtener_incidencias_paginadas(
     page: int = 1,
     limit: int = 50,
     tipo: str = None,
-    celda: str = None
+    celda: str = None,
+    columna: str = None,
+    campania: str = None,
+    geotecnico: str = None,
+    sector_geotecnico: str = None,
+    search: str = None,
+    audit_id: str = None
 ):
-    """Devuelve bloques de incidencias (de 50 en 50) consultando la caché de 200MB."""
-    global DIAGNOSTIC_CACHE
-    if DIAGNOSTIC_CACHE is None:
+    """Devuelve bloques de incidencias cruzando filtros avanzados con resiliencia en segundo plano."""
+    if audit_id:
+        raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
+        excel_file = os.path.join(uploads_dir, "history", f"{audit_id}.xlsx")
+    else:
         raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
-        if os.path.exists(raw_file):
-            with open(raw_file, "r", encoding="utf-8") as f:
-                DIAGNOSTIC_CACHE = json.load(f)
-        else:
-            raise HTTPException(status_code=404, detail="El diagnostico no ha sido generado en el servidor.")
+        excel_file = os.path.join(uploads_dir, "bulk_raw.xlsx")
+        
+    if not os.path.exists(raw_file):
+        if os.path.exists(excel_file):
+            # El archivo Excel se encuentra procesándose, se retorna vacío sin levantar 404
+            return {
+                "page": page,
+                "limit": limit,
+                "total_records": 0,
+                "total_pages": 0,
+                "data": [],
+                "status": "procesando"
+            }
+        raise HTTPException(status_code=404, detail="El diagnóstico solicitado no existe.")
 
-    incidencias = DIAGNOSTIC_CACHE.get("incidencias", [])
+    with open(raw_file, "r", encoding="utf-8") as f:
+        diag_data = json.load(f)
+
+    incidencias = diag_data.get("incidencias", [])
     
-    # Filtros optimizados en memoria
+    # Aplicar filtros cruzados avanzados en memoria
     filtered = incidencias
     if tipo:
         filtered = [i for i in filtered if i.get("tipo_incidencia") == tipo.upper()]
     if celda:
-        filtered = [i for i in filtered if i.get("celda_padre") == celda.upper() or i.get("celda_hija") == celda.upper()]
+        celda_up = celda.upper()
+        filtered = [i for i in filtered if i.get("celda_padre") == celda_up or i.get("celda_hija") == celda_up]
+    if columna:
+        filtered = [i for i in filtered if i.get("columna", "").upper() == columna.upper()]
+    if campania:
+        filtered = [i for i in filtered if i.get("campania") == campania]
+    if geotecnico:
+        geo_up = geotecnico.upper()
+        filtered = [i for i in filtered if i.get("geotecnico", "").upper() == geo_up]
+    if sector_geotecnico:
+        sect_up = sector_geotecnico.upper()
+        filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    if search:
+        search_lower = search.lower()
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in i.get("columna", "").lower()
+            or search_lower in i.get("celda_padre", "").lower()
+        ]
+        
+    total_records = len(filtered)
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    
+    return {
+        "page": page,
+        "limit": limit,
+        "total_records": total_records,
+        "total_pages": math.ceil(total_records / limit),
+        "data": filtered[start_idx:end_idx],
+        "status": "completado"
+    }
+
+@app.post("/api/geomecanica/importar-excel-bulk")
+async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="El archivo provisto no es una planilla Excel valida.")
+        
+    audit_id = f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    history_dir = os.path.join(uploads_dir, "history")
+    os.makedirs(history_dir, exist_ok=True)
+    
+    file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id)
+    return {"status": "procesando", "audit_id": audit_id, "filename": file.filename}
+
+
+@app.get("/api/geomecanica/auditorias")
+def listar_auditorias():
+    history_dir = os.path.join(uploads_dir, "history")
+    if not os.path.exists(history_dir):
+        return []
+    
+    audits = []
+    for f in os.listdir(history_dir):
+        if f.endswith("_compact.json"):
+            audit_id = f.replace("_compact.json", "")
+            compact_file = os.path.join(history_dir, f)
+            try:
+                with open(compact_file, "r", encoding="utf-8") as file_content:
+                    meta = json.load(file_content)
+                    audits.append({
+                        "audit_id": audit_id,
+                        "fecha": meta.get("fecha_auditoria", "Desconocida"),
+                        "archivo": meta.get("nombre_archivo", "Desconocido.xlsx"),
+                        "total_filas": meta.get("familia1", {}).get("total_discontinuidades", 0),
+                        "total_vacios": meta.get("familia2", {}).get("total_vacios", 0),
+                        "total_advertencias": meta.get("familia2", {}).get("total_advertencias", 0),
+                        "total_alertas": meta.get("familia2", {}).get("total_alertas", 0),
+                    })
+            except Exception:
+                pass
+                
+    audits.sort(key=lambda x: x["fecha"], reverse=True)
+    return audits
+
+
+@app.get("/api/geomecanica/resumen-ligero")
+def obtener_resumen_ligero(audit_id: str = None):
+    """
+    Retorna los KPIs compactos. Si el archivo final no existe pero el Excel
+    de origen sí, indica al cliente que el proceso está en curso (202).
+    """
+    global COMPACT_CACHE
+    if audit_id:
+        compact_file = os.path.join(uploads_dir, "history", f"{audit_id}_compact.json")
+        if os.path.exists(compact_file):
+            with open(compact_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        
+        # Si el JSON no existe, pero el Excel sí, es porque se está procesando
+        excel_file = os.path.join(uploads_dir, "history", f"{audit_id}.xlsx")
+        if os.path.exists(excel_file):
+            return JSONResponse(
+                status_code=202,
+                content={"status": "procesando", "message": "Compilando estadísticas de las 8 familias geotécnicas..."}
+            )
+            
+        raise HTTPException(status_code=404, detail="Auditoría no encontrada")
+        
+    if COMPACT_CACHE is None:
+        compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
+        if os.path.exists(compact_file):
+            with open(compact_file, "r", encoding="utf-8") as f:
+                COMPACT_CACHE = json.load(f)
+        else:
+            return JSONResponse(status_code=202, content={"status": "procesando", "message": "Los datos generales se están procesando."})
+    return COMPACT_CACHE
+
+
+@app.get("/api/geomecanica/incidencias-paginadas")
+def obtener_incidencias_paginadas(
+    page: int = 1,
+    limit: int = 50,
+    tipo: str = None,
+    celda: str = None,
+    columna: str = None,
+    campania: str = None,
+    geotecnico: str = None,
+    sector_geotecnico: str = None,
+    search: str = None,
+    audit_id: str = None
+):
+    if audit_id:
+        raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
+    else:
+        raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
+        
+    if not os.path.exists(raw_file):
+        raise HTTPException(status_code=404, detail="El diagnóstico solicitado no existe.")
+
+    with open(raw_file, "r", encoding="utf-8") as f:
+        diag_data = json.load(f)
+
+    incidencias = diag_data.get("incidencias", [])
+    
+    filtered = incidencias
+    if tipo:
+        filtered = [i for i in filtered if i.get("tipo_incidencia") == tipo.upper()]
+    if celda:
+        celda_up = celda.upper()
+        filtered = [i for i in filtered if i.get("celda_padre") == celda_up or i.get("celda_hija") == celda_up]
+    if columna:
+        filtered = [i for i in filtered if i.get("columna", "").upper() == columna.upper()]
+    if campania:
+        filtered = [i for i in filtered if i.get("campania") == campania]
+    if geotecnico:
+        geo_up = geotecnico.upper()
+        filtered = [i for i in filtered if i.get("geotecnico", "").upper() == geo_up]
+    if sector_geotecnico:
+        sect_up = sector_geotecnico.upper()
+        filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    if search:
+        search_lower = search.lower()
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in i.get("columna", "").lower()
+            or search_lower in i.get("celda_padre", "").lower()
+        ]
         
     total_records = len(filtered)
     start_idx = (page - 1) * limit
@@ -1349,3 +1669,96 @@ def obtener_incidencias_paginadas(
         "total_pages": math.ceil(total_records / limit),
         "data": filtered[start_idx:end_idx]
     }
+
+
+@app.get("/api/geomecanica/reporte-markdown")
+def descargar_reporte_markdown(
+    tipo: str = None,
+    celda: str = None,
+    columna: str = None,
+    campania: str = None,
+    geotecnico: str = None,
+    sector_geotecnico: str = None,
+    search: str = None,
+    audit_id: str = None
+):
+    if audit_id:
+        raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
+    else:
+        raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
+        
+    if not os.path.exists(raw_file):
+        raise HTTPException(status_code=404, detail="El diagnóstico solicitado no ha sido generado.")
+        
+    with open(raw_file, "r", encoding="utf-8") as f:
+        diag = json.load(f)
+            
+    incidencias = diag.get("incidencias", [])
+    
+    # Aplicar idénticos filtros cruzados
+    filtered = incidencias
+    if tipo:
+        filtered = [i for i in filtered if i.get("tipo_incidencia") == tipo.upper()]
+    if celda:
+        celda_up = celda.upper()
+        filtered = [i for i in filtered if i.get("celda_padre") == celda_up or i.get("celda_hija") == celda_up]
+    if columna:
+        filtered = [i for i in filtered if i.get("columna", "").upper() == columna.upper()]
+    if campania:
+        filtered = [i for i in filtered if i.get("campania") == campania]
+    if geotecnico:
+        geo_up = geotecnico.upper()
+        filtered = [i for i in filtered if i.get("geotecnico", "").upper() == geo_up]
+    if sector_geotecnico:
+        sect_up = sector_geotecnico.upper()
+        filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    if search:
+        search_lower = search.lower()
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in i.get("columna", "").lower()
+        ]
+        
+    md_content = []
+    md_content.append("# Reporte de Auditoria de Consistencia Geomecanica Detallado")
+    md_content.append(f"**Generado el:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ")
+    md_content.append(f"**Total Incidencias Coincidentes:** {len(filtered):,}  \n")
+    md_content.append("### Filtros de Auditoria Aplicados:")
+    md_content.append(f"*   **Tipo de Incidencia:** `{tipo if tipo else 'TODOS'}`")
+    md_content.append(f"*   **Columna del Excel:** `{columna if columna else 'TODAS'}`")
+    md_content.append(f"*   **Estacion de Mapeo (Celda):** `{celda if celda else 'TODAS'}`")
+    md_content.append(f"*   **Campaña (Año):** `{campania if campania else 'TODAS'}`")
+    md_content.append(f"*   **Sector Geotécnico:** `{sector_geotecnico if sector_geotecnico else 'TODOS'}`")
+    md_content.append(f"*   **Geotécnico Logueador:** `{geotecnico if geotecnico else 'TODOS'}`")
+    if search:
+        md_content.append(f"*   **Filtro por Buscador:** `{search}`")
+    md_content.append("\n---")
+    
+    md_content.append("\n| Fila Excel | Celda Padre | Celda Hija | Columna | Valor Actual | Tipo | Mensaje de Retroalimentación |")
+    md_content.append("| :-: | :--- | :--- | :--- | :---: | :---: | :--- |")
+    
+    limite_exportacion = 3000
+    for inc in filtered[:limite_exportacion]:
+        val = inc.get("valor_actual")
+        val_display = val if val is not None else "—"
+        md_content.append(
+            f"| {inc.get('fila_excel', '—')} | "
+            f"{inc.get('celda_padre', '—')} | "
+            f"{inc.get('celda_hija', '—')} | "
+            f"{inc.get('columna', '—')} | "
+            f"{val_display} | "
+            f"`{inc.get('tipo_incidencia')}` | "
+            f"{inc.get('mensaje', '—')} |"
+        )
+        
+    if len(filtered) > limite_exportacion:
+        md_content.append(f"\n*Nota: Se han acotado los registros detallados a los primeros {limite_exportacion} elementos por estabilidad del archivo.*")
+        
+    md_string = "\n".join(md_content)
+    
+    return StreamingResponse(
+        io.BytesIO(md_string.encode("utf-8")),
+        media_type="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=reporte_auditoria_detallado.md"}
+    )
