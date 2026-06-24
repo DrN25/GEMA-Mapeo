@@ -14,6 +14,7 @@ import ExcelImportModal from './components/ExcelImportModal';
 import CatalogsView from './components/CatalogsView';
 import CommentsPhotos from './components/CommentsPhotos';
 import PltEnsayosView from './components/PltEnsayosView';
+import BulkAuditor from './components/BulkAuditor';
 
 import {
   calculateWindowGeomec,
@@ -809,6 +810,10 @@ export default function App() {
               onDeleteWindow={handleDeleteWindow}
               onOpenImportModal={() => setIsImportModalOpen(true)}
             />
+          )}
+
+          {currentView === 'auditoria_masiva' && (
+            <BulkAuditor apiBase={RESOLVED_API_BASE} />
           )}
 
           {currentView === 'mapeo' && activeWindow && (

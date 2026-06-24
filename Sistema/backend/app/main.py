@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
@@ -9,11 +9,30 @@ import io
 import openpyxl
 import math
 import os
+import shutil
+import json
 from fastapi.staticfiles import StaticFiles
+
+import sys
+from fastapi import BackgroundTasks
 
 from app.database import get_db, Base, engine
 from app import models, schemas, calculator
 from sqlalchemy import text
+
+
+# Agregar el directorio raíz al path para poder importar tu validador_geomecanico.py
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from validador_geomecanico import validate_bulk_excel
+except ImportError:
+    # Fallback preventivo si se ejecuta desde otro contexto de directorios
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from validador_geomecanico import validate_bulk_excel
+
+# Caches globales en memoria para respuestas instantáneas (< 10ms) al frontend
+DIAGNOSTIC_CACHE = None
+COMPACT_CACHE = None
 
 # Auto-migrate database tables to add missing columns on startup
 try:
@@ -47,7 +66,7 @@ app.mount("/api/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1243,3 +1262,90 @@ def get_fotos(codigo: str):
                         break
                 
     return {"photos": photos, "captions": captions}
+
+def run_bulk_pipeline(file_path: str):
+    """
+    Background Task: Ejecuta tu validador sobre el Excel subido,
+    escribe el JSON de 200MB y genera el resumen compacto de < 1MB de forma automática.
+    """
+    raw_json_out = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
+    compact_json_out = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
+    
+    # 1. Ejecutar tu validador de 79 columnas ya corregido
+    validate_bulk_excel(file_path, raw_json_out)
+    
+    # 2. Cargar en memoria y generar la versión compacta (Sinfín de Incidencias)
+    global DIAGNOSTIC_CACHE, COMPACT_CACHE
+    with open(raw_json_out, "r", encoding="utf-8") as f:
+        DIAGNOSTIC_CACHE = json.load(f)
+        
+    # Extraemos todos los KPIs menos el arreglo de 1 millón de incidencias detalladas
+    COMPACT_CACHE = {k: v for k, v in DIAGNOSTIC_CACHE.items() if k != "incidencias"}
+    
+    # Guardamos la versión compacta ligera en el disco del servidor
+    with open(compact_json_out, "w", encoding="utf-8") as f:
+        json.dump(COMPACT_CACHE, f, ensure_ascii=False)
+
+@app.post("/api/geomecanica/importar-excel-bulk")
+async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Recibe la planilla Excel bulk y ejecuta la auditoría en segundo plano."""
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="El archivo provisto no es una planilla Excel valida.")
+        
+    file_path = os.path.join(uploads_dir, "bulk_raw.xlsx")
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    background_tasks.add_task(run_bulk_pipeline, file_path)
+    return {"status": "procesando"}
+
+@app.get("/api/geomecanica/resumen-ligero")
+def obtener_resumen_ligero():
+    """Retorna los KPIs ligeros (<1MB) de forma instantánea para la web."""
+    global COMPACT_CACHE
+    if COMPACT_CACHE is None:
+        compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
+        if os.path.exists(compact_file):
+            with open(compact_file, "r", encoding="utf-8") as f:
+                COMPACT_CACHE = json.load(f)
+        else:
+            return JSONResponse(status_code=202, content={"status": "procesando", "message": "Los datos aun se estan procesando en el servidor."})
+    return COMPACT_CACHE
+
+@app.get("/api/geomecanica/incidencias-paginadas")
+def obtener_incidencias_paginadas(
+    page: int = 1,
+    limit: int = 50,
+    tipo: str = None,
+    celda: str = None
+):
+    """Devuelve bloques de incidencias (de 50 en 50) consultando la caché de 200MB."""
+    global DIAGNOSTIC_CACHE
+    if DIAGNOSTIC_CACHE is None:
+        raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
+        if os.path.exists(raw_file):
+            with open(raw_file, "r", encoding="utf-8") as f:
+                DIAGNOSTIC_CACHE = json.load(f)
+        else:
+            raise HTTPException(status_code=404, detail="El diagnostico no ha sido generado en el servidor.")
+
+    incidencias = DIAGNOSTIC_CACHE.get("incidencias", [])
+    
+    # Filtros optimizados en memoria
+    filtered = incidencias
+    if tipo:
+        filtered = [i for i in filtered if i.get("tipo_incidencia") == tipo.upper()]
+    if celda:
+        filtered = [i for i in filtered if i.get("celda_padre") == celda.upper() or i.get("celda_hija") == celda.upper()]
+        
+    total_records = len(filtered)
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    
+    return {
+        "page": page,
+        "limit": limit,
+        "total_records": total_records,
+        "total_pages": math.ceil(total_records / limit),
+        "data": filtered[start_idx:end_idx]
+    }
