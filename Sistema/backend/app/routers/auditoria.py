@@ -12,18 +12,10 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from app.database import get_db
-from app.utils.validator import validate_bulk_excel
-
-# Evitar importaciones circulares referenciando el validador a nivel de módulo
-import sys
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(BASE_DIR)
-try:
-    from validador_geomecanico import validate_bulk_excel
-except ImportError:
-    from app.validador_geomecanico import validate_bulk_excel
+from app.utils.validator import validate_bulk_excel # <--- IMPORTACIÓN DIRECTA MODULAR CORREGIDA
 
 router = APIRouter()
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 uploads_dir = os.path.join(BASE_DIR, "uploads")
 
 COMPACT_CACHE = None
@@ -37,6 +29,101 @@ def safe_float(val, default=0.0):
     if val is None: return default
     try: return float(val)
     except: return default
+
+def simplify_message(msg):
+    """
+    Consolida de manera inteligente todos los mensajes de error dinámicos con variables numéricas
+    en categorías normalizadas legibles para estadísticas de frecuencia.
+    """
+    msg_clean = str(msg or "").strip()
+    msg_up = msg_clean.upper()
+    
+    # 1. Ratings de espaciamiento no alineados con promedio
+    if "RATING DE ESPACIAMIENTO" in msg_up and "NO SE ALINEA CON EL PROMEDIO" in msg_up:
+        if "76" in msg_up:
+            return "Rating de espaciamiento (76) no se alinea con el promedio esperado."
+        if "89" in msg_up:
+            return "Rating de espaciamiento (89) no se alinea con el promedio esperado."
+        return "Rating de espaciamiento no se alinea con el promedio esperado."
+        
+    # 2. Ratings de agua incongruentes con códigos de catálogo
+    if "RATING DE AGUA" in msg_up and "ES INCONGRUENTE CON EL CÓDIGO" in msg_up:
+        if "76" in msg_up:
+            return "Rating de agua (76) es incongruente con el código de agua."
+        if "89" in msg_up:
+            return "Rating de agua (89) es incongruente con el código de agua."
+        return "Rating de agua es incongruente con el código de agua."
+        
+    # 3. Resistencia incongruente con clave de dureza
+    if "ES INCONGRUENTE CON LA DUREZA" in msg_up or "INCONGRUENTE CON LA DUREZA" in msg_up:
+        if "76" in msg_up:
+            return "Resistencia (76) es incongruente con la dureza."
+        if "89" in msg_up:
+            return "Resistencia (89) es incongruente con la dureza."
+        return "Resistencia es incongruente con la dureza."
+        
+    # 4. Relleno no pertenece al catálogo (Agrupa todos los rellen_val que no coinciden)
+    if "TIPO DE RELLENO" in msg_up and ("NO PERTENECE" in msg_up or "NO RECONOCIDO" in msg_up or "TIPO DE  RELLENO" in msg_up):
+        return "Tipo de relleno no pertenece al catálogo."
+        
+    # 5. Rugosidad de junta fuera de límites [1, 9]
+    if "RUGOSIDAD" in msg_up and ("FUERA DE LÍMITES" in msg_up or "FUERA DE LIMITES" in msg_up or "RANGO PERMITIDO" in msg_up or "CLASE DE RUGOSIDAD" in msg_up):
+        return "Clase de rugosidad de junta fuera de límites [1, 9]."
+
+    # 6. Persistencia / Continuidad supera largo de ventana o límites
+    if "PERSISTENCIA" in msg_up and ("SUPERA EL LARGO" in msg_up or "SUPERA EL LAROG" in msg_up or "SUPERA ELLAROG" in msg_up):
+        return "La persistencia de discontinuidad supera el largo de ventana."
+    if "LA PERSISTENCIA" in msg_up and ("ES SUPERIOR A 25 METROS" in msg_up or "ES INUSUALMENTE ELEVADA" in msg_up):
+        return "La persistencia es superior a 25 metros."
+
+    # 7. Abertura de falla o estándar
+    if "LA ABERTURA DE LA FALLA" in msg_up and "SUPERA LA LONGITUD DE LA CELDA" in msg_up:
+        return "La abertura de la falla supera la longitud de la celda."
+    if "LA ABERTURA" in msg_up and "EXCEDE EL MÁXIMO SUGERIDO" in msg_up:
+        return "La abertura excede el máximo sugerido de 10000mm."
+
+    # 8. Campos vacíos (Agrupa todos los campos vacíos en un solo tipo de frecuencia)
+    if "SE ENCUENTRA VACÍO" in msg_up or "SE ENCUENTRA VACIO" in msg_up:
+        return "Campo obligatorio se encuentra vacío."
+
+    # 9. Espesor mayor a abertura
+    if "ESPESOR DEL RELLENO" in msg_up and "SUPERIOR A LA ABERTURA" in msg_up:
+        return "Espesor del relleno es superior a la abertura total."
+
+    # 10. UCS vs is50
+    if "UCS" in msg_up and "DEBE SER MAYOR A IS50" in msg_up:
+        return "UCS debe ser mayor a Is50."
+
+    # 11. Uniaxial strength correlation (UCS vs Is50 * K)
+    if "DIVERGENCIA DE RESISTENCIA UNIAXIAL" in msg_up or "DIFERE DE LA ESTIMACIÓN" in msg_up or "DIFIE" in msg_up:
+        if "UCS" in msg_up:
+            return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
+
+    # 12. Litología
+    if "COMBINACIÓN LITOLÓGICA INVÁLIDA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
+        return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
+    if "UNIDAD LITOLÓGICA" in msg_up and "ES INCONGRUENTE CON LA LITOLOGÍA" in msg_up:
+        return "Unidad litológica es incongruente con la litología."
+
+    # 13. Valores medios intermedios no exactos de escalas discretas
+    if "VALOR MEDIO NO EXACTO" in msg_up:
+        if "RQD" in msg_up:
+            if "76" in msg_up: return "Puntaje de RQD (76) es un valor medio no exacto."
+            if "89" in msg_up: return "Puntaje de RQD (89) es un valor medio no exacto."
+        if "ESPACIAMIENTO" in msg_up:
+            if "76" in msg_up: return "Puntaje de espaciamiento (76) es un valor medio no exacto."
+            if "89" in msg_up: return "Puntaje de espaciamiento (89) es un valor medio no exacto."
+        if "VOLADURA" in msg_up:
+            if "76" in msg_up: return "Puntaje de efectos de voladura (76) es un valor medio no exacto."
+            if "89" in msg_up: return "Puntaje de efectos de voladura (89) es un valor medio no exacto."
+        if "AGUA" in msg_up:
+            if "76" in msg_up: return "Valor de agua (76) es un valor medio no exacto."
+            if "89" in msg_up: return "Valor de agua (89) es un valor medio no exacto."
+        if "RESISTENCIA" in msg_up:
+            if "76" in msg_up: return "Puntaje de resistencia (76) es un valor medio no exacto."
+            if "89" in msg_up: return "Puntaje de resistencia (89) es un valor medio no exacto."
+
+    return msg_clean
 
 def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
     history_dir = os.path.join(uploads_dir, "history")
@@ -57,6 +144,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
     resumen_celdas = diag.get("resumen_por_celda_padre", {})
     num_celdas_padre = len(resumen_celdas)
     promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
+    total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
     
     total_fields = total_filas * 77
     total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
@@ -133,18 +221,26 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
             "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
         })
         
-    msg_alertas = Counter(i.get("mensaje") for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(i.get("mensaje") for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    # Aplicar la agrupación inteligente en las frecuencias
+    msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
     
     top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
-    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(20)]
-    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common(20)]
+    
+    # Remover cortes restrictivos: mapear el 100% de los elementos
+    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
+    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
     
     compact["audit_id"] = audit_id
     compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     compact["nombre_archivo"] = os.path.basename(file_path)
     
-    compact["familia1"] = {"num_celdas_padre": num_celdas_padre, "promedio_hijas": round(promedio_hijas, 2), "total_discontinuidades": total_filas}
+    compact["familia1"] = {
+        "num_celdas_padre": num_celdas_padre,
+        "promedio_hijas": round(promedio_hijas, 2),
+        "total_discontinuidades": total_filas,
+        "total_metros": round(total_metros, 2)  # Exponer la sumatoria real de metros
+    }
     compact["familia2"] = {"total_fields": total_fields, "total_vacios": total_vacios, "total_advertencias": total_advertencias, "total_alertas": total_alertas, "total_correctos": total_correctos}
     compact["familia3"] = {"total_discontinuidades": total_filas, "discontinuidades_alertas": discs_con_alerta, "discontinuidades_advertencias": discs_con_advertencia, "discontinuidades_vacios": discs_con_vacio, "discontinuidades_correctas": discs_correctas}
     compact["distribucion_campania"] = distribucion_campania
@@ -243,9 +339,19 @@ def obtener_incidencias_paginadas(
     if sector_geotecnico:
         sect_up = sector_geotecnico.upper()
         filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    
+    # PARCHE DE BÚSQUEDA REACTIVA CRUZADA: Compara el filtro 'search'
+    # tanto con el mensaje detallado original como con el mensaje simplificado dinámico.
     if search:
         search_lower = search.lower()
-        filtered = [i for i in filtered if search_lower in i.get("mensaje", "").lower() or search_lower in i.get("columna", "").lower() or search_lower in i.get("celda_padre", "").lower()]
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in simplify_message(i.get("mensaje", "")).lower()
+            or search_lower in i.get("columna", "").lower()
+            or search_lower in i.get("celda_padre", "").lower()
+        ]
+        
     total_records = len(filtered)
     start_idx = (page - 1) * limit
     return {"page": page, "limit": limit, "total_records": total_records, "total_pages": math.ceil(total_records / limit), "data": filtered[start_idx:start_idx+limit]}
@@ -290,9 +396,17 @@ def descargar_reporte_excel(
     if sector_geotecnico:
         sect_up = sector_geotecnico.upper()
         filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    
+    # Parche de búsqueda reactiva cruzada en Excel
     if search:
         search_lower = search.lower()
-        filtered = [i for i in filtered if search_lower in i.get("mensaje", "").lower() or search_lower in i.get("columna", "").lower() or search_lower in i.get("celda_padre", "").lower()]
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in simplify_message(i.get("mensaje", "")).lower()
+            or search_lower in i.get("columna", "").lower()
+            or search_lower in i.get("celda_padre", "").lower()
+        ]
 
     wb = openpyxl.Workbook()
     default_sheet = wb.active
@@ -698,12 +812,20 @@ def descargar_reporte_markdown(
     if sector_geotecnico:
         sect_up = sector_geotecnico.upper()
         filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    
+    # Parche de búsqueda reactiva cruzada en Markdown
     if search:
         search_lower = search.lower()
-        filtered = [i for i in filtered if search_lower in i.get("mensaje", "").lower() or search_lower in i.get("columna", "").lower()]
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in simplify_message(i.get("mensaje", "")).lower()
+            or search_lower in i.get("columna", "").lower()
+        ]
+        
     md_content = ["# Reporte de Auditoria de Consistencia Geomecanica Detallado", f"**Generado el:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ", f"**Total Incidencias Coincidentes:** {len(filtered):,}  \n", "### Filtros Aplicados:", f"* **Tipo:** `{tipo or 'TODOS'}`", f"* **Columna:** `{columna or 'TODAS'}`", f"* **Estación:** `{celda or 'TODAS'}`", f"* **Campaña:** `{campania or 'TODAS'}`", f"* **Sector:** `{sector_geotecnico or 'TODOS'}`", f"* **Geotécnico:** `{geotecnico or 'TODOS'}`"]
     if search: md_content.append(f"* **Buscador:** `{search}`")
-    md_content.extend(["\n---", "\n| Fila Excel | Celda Padre | Celda Hija | Columna | Valor Actual | Tipo | Mensaje de Retroalimentación |", "| :-: | :--- | :--- | :--- | :---: | :---: | :--- |"])
+    md_content.extend(["\n---", "\n| Fila Excel | Celda Padre | Estructura | Columna | Valor Actual | Tipo | Mensaje de Retroalimentación |", "| :-: | :--- | :--- | :--- | :---: | :---: | :--- |"])
     for inc in filtered[:3000]:
         val = inc.get("valor_actual")
         md_content.append(f"| {inc.get('fila_excel', '—')} | {inc.get('celda_padre', '—')} | {inc.get('celda_hija', '—')} | {inc.get('columna', '—')} | {val if val is not None else '—'} | `{inc.get('tipo_incidencia')}` | {inc.get('mensaje', '—')} |")

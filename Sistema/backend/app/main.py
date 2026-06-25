@@ -11,16 +11,16 @@ from app.database import engine, Base
 # Asegurar que el directorio raíz esté en el path para las importaciones
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Auto-migración preventiva de columnas faltantes
+# Auto-migración preventiva de columnas faltantes corregida (sin typos de variables locales)
 try:
     with engine.begin() as conn:
-        for col_def, table in [
-            ("ALTER TABLE ventana ADD turno VARCHAR(50) NULL", "ventana"),
-            ("ALTER TABLE ventanas_final ADD turno VARCHAR(50) NULL", "ventanas_final"),
-            ("ALTER TABLE ventanas_final ADD campania INT NULL", "ventanas_final")
+        for col_def in [
+            "ALTER TABLE ventana ADD turno VARCHAR(50) NULL",
+            "ALTER TABLE ventanas_final ADD turno VARCHAR(50) NULL",
+            "ALTER TABLE ventanas_final ADD campania INT NULL"
         ]:
             try:
-                conn.execute(text(col_dir))
+                conn.execute(text(col_def))
             except Exception:
                 pass
 except Exception as e:
@@ -49,12 +49,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Importación e inyección de routers modulares
-from app.routers import ventanas, plt, auditoria
+# IMPORTACIÓN DIRECTA Y EXPLÍCITA POR SUBMÓDULOS (Evita conflictos de __init__.py)
+from app.routers.ventanas import router as ventanas_router
+from app.routers.plt import router as plt_router
+from app.routers.auditoria import router as auditoria_router
 
-app.include_router(ventanas.router, prefix="/api", tags=["Ventanas"])
-app.include_router(plt.router, prefix="/api", tags=["Ensayos PLT"])
-app.include_router(auditoria.router, prefix="/api", tags=["Auditoría Geotécnica Masiva"])
+app.include_router(ventanas_router, prefix="/api", tags=["Ventanas"])
+app.include_router(plt_router, prefix="/api", tags=["Ensayos PLT"])
+app.include_router(auditoria_router, prefix="/api", tags=["Auditoría Geotécnica Masiva"])
 
 @app.get("/")
 def read_root():

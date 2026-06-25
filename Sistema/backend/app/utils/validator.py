@@ -244,10 +244,15 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                 registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ALERTA", f"Rating de espaciamiento '89 ({espac_val_89}) no se alinea con el promedio de {espac_prom_89}m (se esperaba {expected}).")
 
 def validate_structural_row(row_dict, dist_celda, registrar_error):
-    # 1. Tipo de estructura
+    # 1. Tipo de estructura (Normalización de 'J' a 'ADVERTENCIA')
     tipo_junta = sanitize_value(get_row_val(row_dict, "TIPO"), str)
-    if tipo_junta is not None and tipo_junta.upper() not in TIPO_ESTRUCTURA_CATALOG:
-        registrar_error("TIPO", tipo_junta, "ALERTA", f"Tipo de estructura geológica '{tipo_junta}' no permitida.")
+    if tipo_junta is not None:
+        tipo_junta_up = tipo_junta.upper()
+        if tipo_junta_up not in TIPO_ESTRUCTURA_CATALOG:
+            if tipo_junta_up == 'J':
+                registrar_error("TIPO", tipo_junta, "ADVERTENCIA", "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN' según catálogo estándar.")
+            else:
+                registrar_error("TIPO", tipo_junta, "ALERTA", f"Tipo de estructura geológica '{tipo_junta}' no permitida.")
 
     # 2. Relleno 1 y Relleno 2
     rel1 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 1"), str)
@@ -345,9 +350,12 @@ def validate_lithology_correlation(row_dict, registrar_error):
 
 # --- PROCESADOR CENTRAL DE PLANILLAS EXCEL ---
 
+# app/utils/validator.py
+
 def validate_bulk_excel(file_path, output_json_path):
     print(f"[*] Leyendo archivo Excel: {file_path}")
-    try: df = pd.read_excel(file_path, engine='openpyxl')
+    try: 
+        df = pd.read_excel(file_path, engine='openpyxl')
     except Exception as e:
         print(f"[-] Error al abrir el archivo Excel: {e}")
         sys.exit(1)
@@ -397,13 +405,28 @@ def validate_bulk_excel(file_path, output_json_path):
             total_alertas += 1
             continue
 
+        # --- SE DECLARAN Y SANITIZAN TODAS LAS VARIABLES AL INICIO DE LA ITERACIÓN ---
         camp = sanitize_value(get_row_val(row_dict, 'Campaña'), int)
-        if camp: filas_por_campana[str(camp)] = filas_por_campana.get(str(camp), 0) + 1
         geo = sanitize_value(get_row_val(row_dict, 'GEOTECNICO'), str)
-        if geo: filas_por_geotecnico[geo] = filas_por_geotecnico.get(geo, 0) + 1
+        dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
+        # Acumular distribuciones generales
+        if camp: 
+            filas_por_campana[str(camp)] = filas_por_campana.get(str(camp), 0) + 1
+        if geo: 
+            filas_por_geotecnico[geo] = filas_por_geotecnico.get(geo, 0) + 1
+
+        # Inicializar el resumen de la estación padre de manera segura sin errores de variables locales
         if celda_padre not in resumen_celdas:
-            resumen_celdas[celda_padre] = {"total_hijas": 0, "vacios": 0, "advertencias": 0, "alertas": 0, "estado_celda": "OK"}
+            resumen_celdas[celda_padre] = {
+                "total_hijas": 0,
+                "vacios": 0,
+                "advertencias": 0,
+                "alertas": 0,
+                "estado_celda": "OK",
+                "dist_celda": dist_celda if dist_celda is not None else 0.0,
+                "campania": str(camp) if camp else "N/A"
+            }
 
         if celda_padre != current_parent:
             current_parent, daughter_counter = celda_padre, 1
@@ -413,8 +436,6 @@ def validate_bulk_excel(file_path, output_json_path):
         celda_hija = f"{celda_padre}-{daughter_counter}"
         resumen_celdas[celda_padre]["total_hijas"] += 1
         row_has_errors = False
-
-        dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
         def registrar_error(col, val, tipo, msg):
             nonlocal row_has_errors, total_vacios, total_advertencias, total_alertas

@@ -34,7 +34,7 @@ RESISTENCIA_RATING_CATALOG = {
 # 3. TABLA CONTROL ESTRUCTURAL
 CONTROL_ESTRUCTURAL_CATALOG = [1, 2, 3, 4, 5]
 
-# 4. TABLA EFECTOS DE VOLADURA (Obsérvese que se omite el valor 4)
+# 4. TABLA EFECTOS DE VOLADURA
 EFECTOS_VOLADURA_CATALOG = [1, 2, 3, 5, 6]
 
 # 5. TABLA RQD% (Ratings por umbral discreto)
@@ -66,8 +66,8 @@ ESPACIAMIENTO_R76_CATALOG = [
 # 7. TABLA TIPO DE ESTRUCTURA
 TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'DQ', 'F', 'JN', 'SZ', 'VN', 'SE', 'F+10', 'F-10', '-1', 'RF']
 
-# 8. TABLA TIPO DE RELLENO
-TIPO_RELLENO_CATALOG = ['ca', 'sa', 'cl', 'ys', 'g', 'ox', 'si', 'q', 'sf', 'oc', 'ep', 'c', '-1']
+# 8. TABLA TIPO DE RELLENO ACTUALIZADA CON NOMBRES REALES DE EXCEL
+TIPO_RELLENO_CATALOG = ['ca', 'sand', 'ch', 'cl', 'gy', 'rxf', 'fbx', 'gou', 'g', 'pat', 'sio', 'si', 'qz', 'su', 'sf', 'ox', 'ep', 'c', '-1']
 
 # 9. TABLA PERFILES DE RUGOSIDAD TIPICOS (ISRM, 1989)
 RUGOSIDAD_CATALOG = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -78,7 +78,7 @@ FORMA_ESTRUCTURA_CATALOG = ['P', 'C', 'O', 'E', 'I']
 # 11. TABLA TIPOS DE ALTERACION
 ALTERACION_CATALOG = ['f', 'd', 'm', 'a', 'c', 's', '-1']
 
-# 12. TABLA LITOLOGÍAS Y FACTOR K (Correlación ISRM Oficial)
+# 12. TABLA LITOLOGÍAS Y FACTOR K
 LITHOLOGY_CLASSIFICATION = [
     {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_EQ", "k": 8.29},
     {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_P", "k": 8.53},

@@ -23,12 +23,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'loaded' | 'error'>('idle');
     const [message, setMessage] = useState<string>('');
 
-    // Lista de auditorías pasadas
+    // Historial de auditorías
     const [history, setHistory] = useState<AuditHistoryItem[]>([]);
     const [selectedAuditId, setSelectedAuditId] = useState<string>('');
     const [kpis, setKpis] = useState<any>(null);
 
-    // Estados de control de filtros cruzados interactivos (Power BI)
+    // Filtros e incidencias paginadas
     const [incidencias, setIncidencias] = useState<any[]>([]);
     const [page, setPage] = useState<number>(1);
     const [totalPages, setTotalPages] = useState<number>(1);
@@ -42,14 +42,15 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const [filterSector, setFilterSector] = useState<string>('');
     const [filterSearch, setFilterSearch] = useState<string>('');
 
+    // Nuevo estado para período dinámico de campaña
+    const [selectedYear, setSelectedYear] = useState<string>('TODOS');
+
     const MANDATORY_COLS_COUNT = 77;
 
-    // Cargar lista de auditorías históricas al montar
     useEffect(() => {
         fetchHistory();
     }, []);
 
-    // Recargar incidencias y KPIs al cambiar filtros o auditoría activa
     useEffect(() => {
         if (status === 'loaded' && selectedAuditId) {
             fetchKpisAndIncidencias();
@@ -181,6 +182,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const handleSelectPastAudit = (auditId: string) => {
         setSelectedAuditId(auditId);
         clearAllFilters();
+        setSelectedYear('TODOS');
         setStatus('loaded');
     };
 
@@ -199,6 +201,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         setFilterGeotecnico('');
         setFilterSector('');
         setFilterSearch('');
+        setSelectedYear('TODOS');
     };
 
     const handlePrintPDF = () => {
@@ -216,7 +219,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         if (filterSector) queryParams.append('sector_geotecnico', filterSector);
         if (filterSearch) queryParams.append('search', filterSearch);
 
-        window.open(`${apiBase}/api/geomecanica/reporte-excel?${queryParams.toString()}`);
+        const resolvedBase = apiBase || `${window.location.protocol}//${window.location.hostname}:8001`;
+        window.open(`${resolvedBase}/api/geomecanica/reporte-excel?${queryParams.toString()}`);
     };
 
     const handleDownloadMD = () => {
@@ -233,42 +237,52 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         window.open(`${apiBase}/api/geomecanica/reporte-markdown?${queryParams.toString()}`);
     };
 
-    const totalCeldasEvaluadas = kpis ? kpis.total_filas_procesadas * MANDATORY_COLS_COUNT : 0;
+    // --- CÁLCULO DINÁMICO DE KPIS SEGÚN CAMPAÑA/AÑO SELECCIONADO ---
+    let numCeldasPadre = kpis?.familia1?.num_celdas_padre || 0;
+    let totalDiscontinuidades = kpis?.familia1?.total_discontinuidades || 0;
+    let totalMetrosMapped = kpis?.familia1?.total_metros || 0;
+    let periodLabel = "Periodo Completo";
 
-    // Formateadores específicos de Rango de Alerta (Rojo -> Naranja -> Amarillo)
+    if (kpis) {
+        if (selectedYear !== 'TODOS' && kpis.resumen_por_celda_padre) {
+            const matchingCeldas = Object.entries(kpis.resumen_por_celda_padre).filter(
+                ([_, cellData]: [any, any]) => String(cellData.campania) === selectedYear
+            );
+            numCeldasPadre = matchingCeldas.length;
+            totalDiscontinuidades = matchingCeldas.reduce((acc, [_, cellData]: [any, any]) => acc + (cellData.total_hijas || 0), 0);
+            totalMetrosMapped = matchingCeldas.reduce((acc, [_, cellData]: [any, any]) => acc + (cellData.dist_celda || 0), 0);
+            periodLabel = `Campaña: ${selectedYear}`;
+        } else if (kpis.distribucion_campania && kpis.distribucion_campania.length > 0) {
+            const years = kpis.distribucion_campania.map((c: any) => parseInt(c.campania)).filter((y: any) => !isNaN(y));
+            if (years.length > 0) {
+                periodLabel = `Periodo: ${Math.min(...years)} - ${Math.max(...years)}`;
+            }
+        }
+    }
+
+    // --- FORMATEADOR DE RANKING REESTRUCTURADO ---
+    // Alertas: Rojo (1-3), Naranja (4-10), Amarillo (11+)
     const getAlertRankStyle = (index: number) => {
         const rank = index + 1;
-        if (rank === 1) {
-            return "text-red-500 font-extrabold text-sm bg-red-500/10 border border-red-500/40 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(239,68,68,0.35)]";
+        if (rank >= 1 && rank <= 3) {
+            return "text-red-500 font-extrabold text-sm bg-red-500/10 border border-red-500/30 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(239,68,68,0.25)]";
         }
-        if (rank === 2) {
-            return "text-orange-500 font-extrabold text-sm bg-orange-500/10 border border-orange-500/40 px-2.5 py-0.5 rounded shadow-[0_0_10px_rgba(249,115,22,0.3)]";
+        if (rank >= 4 && rank <= 10) {
+            return "text-orange-500 font-extrabold text-xs bg-orange-500/10 border border-orange-500/30 px-2 py-0.5 rounded shadow-[0_0_8px_rgba(249,115,22,0.15)]";
         }
-        if (rank === 3) {
-            return "text-yellow-400 font-extrabold text-sm bg-yellow-500/10 border border-yellow-500/40 px-2.5 py-0.5 rounded shadow-[0_0_10px_rgba(234,179,8,0.3)]";
-        }
-        if (rank <= 10) {
-            return "text-indigo-300 font-extrabold text-xs bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded";
-        }
-        return "text-slate-500 font-medium text-xs bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded";
+        return "text-yellow-400 font-bold text-xs bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded";
     };
 
-    // Formateadores específicos de Rango de Advertencia (Naranja -> Amarillo -> Crema)
+    // Advertencias: Naranja (1-3), Amarillo (4-10), Crema (11+)
     const getWarningRankStyle = (index: number) => {
         const rank = index + 1;
-        if (rank === 1) {
-            return "text-orange-500 font-extrabold text-sm bg-orange-500/10 border border-orange-500/40 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(249,115,22,0.35)]";
+        if (rank >= 1 && rank <= 3) {
+            return "text-orange-500 font-extrabold text-sm bg-orange-500/10 border border-orange-500/30 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(249,115,22,0.25)]";
         }
-        if (rank === 2) {
-            return "text-yellow-400 font-extrabold text-sm bg-yellow-500/10 border border-yellow-500/40 px-2.5 py-0.5 rounded shadow-[0_0_10px_rgba(234,179,8,0.3)]";
+        if (rank >= 4 && rank <= 10) {
+            return "text-yellow-400 font-extrabold text-xs bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded shadow-[0_0_8px_rgba(234,179,8,0.15)]";
         }
-        if (rank === 3) {
-            return "text-[#fef3c7] font-extrabold text-sm bg-amber-500/10 border border-amber-200/20 px-2.5 py-0.5 rounded shadow-[0_0_10px_rgba(254,243,199,0.2)]";
-        }
-        if (rank <= 10) {
-            return "text-indigo-300 font-extrabold text-xs bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded";
-        }
-        return "text-slate-500 font-medium text-xs bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded";
+        return "text-[#fef3c7] font-semibold text-xs bg-amber-500/10 border border-amber-200/20 px-1.5 py-0.5 rounded";
     };
 
     const pctFieldsCorrectos = kpis?.familia2 ? ((kpis.familia2.total_correctos / kpis.familia2.total_fields) * 100).toFixed(2) : '0';
@@ -282,7 +296,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const pctDiscsAlertas = kpis?.familia3 ? ((kpis.familia3.discontinuidades_alertas / kpis.familia3.total_discontinuidades) * 100).toFixed(2) : '0';
 
     return (
-        <div className="space-y-6 select-none text-left animate-fade-in text-slate-100 print:text-black print:bg-white text-xs sm:text-sm bg-[#02040a] min-h-screen p-1 sm:p-3">
+        <div className="space-y-6 select-none text-left animate-fade-in text-slate-100 print:text-black print:bg-white text-xs sm:text-sm bg-[#02040a] min-h-screen p-1 sm:p-3 font-sans">
 
             {/* SECCIÓN 1: HISTORIAL DE AUDITORÍAS PASADAS */}
             <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-4 print:hidden">
@@ -307,12 +321,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                         {audit.archivo}
                                     </span>
                                     <span className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-bold">
-                                        {audit.total_filas} filas
+                                        {audit.total_filas} estructuras
                                     </span>
                                 </div>
                                 <div className="text-xs text-slate-400 mt-1 flex gap-2">
                                     <span>{audit.fecha}</span>
-                                    <span className="text-red-400 font-semibold">{audit.total_alertas} Alertas</span>
+                                    <span className="text-red-500 font-semibold">{audit.total_alertas} Alertas</span>
                                 </div>
                             </button>
                         );
@@ -363,19 +377,41 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             {/* CABECERA CUANDO SE ENCUENTRAN RESULTADOS CARGADOS */}
             {(status === 'loaded' || selectedAuditId) && kpis && (
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#090f1d]/60 p-4 border border-slate-800/80 rounded-xl gap-4 print:border-b print:border-black print:pb-4 print:mb-6 shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg print:hidden">
-                            <ShieldCheck size={18} />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg print:hidden">
+                                <ShieldCheck size={18} />
+                            </div>
+                            <div>
+                                <h1 className="text-xs font-black uppercase tracking-widest print:text-lg">Auditoría Geotécnica de Integridad</h1>
+                                <p className="text-xs text-slate-400 uppercase tracking-wider print:text-xs mt-1">
+                                    Auditoría Activa: <span className="font-bold text-slate-100 print:text-black">{kpis?.nombre_archivo || 'Por Defecto'}</span>
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h1 className="text-xs font-black uppercase tracking-widest print:text-lg">Auditoría Geotécnica de Integridad</h1>
-                            <p className="text-xs text-slate-400 uppercase tracking-wider print:text-xs mt-1">
-                                Auditoría Activa: <span className="font-bold text-slate-100 print:text-black">{kpis?.nombre_archivo || 'Por Defecto'}</span>
-                            </p>
-                        </div>
+
+                        {/* SELECTOR DINÁMICO DE PERÍODO (CAMPAÑA) */}
+                        {kpis.distribucion_campania && kpis.distribucion_campania.length > 0 && (
+                            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800/80 px-3 py-1.5 rounded-lg shrink-0 print:hidden">
+                                <Calendar size={13} className="text-indigo-400" />
+                                <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wide">Campaña:</span>
+                                <select
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value)}
+                                    className="bg-transparent text-xs text-slate-200 font-bold focus:outline-none cursor-pointer"
+                                >
+                                    <option value="TODOS" className="bg-[#02040a] text-slate-300">Todas las campañas</option>
+                                    {kpis.distribucion_campania.map((c: any) => (
+                                        <option key={c.campania} value={c.campania} className="bg-[#02040a] text-slate-300">
+                                            Año {c.campania}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex items-center gap-2 print:hidden">
-                        {/* NUEVO BOTÓN EXPORTAR EXCEL */}
+
+                    <div className="flex items-center gap-2 print:hidden w-full sm:w-auto justify-end">
                         <button
                             onClick={handleDownloadExcel}
                             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-750 border border-emerald-500/30 text-white px-4 py-2 rounded-lg text-xs font-black shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all active:scale-95"
@@ -426,7 +462,48 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-black text-slate-300 uppercase tracking-wider mr-1">Consultas Activas:</span>
 
-                                    {/* ... Mantener todos tus bloques de badges activos (filterTipo, filterCelda, etc.) ... */}
+                                    {filterTipo && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Tipo: {filterTipo}</span>
+                                            <button onClick={() => setFilterTipo('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
+                                    {filterCelda && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Estación: {filterCelda}</span>
+                                            <button onClick={() => setFilterCelda('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
+                                    {filterColumna && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Columna: {filterColumna}</span>
+                                            <button onClick={() => setFilterColumna('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
+                                    {filterCampania && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Año: {filterCampania}</span>
+                                            <button onClick={() => setFilterCampania('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
+                                    {filterSector && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Sector: {filterSector}</span>
+                                            <button onClick={() => setFilterSector('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
+                                    {filterGeotecnico && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Logueador: {filterGeotecnico}</span>
+                                            <button onClick={() => setFilterGeotecnico('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
+                                    {filterSearch && (
+                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
+                                            <span>Búsqueda: {filterSearch}</span>
+                                            <button onClick={() => setFilterSearch('')} className="hover:text-red-400"><X size={12} /></button>
+                                        </span>
+                                    )}
 
                                     <button onClick={clearAllFilters} className="text-xs text-slate-400 hover:text-white underline font-extrabold ml-2">
                                         Limpiar Todo
@@ -438,7 +515,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             <div className="flex flex-wrap gap-2 shrink-0">
                                 <button
                                     onClick={handleDownloadExcel}
-                                    className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/25 text-emerald-300 px-3.5 py-2 rounded-lg text-xs font-black shadow-sm transition-all active:scale-95"
+                                    className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/25 text-emerald-400 px-3.5 py-2 rounded-lg text-xs font-black shadow-sm transition-all active:scale-95"
                                     title="Exportar base consolidada y listado filtrado a Excel"
                                 >
                                     <Download size={14} className="text-emerald-400" />
@@ -455,29 +532,29 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                         </div>
                     )}
 
-                    {/* CONTROL DE ESTACIONES MAPEADAS */}
+                    {/* CONTROL DE ESTACIONES MAPEADAS (KPIs REACTIVOS AL PERÍODO) */}
                     {kpis.familia1 && (
                         <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-5 grid grid-cols-1 md:grid-cols-3 gap-6 print:border-black print:text-black">
                             <div className="space-y-1">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Métricas de Ventanas</span>
                                 <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
-                                    {kpis.familia1.num_celdas_padre.toLocaleString()}
+                                    {numCeldasPadre.toLocaleString()}
                                 </span>
-                                <span className="text-xs text-slate-400 font-semibold block">Periodo de registro: 20xx - 20xx</span>
+                                <span className="text-xs text-slate-400 font-semibold block">{periodLabel}</span>
                             </div>
                             <div className="space-y-1 border-l border-slate-800/60 pl-6 print:border-black">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Total de Estructuras Mapeadas</span>
                                 <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
-                                    {kpis.familia1.total_discontinuidades.toLocaleString()}
+                                    {totalDiscontinuidades.toLocaleString()}
                                 </span>
-                                <span className="text-xs text-slate-400 font-semibold block">Periodo de registro: 20xx - 20xx</span>
+                                <span className="text-xs text-slate-400 font-semibold block">{periodLabel}</span>
                             </div>
                             <div className="space-y-1 border-l border-slate-800/60 pl-6 print:border-black">
-                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Total de metros mapeados</span>
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">TOTAL DE METROS MAPEADOS</span>
                                 <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
-                                    {kpis.familia1.promedio_hijas} <span className="text-xs text-slate-400 font-semibold">metros</span>
+                                    {totalMetrosMapped.toLocaleString()} <span className="text-xs text-slate-400 font-semibold">metros</span>
                                 </span>
-                                <span className="text-xs text-slate-400 font-semibold block">Periodo de registro: 20xx - 20xx</span>
+                                <span className="text-xs text-slate-400 font-semibold block">{periodLabel}</span>
                             </div>
                         </div>
                     )}
@@ -496,7 +573,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                 </h3>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                                    <div className="bg-[#10b981]/5 border border-[#10b981]/30 p-4 rounded-xl text-center shadow-inner">
+                                    <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center shadow-inner">
                                         <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Campos OK</span>
                                         <span className="text-3xl font-black text-[#10b981] block mt-2 font-mono">{kpis.familia2.total_correctos.toLocaleString()}</span>
                                         <span className="text-xs font-extrabold text-[#10b981] block mt-2 bg-[#10b981]/10 border border-[#10b981]/20 py-1 rounded">
@@ -549,19 +626,19 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </div>
                         )}
 
-                        {/* INTEGRIDAD DE DISCONTINUIDADES (FILAS COMPLETAS) */}
+                        {/* INTEGRIDAD DE DISCONTINUIDADES (FILAS COMPLETAS - ESTRELLA DE COLORES UNIFICADOS) */}
                         {kpis.familia3 && (
                             <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-6 space-y-4 print:border-black">
                                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex justify-between">
-                                    <span>Integridad Estructural de Discontinuidades (Filas de Excel)</span>
+                                    <span>Integridad Estructural de Discontinuidades (Estructuras)</span>
                                     <span className="text-xs bg-slate-900 text-slate-400 px-2 py-0.5 rounded font-mono">
-                                        Total: {kpis.familia3.total_discontinuidades.toLocaleString()} filas
+                                        Total: {kpis.familia3.total_discontinuidades.toLocaleString()} estructuras
                                     </span>
                                 </h3>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                     <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center shadow-inner">
-                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Filas 100% OK</span>
+                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Estructuras OK</span>
                                         <span className="text-3xl font-black text-[#10b981] block mt-2 font-mono">{kpis.familia3.discontinuidades_correctas.toLocaleString()}</span>
                                         <span className="text-xs font-bold text-[#10b981] block mt-2 bg-[#10b981]/10 border border-[#10b981]/20 py-1 rounded">
                                             {pctDiscsCorrectas}% del total
@@ -569,7 +646,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     </div>
 
                                     <div className="bg-yellow-500/5 border border-yellow-500/20 p-4 rounded-xl text-center shadow-inner">
-                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Filas con Vacíos</span>
+                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Estructuras con Vacíos</span>
                                         <span className="text-3xl font-black text-yellow-500 block mt-2 font-mono">{kpis.familia3.discontinuidades_vacios.toLocaleString()}</span>
                                         <span className="text-xs font-bold text-yellow-500 block mt-2 bg-yellow-500/10 border border-yellow-500/20 py-1 rounded">
                                             {pctDiscsVacias}% del total
@@ -577,7 +654,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     </div>
 
                                     <div className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-xl text-center shadow-inner">
-                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Filas con Advs</span>
+                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Estructuras con Advs</span>
                                         <span className="text-3xl font-black text-orange-500 block mt-2 font-mono">{kpis.familia3.discontinuidades_advertencias.toLocaleString()}</span>
                                         <span className="text-xs font-bold text-orange-500 block mt-2 bg-orange-500/10 border border-orange-500/20 py-1 rounded">
                                             {pctDiscsAdvs}% del total
@@ -585,7 +662,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     </div>
 
                                     <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl text-center shadow-inner">
-                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Filas con Alertas</span>
+                                        <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Estructuras con Alertas</span>
                                         <span className="text-3xl font-black text-red-500 block mt-2 font-mono">{kpis.familia3.discontinuidades_alertas.toLocaleString()}</span>
                                         <span className="text-xs font-bold text-red-500 block mt-2 bg-red-500/10 border border-red-500/20 py-1 rounded">
                                             {pctDiscsAlertas}% del total
@@ -612,7 +689,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                         <thead className="sticky top-0 z-10">
                                             <tr className="bg-slate-950 text-xs text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-800 print:bg-slate-100 print:text-black">
                                                 <th className="py-2.5 px-3 bg-slate-950">Campaña</th>
-                                                <th className="py-2.5 px-3 text-center bg-slate-950">Filas (N)</th>
+                                                <th className="py-2.5 px-3 text-center bg-slate-950">Estructuras (N)</th>
                                                 <th className="py-2.5 px-3 text-center text-red-500 bg-slate-950">Alertas (%)</th>
                                                 <th className="py-2.5 px-3 text-center text-yellow-500 bg-slate-950">Vacíos (%)</th>
                                             </tr>
@@ -656,7 +733,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                         <thead className="sticky top-0 z-10">
                                             <tr className="bg-slate-950 text-xs text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-800 print:bg-slate-100 print:text-black">
                                                 <th className="py-2.5 px-3 bg-slate-950">Sector</th>
-                                                <th className="py-2.5 px-3 text-center bg-slate-950">Filas (N)</th>
+                                                <th className="py-2.5 px-3 text-center bg-slate-950">Estructuras (N)</th>
                                                 <th className="py-2.5 px-3 text-center text-red-500 bg-slate-950">Alertas (%)</th>
                                                 <th className="py-2.5 px-3 text-center text-yellow-500 bg-slate-950">Vacíos (%)</th>
                                             </tr>
@@ -700,7 +777,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                         <thead className="sticky top-0 z-10">
                                             <tr className="bg-slate-950 text-xs text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-800 print:bg-slate-100 print:text-black">
                                                 <th className="py-2.5 px-3 bg-slate-950">Geotécnico</th>
-                                                <th className="py-2.5 px-3 text-center bg-slate-950">Filas (N)</th>
+                                                <th className="py-2.5 px-3 text-center bg-slate-950">Estructuras (N)</th>
                                                 <th className="py-2.5 px-3 text-center text-red-500 bg-slate-950">Alertas (%)</th>
                                                 <th className="py-2.5 px-3 text-center text-yellow-500 bg-slate-950">Vacíos (%)</th>
                                             </tr>
@@ -737,7 +814,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     {/* CUADROS GEMELOS: ALERTAS DE INCOMPATIBILIDAD FISICA VS ADVERTENCIAS DE CONSISTENCIA */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                        {/* COMPONENTE IZQUIERDO: ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS */}
+                        {/* ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS */}
                         <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <AlertTriangle size={14} className="text-red-500" />
@@ -746,7 +823,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
                             <div className="rounded-xl border border-slate-800/80 overflow-hidden">
                                 <div className="space-y-3 max-h-[420px] overflow-y-auto p-2 bg-[#02040a]/40 scrollbar-thin scrollbar-thumb-slate-800">
-                                    {kpis.error_types_detailed?.alertas?.slice(0, 15).map((item: any, idx: number) => {
+                                    {kpis.error_types_detailed?.alertas?.map((item: any, idx: number) => {
                                         const isFiltered = filterSearch === item.mensaje;
                                         return (
                                             <button
@@ -758,6 +835,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    {/* NUEVO FORMATEADOR DE RANKING PARA ALERTAS */}
                                                     <span className={`shrink-0 ${getAlertRankStyle(idx)}`}>
                                                         {idx + 1}
                                                     </span>
@@ -781,7 +859,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </div>
                         </div>
 
-                        {/* COMPONENTE DERECHO: ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS */}
+                        {/* ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS */}
                         <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <Settings size={14} className="text-amber-500" />
@@ -790,7 +868,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
                             <div className="rounded-xl border border-slate-800/80 overflow-hidden">
                                 <div className="space-y-3 max-h-[420px] overflow-y-auto p-2 bg-[#02040a]/40 scrollbar-thin scrollbar-thumb-slate-800">
-                                    {kpis.error_types_detailed?.advertencias?.slice(0, 15).map((item: any, idx: number) => {
+                                    {kpis.error_types_detailed?.advertencias?.map((item: any, idx: number) => {
                                         const isFiltered = filterSearch === item.mensaje;
                                         return (
                                             <button
@@ -802,6 +880,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    {/* NUEVO FORMATEADOR DE RANKING PARA ADVERTENCIAS */}
                                                     <span className={`shrink-0 ${getWarningRankStyle(idx)}`}>
                                                         {idx + 1}
                                                     </span>
@@ -814,7 +893,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                     <span className="bg-[#02040a] border border-slate-800/80 text-slate-300 px-2.5 py-1 rounded-md text-xs font-normal lowercase font-sans">
                                                         {item.cantidad.toLocaleString()} ocurrencias
                                                     </span>
-                                                    <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-2.5 py-1 rounded-md text-xs font-normal lowercase font-sans">
+                                                    <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 px-2.5 py-1 rounded-md text-xs font-normal lowercase font-sans">
                                                         {item.pct.toFixed(2)}% del total
                                                     </span>
                                                 </div>
@@ -837,7 +916,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     <span>Buscador y Monitor de Anomalías Paginado</span>
                                 </h3>
                                 <p className="text-xs text-slate-400 mt-1">
-                                    Mostrando **{totalRecords.toLocaleString()}** registros que coinciden con los filtros cruzados seleccionados.
+                                    Mostrando **{totalRecords.toLocaleString()}** registros de estructuras que coinciden con los filtros cruzados seleccionados.
                                 </p>
                             </div>
 
@@ -867,7 +946,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                         <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800/80 h-10 uppercase text-xs tracking-wider">
                                             <th className="py-2.5 px-3 text-center">Fila</th>
                                             <th className="py-2.5 px-3">Estación Padre</th>
-                                            <th className="py-2.5 px-3">Capas Hijas</th>
+                                            <th className="py-2.5 px-3">Estructura</th>
                                             <th className="py-2.5 px-3">Campaña</th>
                                             <th className="py-2.5 px-3">Geotécnico</th>
                                             <th className="py-2.5 px-3">Columna</th>
@@ -892,7 +971,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                     <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase ${inc.tipo_incidencia === 'ALERTA'
                                                         ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                                                         : inc.tipo_incidencia === 'ADVERTENCIA'
-                                                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                            ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
                                                             : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
                                                         }`}>
                                                         {inc.tipo_incidencia}
