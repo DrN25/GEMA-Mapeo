@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from app.database import get_db
+from app.utils.validator import validate_bulk_excel
 
 # Evitar importaciones circulares referenciando el validador a nivel de módulo
 import sys
