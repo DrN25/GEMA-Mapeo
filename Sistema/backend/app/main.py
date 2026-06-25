@@ -1762,3 +1762,576 @@ def descargar_reporte_markdown(
         media_type="text/markdown",
         headers={"Content-Disposition": "attachment; filename=reporte_auditoria_detallado.md"}
     )
+
+# Funciones auxiliares de conversión segura para evitar TypeErrors en datos antiguos
+def safe_int(val, default=0):
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except:
+        return default
+
+def safe_float(val, default=0.0):
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except:
+        return default
+
+@app.get("/api/geomecanica/reporte-excel")
+def descargar_reporte_excel(
+    tipo: str = None,
+    celda: str = None,
+    columna: str = None,
+    campania: str = None,
+    geotecnico: str = None,
+    sector_geotecnico: str = None,
+    search: str = None,
+    audit_id: str = None
+):
+    # Ruta de archivos por defecto
+    if audit_id:
+        raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
+        compact_file = os.path.join(uploads_dir, "history", f"{audit_id}_compact.json")
+    else:
+        raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
+        compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
+        
+        # Búsqueda autocurativa en el historial si los archivos por defecto no están
+        if not os.path.exists(raw_file) or not os.path.exists(compact_file):
+            history_dir = os.path.join(uploads_dir, "history")
+            if os.path.exists(history_dir):
+                jsons = [f for f in os.listdir(history_dir) if f.endswith("_diagnostico.json")]
+                if jsons:
+                    jsons.sort(key=lambda x: os.path.getmtime(os.path.join(history_dir, x)), reverse=True)
+                    latest_id = jsons[0].replace("_diagnostico.json", "")
+                    raw_file = os.path.join(history_dir, f"{latest_id}_diagnostico.json")
+                    compact_file = os.path.join(history_dir, f"{latest_id}_compact.json")
+            
+    if not os.path.exists(raw_file) or not os.path.exists(compact_file):
+        raise HTTPException(status_code=404, detail="El diagnóstico solicitado no ha sido generado o está incompleto.")
+        
+    with open(raw_file, "r", encoding="utf-8") as f:
+        diag = json.load(f)
+    with open(compact_file, "r", encoding="utf-8") as f:
+        compact = json.load(f)
+        
+    incidencias = diag.get("incidencias", [])
+    
+    # Aplicar filtros cruzados dinámicos
+    filtered = incidencias
+    if tipo:
+        filtered = [i for i in filtered if i.get("tipo_incidencia") == tipo.upper()]
+    if celda:
+        celda_up = celda.upper()
+        filtered = [i for i in filtered if i.get("celda_padre") == celda_up or i.get("celda_hija") == celda_up]
+    if columna:
+        filtered = [i for i in filtered if i.get("columna", "").upper() == columna.upper()]
+    if campania:
+        filtered = [i for i in filtered if i.get("campania") == campania]
+    if geotecnico:
+        geo_up = geotecnico.upper()
+        filtered = [i for i in filtered if i.get("geotecnico", "").upper() == geo_up]
+    if sector_geotecnico:
+        sect_up = sector_geotecnico.upper()
+        filtered = [i for i in filtered if i.get("sector_geotecnico", "").upper() == sect_up]
+    if search:
+        search_lower = search.lower()
+        filtered = [
+            i for i in filtered 
+            if search_lower in i.get("mensaje", "").lower() 
+            or search_lower in i.get("columna", "").lower()
+            or search_lower in i.get("celda_padre", "").lower()
+        ]
+
+    wb = openpyxl.Workbook()
+    default_sheet = wb.active
+    wb.remove(default_sheet)
+    
+    # Estilos reutilizables
+    font_title = Font(name="Calibri", size=16, bold=True, color="1B365D")
+    font_subtitle = Font(name="Calibri", size=10, italic=True, color="555555")
+    font_section = Font(name="Calibri", size=11, bold=True, color="1B365D")
+    font_header = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+    font_bold = Font(name="Calibri", size=10, bold=True, color="000000")
+    font_regular = Font(name="Calibri", size=10, color="000000")
+    
+    fill_primary = PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid")
+    fill_accent_green = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+    fill_accent_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    fill_accent_orange = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    fill_accent_red = PatternFill(start_color="F2DCDB", end_color="F2DCDB", fill_type="solid")
+    
+    border_thin = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+    alignment_center = Alignment(horizontal="center", vertical="center")
+    alignment_left = Alignment(horizontal="left", vertical="center")
+    alignment_right = Alignment(horizontal="right", vertical="center")
+    
+    # ----------------------------------------------------
+    # HOJA 1: RESUMEN EJECUTIVO (Poco volumen, estéticamente pulido)
+    # ----------------------------------------------------
+    ws1 = wb.create_sheet(title="Resumen Ejecutivo")
+    ws1.views.sheetView[0].showGridLines = True
+    
+    ws1.cell(row=2, column=2, value="AUDITORÍA DE INTEGRIDAD GEOTÉCNICA").font = font_title
+    ws1.cell(row=3, column=2, value="Reporte consolidado del estado de consistencia física y lógica").font = font_subtitle
+    
+    meta_rows = [
+        ("Archivo Auditado:", compact.get("nombre_archivo", "N/A")),
+        ("Fecha de Auditoría:", compact.get("fecha_auditoria", "N/A")),
+        ("Celdas Padre Evaluadas:", safe_int(compact.get("familia1", {}).get("num_celdas_padre", 0))),
+        ("Total de Estructuras (Filas):", safe_int(compact.get("familia1", {}).get("total_discontinuidades", 0))),
+        ("Total de Datos (Campos):", safe_int(compact.get("familia2", {}).get("total_fields", 0)))
+    ]
+    
+    start_row = 5
+    for label, val in meta_rows:
+        c1 = ws1.cell(row=start_row, column=2, value=label)
+        c1.font = font_bold
+        c1.border = border_thin
+        c2 = ws1.cell(row=start_row, column=3, value=val)
+        c2.font = font_regular
+        c2.border = border_thin
+        if isinstance(val, (int, float)):
+            c2.number_format = '#,##0'
+            c2.alignment = alignment_right
+        start_row += 1
+        
+    ws1.cell(row=11, column=2, value="MÉTRICAS DE ESTRUCTURAS Y CELDAS").font = font_section
+    header_row = 12
+    cols = ["Métrica", "Valor", "Descripción"]
+    for idx, col in enumerate(cols, start=2):
+        cell = ws1.cell(row=header_row, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    fam1 = compact.get("familia1", {})
+    general_metrics = [
+        ("Celdas Padre", safe_int(fam1.get("num_celdas_padre", 0)), "Estaciones totales auditadas"),
+        ("Promedio de Capas Hijas", safe_float(fam1.get("promedio_hijas", 0)), "Estructuras promedio por estación"),
+        ("Total de Estructuras Mapeadas", safe_int(fam1.get("total_discontinuidades", 0)), "Total de filas de discontinuidades")
+    ]
+    
+    curr_row = 13
+    for m, v, d in general_metrics:
+        ws1.cell(row=curr_row, column=2, value=m).font = font_regular
+        ws1.cell(row=curr_row, column=2).border = border_thin
+        
+        val_cell = ws1.cell(row=curr_row, column=3, value=v)
+        val_cell.font = font_bold
+        val_cell.border = border_thin
+        val_cell.alignment = alignment_right
+        if isinstance(v, int):
+            val_cell.number_format = '#,##0'
+        elif isinstance(v, float):
+            val_cell.number_format = '#,##0.00'
+            
+        ws1.cell(row=curr_row, column=4, value=d).font = font_regular
+        ws1.cell(row=curr_row, column=4).border = border_thin
+        curr_row += 1
+        
+    ws1.cell(row=17, column=2, value="AUDITORÍA DE DATOS INDIVIDUALES (CAMPOS)").font = font_section
+    header_row = 18
+    for idx, col in enumerate(["Estado de Campo", "Cantidad de Campos", "Porcentaje", "Acción Recomendada"], start=2):
+        cell = ws1.cell(row=header_row, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    fam2 = compact.get("familia2", {})
+    total_fields = max(1, safe_int(fam2.get("total_fields", 1)))
+    fields_metrics = [
+        ("Campos OK", safe_int(fam2.get("total_correctos", 0)), fill_accent_green, "Datos validados, listos para análisis geomecánico"),
+        ("Campos Vacíos", safe_int(fam2.get("total_vacios", 0)), fill_accent_yellow, "Completar celdas obligatorias según scanline"),
+        ("Advertencias", safe_int(fam2.get("total_advertencias", 0)), fill_accent_orange, "Revisar posibles inconsistencias lógicas"),
+        ("Alertas Críticas", safe_int(fam2.get("total_alertas", 0)), fill_accent_red, "Corregir inmediatamente para evitar distorsión RMR")
+    ]
+    
+    curr_row = 19
+    for name, qty, fill, rcmd in fields_metrics:
+        ws1.cell(row=curr_row, column=2, value=name).font = font_regular
+        ws1.cell(row=curr_row, column=2).border = border_thin
+        
+        qty_cell = ws1.cell(row=curr_row, column=3, value=qty)
+        qty_cell.font = font_bold
+        qty_cell.border = border_thin
+        qty_cell.alignment = alignment_right
+        qty_cell.number_format = '#,##0'
+        
+        pct_cell = ws1.cell(row=curr_row, column=4, value=qty / total_fields)
+        pct_cell.font = font_bold
+        pct_cell.border = border_thin
+        pct_cell.alignment = alignment_right
+        pct_cell.number_format = '0.00%'
+        
+        rc_cell = ws1.cell(row=curr_row, column=5, value=rcmd)
+        rc_cell.font = font_regular
+        rc_cell.border = border_thin
+        rc_cell.fill = fill
+        
+        curr_row += 1
+        
+    ws1.cell(row=24, column=2, value="AUDITORÍA POR ESTRUCTURAS (FILAS)").font = font_section
+    header_row = 25
+    for idx, col in enumerate(["Estado de Estructura", "Cantidad de Filas", "Porcentaje", "Efecto en Calidad de Base de Datos"], start=2):
+        cell = ws1.cell(row=header_row, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    fam3 = compact.get("familia3", {})
+    total_discs = max(1, safe_int(fam3.get("total_discontinuidades", 1)))
+    discs_metrics = [
+        ("Filas 100% OK", safe_int(fam3.get("discontinuidades_correctas", 0)), fill_accent_green, "Integridad de registros geomecánicos perfecta"),
+        ("Filas con Vacíos", safe_int(fam3.get("discontinuidades_vacios", 0)), fill_accent_yellow, "Registros incompletos con datos vacíos"),
+        ("Filas con Advertencias", safe_int(fam3.get("discontinuidades_advertencias", 0)), fill_accent_orange, "Registros con desvíos leves de consistencia"),
+        ("Filas con Alertas", safe_int(fam3.get("discontinuidades_alertas", 0)), fill_accent_red, "Incompatibilidad física o geométrica grave detectada")
+    ]
+    
+    curr_row = 26
+    for name, qty, fill, eff in discs_metrics:
+        ws1.cell(row=curr_row, column=2, value=name).font = font_regular
+        ws1.cell(row=curr_row, column=2).border = border_thin
+        
+        qty_cell = ws1.cell(row=curr_row, column=3, value=qty)
+        qty_cell.font = font_bold
+        qty_cell.border = border_thin
+        qty_cell.alignment = alignment_right
+        qty_cell.number_format = '#,##0'
+        
+        pct_cell = ws1.cell(row=curr_row, column=4, value=qty / total_discs)
+        pct_cell.font = font_bold
+        pct_cell.border = border_thin
+        pct_cell.alignment = alignment_right
+        pct_cell.number_format = '0.00%'
+        
+        eff_cell = ws1.cell(row=curr_row, column=5, value=eff)
+        eff_cell.font = font_regular
+        eff_cell.border = border_thin
+        eff_cell.fill = fill
+        
+        curr_row += 1
+        
+    # --- HOJA 2: DISTRIBUCIONES & CELDAS ---
+    ws2 = wb.create_sheet(title="Distribuciones & Celdas")
+    ws2.views.sheetView[0].showGridLines = True
+    
+    ws2.cell(row=2, column=2, value="DISTRIBUCIÓN POR CAMPAÑA DE LOGUEO (AÑO)").font = font_section
+    r_cam = 3
+    for idx, col in enumerate(["Campaña", "Discontinuidades", "Alertas (cant)", "Alertas (%)", "Vacíos (cant)", "Vacíos (%)"], start=2):
+        cell = ws2.cell(row=r_cam, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    for row in compact.get("distribucion_campania", []):
+        r_cam += 1
+        ws2.cell(row=r_cam, column=2, value=row.get("campania")).font = font_bold
+        ws2.cell(row=r_cam, column=3, value=safe_int(row.get("discontinuidades"))).font = font_regular
+        ws2.cell(row=r_cam, column=4, value=safe_int(row.get("alertas_cant"))).font = font_regular
+        
+        alertas_pct = safe_float(row.get("alertas_pct")) / 100.0
+        ws2.cell(row=r_cam, column=5, value=alertas_pct).font = font_regular
+        
+        ws2.cell(row=r_cam, column=6, value=safe_int(row.get("vacios_cant"))).font = font_regular
+        
+        vacios_pct = safe_float(row.get("vacios_pct")) / 100.0
+        ws2.cell(row=r_cam, column=7, value=vacios_pct).font = font_regular
+        
+        ws2.cell(row=r_cam, column=2).alignment = alignment_center
+        ws2.cell(row=r_cam, column=3).number_format = '#,##0'
+        ws2.cell(row=r_cam, column=3).alignment = alignment_right
+        ws2.cell(row=r_cam, column=4).number_format = '#,##0'
+        ws2.cell(row=r_cam, column=4).alignment = alignment_right
+        ws2.cell(row=r_cam, column=5).number_format = '0.00%'
+        ws2.cell(row=r_cam, column=5).alignment = alignment_right
+        ws2.cell(row=r_cam, column=6).number_format = '#,##0'
+        ws2.cell(row=r_cam, column=6).alignment = alignment_right
+        ws2.cell(row=r_cam, column=7).number_format = '0.00%'
+        ws2.cell(row=r_cam, column=7).alignment = alignment_right
+        
+        for col_idx in range(2, 8):
+            ws2.cell(row=r_cam, column=col_idx).border = border_thin
+            
+    r_sec = r_cam + 3
+    ws2.cell(row=r_sec-1, column=2, value="DISTRIBUCIÓN POR SECTOR GEOTÉCNICO").font = font_section
+    for idx, col in enumerate(["Sector", "Discontinuidades", "Alertas (cant)", "Alertas (%)", "Vacíos (cant)", "Vacíos (%)"], start=2):
+        cell = ws2.cell(row=r_sec, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    for row in compact.get("distribucion_sector", []):
+        r_sec += 1
+        ws2.cell(row=r_sec, column=2, value=row.get("sector")).font = font_bold
+        ws2.cell(row=r_sec, column=3, value=safe_int(row.get("discontinuidades"))).font = font_regular
+        ws2.cell(row=r_sec, column=4, value=safe_int(row.get("alertas_cant"))).font = font_regular
+        
+        alertas_pct = safe_float(row.get("alertas_pct")) / 100.0
+        ws2.cell(row=r_sec, column=5, value=alertas_pct).font = font_regular
+        
+        ws2.cell(row=r_sec, column=6, value=safe_int(row.get("vacios_cant"))).font = font_regular
+        
+        vacios_pct = safe_float(row.get("vacios_pct")) / 100.0
+        ws2.cell(row=r_sec, column=7, value=vacios_pct).font = font_regular
+        
+        ws2.cell(row=r_sec, column=2).alignment = alignment_center
+        ws2.cell(row=r_sec, column=3).number_format = '#,##0'
+        ws2.cell(row=r_sec, column=3).alignment = alignment_right
+        ws2.cell(row=r_sec, column=4).number_format = '#,##0'
+        ws2.cell(row=r_sec, column=4).alignment = alignment_right
+        ws2.cell(row=r_sec, column=5).number_format = '0.00%'
+        ws2.cell(row=r_sec, column=5).alignment = alignment_right
+        ws2.cell(row=r_sec, column=6).number_format = '#,##0'
+        ws2.cell(row=r_sec, column=6).alignment = alignment_right
+        ws2.cell(row=r_sec, column=7).number_format = '0.00%'
+        ws2.cell(row=r_sec, column=7).alignment = alignment_right
+        
+        for col_idx in range(2, 8):
+            ws2.cell(row=r_sec, column=col_idx).border = border_thin
+            
+    r_geo = r_sec + 3
+    ws2.cell(row=r_geo-1, column=2, value="CALIDAD DE REGISTRO POR GEOTÉCNICO / PERSONA").font = font_section
+    for idx, col in enumerate(["Geotécnico", "Discontinuidades", "Alertas (cant)", "Alertas (%)", "Vacíos (cant)", "Vacíos (%)"], start=2):
+        cell = ws2.cell(row=r_geo, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    for row in compact.get("distribucion_geotecnico", []):
+        r_geo += 1
+        ws2.cell(row=r_geo, column=2, value=row.get("geotecnico")).font = font_bold
+        ws2.cell(row=r_geo, column=3, value=safe_int(row.get("discontinuidades"))).font = font_regular
+        ws2.cell(row=r_geo, column=4, value=safe_int(row.get("alertas_cant"))).font = font_regular
+        
+        alertas_pct = safe_float(row.get("alertas_pct")) / 100.0
+        ws2.cell(row=r_geo, column=5, value=alertas_pct).font = font_regular
+        
+        ws2.cell(row=r_geo, column=6, value=safe_int(row.get("vacios_cant"))).font = font_regular
+        
+        vacios_pct = safe_float(row.get("vacios_pct")) / 100.0
+        ws2.cell(row=r_geo, column=7, value=vacios_pct).font = font_regular
+        
+        ws2.cell(row=r_geo, column=2).alignment = alignment_center
+        ws2.cell(row=r_geo, column=3).number_format = '#,##0'
+        ws2.cell(row=r_geo, column=3).alignment = alignment_right
+        ws2.cell(row=r_geo, column=4).number_format = '#,##0'
+        ws2.cell(row=r_geo, column=4).alignment = alignment_right
+        ws2.cell(row=r_geo, column=5).number_format = '0.00%'
+        ws2.cell(row=r_geo, column=5).alignment = alignment_right
+        ws2.cell(row=r_geo, column=6).number_format = '#,##0'
+        ws2.cell(row=r_geo, column=6).alignment = alignment_right
+        ws2.cell(row=r_geo, column=7).number_format = '0.00%'
+        ws2.cell(row=r_geo, column=7).alignment = alignment_right
+        
+        for col_idx in range(2, 8):
+            ws2.cell(row=r_geo, column=col_idx).border = border_thin
+            
+    r_worst = r_geo + 3
+    ws2.cell(row=r_worst-1, column=2, value="PEORES CELDAS DE ESTACIÓN (MAYOR ACUMULACIÓN DE OBSERVACIONES)").font = font_section
+    for idx, col in enumerate(["Estación (Celda)", "Total Hijas", "Vacíos", "Advertencias", "Alertas", "Calificación"], start=2):
+        cell = ws2.cell(row=r_worst, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    for row in compact.get("worst_cells", []):
+        r_worst += 1
+        ws2.cell(row=r_worst, column=2, value=row.get("celda")).font = font_bold
+        ws2.cell(row=r_worst, column=3, value=safe_int(row.get("total_hijas"))).font = font_regular
+        ws2.cell(row=r_worst, column=4, value=safe_int(row.get("vacios"))).font = font_regular
+        ws2.cell(row=r_worst, column=5, value=safe_int(row.get("advertencias"))).font = font_regular
+        ws2.cell(row=r_worst, column=6, value=safe_int(row.get("alertas"))).font = font_regular
+        
+        status = row.get("estado_celda", "OK")
+        status_cell = ws2.cell(row=r_worst, column=7, value=status)
+        status_cell.font = font_bold
+        if status == "ALERTA":
+            status_cell.fill = fill_accent_red
+        elif status == "ADVERTENCIA":
+            status_cell.fill = fill_accent_orange
+        else:
+            status_cell.fill = fill_accent_green
+            
+        ws2.cell(row=r_worst, column=2).alignment = alignment_center
+        ws2.cell(row=r_worst, column=3).number_format = '#,##0'
+        ws2.cell(row=r_worst, column=3).alignment = alignment_right
+        ws2.cell(row=r_worst, column=4).number_format = '#,##0'
+        ws2.cell(row=r_worst, column=4).alignment = alignment_right
+        ws2.cell(row=r_worst, column=5).number_format = '#,##0'
+        ws2.cell(row=r_worst, column=5).alignment = alignment_right
+        ws2.cell(row=r_worst, column=6).number_format = '#,##0'
+        ws2.cell(row=r_worst, column=6).alignment = alignment_right
+        ws2.cell(row=r_worst, column=7).alignment = alignment_center
+        
+        for col_idx in range(2, 8):
+            ws2.cell(row=r_worst, column=col_idx).border = border_thin
+            
+    # --- HOJA 3: TOP FRECUENCIA DE ERRORES ---
+    ws3 = wb.create_sheet(title="Top Frecuencia de Errores")
+    ws3.views.sheetView[0].showGridLines = True
+    
+    ws3.cell(row=2, column=2, value="ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS").font = font_section
+    r_err = 3
+    for idx, col in enumerate(["Ranking", "Mensaje de Alerta Crítica", "Ocurrencias", "Porcentaje (%)"], start=2):
+        cell = ws3.cell(row=r_err, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    for i_idx, item in enumerate(compact.get("error_types_detailed", {}).get("alertas", [])):
+        r_err += 1
+        ws3.cell(row=r_err, column=2, value=i_idx+1).font = font_bold
+        ws3.cell(row=r_err, column=3, value=item.get("mensaje")).font = font_regular
+        ws3.cell(row=r_err, column=4, value=safe_int(item.get("cantidad"))).font = font_regular
+        
+        pct = safe_float(item.get("pct")) / 100.0
+        ws3.cell(row=r_err, column=5, value=pct).font = font_regular
+        
+        ws3.cell(row=r_err, column=2).alignment = alignment_center
+        ws3.cell(row=r_err, column=4).number_format = '#,##0'
+        ws3.cell(row=r_err, column=4).alignment = alignment_right
+        ws3.cell(row=r_err, column=5).number_format = '0.00%'
+        ws3.cell(row=r_err, column=5).alignment = alignment_right
+        
+        for col_idx in range(2, 6):
+            cell_border = ws3.cell(row=r_err, column=col_idx)
+            cell_border.border = border_thin
+            if i_idx < 3:
+                cell_border.fill = fill_accent_red
+                
+    r_warn = r_err + 3
+    ws3.cell(row=r_warn-1, column=2, value="ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS").font = font_section
+    for idx, col in enumerate(["Ranking", "Mensaje de Advertencia", "Ocurrencias", "Porcentaje (%)"], start=2):
+        cell = ws3.cell(row=r_warn, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    for i_idx, item in enumerate(compact.get("error_types_detailed", {}).get("advertencias", [])):
+        r_warn += 1
+        ws3.cell(row=r_warn, column=2, value=i_idx+1).font = font_bold
+        ws3.cell(row=r_warn, column=3, value=item.get("mensaje")).font = font_regular
+        ws3.cell(row=r_warn, column=4, value=safe_int(item.get("cantidad"))).font = font_regular
+        
+        pct = safe_float(item.get("pct")) / 100.0
+        ws3.cell(row=r_warn, column=5, value=pct).font = font_regular
+        
+        ws3.cell(row=r_warn, column=2).alignment = alignment_center
+        ws3.cell(row=r_warn, column=4).number_format = '#,##0'
+        ws3.cell(row=r_warn, column=4).alignment = alignment_right
+        ws3.cell(row=r_warn, column=5).number_format = '0.00%'
+        ws3.cell(row=r_warn, column=5).alignment = alignment_right
+        
+        for col_idx in range(2, 6):
+            cell_border = ws3.cell(row=r_warn, column=col_idx)
+            cell_border.border = border_thin
+            if i_idx < 3:
+                cell_border.fill = fill_accent_orange
+                
+    # ----------------------------------------------------
+    # HOJA 4: DETALLE INDIVIDUAL FILTRADO (CORREGIDO)
+    # ----------------------------------------------------
+    ws4 = wb.create_sheet(title="Listado Incidencias Detalle")
+    ws4.views.sheetView[0].showGridLines = True
+    
+    headers_inc = [
+        "Fila Excel", "Celda Padre", "Celda Hija", "Campaña", 
+        "Geotécnico", "Sector Geotécnico", "Columna Evaluada", 
+        "Valor Actual", "Tipo Incidencia", "Mensaje"
+    ]
+    
+    ws4.cell(row=2, column=2, value="DETALLE INDIVIDUAL DE REGISTROS CON OBSERVACIONES (FILTRADO)").font = font_section
+    ws4.cell(row=3, column=2, value="Listado dinámico según filtros cruzados aplicados en el panel de auditoría").font = font_subtitle
+    
+    # Escribir cabecera (Fila 5)
+    for idx, col in enumerate(headers_inc, start=2):
+        cell = ws4.cell(row=5, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+        
+    # Acotar exportación a un límite seguro de filas (ej. 12,000) para asegurar tiempos óptimos de descarga
+    limite_filas = 12000
+    r_inc = 5
+    for inc in filtered[:limite_filas]:
+        r_inc += 1
+        ws4.cell(row=r_inc, column=2, value=safe_int(inc.get("fila_excel"))).font = font_regular
+        ws4.cell(row=r_inc, column=3, value=inc.get("celda_padre")).font = font_bold
+        ws4.cell(row=r_inc, column=4, value=inc.get("celda_hija")).font = font_regular
+        ws4.cell(row=r_inc, column=5, value=inc.get("campania")).font = font_regular
+        ws4.cell(row=r_inc, column=6, value=inc.get("geotecnico")).font = font_regular
+        ws4.cell(row=r_inc, column=7, value=inc.get("sector_geotecnico")).font = font_regular
+        ws4.cell(row=r_inc, column=8, value=inc.get("columna")).font = font_regular
+        
+        val_act = inc.get("valor_actual")
+        ws4.cell(row=r_inc, column=9, value=val_act if val_act is not None else "—").font = font_regular
+        
+        tipo_inc = inc.get("tipo_incidencia")
+        tipo_cell = ws4.cell(row=r_inc, column=10, value=tipo_inc)
+        tipo_cell.font = font_bold
+        if tipo_inc == "ALERTA":
+            tipo_cell.fill = fill_accent_red
+        elif tipo_inc == "ADVERTENCIA":
+            tipo_cell.fill = fill_accent_orange
+        else:
+            tipo_cell.fill = fill_accent_yellow
+            
+        ws4.cell(row=r_inc, column=11, value=inc.get("mensaje")).font = font_regular
+        
+        # Estilos rápidos por celda
+        ws4.cell(row=r_inc, column=2).alignment = alignment_center
+        ws4.cell(row=r_inc, column=3).alignment = alignment_center
+        ws4.cell(row=r_inc, column=4).alignment = alignment_center
+        ws4.cell(row=r_inc, column=5).alignment = alignment_center
+        ws4.cell(row=r_inc, column=6).alignment = alignment_left
+        ws4.cell(row=r_inc, column=7).alignment = alignment_center
+        ws4.cell(row=r_inc, column=8).alignment = alignment_left
+        ws4.cell(row=r_inc, column=9).alignment = alignment_center
+        ws4.cell(row=r_inc, column=10).alignment = alignment_center
+        ws4.cell(row=r_inc, column=11).alignment = alignment_left
+        
+        for col_idx in range(2, 12):
+            ws4.cell(row=r_inc, column=col_idx).border = border_thin
+            
+    # Auto-ajustar anchos para evitar desbordes y textos truncados (###)
+    for ws in [ws1, ws2, ws3, ws4]:
+        ws.column_dimensions['A'].width = 3
+        for col in ws.columns:
+            if col[0].column == 1:
+                continue
+            vals = [str(cell.value or '') for cell in col if cell.value is not None]
+            if not vals:
+                continue
+            max_len = max(len(v) for v in vals)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = min(max(max_len + 4, 12), 48)
+            
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    filename = f"reporte_auditoria_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
