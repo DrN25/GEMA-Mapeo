@@ -17,17 +17,14 @@ export default function StructurePlot({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Dimensiones dinámicas del contenedor para garantizar responsividad
   const [dimensions, setDimensions] = useState({ width: 800, height: 480 });
 
-  // Estados para Navegación de Gráfico (Pan & Zoom interactivo)
   const [zoom, setZoom] = useState(1.0);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Tooltip flotante inteligente anti-recorte
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState<{
     joint: CalculatedJoint;
@@ -37,7 +34,6 @@ export default function StructurePlot({
     alignedTop: boolean;
   } | null>(null);
 
-  // Paleta de colores sincronizada con DisconTable.tsx
   const getFamilyColor = (famNum: number): string => {
     const colors = [
       '#fb923c', // Orange (F1)
@@ -53,7 +49,6 @@ export default function StructurePlot({
     return colors[(famNum - 1) % colors.length];
   };
 
-  // Convertidor robusto para soportar comas decimales regionales
   const parseLocaleFloat = (val: any): number => {
     if (val === undefined || val === null) return 0;
     const str = String(val).replace(',', '.').trim();
@@ -82,13 +77,11 @@ export default function StructurePlot({
     return val.toFixed(2);
   };
 
-  // Filtramos la leyenda para mostrar ÚNICAMENTE las familias activas registradas de forma dinámica
   const activeFamiliesInPlot = useMemo(() => {
     const jointsList = calculatedJoints || [];
     return Array.from(new Set(jointsList.map(j => j.row?.familia || (j.row as any)?.fam).filter(Boolean))).sort((a, b) => a - b);
   }, [calculatedJoints]);
 
-  // Convertimos las coordenadas de entrada usando el parseador local robusto
   const xFromVal = parseLocaleFloat(header?.este_from);
   const yFromVal = parseLocaleFloat(header?.norte_from);
   const cFromVal = parseLocaleFloat(header?.cota_from);
@@ -99,7 +92,6 @@ export default function StructurePlot({
   const largoValid = largo > 0;
   const isCoordsValid = [xFromVal, yFromVal, cFromVal, xToVal, yToVal, cToVal].every(c => c !== 0);
 
-  // Escala de gráfico ISOTRÓPICA real (Conserva relación de aspecto 1:1 real y previene distorsiones)
   const base_scale_current = (W: number, H: number) => {
     const ML = 95, MR = 40, MT = 50, MB = 65;
     const PW = W - ML - MR;
@@ -115,7 +107,7 @@ export default function StructurePlot({
 
     const scaleX = PW / spanX;
     const scaleY = PH / spanY;
-    const scale = Math.min(scaleX, scaleY) * zoom; // Escala unificada 1:1
+    const scale = Math.min(scaleX, scaleY) * zoom;
 
     return {
       scale,
@@ -124,7 +116,6 @@ export default function StructurePlot({
     };
   };
 
-  // ResizeObserver para adaptar el canvas en tiempo real al contenedor HTML
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -141,7 +132,6 @@ export default function StructurePlot({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Sincronización del bucle de dibujo
   useEffect(() => {
     drawPlot();
   }, [header, calculatedJoints, zoom, largo, panX, panY, dimensions]);
@@ -156,7 +146,6 @@ export default function StructurePlot({
       const W = dimensions.width;
       const H = dimensions.height;
 
-      // --- CONFIGURACIÓN HIGH-DPI / RETINA (VIRTUALIZACIÓN VECTORIAL RAZOR-SHARP) ---
       const dpr = window.devicePixelRatio || 1;
       canvas.width = W * dpr;
       canvas.height = H * dpr;
@@ -164,11 +153,9 @@ export default function StructurePlot({
       canvas.style.height = `${H}px`;
       ctx.scale(dpr, dpr);
 
-      // Fondo oscuro
       ctx.fillStyle = '#0c0a09';
       ctx.fillRect(0, 0, W, H);
 
-      // Grid de fondo decorativo
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
       ctx.lineWidth = 1;
       const gridSpacing = 40;
@@ -191,7 +178,6 @@ export default function StructurePlot({
       const PW = W - ML - MR;
       const PH = H - MT - MB;
 
-      // Escala isotrópica real
       const { scale } = base_scale_current(W, H);
 
       const centerX = ML + PW / 2;
@@ -199,14 +185,12 @@ export default function StructurePlot({
       const mapCenterX = (xFromVal + xToVal) / 2;
       const mapCenterY = (yFromVal + yToVal) / 2;
 
-      // Métodos de transformación con Pan y Zoom
       const toCanvasX = (mx: number) => centerX + panX + (mx - mapCenterX) * scale;
       const toCanvasY = (my: number) => centerY + panY - (my - mapCenterY) * scale;
 
       const fromCanvasX = (cx: number) => mapCenterX + (cx - centerX - panX) / scale;
       const fromCanvasY = (cy: number) => mapCenterY - (cy - centerY - panY) / scale;
 
-      // --- CAPA DE RECORTE (VIEWPORT CLIP) ---
       ctx.save();
       ctx.beginPath();
       ctx.rect(ML, MT, PW, PH);
@@ -217,7 +201,6 @@ export default function StructurePlot({
       const xTo = toCanvasX(xToVal);
       const yTo = toCanvasY(yToVal);
 
-      // Corredor de ventana
       const boxPad = 12;
       const perpAngle = Math.atan2(yTo - yFrom, xTo - xFrom) + Math.PI / 2;
       const px = Math.cos(perpAngle) * boxPad;
@@ -229,14 +212,12 @@ export default function StructurePlot({
       ctx.fillStyle = "rgba(14,165,233,0.06)";
       ctx.fill();
 
-      // Línea de Scanline
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 4]);
       ctx.beginPath(); ctx.moveTo(xFrom, yFrom); ctx.lineTo(xTo, yTo); ctx.stroke();
       ctx.setLineDash([]);
 
-      // Dibujar discontinuidades
       (calculatedJoints || []).forEach(cj => {
         if (!cj.row) return;
         const cx = toCanvasX(cj.x);
@@ -247,7 +228,6 @@ export default function StructurePlot({
         const strikeAngle = dipDirRad - Math.PI / 2;
 
         const cont = cj.row.continuidad !== undefined && cj.row.continuidad !== -1 ? cj.row.continuidad : 1.5;
-        // Escala física 1:1 real exacta sin multiplicadores distorsionadores
         const visibleLength = cont * scale;
         const halfL = visibleLength / 2;
 
@@ -261,7 +241,6 @@ export default function StructurePlot({
         const famColor = getFamilyColor(fam);
 
         if (cj.inBounds) {
-          // Dentro de rango (Línea continua sólida)
           ctx.strokeStyle = famColor;
           ctx.lineWidth = 3;
           ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
@@ -269,12 +248,11 @@ export default function StructurePlot({
           ctx.fillStyle = '#ffffff';
           ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2); ctx.fill();
         } else {
-          // Fuera de rango (Conserva color original de la familia pero en punteado con opacidad baja)
           ctx.save();
           ctx.strokeStyle = famColor;
           ctx.lineWidth = 1.5;
           ctx.setLineDash([4, 4]);
-          ctx.globalAlpha = 0.4; // Sutil diferenciación visual sin romper la consistencia de color
+          ctx.globalAlpha = 0.4;
           ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
 
           ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
@@ -286,17 +264,16 @@ export default function StructurePlot({
 
         ctx.fillStyle = cj.inBounds ? '#94a3b8' : 'rgba(148,163,184,0.4)';
         ctx.font = 'bold 10px monospace';
+        ctx.textBaseline = 'middle';
         ctx.textAlign = 'left';
         ctx.fillText(`F${fam} (#${id})`, cx + 6, cy + 3);
       });
 
-      // Marcadores de Extremos
       drawNode(ctx, xFrom, yFrom, 'FROM', '#22d3ee');
       drawNode(ctx, xTo, yTo, 'TO', '#a78bfa');
 
-      ctx.restore(); // Termina capa de recorte
+      ctx.restore();
 
-      // --- DIBUJAR MARCO Y EJES CON COORDENADAS DINÁMICAS ---
       ctx.strokeStyle = 'rgba(100, 116, 139, 0.6)';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(ML, MT, PW, PH);
@@ -325,7 +302,8 @@ export default function StructurePlot({
         ctx.fillText(formatNumber3(wy), ML - 8, cy);
       }
 
-      ctx.font = "13px 'Outfit', sans-serif";
+      // CORREGIDO: Cambio de tipografía de 'Outfit' a 'Inter' para garantizar consistencia global
+      ctx.font = "13px 'Inter', sans-serif";
       ctx.fillStyle = "rgba(148,163,184,0.8)";
       ctx.textAlign = "center";
       ctx.fillText("Este (UTM X) →", ML + PW / 2, MT + PH + 32);
@@ -515,7 +493,6 @@ export default function StructurePlot({
           </div>
         )}
 
-        {/* Tooltip con posicionamiento dinámico anti-recorte */}
         {showTooltip && tooltipData && tooltipData.joint.row && (
           <div
             className="absolute z-50 bg-navy-950/95 border border-navy-700 rounded-xl p-3.5 text-xs shadow-2xl backdrop-blur-md space-y-1.5 w-64 text-left pointer-events-none text-slate-300"
@@ -556,7 +533,6 @@ export default function StructurePlot({
         )}
       </div>
 
-      {/* LEYENDA DINÁMICA */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center text-xs font-bold text-slate-400 border-b border-navy-900 pb-3">
         <span className="flex items-center gap-1.5">
           <span className="w-5 h-1 rounded-sm bg-[#38bdf8]"></span>
@@ -579,7 +555,6 @@ export default function StructurePlot({
         )}
       </div>
 
-      {/* TABLA DE PROYECCIONES Y ÁNGULOS CALCULADOS */}
       <div className="border border-navy-850 rounded-xl overflow-hidden bg-navy-950/45 pt-1.5">
         <div className="px-4 py-2.5 border-b border-navy-850 bg-navy-950 flex justify-between items-center flex-wrap gap-2">
           <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Tabla de Detalle de Proyecciones Estructurales</span>
@@ -616,8 +591,8 @@ export default function StructurePlot({
                     <td className="py-2 px-2 text-center font-extrabold" style={{ color }}>F{fam}</td>
                     <td className="py-2 px-2 font-bold text-slate-400">{cj.row.tipo_estructura}</td>
                     <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber3(cj.row.distancia)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber4(cj.x)}</td> {/* <- Cambiado a 4 decimales */}
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber2(cj.y)}</td> {/* <- Cambiado a 2 decimales */}
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber4(cj.x)}</td>
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber2(cj.y)}</td>
                     <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber6(cj.z)}</td>
                     <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">{formatNumber6(cj.theta)}&deg;</td>
                     <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">{formatNumber6(cj.alpha)}&deg;</td>

@@ -17,8 +17,9 @@ interface GeomecTableProps<T> {
     validationErrors?: Record<string, 'ERROR' | 'WARNING'>;
     showFormulas?: boolean;
     tableId: string;
-    renderCell?: (colKey: string, val: any, row: T) => React.ReactNode; // Callback modular para celdas personalizadas
-    getRowClassName?: (row: T, idx: number) => string; // Callback modular para clases de fila
+    renderCell?: (colKey: string, val: any, row: T) => React.ReactNode;
+    getRowClassName?: (row: T, idx: number) => string;
+    renderRowIndex?: (idx: number, row: T) => React.ReactNode;
 }
 
 export default function GeomecTable<T extends { id: any;[key: string]: any }>({
@@ -36,7 +37,8 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
     showFormulas = true,
     tableId,
     renderCell,
-    getRowClassName
+    getRowClassName,
+    renderRowIndex
 }: GeomecTableProps<T>) {
     const [localValues, setLocalValues] = useState<Record<string, string>>({});
     const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const deltaX = moveEvent.clientX - startX;
-            const newWidth = Math.max(50, currentWidth + deltaX);
+            const newWidth = Math.max(60, currentWidth + deltaX);
             const updatedWidths = { ...columnWidths, [colKey]: newWidth };
             setColumnWidths(updatedWidths);
             localStorage.setItem(`geomec-table-widths-${tableId}`, JSON.stringify(updatedWidths));
@@ -74,29 +76,6 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
         window.addEventListener('mouseup', handleMouseUp);
     };
 
-    const clampOnTheFly = (val: string, col: ColumnConfig): string => {
-        let cleaned = val.replace(/[^0-9.-]/g, '');
-
-        const dots = cleaned.split('.');
-        if (dots.length > 2) {
-            cleaned = dots[0] + '.' + dots.slice(1).join('');
-        }
-
-        if (col.precision === 0) {
-            cleaned = cleaned.split('.')[0];
-        }
-
-        if (col.range) {
-            const [min, max] = col.range;
-            const num = parseFloat(cleaned);
-            if (!isNaN(num)) {
-                if (num > max) return String(max);
-                if (num < 0 && min >= 0) return '';
-            }
-        }
-        return cleaned;
-    };
-
     const getInputValue = (rowId: any, key: string, stateVal: any): string => {
         const mapKey = `${rowId}-${key}`;
         if (localValues[mapKey] !== undefined) return localValues[mapKey];
@@ -106,9 +85,12 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
 
     const handleInputChange = (rowId: any, key: string, rawVal: string, precision?: number) => {
         const mapKey = `${rowId}-${key}`;
-        let val = rawVal;
+
+        // CORREGIDO: Sanitizador global de comas decimales regionales en tiempo real
+        let val = rawVal.replace(',', '.');
+
         if (precision !== undefined) {
-            val = handleNumberLimit(rawVal, precision);
+            val = handleNumberLimit(val, precision);
         }
         setLocalValues(prev => ({ ...prev, [mapKey]: val }));
 
@@ -151,8 +133,11 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
             return;
         }
 
+        // CORREGIDO: Sanitizador global de comas decimales regionales al perder el foco
+        const sanitizedVal = rawVal.replace(',', '.');
+
         if (col.type === 'number') {
-            let num = parseFloat(rawVal);
+            let num = parseFloat(sanitizedVal);
             if (isNaN(num)) {
                 onCellChange(rowId, col.key, -1);
                 return;
@@ -162,7 +147,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
             }
             onCellChange(rowId, col.key, num);
         } else {
-            onCellChange(rowId, col.key, rawVal);
+            onCellChange(rowId, col.key, sanitizedVal);
         }
     };
 
@@ -184,19 +169,35 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
             e.preventDefault();
             const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
             if (prevTr) {
-                targetInput = prevTr.cells[cellIndex]?.querySelector("input, select");
+                const targetTd = prevTr.cells[cellIndex];
+                if (targetDataInput(targetTd)) {
+                    targetDataInput(targetTd).focus();
+                    if (targetDataInput(targetTd) instanceof HTMLInputElement) {
+                        (targetDataInput(targetTd) as HTMLInputElement).select();
+                    }
+                }
             }
         } else if (key === "ArrowDown" || key === "Enter") {
             e.preventDefault();
             const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
             if (nextTr) {
-                targetInput = nextTr.cells[cellIndex]?.querySelector("input, select");
+                const targetTd = nextTr.cells[cellIndex];
+                if (targetDataInput(targetTd)) {
+                    targetDataInput(targetTd).focus();
+                    if (targetDataInput(targetTd) instanceof HTMLInputElement) {
+                        (targetDataInput(targetTd) as HTMLInputElement).select();
+                    }
+                }
             }
         } else if (key === "ArrowLeft") {
             let shouldMove = true;
             if (activeElement instanceof HTMLInputElement) {
-                if (activeElement.selectionStart !== null && activeElement.selectionStart > 0) {
-                    shouldMove = false;
+                try {
+                    if (activeElement.selectionStart !== null && activeElement.selectionStart > 0) {
+                        shouldMove = false;
+                    }
+                } catch {
+                    // Fallback
                 }
             }
             if (shouldMove) {
@@ -214,8 +215,12 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
         } else if (key === "ArrowRight") {
             let shouldMove = true;
             if (activeElement instanceof HTMLInputElement) {
-                if (activeElement.selectionStart !== null && activeElement.selectionEnd !== activeElement.value.length) {
-                    shouldMove = false;
+                try {
+                    if (activeElement.selectionStart !== null && activeElement.selectionEnd !== activeElement.value.length) {
+                        shouldMove = false;
+                    }
+                } catch {
+                    // Fallback
                 }
             }
             if (shouldMove) {
@@ -240,11 +245,16 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
         }
     };
 
+    const targetDataInput = (td: HTMLTableCellElement | null): HTMLInputElement | HTMLSelectElement | null => {
+        if (!td) return null;
+        return td.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
+    };
+
     const getCellClassName = (col: ColumnConfig, customTdStyle: string, errType?: 'ERROR' | 'WARNING') => {
-        let borderClass = "border-r border-b border-navy-800";
-        if (errType === 'ERROR') borderClass = "border-r border-b border-red-500 bg-red-950/20";
-        else if (errType === 'WARNING') borderClass = "border-r border-b border-amber-500 bg-amber-950/10";
-        return `relative h-8 p-0 ${borderClass} ${customTdStyle} transition-colors`;
+        let borderClass = "border-r border-b border-navy-800/60";
+        if (errType === 'ERROR') borderClass = "border-r border-b border-red-500/80 bg-red-950/20 shadow-[inset_0_0_8px_rgba(239,68,68,0.15)]";
+        else if (errType === 'WARNING') borderClass = "border-r border-b border-amber-500/80 bg-amber-950/15 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]";
+        return `relative h-9 p-0 ${borderClass} ${customTdStyle} transition-all duration-150`;
     };
 
     const formatCellValue = (val: any, col: ColumnConfig, isFocused: boolean) => {
@@ -253,28 +263,28 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
             return col.formatOnBlur(val);
         }
         if (col.type === 'number' && col.precision !== undefined && typeof val === 'number') {
-            if (isFocused) return String(val); // Mantener string crudo mientras edita
+            if (isFocused) return String(val);
             return val.toFixed(col.precision);
         }
         return String(val);
     };
 
     return (
-        <div className="overflow-x-auto relative rounded-lg border border-navy-700 bg-navy-950/20">
+        <div className="overflow-x-auto relative rounded-xl border border-navy-800/80 bg-navy-950/45 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
             <table className="w-max min-w-full border-collapse border-separate border-spacing-0" style={{ minWidth: minWidthStyle }}>
                 {customHeader ? (
                     customHeader
                 ) : (
                     <thead>
-                        <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800 h-8">
-                            <th className="py-2 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-b border-navy-800 w-12 min-w-[48px] h-8">#</th>
+                        <tr className="bg-navy-900/90 text-slate-300 font-bold uppercase tracking-wider text-xs h-9">
+                            <th className="py-2.5 px-3 text-center sticky left-0 bg-navy-900/90 z-20 border-r border-b border-navy-800 w-12 min-w-[48px] h-9 shadow-[2px_0_5px_rgba(0,0,0,0.2)]">#</th>
                             {columns.map(c => {
                                 const width = columnWidths[c.key] || c.width;
                                 return (
                                     <th
                                         key={c.key}
                                         style={{ width, minWidth: width }}
-                                        className="relative py-2 px-2 text-center border-r border-b border-navy-800 text-[10px] select-none font-bold uppercase tracking-wider h-8"
+                                        className="relative py-2.5 px-2 text-center border-r border-b border-navy-800/80 text-[11px] select-none font-bold uppercase tracking-wider h-9"
                                     >
                                         <span>{c.label}</span>
                                         <div
@@ -285,7 +295,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                 );
                             })}
                             {(onInsertRowBelow || onDeleteRow) && (
-                                <th className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-b border-navy-800 w-[75px] min-w-[75px] h-8">Acción</th>
+                                <th className="py-2.5 px-2 text-center sticky right-0 bg-navy-900/90 z-20 border-l border-b border-navy-800 w-[75px] min-w-[75px] h-9 shadow-[-2px_0_5px_rgba(0,0,0,0.15)]">Acción</th>
                             )}
                         </tr>
                     </thead>
@@ -293,17 +303,18 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                 <tbody>
                     {data.map((row, idx) => {
                         const isSelected = selectedRowIndex === idx;
-                        const customRowBg = getRowClassName ? getRowClassName(row, idx) : (idx % 2 === 0 ? "bg-navy-900/5" : "bg-navy-950/20");
-                        const rowBg = isSelected ? "bg-indigo-500/10" : customRowBg;
+                        const customRowBg = getRowClassName ? getRowClassName(row, idx) : (idx % 2 === 0 ? "bg-navy-900/10" : "bg-navy-950/30");
+                        const rowBg = isSelected ? "bg-indigo-500/10 shadow-[inset_0_0_12px_rgba(99,102,241,0.08)]" : customRowBg;
 
                         return (
                             <tr
                                 key={row[rowIdKey]}
                                 onClick={() => onSelectRow?.(idx)}
-                                className={`${rowBg} h-8 transition-colors border-b border-navy-900/20 hover:bg-navy-900/10`}
+                                className={`${rowBg} h-9 transition-colors border-b border-navy-900/30 hover:bg-navy-900/20`}
                             >
-                                <td className="sticky left-0 bg-navy-950 text-center text-slate-500 font-mono font-bold text-[10px] py-1 border-r border-b border-navy-800 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.15)] select-none h-8">
-                                    {idx + 1}
+                                {/* CORREGIDO: FAM sticky left tiene fondo sólido bg-navy-950 absoluto y un z-index aumentado a z-20 para evitar solapamientos */}
+                                <td className="sticky left-0 bg-navy-950 text-center text-slate-400 font-mono font-bold text-xs py-1.5 border-r border-b border-navy-800/80 z-20 shadow-[3px_0_6px_rgba(0,0,0,0.25)] select-none h-9">
+                                    {renderRowIndex ? renderRowIndex(idx, row) : idx + 1}
                                 </td>
 
                                 {columns.map(c => {
@@ -321,7 +332,6 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                             style={{ width, minWidth: width, maxWidth: width }}
                                             className={getCellClassName(c, customTdStyle, errType)}
                                         >
-                                            {/* Renderizado de celda personalizado mediante callback */}
                                             {renderCell && renderCell(c.key, val, row) ? (
                                                 <div className="absolute inset-0 w-full h-full flex items-center justify-center">
                                                     {renderCell(c.key, val, row)}
@@ -333,7 +343,6 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
 
                                                     const renderCellContent = (
                                                         <div className={`absolute inset-0 flex items-center justify-center text-xs text-center leading-none ${c.customStyleClass || 'text-indigo-300 font-semibold'}`}>
-                                                            {/* Ratings individuales llevan borde dashed inset, los totales llenan la celda */}
                                                             {!isTotal && (
                                                                 <div className="absolute inset-[2px] border border-dashed border-indigo-500/20 rounded-sm pointer-events-none" />
                                                             )}
@@ -362,11 +371,11 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                             value={val ?? ''}
                                                             onChange={(e) => onCellChange(row[rowIdKey], c.key, e.target.value || null)}
                                                             onKeyDown={handleGridKeyDown}
-                                                            className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full h-full text-xs font-semibold px-1 border-0"
+                                                            className="bg-transparent text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-center cursor-pointer w-full h-full text-xs font-normal px-2 border-0"
                                                         >
                                                             <option value="" className="bg-navy-950 text-slate-500">—</option>
                                                             {c.options.map(o => (
-                                                                <option key={o.value} value={o.value} className="bg-navy-950">{o.label}</option>
+                                                                <option key={o.value} value={o.value} className="bg-navy-950 text-slate-100">{o.label}</option>
                                                             ))}
                                                         </select>
                                                     ) : (
@@ -374,10 +383,10 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                             type={c.type === 'date' ? 'date' : 'text'}
                                                             value={getInputValue(row[rowIdKey], c.key, formatCellValue(val, c, isFocused))}
                                                             onFocus={() => setFocusedField(mapKey)}
-                                                            onChange={(e) => handleInputChange(row[rowIdKey], c, e.target.value)}
+                                                            onChange={(e) => handleInputChange(row[rowIdKey], c.key, e.target.value, c.precision)}
                                                             onBlur={(e) => handleInputBlur(row[rowIdKey], c, e.target.value)}
                                                             onKeyDown={handleGridKeyDown}
-                                                            className="w-full h-full bg-transparent text-slate-200 text-center focus:outline-none border-0 px-2 text-xs"
+                                                            className="w-full h-full bg-transparent text-slate-100 text-center focus:outline-none focus:bg-navy-900/50 focus:ring-1 focus:ring-indigo-500/40 border-0 px-2 text-xs font-normal transition-all"
                                                         />
                                                     )}
                                                 </div>
@@ -386,13 +395,14 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                     );
                                 })}
 
+                                {/* CORREGIDO: ACCIÓN sticky right tiene fondo sólido bg-navy-950 absoluto y un z-index aumentado a z-20 para evitar solapamientos */}
                                 {(onInsertRowBelow || onDeleteRow) && (
-                                    <td className="sticky right-0 bg-navy-950 text-center py-1 px-2 border-l border-b border-navy-800 z-10 w-[75px] min-w-[75px] h-8">
+                                    <td className="sticky right-0 bg-navy-950 text-center py-1 px-2 border-l border-b border-navy-800/80 z-20 w-[75px] min-w-[75px] h-9 shadow-[-3px_0_6px_rgba(0,0,0,0.25)]">
                                         <div className="flex items-center justify-center gap-3">
                                             {onInsertRowBelow && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onInsertRowBelow(idx); }}
-                                                    className="text-slate-500 hover:text-emerald-400 font-black text-sm px-1 transition-colors select-none"
+                                                    className="text-slate-400 hover:text-emerald-400 font-extrabold text-sm px-1 transition-colors select-none"
                                                     title="Insertar fila abajo"
                                                 >
                                                     +
@@ -401,7 +411,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                             {onDeleteRow && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onDeleteRow(row[rowIdKey]); }}
-                                                    className="p-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:text-red-400 transition-colors flex items-center justify-center mx-auto active:scale-95"
+                                                    className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all flex items-center justify-center mx-auto active:scale-95"
                                                     title="Limpiar fila"
                                                 >
                                                     <Trash2 size={13} />
@@ -413,6 +423,14 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                             </tr>
                         );
                     })}
+
+                    {data.length === 0 && (
+                        <tr>
+                            <td colSpan={columns.length + 2} className="py-16 text-center text-slate-500 italic bg-navy-950 border-b border-navy-800 text-xs font-semibold select-none">
+                                No se registran discontinuidades con distancias válidas para proyectar.
+                            </td>
+                        </tr>
+                    )}
                 </tbody>
             </table>
         </div>

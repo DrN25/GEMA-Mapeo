@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Upload, FileSpreadsheet, AlertTriangle, ChevronLeft, ChevronRight,
-    BarChart3, Database, RefreshCw, Activity, ShieldCheck, X, Download, Filter, Search, FileText, Calendar, User, Folder, Settings
-} from 'lucide-react';
+import { ShieldCheck, Download, Filter, X, Folder, Calendar, BarChart3, User, AlertTriangle, Settings } from 'lucide-react';
+
+import ExcelImportAuditor from './ExcelImportAuditor';
+import LiveInspectorTable, { type IncidenceItem } from './LiveInspectorTable';
 
 interface BulkAuditorProps {
     apiBase: string;
@@ -28,8 +28,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const [selectedAuditId, setSelectedAuditId] = useState<string>('');
     const [kpis, setKpis] = useState<any>(null);
 
-    // Estados de control de filtros cruzados interactivos (Power BI)
-    const [incidencias, setIncidencias] = useState<any[]>([]);
+    // Estados de control de filtros cruzados interactivos
+    const [incidencias, setIncidencias] = useState<IncidenceItem[]>([]);
     const [page, setPage] = useState<number>(1);
     const [totalPages, setTotalPages] = useState<number>(1);
     const [totalRecords, setTotalRecords] = useState<number>(0);
@@ -44,12 +44,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
     const MANDATORY_COLS_COUNT = 77;
 
-    // Cargar lista de auditorías históricas al montar
+    // Cargar historial de auditorías
     useEffect(() => {
         fetchHistory();
     }, []);
 
-    // Recargar incidencias y KPIs al cambiar filtros o auditoría activa
+    // Sincronizar filtrados cruzados interactivos en tiempo real
     useEffect(() => {
         if (status === 'loaded' && selectedAuditId) {
             fetchKpisAndIncidencias();
@@ -64,7 +64,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 setHistory(data);
             }
         } catch (e) {
-            console.error("Error al cargar historial de auditorías:", e);
+            console.error("Error al cargar historial:", e);
         }
     };
 
@@ -219,8 +219,6 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         window.open(`${apiBase}/api/geomecanica/reporte-markdown?${queryParams.toString()}`);
     };
 
-    const totalCeldasEvaluadas = kpis ? kpis.total_filas_procesadas * MANDATORY_COLS_COUNT : 0;
-
     // Formateadores específicos de Rango de Alerta (Rojo -> Naranja -> Amarillo)
     const getAlertRankStyle = (index: number) => {
         const rank = index + 1;
@@ -271,80 +269,51 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         <div className="space-y-6 select-none text-left animate-fade-in text-slate-100 print:text-black print:bg-white text-xs sm:text-sm bg-[#02040a] min-h-screen p-1 sm:p-3">
 
             {/* SECCIÓN 1: HISTORIAL DE AUDITORÍAS PASADAS */}
-            <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-4 print:hidden">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                    <Folder size={14} className="text-indigo-400" />
-                    <span>Historial de Importaciones Geotécnicas Auditadas</span>
-                </h3>
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-                    {history.map((audit) => {
-                        const isActive = selectedAuditId === audit.audit_id;
-                        return (
-                            <button
-                                key={audit.audit_id}
-                                onClick={() => handleSelectPastAudit(audit.audit_id)}
-                                className={`flex-shrink-0 p-3 rounded-lg border text-left transition-all ${isActive
-                                    ? 'bg-indigo-500/10 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/30'
-                                    : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/70'
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs font-black text-slate-100 truncate max-w-[180px]" title={audit.archivo}>
-                                        {audit.archivo}
-                                    </span>
-                                    <span className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-bold">
-                                        {audit.total_filas} filas
-                                    </span>
-                                </div>
-                                <div className="text-xs text-slate-400 mt-1 flex gap-2">
-                                    <span>{audit.fecha}</span>
-                                    <span className="text-red-400 font-semibold">{audit.total_alertas} Alertas</span>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* ÁREA DE CARGA INICIAL (Auditoría Nueva) */}
-            {status !== 'loaded' && !selectedAuditId && (
-                <div className="rounded-xl border border-slate-800/80 p-8 space-y-6 max-w-xl mx-auto bg-[#090f1d]/50 backdrop-blur-md mt-6 print:hidden shadow-xl">
-                    <div className="text-center space-y-2">
-                        <div className="p-3.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-md">
-                            <Database size={24} />
-                        </div>
-                        <div>
-                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-100">Auditar Nueva Planilla de Mapeo</h3>
-                            <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
-                                Sube un nuevo archivo Excel de discontinuidades para escanear, auditar y compilar KPIs de integridad.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="border border-dashed border-slate-700 hover:border-indigo-500/45 rounded-xl p-6 text-center bg-slate-900/20 transition-all cursor-pointer relative group">
-                        <input
-                            type="file"
-                            accept=".xlsx, .xls"
-                            onChange={handleFileChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <FileSpreadsheet size={32} className="mx-auto text-slate-500 group-hover:text-indigo-400 transition-colors mb-2" />
-                        <span className="text-xs font-semibold text-slate-300 block">
-                            {file ? file.name : 'Arrastra tu archivo .xlsx o haz clic para buscar'}
-                        </span>
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t border-slate-850">
-                        <button
-                            onClick={handleUpload}
-                            disabled={!file}
-                            className="bg-indigo-500 hover:bg-indigo-600 border border-indigo-400/30 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all disabled:opacity-30"
-                        >
-                            Iniciar Auditoría Masiva
-                        </button>
+            {history.length > 0 && (
+                <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-4 print:hidden">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                        <Folder size={14} className="text-indigo-400" />
+                        <span>Historial de Importaciones Geotécnicas Auditadas</span>
+                    </h3>
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                        {history.map((audit) => {
+                            const isActive = selectedAuditId === audit.audit_id;
+                            return (
+                                <button
+                                    key={audit.audit_id}
+                                    onClick={() => handleSelectPastAudit(audit.audit_id)}
+                                    className={`flex-shrink-0 p-3 rounded-lg border text-left transition-all ${isActive
+                                        ? 'bg-indigo-500/10 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/30'
+                                        : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/70'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-xs font-black text-slate-100 truncate max-w-[180px]" title={audit.archivo}>
+                                            {audit.archivo}
+                                        </span>
+                                        <span className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-bold">
+                                            {audit.total_filas} filas
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-slate-400 mt-1 flex gap-2">
+                                        <span>{audit.fecha}</span>
+                                        <span className="text-red-400 font-semibold">{audit.total_alertas} Alertas</span>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
+
+            {/* ASISTENTE DE CARGA MODULAR */}
+            <ExcelImportAuditor
+                status={status}
+                message={message}
+                file={file}
+                onFileChange={handleFileChange}
+                onUpload={handleUpload}
+            />
 
             {/* CABECERA CUANDO SE ENCUENTRAN RESULTADOS CARGADOS */}
             {(status === 'loaded' || selectedAuditId) && kpis && (
@@ -363,7 +332,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     <div className="flex items-center gap-2 print:hidden">
                         <button
                             onClick={handlePrintPDF}
-                            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/30 text-white px-4 py-2 rounded-lg text-xs font-black shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+                            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-50 border border-indigo-500/30 text-white px-4 py-2 rounded-lg text-xs font-black shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                         >
                             <Download size={14} />
                             <span>Exportar PDF</span>
@@ -378,15 +347,6 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             Subir Otro Excel
                         </button>
                     </div>
-                </div>
-            )}
-
-            {/* COMPRESOR LOADER */}
-            {(status === 'uploading' || status === 'processing') && (
-                <div className="rounded-xl border border-slate-800/80 text-center space-y-4 max-w-lg mx-auto animate-pulse print:hidden bg-[#090f1d]/50 backdrop-blur-md p-10">
-                    <Activity size={32} className="text-indigo-400 animate-spin mx-auto" />
-                    <p className="text-xs font-black uppercase tracking-wider">{status === 'uploading' ? 'Cargando Base de Datos...' : 'Auditoría en Ejecución'}</p>
-                    <p className="text-xs text-slate-400 leading-relaxed">{message}</p>
                 </div>
             )}
 
@@ -461,29 +421,29 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                         </div>
                     )}
 
-                    {/* CONTROL DE ESTACIONES MAPEADAS */}
+                    {/* MÉTRICAS DE ESTACIÓN */}
                     {kpis.familia1 && (
-                        <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-5 grid grid-cols-1 md:grid-cols-3 gap-6 print:border-black print:text-black">
+                        <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-5 grid grid-cols-1 md:grid-cols-3 gap-6 print:border-black print:text-black shadow-md">
                             <div className="space-y-1">
-                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Métricas de Ventanas</span>
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Métricas de Estación • Número de Celdas Padre</span>
                                 <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
                                     {kpis.familia1.num_celdas_padre.toLocaleString()}
                                 </span>
-                                <span className="text-xs text-slate-400 font-semibold block">Periodo de registro: 20xx - 20xx</span>
+                                <span className="text-xs text-slate-400 font-semibold block">Estaciones totales auditadas en la base de datos</span>
+                            </div>
+                            <div className="space-y-1 border-l border-slate-800/60 pl-6 print:border-black">
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Métricas de Estación • Promedio de Capas Hijas</span>
+                                <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
+                                    {kpis.familia1.promedio_hijas} <span className="text-xs text-slate-400 font-semibold">hijas/celda</span>
+                                </span>
+                                <span className="text-xs text-slate-400 font-semibold block">Estructuras mapeadas promedio por estación</span>
                             </div>
                             <div className="space-y-1 border-l border-slate-800/60 pl-6 print:border-black">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Total de Estructuras Mapeadas</span>
                                 <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
                                     {kpis.familia1.total_discontinuidades.toLocaleString()}
                                 </span>
-                                <span className="text-xs text-slate-400 font-semibold block">Periodo de registro: 20xx - 20xx</span>
-                            </div>
-                            <div className="space-y-1 border-l border-slate-800/60 pl-6 print:border-black">
-                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Total de metros mapeados</span>
-                                <span className="text-4xl font-black text-indigo-400 font-mono block mt-1 print:text-black">
-                                    {kpis.familia1.promedio_hijas} <span className="text-xs text-slate-400 font-semibold">metros</span>
-                                </span>
-                                <span className="text-xs text-slate-400 font-semibold block">Periodo de registro: 20xx - 20xx</span>
+                                <span className="text-xs text-slate-400 font-semibold block">Filas totales de discontinuidades cargadas</span>
                             </div>
                         </div>
                     )}
@@ -502,10 +462,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                 </h3>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                                    <div className="bg-[#10b981]/5 border border-[#10b981]/30 p-4 rounded-xl text-center shadow-inner">
+                                    <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center shadow-inner">
                                         <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Campos OK</span>
                                         <span className="text-3xl font-black text-[#10b981] block mt-2 font-mono">{kpis.familia2.total_correctos.toLocaleString()}</span>
-                                        <span className="text-xs font-extrabold text-[#10b981] block mt-2 bg-[#10b981]/10 border border-[#10b981]/20 py-1 rounded">
+                                        <span className="text-xs font-bold text-[#10b981] block mt-2 bg-[#10b981]/10 border border-[#10b981]/20 py-1 rounded">
                                             {pctFieldsCorrectos}% del total
                                         </span>
                                     </div>
@@ -513,13 +473,13 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     <button
                                         onClick={() => handleFilterTipo('VACIO')}
                                         className={`border p-4 rounded-xl text-center transition-all shadow-inner ${filterTipo === 'VACIO'
-                                            ? 'bg-yellow-500/15 border-yellow-500 ring-2 ring-yellow-500/40'
-                                            : 'bg-yellow-500/5 border-yellow-500/20 hover:bg-yellow-500/10 hover:border-yellow-500/40'
+                                            ? 'bg-yellow-500/10 border-yellow-500 ring-2 ring-yellow-500/35'
+                                            : 'bg-yellow-500/[0.03] border-yellow-500/20 hover:bg-yellow-500/[0.07] hover:border-yellow-500/40'
                                             }`}
                                     >
                                         <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Campos Vacíos</span>
                                         <span className="text-3xl font-black text-yellow-500 block mt-2 font-mono">{kpis.familia2.total_vacios.toLocaleString()}</span>
-                                        <span className="text-xs font-extrabold text-yellow-500 block mt-2 bg-yellow-500/10 border border-yellow-500/20 py-1 rounded">
+                                        <span className="text-xs font-extrabold text-yellow-500/90 block mt-2 bg-yellow-500/10 border border-yellow-500/20 py-1 rounded">
                                             {pctFieldsVacios}% del total
                                         </span>
                                     </button>
@@ -527,8 +487,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     <button
                                         onClick={() => handleFilterTipo('ADVERTENCIA')}
                                         className={`border p-4 rounded-xl text-center transition-all shadow-inner ${filterTipo === 'ADVERTENCIA'
-                                            ? 'bg-orange-500/15 border-orange-500 ring-2 ring-orange-500/40'
-                                            : 'bg-orange-500/5 border-orange-500/20 hover:bg-orange-500/10 hover:border-orange-500/40'
+                                            ? 'bg-orange-500/10 border-orange-500 ring-2 ring-orange-500/40'
+                                            : 'bg-[#0f172a]/30 border-slate-800/80 hover:bg-slate-900/50 hover:border-slate-700'
                                             }`}
                                     >
                                         <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Advertencias</span>
@@ -541,8 +501,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     <button
                                         onClick={() => handleFilterTipo('ALERTA')}
                                         className={`border p-4 rounded-xl text-center transition-all shadow-inner ${filterTipo === 'ALERTA'
-                                            ? 'bg-red-500/15 border-red-500 ring-2 ring-red-500/40'
-                                            : 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10 hover:border-red-500/40'
+                                            ? 'bg-red-500/10 border-red-500 ring-2 ring-red-500/40'
+                                            : 'bg-red-500/[0.03] border-red-500/20 hover:bg-red-500/[0.07] hover:border-red-500/40'
                                             }`}
                                     >
                                         <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Alertas Críticas</span>
@@ -559,9 +519,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                         {kpis.familia3 && (
                             <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-6 space-y-4 print:border-black">
                                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex justify-between">
-                                    <span>Integridad Estructural de Discontinuidades (Filas de Excel)</span>
+                                    <span>Registro total de Estructuras</span>
                                     <span className="text-xs bg-slate-900 text-slate-400 px-2 py-0.5 rounded font-mono">
-                                        Total: {kpis.familia3.total_discontinuidades.toLocaleString()} filas
+                                        Total: {kpis.familia3.total_discontinuidades.toLocaleString()} estructuras
                                     </span>
                                 </h3>
 
@@ -582,10 +542,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                         </span>
                                     </div>
 
-                                    <div className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-xl text-center shadow-inner">
+                                    <div className="bg-[#f97316]/5 border border-[#f97316]/20 p-4 rounded-xl text-center shadow-inner">
                                         <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Filas con Advs</span>
-                                        <span className="text-3xl font-black text-orange-500 block mt-2 font-mono">{kpis.familia3.discontinuidades_advertencias.toLocaleString()}</span>
-                                        <span className="text-xs font-bold text-orange-500 block mt-2 bg-orange-500/10 border border-orange-500/20 py-1 rounded">
+                                        <span className="text-3xl font-black text-[#f97316] block mt-2 font-mono">{kpis.familia3.discontinuidades_advertencias.toLocaleString()}</span>
+                                        <span className="text-xs font-bold text-[#f97316] block mt-2 bg-[#f97316]/10 border border-[#f97316]/20 py-1 rounded">
                                             {pctDiscsAdvs}% del total
                                         </span>
                                     </div>
@@ -603,7 +563,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
                     </div>
 
-                    {/* TABLAS COMPARATIVAS DE DISTRIBUCIÓN POR CATEGORÍAS - CON ALTURA LIMITADA Y SCROLL */}
+                    {/* TABLAS COMPARATIVAS DE DISTRIBUCIÓN POR CATEGORÍAS */}
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
                         {/* DISTRIBUCIÓN POR CAMPAÑA DE LOGUEO */}
@@ -743,8 +703,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     {/* CUADROS GEMELOS: ALERTAS DE INCOMPATIBILIDAD FISICA VS ADVERTENCIAS DE CONSISTENCIA */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                        {/* COMPONENTE IZQUIERDO: ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS */}
-                        <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
+                        {/* ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS */}
+                        <div className="glass-panel p-5 rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <AlertTriangle size={14} className="text-red-500" />
                                 <span>Alertas Críticas con Mayor Cantidad de Ocurrencias</span>
@@ -787,8 +747,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </div>
                         </div>
 
-                        {/* COMPONENTE DERECHO: ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS */}
-                        <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
+                        {/* ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS */}
+                        <div className="glass-panel p-5 rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <Settings size={14} className="text-amber-500" />
                                 <span>Advertencias de Consistencia con Mayor Cantidad de Ocurrencias</span>
@@ -803,7 +763,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                 key={idx}
                                                 onClick={() => setFilterSearch(prev => prev === item.mensaje ? '' : item.mensaje)}
                                                 className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-xl border text-left transition-all hover:scale-[1.015] ${isFiltered
-                                                    ? 'bg-orange-500/10 border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.15)] ring-1 ring-orange-500/30'
+                                                    ? 'bg-[#f97316]/10 border-[#f97316] shadow-[0_0_15px_rgba(249,115,22,0.15)] ring-1 ring-[#f97316]/30'
                                                     : 'bg-[#0f172a]/30 border-slate-800/80 hover:bg-slate-900/50 hover:border-slate-700'
                                                     }`}
                                             >
@@ -811,7 +771,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                     <span className={`shrink-0 ${getWarningRankStyle(idx)}`}>
                                                         {idx + 1}
                                                     </span>
-                                                    <span className="text-orange-500 font-black uppercase text-xs tracking-wider leading-relaxed block break-words">
+                                                    <span className="text-[#f97316] font-black uppercase text-xs tracking-wider leading-relaxed block break-words">
                                                         {item.mensaje}
                                                     </span>
                                                 </div>
@@ -820,7 +780,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                                     <span className="bg-[#02040a] border border-slate-800/80 text-slate-300 px-2.5 py-1 rounded-md text-xs font-normal lowercase font-sans">
                                                         {item.cantidad.toLocaleString()} ocurrencias
                                                     </span>
-                                                    <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-2.5 py-1 rounded-md text-xs font-normal lowercase font-sans">
+                                                    <span className="bg-[#f97316]/10 border border-[#f97316]/20 text-[#f97316] px-2.5 py-1 rounded-md text-xs font-normal lowercase font-sans">
                                                         {item.pct.toFixed(2)}% del total
                                                     </span>
                                                 </div>
@@ -834,121 +794,16 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     </div>
 
                     {/* VISOR COMPLETO FILA POR FILA (LIVE DETAILED GRID CON BUSCADOR) */}
-                    <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-6 space-y-4 print:hidden shadow-lg">
+                    <LiveInspectorTable
+                        incidencias={incidencias}
+                        totalRecords={totalRecords}
+                        page={page}
+                        totalPages={totalPages}
+                        filterSearch={filterSearch}
+                        onFilterSearchChange={setFilterSearch}
+                        onPageChange={(newPage) => fetchPaginatedIncidencias(newPage)}
+                    />
 
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <div>
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                                    <FileText size={14} className="text-indigo-400" />
-                                    <span>Buscador y Monitor de Anomalías Paginado</span>
-                                </h3>
-                                <p className="text-xs text-slate-400 mt-1">
-                                    Mostrando **{totalRecords.toLocaleString()}** registros que coinciden con los filtros cruzados seleccionados.
-                                </p>
-                            </div>
-
-                            {/* BUSCADOR */}
-                            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-1.5 w-full sm:w-64">
-                                <Search size={14} className="text-slate-500 shrink-0" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar columna, celda, error..."
-                                    value={filterSearch}
-                                    onChange={(e) => setFilterSearch(e.target.value)}
-                                    className="bg-transparent text-xs text-slate-200 focus:outline-none w-full font-bold"
-                                />
-                                {filterSearch && (
-                                    <button onClick={() => setFilterSearch('')} className="text-slate-500 hover:text-slate-300">
-                                        <X size={12} />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* TABLA DE INCIDENCIAS */}
-                        <div className="rounded-xl border border-slate-800/60 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800/80 h-10 uppercase text-xs tracking-wider">
-                                            <th className="py-2.5 px-3 text-center">Fila</th>
-                                            <th className="py-2.5 px-3">Estación Padre</th>
-                                            <th className="py-2.5 px-3">Capas Hijas</th>
-                                            <th className="py-2.5 px-3">Campaña</th>
-                                            <th className="py-2.5 px-3">Geotécnico</th>
-                                            <th className="py-2.5 px-3">Columna</th>
-                                            <th className="py-2.5 px-3 text-center">Valor</th>
-                                            <th className="py-2.5 px-3 text-center">Tipo</th>
-                                            <th className="py-2.5 px-3">Feedback / Retroalimentación de Consistencia</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {incidencias.map((inc, i) => (
-                                            <tr key={i} className="border-b border-slate-900/40 hover:bg-slate-900/10">
-                                                <td className="py-2 px-3 text-center font-mono text-slate-500 h-8">{inc.fila_excel}</td>
-                                                <td className="py-2 px-3 font-bold text-slate-200 h-8">{inc.celda_padre}</td>
-                                                <td className="py-2 px-3 font-semibold text-slate-300 h-8">{inc.celda_hija}</td>
-                                                <td className="py-2 px-3 text-slate-400 font-mono h-8">{inc.campania || 'N/A'}</td>
-                                                <td className="py-2 px-3 text-slate-400 font-medium h-8">{inc.geotecnico || 'N/A'}</td>
-                                                <td className="py-2 px-3 text-indigo-400 font-mono h-8">{inc.columna}</td>
-                                                <td className="py-2 px-3 text-center font-bold h-8">
-                                                    {inc.valor_actual !== null ? String(inc.valor_actual) : '—'}
-                                                </td>
-                                                <td className="py-2 px-3 text-center h-8">
-                                                    <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase ${inc.tipo_incidencia === 'ALERTA'
-                                                        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                        : inc.tipo_incidencia === 'ADVERTENCIA'
-                                                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                                            : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-                                                        }`}>
-                                                        {inc.tipo_incidencia}
-                                                    </span>
-                                                </td>
-                                                <td className="py-2 px-3 text-slate-300 italic leading-snug h-8">{inc.mensaje}</td>
-                                            </tr>
-                                        ))}
-                                        {incidencias.length === 0 && (
-                                            <tr>
-                                                <td colSpan={9} className="py-8 text-center text-slate-500 italic">
-                                                    No se hallaron coincidencias geomecánicas para los filtros cruzados seleccionados.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* CONTROLES DE PAGINACIÓN */}
-                        <div className="flex justify-between items-center text-xs text-slate-400 pt-2 select-none">
-                            <span>Página **{page}** de **{totalPages}**</span>
-                            <div className="flex gap-2">
-                                <button
-                                    disabled={page <= 1}
-                                    onClick={() => {
-                                        const newPage = page - 1;
-                                        setPage(newPage);
-                                        fetchPaginatedIncidencias(newPage);
-                                    }}
-                                    className="p-1.5 rounded-lg bg-[#090f1d] hover:bg-slate-900 border border-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
-                                >
-                                    <ChevronLeft size={16} />
-                                </button>
-                                <button
-                                    disabled={page >= totalPages}
-                                    onClick={() => {
-                                        const newPage = page + 1;
-                                        setPage(newPage);
-                                        fetchPaginatedIncidencias(newPage);
-                                    }}
-                                    className="p-1.5 rounded-lg bg-[#090f1d] hover:bg-slate-900 border border-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
-                                >
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </div>
-
-                    </div>
                 </div>
             )}
 

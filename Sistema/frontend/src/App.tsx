@@ -730,7 +730,7 @@ export default function App() {
             {/* Server Connectivity Indicator */}
             <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
               <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'synced' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' :
-                syncStatus === 'saving' ? 'bg-indigo-500 animate-pulse' :
+                syncStatus === 'saving' ? 'bg-violet-500 animate-pulse' :
                   syncStatus === 'unsaved' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
                     'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                 }`} />
@@ -747,22 +747,22 @@ export default function App() {
 
               <button
                 onClick={() => setShowFormulas(!showFormulas)}
-                className={`flex items-center gap-1.5 border px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${showFormulas
-                  ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20'
+                className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${showFormulas
+                  ? 'bg-violet-500/10 border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.12)]'
                   : 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200'
                   }`}
                 title="Activar/Desactivar visualización de fórmulas al pasar el mouse"
               >
-                <Calculator size={14} className={showFormulas ? 'text-indigo-400 animate-pulse' : 'text-slate-400'} />
+                <Calculator size={14} className={showFormulas ? 'text-violet-400 animate-pulse' : 'text-slate-400'} />
                 <span>{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
               </button>
 
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
-                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95"
                 title="Ver Catálogos de Referencia Geomecánica"
               >
-                <BookOpen size={14} className="text-indigo-400" />
+                <BookOpen size={14} className="text-sky-400" />
                 <span>Catálogos</span>
               </button>
 
@@ -770,10 +770,10 @@ export default function App() {
               {activeWindow && (
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95"
                   title="Exportar Mapeo de esta Ventana en Formato Excel DB"
                 >
-                  <FileSpreadsheet size={14} className="text-emerald-500" />
+                  <FileSpreadsheet size={14} className="text-emerald-400" />
                   <span>Exportar</span>
                 </button>
               )}
@@ -782,13 +782,13 @@ export default function App() {
                 <button
                   onClick={currentView === 'plt_ensayos' ? handleSaveActivePlt : handleSaveActive}
                   disabled={syncStatus === 'saving'}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 border ${syncStatus === 'unsaved'
-                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-900 border-amber-400/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse-ring'
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border ${syncStatus === 'unsaved'
+                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
                     : syncStatus === 'saving'
-                      ? 'bg-indigo-600 text-white border-indigo-500/30 cursor-wait'
+                      ? 'bg-violet-600/35 text-violet-300 border-violet-500/40 cursor-wait'
                       : syncStatus === 'synced'
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold'
-                        : 'bg-navy-900 hover:bg-navy-850 text-slate-300 border-navy-800'
+                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                        : 'bg-navy-900 border-navy-800 text-slate-300 hover:text-slate-100'
                     }`}
                   title={currentView === 'plt_ensayos' ? "Guardar ensayos PLT" : "Guardar todos los cambios en SQL Server"}
                 >

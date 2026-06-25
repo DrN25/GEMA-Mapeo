@@ -1,7 +1,7 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
-import { Calendar, User, AlignLeft, FileSpreadsheet } from 'lucide-react';
+import { AlignLeft, FileSpreadsheet } from 'lucide-react';
 
 interface VentanaFormProps {
   header: WindowHeader;
@@ -10,7 +10,6 @@ interface VentanaFormProps {
   onOpenImportModal: () => void;
 }
 
-// Función helper para limitar la edición de enteros y decimales en inputs de texto
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
   const cleaned = value.replace(/[^0-9.]/g, '');
   const parts = cleaned.split('.');
@@ -27,6 +26,12 @@ const handleNumberInputLimit = (value: string, intDigits: number, decDigits: num
   }
 
   return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+};
+
+// Sanitizador global de entrada decimal para unificar de coma a punto en tiempo real
+const sanitizeDecimalInput = (val: string, intDigits: number, decDigits: number): string => {
+  const sanitized = val.replace(',', '.');
+  return handleNumberInputLimit(sanitized, intDigits, decDigits);
 };
 
 export default function VentanaForm({
@@ -52,7 +57,8 @@ export default function VentanaForm({
   };
 
   const handleCoordinateInputChange = (field: keyof WindowHeader, val: string, intDigits: number, decDigits: number) => {
-    const restricted = handleNumberInputLimit(val, intDigits, decDigits);
+    const sanitized = val.replace(',', '.');
+    const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits);
     setLocalValues(prev => ({ ...prev, [field as string]: restricted }));
 
     const num = parseFloat(restricted);
@@ -77,28 +83,8 @@ export default function VentanaForm({
     }
   };
 
-  const handleDegreeChange = (field: keyof WindowHeader, val: string, maxVal: number) => {
-    if (val === '') {
-      handleChange(field, '');
-      return;
-    }
-    let num = parseFloat(val);
-    if (isNaN(num)) return;
-
-    if (field !== 'dip_hw' && num < 0) {
-      num = 0;
-    } else if (field === 'dip_hw' && num < -90) {
-      num = -90;
-    }
-
-    if (num > maxVal) num = maxVal;
-    if (maxVal === 360 && num === 360) num = 0;
-    handleChange(field, Math.round(num * 100) / 100);
-  };
-
-  // 🧪 LÓGICA DE FILTRADO Y CASCADA INTELIGENTE DE LITOLOGÍAS NATIVAS
   const uniqueLito1 = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
-  const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.grupo))).sort(); // unidad_litologica es grupo
+  const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.grupo))).sort();
 
   const filteredLito2Options = header.lito_1
     ? Array.from(new Set(LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.lito_1).map(item => item.litologia))).sort()
@@ -194,7 +180,14 @@ export default function VentanaForm({
     handleChange('unidad_litologica', val);
   };
 
-  // Cálculo de largo automático redondeado estrictamente a entero
+  const handleSectGeotChange = (val: string) => {
+    onChange({
+      ...header,
+      sect_geot: val,
+      sector: val
+    });
+  };
+
   const ix = parseFloat(String(header.este_from));
   const iy = parseFloat(String(header.norte_from));
   const ic = parseFloat(String(header.cota_from));
@@ -217,385 +210,429 @@ export default function VentanaForm({
 
   return (
     <div className="space-y-4 select-none text-left">
-      {/* SECCIÓN 1: DATOS DE IDENTIFICACIÓN Y COORDENADAS 3D APILADAS VERTICALMENTE */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 bg-navy-900/10">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2 flex items-center justify-between">
-          <span className="flex items-center gap-2 text-xs md:text-sm">
-            <AlignLeft size={14} className="text-emerald-500" />
-            <span>Datos de Registro — Identificación de la ventana</span>
-          </span>
+      {/* TARJETA UNIFICADA PREMIUM CON BORDE IZQUIERDO VIOLETA DE NEÓN */}
+      <div className="glass-panel p-6 rounded-2xl border border-navy-800 bg-navy-950/20 border-l-4 border-l-violet-500 shadow-xl relative overflow-hidden">
+
+        {/* ENCABEZADO PRINCIPAL (CORREGIDO: Jerarquía unificada idéntica a "Comentarios y Fotos") */}
+        <div className="flex items-center justify-between border-b border-navy-900 pb-4 flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-violet-500/10 border border-violet-500/20 text-violet-400 rounded-lg">
+              <AlignLeft size={18} className="text-violet-400" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">
+                Datos de Registro
+              </h4>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                Identificación y geometría espacial de la celda de mapeo
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onOpenImportModal}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-emerald-500/30 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+            className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
           >
-            <FileSpreadsheet size={14} className="text-emerald-500" />
+            <FileSpreadsheet size={14} className="text-emerald-400" />
             <span>Importar Excel</span>
           </button>
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {/* CELDA */}
-          <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Celda</label>
-            <input
-              type="text"
-              id="header-celda"
-              value={header.celda}
-              onChange={(e) => handleChange('celda', e.target.value.toUpperCase())}
-              placeholder="TD2-001"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 tracking-wider text-xs"
-            />
-          </div>
-
-          {/* COORDENADAS INICIALES (FROM) - APILADAS */}
-          <div className="md:col-span-4 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas Iniciales (From)</label>
-            <div className="flex flex-col gap-1.5">
-              <input
-                type="text"
-                placeholder="Este (X)"
-                value={getInputValue('este_from', header.este_from)}
-                id="header-este_from"
-                onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 4)} // <- Cambiado a 4 decimales
-                onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
-              />
-              <input
-                type="text"
-                placeholder="Norte (Y)"
-                value={getInputValue('norte_from', header.norte_from)}
-                id="header-norte_from"
-                onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 3)} // <- Cambiado a 3 decimales
-                onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
-              />
-              <input
-                type="text"
-                placeholder="Cota (Z)"
-                value={getInputValue('cota_from', header.cota_from)}
-                id="header-cota_from"
-                onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, 4, 2)}
-                onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
-              />
-            </div>
-          </div>
-
-          {/* COORDENADAS FINALES (TO) - APILADAS */}
-          <div className="md:col-span-4 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Coordenadas Finales (To)</label>
-            <div className="flex flex-col gap-1.5">
-              <input
-                type="text"
-                placeholder="Este (X)"
-                value={getInputValue('este_to', header.este_to)}
-                id="header-este_to"
-                onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 4)} // <- Cambiado a 4 decimales
-                onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
-              />
-              <input
-                type="text"
-                placeholder="Norte (Y)"
-                value={getInputValue('norte_to', header.norte_to)}
-                id="header-norte_to"
-                onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 3)} // <- Cambiado a 3 decimales
-                onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
-              />
-              <input
-                type="text"
-                placeholder="Cota (Z)"
-                value={getInputValue('cota_to', header.cota_to)}
-                id="header-cota_to"
-                onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, 4, 2)}
-                onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-left font-normal"
-              />
-            </div>
-          </div>
-
-          {/* LARGO (M) AUTO */}
-          <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between block">
-              <span>Largo (m)</span>
-              {calculatedLargo !== null && (
-                <span className="text-[10px] bg-orange-500/10 border border-orange-500/30 text-orange-400 font-extrabold px-2 py-0.5 rounded cursor-help">
-                  AUTO
-                </span>
-              )}
-            </label>
-            <input
-              type="text"
-              id="header-largo"
-              value={header.largo || ''}
-              readOnly={calculatedLargo !== null}
-              onChange={(e) => {
-                const cleaned = e.target.value.replace(/\D/g, '');
-                handleChange('largo', cleaned === '' ? '' : parseInt(cleaned, 10));
-              }}
-              className={`w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold text-center ${calculatedLargo !== null ? 'text-orange-400 cursor-not-allowed bg-navy-950/50' : 'text-slate-100 bg-navy-900/40'}`}
-              placeholder="m"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* SECCIÓN 2: DIMENSIONES Y ORIENTACIONES (Fila horizontal de 5 campos) */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-900/10">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Altura (m)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={header.altura}
-              id="header-altura"
-              onChange={(e) => handleChange('altura', parseFloat(e.target.value) || 0)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Dip Talud&deg;</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="90"
-              placeholder="0-90"
-              value={header.dip_talud !== undefined ? header.dip_talud : ''}
-              onChange={(e) => handleDegreeChange('dip_talud', e.target.value, 90)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">DipDir Talud&deg;</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="359"
-              placeholder="0-359"
-              value={header.dipdir_talud !== undefined ? header.dipdir_talud : ''}
-              onChange={(e) => handleDegreeChange('dipdir_talud', e.target.value, 360)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Dip Hw&deg;</label>
-            <input
-              type="number"
-              step="0.01"
-              min="-90"
-              max="90"
-              placeholder="0-90"
-              value={header.dip_hw !== undefined ? header.dip_hw : ''}
-              onChange={(e) => handleDegreeChange('dip_hw', e.target.value, 90)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Az Hw&deg;</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="359"
-              placeholder="0-359"
-              value={header.az_hw !== undefined ? header.az_hw : ''}
-              onChange={(e) => handleDegreeChange('az_hw', e.target.value, 360)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* SECCIÓN 3: LITOLOGÍAS DESPLEGABLES CON CASCADA Y METADATOS COMPLEMENTARIOS (En una sola fila de 9 columnas) */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-5 bg-navy-900/10">
-
-        {/* Fila Horizontal Unificada de 9 campos */}
-        <div className="grid grid-cols-3 md:grid-cols-9 gap-3 pb-3">
-          {/* Lito 1 */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lito 1</label>
-            <select
-              value={header.lito_1 || ''}
-              onChange={(e) => handleLito1Change(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
-            >
-              <option value="">— Lito 1 —</option>
-              {uniqueLito1.map(l => (
-                <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Lito 2 */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lito 2</label>
-            <select
-              value={header.lito_2 || '-1'}
-              onChange={(e) => handleLito2Change(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
-            >
-              <option value="-1">— Lito 2 —</option>
-              {filteredLito2Options.map(l => (
-                <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Lito 3 */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lito 3</label>
-            <select
-              value={header.lito_3 || '-1'}
-              onChange={(e) => handleLito3Change(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-orange-400 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
-            >
-              <option value="-1">— Lito 3 —</option>
-              {filteredLito3Options.map(l => (
-                <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Unidad Litológica al costado de las litos */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Unidad Litológica</label>
-            <select
-              value={header.unidad_litologica || ''}
-              onChange={(e) => handleUnidadChange(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold cursor-pointer text-center"
-            >
-              <option value="">— Unidad —</option>
-              {uniqueUnidades.map(u => (
-                <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sector */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector</label>
-            <input
-              type="text"
-              value={header.sector || ''}
-              onChange={(e) => handleChange('sector', e.target.value)}
-              placeholder="Sector"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-
-          {/* Fase */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Fase</label>
-            <input
-              type="text"
-              value={header.fase || ''}
-              onChange={(e) => handleChange('fase', e.target.value)}
-              placeholder="Fase"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-            />
-          </div>
-
-          {/* Nivel */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Nivel</label>
-            <input
-              type="text"
-              value={header.nivel || ''}
-              onChange={(e) => handleChange('nivel', handleNumberInputLimit(e.target.value, 4, 2))}
-              placeholder="Nivel"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-              title="Nivel"
-            />
-          </div>
-
-          {/* Fecha */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Fecha</label>
-            <div className="relative">
-              <Calendar size={12} className="absolute left-2.5 top-2.5 text-slate-500 pointer-events-none" />
-              <input
-                type="date"
-                value={header.fecha || ''}
-                onChange={(e) => handleChange('fecha', e.target.value)}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg pl-8 pr-1 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-              />
-            </div>
-          </div>
-
-          {/* Mapeador */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Mapeador</label>
-            <div className="relative">
-              <User size={12} className="absolute left-2.5 top-2.5 text-slate-500 pointer-events-none" />
-              <input
-                type="text"
-                value={header.mapeador || ''}
-                onChange={(e) => handleChange('mapeador', e.target.value)}
-                placeholder="Nombre"
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg pl-8 pr-1 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-center font-normal"
-              />
-            </div>
-          </div>
         </div>
 
-        {/* Metadatos Geotécnicos de Zona (3 columnas simétricas) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-navy-850 pt-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sector Geotécnico</label>
-            <input
-              type="text"
-              value={header.sect_geot || ''}
-              onChange={(e) => handleChange('sect_geot', e.target.value)}
-              placeholder="Sector Geot."
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal"
-            />
+        {/* ESTRUCTURA SPLIT GEOMECÁNICA */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+
+          {/* ========================================================
+              COLUMNA IZQUIERDA: DEFINICIÓN ESPACIAL Y DE PLANOS (5 COLS)
+              ======================================================== */}
+          <div className="lg:col-span-5 space-y-5">
+
+            {/* Celda & Largo */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Celda</label>
+                <input
+                  type="text"
+                  id="header-celda"
+                  value={header.celda}
+                  onChange={(e) => handleChange('celda', e.target.value.toUpperCase())}
+                  placeholder="TD2-001"
+                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500 text-xs text-center"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between block w-full">
+                  <span>Largo (m)</span>
+                  {calculatedLargo !== null && (
+                    <span className="text-[10px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.1)] select-none">
+                      AUTO
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  id="header-largo"
+                  value={header.largo || ''}
+                  readOnly={calculatedLargo !== null}
+                  onChange={(e) => {
+                    const cleaned = e.target.value.replace(/\D/g, '');
+                    handleChange('largo', cleaned === '' ? '' : parseInt(cleaned, 10));
+                  }}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold text-center transition-all ${calculatedLargo !== null ? 'text-orange-400 border-orange-500/30 bg-orange-500/[0.03] cursor-not-allowed' : 'text-slate-100 border-navy-700/80 bg-navy-900/40'}`}
+                  placeholder="m"
+                />
+              </div>
+            </div>
+
+            {/* COORDENADAS INICIALES (FROM) - VECTOR 3D CON PREFIJOS E, N, Z */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Iniciales (From)</label>
+              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/80 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
+                <div className="px-2.5 py-1.5 bg-navy-950/60 text-slate-400 font-extrabold border-r border-navy-700/80 text-xs select-none uppercase tracking-wider shrink-0">
+                  From
+                </div>
+                <div className="flex-1 flex items-center h-full">
+                  <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
+                  <input
+                    type="text"
+                    placeholder="Este (X)"
+                    value={getInputValue('este_from', header.este_from)}
+                    id="header-este_from"
+                    onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 4)}
+                    onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
+                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                  />
+                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
+                  <input
+                    type="text"
+                    placeholder="Norte (Y)"
+                    value={getInputValue('norte_from', header.norte_from)}
+                    id="header-norte_from"
+                    onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 3)}
+                    onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
+                    className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                  />
+                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">Z</span>
+                  <input
+                    type="text"
+                    placeholder="Cota (Z)"
+                    value={getInputValue('cota_from', header.cota_from)}
+                    id="header-cota_from"
+                    onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, 4, 2)}
+                    onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
+                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* COORDENADAS FINALES (TO) - VECTOR 3D CON PREFIJOS E, N, Z */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Finales (To)</label>
+              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/80 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
+                <div className="px-2.5 py-1.5 bg-navy-950/60 text-slate-400 font-extrabold border-r border-navy-700/80 text-xs select-none uppercase tracking-wider shrink-0">
+                  To
+                </div>
+                <div className="flex-1 flex items-center h-full">
+                  <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
+                  <input
+                    type="text"
+                    placeholder="Este (X)"
+                    value={getInputValue('este_to', header.este_to)}
+                    id="header-este_to"
+                    onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 4)}
+                    onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
+                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                  />
+                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
+                  <input
+                    type="text"
+                    placeholder="Norte (Y)"
+                    value={getInputValue('norte_to', header.norte_to)}
+                    id="header-norte_to"
+                    onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 3)}
+                    onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
+                    className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                  />
+                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">Z</span>
+                  <input
+                    type="text"
+                    placeholder="Cota (Z)"
+                    value={getInputValue('cota_to', header.cota_to)}
+                    id="header-cota_to"
+                    onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, 4, 2)}
+                    onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
+                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Geometría y Orientación de Talud (Estandarizado a inputs de texto con formateo a punto ".") */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Altura (m)</label>
+                <input
+                  type="text"
+                  value={getInputValue('altura', header.altura)}
+                  onChange={(e) => {
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 1);
+                    handleChange('altura', limited);
+                  }}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value);
+                    handleChange('altura', isNaN(num) ? 0 : num);
+                  }}
+                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Dip Talud°</label>
+                <input
+                  type="text"
+                  placeholder="0-90"
+                  value={getInputValue('dip_talud', header.dip_talud)}
+                  onChange={(e) => {
+                    const limited = sanitizeDecimalInput(e.target.value, 2, 2);
+                    handleChange('dip_talud', limited);
+                  }}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value);
+                    handleChange('dip_talud', isNaN(num) ? 0 : Math.min(90, Math.max(0, num)));
+                  }}
+                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">DipDir Talud°</label>
+                <input
+                  type="text"
+                  placeholder="0-359"
+                  value={getInputValue('dipdir_talud', header.dipdir_talud)}
+                  onChange={(e) => {
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 2);
+                    handleChange('dipdir_talud', limited);
+                  }}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value);
+                    handleChange('dipdir_talud', isNaN(num) ? 0 : Math.min(359.99, Math.max(0, num)));
+                  }}
+                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Dip Hw°</label>
+                <input
+                  type="text"
+                  placeholder="-90-90"
+                  value={getInputValue('dip_hw', header.dip_hw)}
+                  onChange={(e) => {
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 2);
+                    handleChange('dip_hw', limited);
+                  }}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value);
+                    handleChange('dip_hw', isNaN(num) ? 0 : Math.min(90, Math.max(-90, num)));
+                  }}
+                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Az Hw°</label>
+                <input
+                  type="text"
+                  placeholder="0-359"
+                  value={getInputValue('az_hw', header.az_hw)}
+                  onChange={(e) => {
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 2);
+                    handleChange('az_hw', limited);
+                  }}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value);
+                    handleChange('az_hw', isNaN(num) ? 0 : Math.min(359.99, Math.max(0, num)));
+                  }}
+                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                />
+              </div>
+            </div>
+
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Intemperismo / Meteorización</label>
-            <select
-              value={header.intemperia || ''}
-              onChange={(e) => handleChange('intemperia', e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal cursor-pointer text-left"
-            >
-              <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
-              {Object.entries(ALTERACION_CATALOG).map(([key, item]) => {
-                const parts = item.name.split(' — ');
-                const desc = parts[1] || item.name;
-                return (
-                  <option key={key} value={key} className="bg-navy-950 text-slate-100 text-xs">
-                    {key} ({desc})
-                  </option>
-                );
-              })}
-              {header.intemperia && !ALTERACION_CATALOG[header.intemperia] && (
-                <option value={header.intemperia} className="bg-navy-950 text-amber-400 text-xs">
-                  {header.intemperia} (Valor no normalizado)
-                </option>
-              )}
-            </select>
-          </div>
+          {/* ========================================================
+              COLUMNA DERECHA: LITOLOGÍA, METADATOS Y ZONIFICACIÓN (7 COLS)
+              Con divisor vertical sutil e indentación horizontal
+              ======================================================== */}
+          <div className="lg:col-span-7 space-y-5 lg:border-l lg:border-navy-900 lg:pl-6">
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Alt. de Zona</label>
-            <input
-              type="text"
-              value={header.alt_zona || ''}
-              onChange={(e) => handleChange('alt_zona', e.target.value)}
-              placeholder="Alta / Media / Baja"
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-normal"
-            />
+            {/* Bloque Litológico */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Lito 1</label>
+                <select
+                  value={header.lito_1 || ''}
+                  onChange={(e) => handleLito1Change(e.target.value)}
+                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center"
+                >
+                  <option value="">— Lito 1 —</option>
+                  {uniqueLito1.map(l => (
+                    <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Lito 2</label>
+                <select
+                  value={header.lito_2 || '-1'}
+                  onChange={(e) => handleLito2Change(e.target.value)}
+                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center"
+                >
+                  <option value="-1">— Lito 2 —</option>
+                  {filteredLito2Options.map(l => (
+                    <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Lito 3</label>
+                <select
+                  value={header.lito_3 || '-1'}
+                  onChange={(e) => handleLito3Change(e.target.value)}
+                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-orange-400 text-xs font-normal cursor-pointer text-center shadow-[0_0_10px_rgba(245,158,11,0.05)]"
+                >
+                  <option value="-1">— Lito 3 —</option>
+                  {filteredLito3Options.map(l => (
+                    <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Lito</label>
+                <select
+                  value={header.unidad_litologica || ''}
+                  onChange={(e) => handleUnidadChange(e.target.value)}
+                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center"
+                >
+                  <option value="">— Unidad —</option>
+                  {uniqueUnidades.map(u => (
+                    <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Divisor de Sección: Zonificación */}
+            <div className="border-t border-navy-900/60 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Sector Geotécnico</label>
+                  <input
+                    type="text"
+                    value={header.sect_geot || ''}
+                    onChange={(e) => handleSectGeotChange(e.target.value)}
+                    placeholder="Sector Geot."
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Intemperismo / Meteorización</label>
+                  <select
+                    value={header.intemperia || ''}
+                    onChange={(e) => handleChange('intemperia', e.target.value)}
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
+                  >
+                    <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
+                    {Object.entries(ALTERACION_CATALOG).map(([key, item]) => {
+                      const parts = item.name.split(' — ');
+                      const desc = parts[1] || item.name;
+                      return (
+                        <option key={key} value={key} className="bg-navy-950 text-slate-100 text-xs">
+                          {key} ({desc})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Alt. de Zona</label>
+                  <input
+                    type="text"
+                    value={header.alt_zona || ''}
+                    onChange={(e) => handleChange('alt_zona', e.target.value)}
+                    placeholder="Alta / Media / Baja"
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Divisor de Sección: Metadatos y Control de Campaña */}
+            <div className="border-t border-navy-900/60 pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Fase</label>
+                  <input
+                    type="text"
+                    value={header.fase || ''}
+                    onChange={(e) => handleChange('fase', e.target.value)}
+                    placeholder="Fase"
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Nivel</label>
+                  <input
+                    type="text"
+                    value={header.nivel || ''}
+                    onChange={(e) => handleChange('nivel', handleNumberInputLimit(e.target.value, 4, 2))}
+                    placeholder="Nivel"
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Fecha</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={header.fecha || ''}
+                      onChange={(e) => handleChange('fecha', e.target.value)}
+                      className="w-full bg-navy-900/40 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Mapeador</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={header.mapeador || ''}
+                      onChange={(e) => handleChange('mapeador', e.target.value)}
+                      placeholder="Mapeador"
+                      className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
+
       </div>
     </div>
   );

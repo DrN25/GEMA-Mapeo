@@ -6,15 +6,13 @@ import {
   ShieldCheck,
   Activity,
   Plus,
-  Trash2
+  Trash2,
+  Filter
 } from 'lucide-react';
 import { FormulaTooltipTrigger } from './FormulaTooltip';
 import PltExcelImportModal from './PltExcelImportModal';
 import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
 
-// ==========================================
-// 1. CONFIGURACIONES, CATÁLOGOS Y HELPERS
-// ==========================================
 export const CAT_TIPO_LITOLOGICO = ["INTRUSIVOS", "SEDIMENTARIOS", "METAMORFICAS", "BRECHAS", "ENDOSKARN"];
 export const CAT_TIPO_FRACTURA = ["M", "E", "C"];
 export const CAT_DIRECCION_ROTURA = ["Pa", "Pe", "NA"];
@@ -45,15 +43,14 @@ function getLito3Options(l1: string, l2: string | null | undefined) {
 
 function getIsrmClass(ucs: number | null) {
   if (ucs === null || ucs === undefined || isNaN(ucs)) return null;
-  const e = ISRM_TABLE.find(r => ucs >= r.minUcs && ucs < r.maxUcs);
-  return e ? { indice: e.indice, denominacion: e.denominacion } : null;
+  const match = ISRM_TABLE.find(r => ucs >= r.minUcs && ucs < r.maxUcs);
+  return match ? { indice: match.indice, denominacion: match.denominacion } : null;
 }
 
 export function applyPltFormulas(row: any) {
   const r = { ...row };
   const num = (v: any) => (v !== null && v !== undefined && v !== "" && !isNaN(Number(v))) ? Number(v) : null;
 
-  // Autocalcular el Código de Muestra concatenando Celda y Muestra
   const celdaStr = String(r.celda_mapeo || "").trim().toUpperCase();
   const muestraStr = String(r.muestra || "").trim();
   r.codigo_muestra = celdaStr && muestraStr ? `${celdaStr}-${muestraStr}` : "";
@@ -197,8 +194,8 @@ export function normalizeCeldaCode(celda: string): string {
 }
 
 function getPltConstraints(key: string): { intDigits: number; decDigits: number } | null {
-  if (key === "este") return { intDigits: 6, decDigits: 4 }; // <- 4 decimales
-  if (key === "norte") return { intDigits: 7, decDigits: 3 }; // <- 3 decimales
+  if (key === "este") return { intDigits: 6, decDigits: 4 };
+  if (key === "norte") return { intDigits: 7, decDigits: 3 };
   if (key === "elevacion") return { intDigits: 4, decDigits: 2 };
   if (key === "espesor_d") return { intDigits: 4, decDigits: 1 };
   if (key === "nivel") return { intDigits: 4, decDigits: 2 };
@@ -243,7 +240,7 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
   let targetInput: HTMLInputElement | HTMLSelectElement | null = null;
 
   if (key === "ArrowUp") {
-    e.preventDefault(); // Detiene el incremento de números y el cambio de opción en selects
+    e.preventDefault();
     const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
     if (prevTr) {
       const targetTd = prevTr.cells[cellIndex];
@@ -255,7 +252,7 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
       }
     }
   } else if (key === "ArrowDown" || key === "Enter") {
-    e.preventDefault(); // Detiene el decremento de números, cambio en selects o submit de formulario
+    e.preventDefault();
     const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
     if (nextTr) {
       const targetTd = nextTr.cells[cellIndex];
@@ -274,7 +271,7 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
           shouldMove = false;
         }
       } catch {
-        // Fallback seguro
+        // Safe
       }
     }
     if (shouldMove) {
@@ -282,7 +279,7 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
       while (prevTd) {
         const input = prevTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
         if (input) {
-          e.preventDefault(); // <- CRITICAL: Detiene el cambio de opción en selects y movimiento del cursor
+          e.preventDefault();
           targetInput = input;
           break;
         }
@@ -297,7 +294,7 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
           shouldMove = false;
         }
       } catch {
-        // Fallback seguro
+        // Safe
       }
     }
     if (shouldMove) {
@@ -305,7 +302,7 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
       while (nextTd) {
         const input = nextTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
         if (input) {
-          e.preventDefault(); // <- CRITICAL: Detiene el cambio de opción en selects y movimiento del cursor
+          e.preventDefault();
           targetInput = input;
           break;
         }
@@ -322,7 +319,6 @@ const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectE
   }
 };
 
-// Función de apoyo para extraer el input o select de una celda de manera limpia
 const targetDataInput = (td: HTMLTableCellElement | null): HTMLInputElement | HTMLSelectElement | null => {
   if (!td) return null;
   return td.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
@@ -599,7 +595,6 @@ export default function PltEnsayosView({
     return String(val);
   };
 
-  // Declaración de handleExportExcel para solucionar el ReferenceError anterior
   const handleExportExcel = () => {
     const dataToExport = computedRows.map((r, idx) => {
       const obj: Record<string, any> = { "#": idx + 1 };
@@ -662,7 +657,6 @@ export default function PltEnsayosView({
     return { total, okCount, errCount, valLong, valAncho };
   }, [qaqcDetails]);
 
-  // Modificado con el cálculo de Is, Is50 y UCS (Min, Max, Promedio de cada uno)
   const reportStats = useMemo(() => {
     const rr = computedRows;
     const total = rr.length;
@@ -693,17 +687,14 @@ export default function PltEnsayosView({
       valL,
       valA,
 
-      // UCS Metrics
       ucsMin: ucsV.length ? Math.min(...ucsV) : null,
       ucsMax: ucsV.length ? Math.max(...ucsV) : null,
       ucsAvg: ucsV.length ? avg(ucsV) : null,
 
-      // Is Metrics
       isMin: isV.length ? Math.min(...isV) : null,
       isMax: isV.length ? Math.max(...isV) : null,
       isAvg: isV.length ? avg(isV) : null,
 
-      // Is(50) Metrics
       is50Min: is50V.length ? Math.min(...is50V) : null,
       is50Max: is50V.length ? Math.max(...is50V) : null,
       is50Avg: is50V.length ? avg(is50V) : null,
@@ -715,10 +706,13 @@ export default function PltEnsayosView({
 
   return (
     <div className="space-y-6 select-none animate-fade-in text-left">
-      {/* TOOLBAR RE-ESTILIZADO PARA CONECTARSE DE FORMA COHERENTE */}
+      {/* TOOLBAR RE-ESTILIZADO CON BOTONES ESTANDARIZADOS */}
       <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest">Ensayos PLT Irregulares</h2>
+          <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
+            <span>Ensayos PLT Irregulares</span>
+          </h2>
           <span className="text-xs bg-navy-900 border border-navy-800 text-slate-400 font-bold px-2 py-0.5 rounded-full">
             {filteredRows.length} de {pltEnsayos.length} registros
           </span>
@@ -730,7 +724,7 @@ export default function PltEnsayosView({
               onChange={(e) => setFilterActiveCell(e.target.checked)}
               onKeyDown={handleGridKeyDown}
               disabled={!activeWindowCelda}
-              className="accent-orange-500 rounded cursor-pointer"
+              className="accent-violet-500 rounded cursor-pointer"
             />
             <span>Filtrar por Celda Actual {activeWindowCelda ? `(${activeWindowCelda})` : ""}</span>
           </label>
@@ -743,7 +737,7 @@ export default function PltEnsayosView({
             value={fCampana}
             onChange={(e) => setFCampana(e.target.value)}
             onKeyDown={handleGridKeyDown}
-            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg w-24 outline-none focus:ring-2 focus:ring-orange-500/20"
+            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-2 rounded-lg w-24 outline-none focus:ring-1 focus:ring-violet-500/50"
           />
           <input
             type="text"
@@ -751,7 +745,7 @@ export default function PltEnsayosView({
             value={fZona}
             onChange={(e) => setFZona(e.target.value)}
             onKeyDown={handleGridKeyDown}
-            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg w-28 outline-none focus:ring-2 focus:ring-orange-500/20"
+            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-2 rounded-lg w-28 outline-none focus:ring-1 focus:ring-violet-500/50"
           />
           <input
             type="text"
@@ -759,46 +753,51 @@ export default function PltEnsayosView({
             value={fLito}
             onChange={(e) => setFLito(e.target.value)}
             onKeyDown={handleGridKeyDown}
-            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg w-28 outline-none focus:ring-2 focus:ring-orange-500/20"
+            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-2 rounded-lg w-28 outline-none focus:ring-1 focus:ring-violet-500/50"
           />
 
           <div className="h-6 w-[1px] bg-navy-800 mx-2" />
 
+          {/* Control QA/QC — Estilo Cian/Cielo Neón */}
           <button
             onClick={() => setActiveModal('qaqc')}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-indigo-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+            className="px-4 py-2 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(14,165,233,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <ShieldCheck size={14} className="text-indigo-400" />
+            <ShieldCheck size={14} className="text-sky-400" />
             <span>Control QA/QC</span>
           </button>
 
+          {/* Reporte Resumen — Estilo Violeta Eléctrico Neón */}
           <button
             onClick={() => setActiveModal('reporte')}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-cyan-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+            className="px-4 py-2 bg-violet-500/10 border border-violet-500/40 hover:bg-violet-500/20 hover:border-violet-400 text-violet-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <Activity size={14} className="text-cyan-400" />
+            <Activity size={14} className="text-violet-400" />
             <span>Reporte Resumen</span>
           </button>
 
+          {/* Importar Excel — Estilo Esmeralda Neón */}
           <button
             onClick={() => setActiveModal('import_excel')}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-emerald-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+            className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <FileSpreadsheet size={14} className="text-emerald-500" />
+            <FileSpreadsheet size={14} className="text-emerald-400" />
             <span>Importar Excel</span>
           </button>
 
+          {/* Exportar Excel — Estilo Esmeralda Neón */}
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-1.5 bg-navy-900 border border-navy-800 hover:bg-navy-850 hover:border-sky-500/30 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
+            className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <Download size={14} className="text-sky-400" />
+            <Download size={14} className="text-emerald-400" />
             <span>Exportar Excel</span>
           </button>
 
+          {/* Nueva Fila — Estilo Violeta Eléctrico Neón */}
           <button
             onClick={handleAddRow}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:brightness-110 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-all active:scale-95 shadow-md shadow-orange-950/20"
+            className="px-4 py-2 bg-violet-500/10 border border-violet-500/40 hover:bg-violet-500/20 hover:border-violet-400 text-violet-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
             <Plus size={14} />
             <span>Nueva Fila</span>
@@ -806,11 +805,10 @@ export default function PltEnsayosView({
         </div>
       </div>
 
-      {/* HORIZONTAL SCROLLABLE GRID (Unificación absoluta de diseño y bordes con DisconTable.tsx) */}
+      {/* HORIZONTAL SCROLLABLE GRID */}
       <div className="overflow-x-auto relative rounded-lg border border-navy-700 bg-navy-950/20">
         <table className="w-max min-w-full border-collapse border-separate border-spacing-0" style={{ minWidth: '3500px' }}>
           <thead>
-            {/* Column Headers (Fila única limpia sin colores, cursivas, asteriscos ni HTML redundante) */}
             <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
               <th className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-b border-navy-800 w-12 min-w-[48px]">#</th>
               {COLS.map(c => (
@@ -870,7 +868,7 @@ export default function PltEnsayosView({
                               else if (c.key === "f") { fId = "plt_f_factor"; params = { de: row.diametro_equivalente, val }; }
                               else if (c.key === "is_mpa") { fId = "plt_is_mpa"; params = { p: row.fuerza_p, de: row.diametro_equivalente, val }; }
                               else if (c.key === "is_50") { fId = "plt_is50"; params = { isVal: row.is_mpa, f: row.f, val }; }
-                              else if (c.key === "ucs") { fId = "plt_ucs"; params = { is50: row.is50, k: row.factor_conversion_k, val }; }
+                              else if (c.key === "ucs") { fId = "plt_ucs"; params = { is50: row.is_50, k: row.factor_conversion_k, val }; }
                               else if (c.key === "resistencia_isrm") { fId = "plt_isrm"; params = { ucs: row.ucs, val }; }
                               else if (c.key === "denominacion_isrm") { fId = "plt_isrm"; params = { ucs: row.ucs, val }; }
 
@@ -901,11 +899,11 @@ export default function PltEnsayosView({
                                 <select
                                   value={val ?? ""}
                                   onChange={(e) => handleCommitSelect(row.id, c.key, e.target.value)}
-                                  className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs font-semibold py-2 px-1"
+                                  className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs font-semibold py-2 px-1 focus:ring-1 focus:ring-violet-500/50"
                                 >
                                   <option value="" className="bg-navy-950 text-slate-500">—</option>
                                   {options.map((o: string) => (
-                                    <option key={o} value={o} className="bg-navy-950">{o}</option>
+                                    <option key={o} value={o} className="bg-navy-950 text-slate-100">{o}</option>
                                   ))}
                                 </select>
                               );
@@ -921,7 +919,6 @@ export default function PltEnsayosView({
                                   const intDig = constraints ? constraints.intDigits : 5;
                                   const decDig = constraints ? constraints.decDigits : (c.type === "int" ? 0 : 2);
 
-                                  // Restringir entrada a dígitos positivos sin signos negativos en tiempo real
                                   inputVal = handlePltNumberLimit(inputVal, intDig, decDig);
 
                                   if (c.key === "nivel") {
@@ -937,7 +934,7 @@ export default function PltEnsayosView({
                               onBlur={(e) => {
                                 handleCommitEdit(row.id, c.key, e.target.value);
                               }}
-                              className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs py-2.5 px-2"
+                              className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs py-2.5 px-2 focus:bg-navy-900/50 focus:ring-1 focus:ring-violet-500/50"
                             />
                           )
                         )}
@@ -1084,8 +1081,32 @@ export default function PltEnsayosView({
               <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-100 text-lg">✕</button>
             </div>
 
+            <div className="grid grid-cols-4 gap-3">
+              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
+                <div className="text-2xl font-black text-emerald-400 font-mono">{qaqcStats.okCount}</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Sin observaciones</div>
+              </div>
+              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
+                <div className="text-2xl font-black text-rose-400 font-mono">{qaqcStats.errCount}</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Con errores</div>
+              </div>
+              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
+                <div className="text-2xl font-black text-orange-400 font-mono">{qaqcStats.valLong}</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidas Longitud (L ≥ D)</div>
+              </div>
+              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
+                <div className="text-2xl font-black text-blue-400 font-mono">{qaqcStats.valAncho}</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidas Ancho (0.3W &lt; D &lt; W)</div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-[10px] font-bold text-slate-400">
+              {["Campos obligatorios", "L ≥ D", "0.3W < D < W", "Fuerza P > 0", "Factor K", "UCS calc", "Fractura", "Dirección"].map(t => (
+                <span key={t} className="bg-navy-950 border border-navy-850 px-2 py-0.5 rounded text-slate-400 font-mono">{t}</span>
+              ))}
+            </div>
+
             <div className="overflow-y-auto flex-1 space-y-6 pr-1">
-              {/* KPIs Grid */}
               <div className="grid grid-cols-4 gap-3">
                 <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
                   <div className="text-2xl font-black text-cyan-400 font-mono">{reportStats.total}</div>
@@ -1107,7 +1128,6 @@ export default function PltEnsayosView({
 
               {/* METRICAS AVANZADAS PLT (Is, Is50, UCS) con Mínimo, Máximo y Promedio de cada uno */}
               <div className="space-y-4">
-                {/* 1. Métrica Is (MPa) */}
                 <div className="bg-navy-950/40 border border-teal-500/20 bg-gradient-to-br from-teal-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(20,184,166,0.02)]">
                   <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
                     <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest block">Índice Is — Carga Puntual No Corregido</span>
@@ -1129,7 +1149,6 @@ export default function PltEnsayosView({
                   </div>
                 </div>
 
-                {/* 2. Métrica Is(50) (MPa) */}
                 <div className="bg-navy-950/40 border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(14,165,233,0.02)]">
                   <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
                     <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest block">Índice Is(50) — Corregido a 50 mm</span>
@@ -1151,7 +1170,6 @@ export default function PltEnsayosView({
                   </div>
                 </div>
 
-                {/* 3. Métrica UCS (MPa) */}
                 <div className="bg-navy-950/40 border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(245,158,11,0.02)]">
                   <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
                     <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block">Resistencia UCS Estimada</span>
@@ -1175,9 +1193,8 @@ export default function PltEnsayosView({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Distribución por Clase ISRM (Sincronizada con los colores de roca oficiales de tu catálogo) */}
-                <div className="bg-navy-950/30 border border-navy-850 p-4 rounded-xl space-y-3">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-navy-800 pb-2">Distribución por Clase ISRM</h4>
+                <div className="bg-navy-950/40 border border-navy-800 p-4 rounded-xl space-y-3">
+                  <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2">Clasificación ISRM</h4>
                   <div className="space-y-2">
                     {(() => {
                       const isrmColors: Record<string, string> = {
@@ -1185,31 +1202,22 @@ export default function PltEnsayosView({
                         R1: "bg-orange-500/60 shadow-[0_0_8px_rgba(249,115,22,0.25)]",
                         R2: "bg-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]",
                         R3: "bg-yellow-500/60 shadow-[0_0_8px_rgba(234,179,8,0.25)]",
-                        R4: "bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]",
-                        R5: "bg-cyan-500/60 shadow-[0_0_8px_rgba(6,182,212,0.25)]",
-                        R6: "bg-indigo-500/60 shadow-[0_0_8px_rgba(99,102,241,0.25)]"
+                        R4: "bg-emerald-500/60 shadow-[0_0_8_rgba(16,185,129,0.25)]",
+                        R5: "bg-cyan-500/60 shadow-[0_0_8_rgba(6,182,212,0.25)]",
+                        R6: "bg-blue-500/60 shadow-[0_0_8_rgba(59,130,246,0.25)]"
                       };
-                      const isrmTextColors: Record<string, string> = {
-                        R0: "text-rose-400",
-                        R1: "text-orange-400",
-                        R2: "text-amber-400",
-                        R3: "text-yellow-400",
-                        R4: "text-emerald-400",
-                        R5: "text-cyan-400 font-extrabold",
-                        R6: "text-indigo-400 font-extrabold"
-                      };
-
-                      return ISRM_TABLE.map(r => {
-                        const count = reportStats.isrmCnt[r.indice] || 0;
-                        const pct = reportStats.total > 0 ? (count / reportStats.total * 100) : 0;
+                      return ISRM_TABLE.map(row => {
+                        const count = reportStats.isrmCnt[row.indice] || 0;
+                        const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
                         return (
-                          <div key={r.indice} className="flex items-center gap-3 text-xs">
-                            <span className={`font-bold w-8 ${isrmTextColors[r.indice] || "text-slate-400"}`}>{r.indice}</span>
-                            <span className="text-[10px] text-slate-500 w-32 truncate" title={r.denominacion}>{r.denominacion}</span>
-                            <div className="flex-1 bg-navy-950 border border-navy-900 rounded h-3 overflow-hidden">
-                              <div className={`h-full rounded transition-all ${isrmColors[r.indice] || "bg-slate-500/40"}`} style={{ width: `${pct}%` }} />
+                          <div key={row.indice} className="space-y-1">
+                            <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                              <span>{row.indice} ({row.denominacion})</span>
+                              <span>{count} ({pct.toFixed(1)}%)</span>
                             </div>
-                            <span className="font-mono text-slate-400 w-6 text-right">{count}</span>
+                            <div className="w-full bg-navy-950 border border-navy-900 rounded-full h-2.5 overflow-hidden">
+                              <div className={`h-full rounded-full ${isrmColors[row.indice] || "bg-slate-500"}`} style={{ width: `${pct}%` }} />
+                            </div>
                           </div>
                         );
                       });
