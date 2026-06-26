@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Upload, FileSpreadsheet, AlertTriangle, ChevronLeft, ChevronRight,
-    BarChart3, Database, RefreshCw, Activity, ShieldCheck, X, Download, Filter, Search, FileText, Calendar, User, Folder, Settings
+    BarChart3, Database, RefreshCw, Activity, ShieldCheck, X, Download, Filter, Search, FileText, Calendar, User, Folder, Settings, ArrowLeft
 } from 'lucide-react';
 
 interface BulkAuditorProps {
@@ -42,8 +42,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const [filterSector, setFilterSector] = useState<string>('');
     const [filterSearch, setFilterSearch] = useState<string>('');
 
-    // Nuevo estado para período dinámico de campaña
-    const [selectedYear, setSelectedYear] = useState<string>('TODOS');
+    // Período dinámico de campaña y Drilldown interactivo
+    const [selectedYears, setSelectedYears] = useState<string[]>([]);
+    const [selectedObservation, setSelectedObservation] = useState<string | null>(null);
 
     const MANDATORY_COLS_COUNT = 77;
 
@@ -51,11 +52,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         fetchHistory();
     }, []);
 
+    // Escuchar cambios de selección de filtros cruzados y peticiones en caliente (selectedYears agregado)
     useEffect(() => {
         if (status === 'loaded' && selectedAuditId) {
             fetchKpisAndIncidencias();
         }
-    }, [selectedAuditId, filterTipo, filterCelda, filterColumna, filterCampania, filterGeotecnico, filterSector, filterSearch, status]);
+    }, [selectedAuditId, filterTipo, filterCelda, filterColumna, filterCampania, filterGeotecnico, filterSector, filterSearch, selectedYears, status]);
 
     const fetchHistory = async () => {
         try {
@@ -71,9 +73,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
     const fetchKpisAndIncidencias = async () => {
         try {
+            // Petición en caliente enviando los años activos separados por comas
+            const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
             const kpiUrl = selectedAuditId
-                ? `${apiBase}/api/geomecanica/resumen-ligero?audit_id=${selectedAuditId}`
-                : `${apiBase}/api/geomecanica/resumen-ligero`;
+                ? `${apiBase}/api/geomecanica/resumen-ligero?audit_id=${selectedAuditId}&years=${yearParam}`
+                : `${apiBase}/api/geomecanica/resumen-ligero?years=${yearParam}`;
+
             const resKpi = await fetch(kpiUrl);
             if (resKpi.ok) {
                 const data = await resKpi.json();
@@ -97,7 +102,14 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             if (filterTipo) queryParams.append('tipo', filterTipo);
             if (filterCelda) queryParams.append('celda', filterCelda);
             if (filterColumna) queryParams.append('columna', filterColumna);
-            if (filterCampania) queryParams.append('campania', filterCampania);
+
+            // Si hay multiselección de años activos en pantalla, la enviamos al buscador
+            if (selectedYears.length > 0) {
+                queryParams.append('campania', selectedYears.join(","));
+            } else if (filterCampania) {
+                queryParams.append('campania', filterCampania);
+            }
+
             if (filterGeotecnico) queryParams.append('geotecnico', filterGeotecnico);
             if (filterSector) queryParams.append('sector_geotecnico', filterSector);
             if (filterSearch) queryParams.append('search', filterSearch);
@@ -182,7 +194,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const handleSelectPastAudit = (auditId: string) => {
         setSelectedAuditId(auditId);
         clearAllFilters();
-        setSelectedYear('TODOS');
+        setSelectedYears([]);
+        setSelectedObservation(null);
         setStatus('loaded');
     };
 
@@ -193,6 +206,16 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const handleFilterGeotecnico = (geo: string) => setFilterGeotecnico(prev => prev === geo ? '' : geo);
     const handleFilterSector = (sec: string) => setFilterSector(prev => prev === sec ? '' : sec);
 
+    const toggleYearSelection = (year: string) => {
+        setSelectedYears(prev => {
+            if (prev.includes(year)) {
+                return prev.filter(y => y !== year);
+            } else {
+                return [...prev, year];
+            }
+        });
+    };
+
     const clearAllFilters = () => {
         setFilterTipo('');
         setFilterCelda('');
@@ -201,7 +224,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         setFilterGeotecnico('');
         setFilterSector('');
         setFilterSearch('');
-        setSelectedYear('TODOS');
+        setSelectedYears([]);
+        setSelectedObservation(null);
     };
 
     const handlePrintPDF = () => {
@@ -214,10 +238,19 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         if (filterTipo) queryParams.append('tipo', filterTipo);
         if (filterCelda) queryParams.append('celda', filterCelda);
         if (filterColumna) queryParams.append('columna', filterColumna);
-        if (filterCampania) queryParams.append('campania', filterCampania);
+
+        if (selectedYears.length > 0) {
+            queryParams.append('campania', selectedYears.join(","));
+        } else if (filterCampania) {
+            queryParams.append('campania', filterCampania);
+        }
+
         if (filterGeotecnico) queryParams.append('geotecnico', filterGeotecnico);
         if (filterSector) queryParams.append('sector_geotecnico', filterSector);
         if (filterSearch) queryParams.append('search', filterSearch);
+
+        // Parámetro dinámico para romper el caché del navegador (Cache Buster)
+        queryParams.append('_t', String(Date.now()));
 
         const resolvedBase = apiBase || `${window.location.protocol}//${window.location.hostname}:8001`;
         window.open(`${resolvedBase}/api/geomecanica/reporte-excel?${queryParams.toString()}`);
@@ -229,7 +262,13 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         if (filterTipo) queryParams.append('tipo', filterTipo);
         if (filterCelda) queryParams.append('celda', filterCelda);
         if (filterColumna) queryParams.append('columna', filterColumna);
-        if (filterCampania) queryParams.append('campania', filterCampania);
+
+        if (selectedYears.length > 0) {
+            queryParams.append('campania', selectedYears.join(","));
+        } else if (filterCampania) {
+            queryParams.append('campania', filterCampania);
+        }
+
         if (filterGeotecnico) queryParams.append('geotecnico', filterGeotecnico);
         if (filterSector) queryParams.append('sector_geotecnico', filterSector);
         if (filterSearch) queryParams.append('search', filterSearch);
@@ -244,14 +283,14 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     let periodLabel = "Periodo Completo";
 
     if (kpis) {
-        if (selectedYear !== 'TODOS' && kpis.resumen_por_celda_padre) {
+        if (selectedYears.length > 0 && kpis.resumen_por_celda_padre) {
             const matchingCeldas = Object.entries(kpis.resumen_por_celda_padre).filter(
-                ([_, cellData]: [any, any]) => String(cellData.campania) === selectedYear
+                ([_, cellData]: [any, any]) => selectedYears.includes(String(cellData.campania))
             );
             numCeldasPadre = matchingCeldas.length;
             totalDiscontinuidades = matchingCeldas.reduce((acc, [_, cellData]: [any, any]) => acc + (cellData.total_hijas || 0), 0);
             totalMetrosMapped = matchingCeldas.reduce((acc, [_, cellData]: [any, any]) => acc + (cellData.dist_celda || 0), 0);
-            periodLabel = `Campaña: ${selectedYear}`;
+            periodLabel = `Campaña: ${selectedYears.sort().join(", ")}`;
         } else if (kpis.distribucion_campania && kpis.distribucion_campania.length > 0) {
             const years = kpis.distribucion_campania.map((c: any) => parseInt(c.campania)).filter((y: any) => !isNaN(y));
             if (years.length > 0) {
@@ -260,15 +299,20 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         }
     }
 
+    // --- COLORES SEMÁNTICOS ESTANDARIZADOS ---
+    const colorVacios = "text-yellow-500 bg-yellow-500/10 border-yellow-500/20";
+    const colorAdvertencias = "text-orange-500 bg-orange-500/10 border-orange-500/20";
+    const colorAlertas = "text-red-500 bg-red-500/10 border-red-500/20";
+
     // --- FORMATEADOR DE RANKING REESTRUCTURADO ---
     // Alertas: Rojo (1-3), Naranja (4-10), Amarillo (11+)
     const getAlertRankStyle = (index: number) => {
         const rank = index + 1;
         if (rank >= 1 && rank <= 3) {
-            return "text-red-500 font-extrabold text-sm bg-red-500/10 border border-red-500/30 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(239,68,68,0.25)]";
+            return "text-red-500 font-extrabold text-xs bg-red-500/10 border border-red-500/30 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(239,68,68,0.25)]";
         }
         if (rank >= 4 && rank <= 10) {
-            return "text-orange-500 font-extrabold text-xs bg-orange-500/10 border border-orange-500/30 px-2 py-0.5 rounded shadow-[0_0_8px_rgba(249,115,22,0.15)]";
+            return "text-orange-500 font-extrabold text-xs bg-orange-500/10 border border-orange-500/30 px-2.5 py-0.5 rounded shadow-[0_0_8px_rgba(249,115,22,0.15)]";
         }
         return "text-yellow-400 font-bold text-xs bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded";
     };
@@ -277,10 +321,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const getWarningRankStyle = (index: number) => {
         const rank = index + 1;
         if (rank >= 1 && rank <= 3) {
-            return "text-orange-500 font-extrabold text-sm bg-orange-500/10 border border-orange-500/30 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(249,115,22,0.25)]";
+            return "text-orange-500 font-extrabold text-xs bg-orange-500/10 border border-orange-500/30 px-2.5 py-0.5 rounded shadow-[0_0_12px_rgba(249,115,22,0.25)]";
         }
         if (rank >= 4 && rank <= 10) {
-            return "text-yellow-400 font-extrabold text-xs bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded shadow-[0_0_8px_rgba(234,179,8,0.15)]";
+            return "text-yellow-400 font-extrabold text-xs bg-yellow-500/10 border border-yellow-500/30 px-2.5 py-0.5 rounded shadow-[0_0_8px_rgba(234,179,8,0.15)]";
         }
         return "text-[#fef3c7] font-semibold text-xs bg-amber-500/10 border border-amber-200/20 px-1.5 py-0.5 rounded";
     };
@@ -294,6 +338,21 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const pctDiscsVacias = kpis?.familia3 ? ((kpis.familia3.discontinuidades_vacios / kpis.familia3.total_discontinuidades) * 100).toFixed(2) : '0';
     const pctDiscsAdvs = kpis?.familia3 ? ((kpis.familia3.discontinuidades_advertencias / kpis.familia3.total_discontinuidades) * 100).toFixed(2) : '0';
     const pctDiscsAlertas = kpis?.familia3 ? ((kpis.familia3.discontinuidades_alertas / kpis.familia3.total_discontinuidades) * 100).toFixed(2) : '0';
+
+    // --- PROCESAMIENTO DINÁMICO DE OBSERVACIONES DESDE EL BACKEND ---
+    const coreObservationTypes = kpis?.consolidado_observaciones
+        ? Array.from(
+            new Set(
+                Object.values(kpis.consolidado_observaciones).flatMap((yearData: any) =>
+                    Object.keys(yearData).filter(k => k !== 'severity' && k !== 'total_incidents')
+                )
+            )
+        ).sort()
+        : [];
+
+    const uniqueYears = kpis?.consolidado_observaciones
+        ? Object.keys(kpis.consolidado_observaciones).sort()
+        : [];
 
     return (
         <div className="space-y-6 select-none text-left animate-fade-in text-slate-100 print:text-black print:bg-white text-xs sm:text-sm bg-[#02040a] min-h-screen p-1 sm:p-3 font-sans">
@@ -390,23 +449,36 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </div>
                         </div>
 
-                        {/* SELECTOR DINÁMICO DE PERÍODO (CAMPAÑA) */}
+                        {/* SELECTOR DINÁMICO DE PERÍODO (CAMPAÑA - PÍLDORAS MULTISELECCIÓN INTERACTIVAS) */}
                         {kpis.distribucion_campania && kpis.distribucion_campania.length > 0 && (
-                            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800/80 px-3 py-1.5 rounded-lg shrink-0 print:hidden">
-                                <Calendar size={13} className="text-indigo-400" />
-                                <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wide">Campaña:</span>
-                                <select
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(e.target.value)}
-                                    className="bg-transparent text-xs text-slate-200 font-bold focus:outline-none cursor-pointer"
+                            <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 border border-slate-800/80 rounded-xl p-1.5 print:hidden">
+                                <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest px-2.5">Campañas:</span>
+                                <button
+                                    onClick={() => setSelectedYears([])}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all uppercase ${selectedYears.length === 0
+                                        ? 'bg-indigo-500 text-slate-950 shadow-[0_0_10px_rgba(99,102,241,0.25)]'
+                                        : 'bg-navy-900/60 border border-navy-800/80 text-slate-400 hover:text-slate-200'
+                                        }`}
                                 >
-                                    <option value="TODOS" className="bg-[#02040a] text-slate-300">Todas las campañas</option>
-                                    {kpis.distribucion_campania.map((c: any) => (
-                                        <option key={c.campania} value={c.campania} className="bg-[#02040a] text-slate-300">
-                                            Año {c.campania}
-                                        </option>
-                                    ))}
-                                </select>
+                                    Todas
+                                </button>
+                                {kpis.distribucion_campania.map((c: any) => {
+                                    const isSelected = selectedYears.includes(String(c.campania));
+                                    return (
+                                        <button
+                                            key={c.campania}
+                                            onClick={() => {
+                                                toggleYearSelection(String(c.campania));
+                                            }}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${isSelected
+                                                ? 'bg-indigo-500 text-slate-950 shadow-[0_0_12px_rgba(99,102,241,0.25)]'
+                                                : 'bg-navy-900/40 border border-navy-800/60 text-slate-400 hover:text-slate-200'
+                                                }`}
+                                        >
+                                            {c.campania}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -462,49 +534,6 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-black text-slate-300 uppercase tracking-wider mr-1">Consultas Activas:</span>
 
-                                    {filterTipo && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Tipo: {filterTipo}</span>
-                                            <button onClick={() => setFilterTipo('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-                                    {filterCelda && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Estación: {filterCelda}</span>
-                                            <button onClick={() => setFilterCelda('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-                                    {filterColumna && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Columna: {filterColumna}</span>
-                                            <button onClick={() => setFilterColumna('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-                                    {filterCampania && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Año: {filterCampania}</span>
-                                            <button onClick={() => setFilterCampania('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-                                    {filterSector && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Sector: {filterSector}</span>
-                                            <button onClick={() => setFilterSector('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-                                    {filterGeotecnico && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Logueador: {filterGeotecnico}</span>
-                                            <button onClick={() => setFilterGeotecnico('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-                                    {filterSearch && (
-                                        <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-2.5 py-1 rounded-lg text-xs font-black uppercase">
-                                            <span>Búsqueda: {filterSearch}</span>
-                                            <button onClick={() => setFilterSearch('')} className="hover:text-red-400"><X size={12} /></button>
-                                        </span>
-                                    )}
-
                                     <button onClick={clearAllFilters} className="text-xs text-slate-400 hover:text-white underline font-extrabold ml-2">
                                         Limpiar Todo
                                     </button>
@@ -515,7 +544,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             <div className="flex flex-wrap gap-2 shrink-0">
                                 <button
                                     onClick={handleDownloadExcel}
-                                    className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/25 text-emerald-400 px-3.5 py-2 rounded-lg text-xs font-black shadow-sm transition-all active:scale-95"
+                                    className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/25 text-emerald-300 px-3.5 py-2 rounded-lg text-xs font-black shadow-sm transition-all active:scale-95"
                                     title="Exportar base consolidada y listado filtrado a Excel"
                                 >
                                     <Download size={14} className="text-emerald-400" />
@@ -556,6 +585,220 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                 </span>
                                 <span className="text-xs text-slate-400 font-semibold block">{periodLabel}</span>
                             </div>
+                        </div>
+                    )}
+
+                    {/* --- NUEVO MONITOR INTERACTIVO DE OBSERVACIONES POR AÑO (VISTA CONSOLIDADA O DRILLDOWN) --- */}
+                    {kpis.consolidado_observaciones && (
+                        <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-6 space-y-6 shadow-xl relative overflow-hidden">
+                            {!selectedObservation ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-100 flex items-center gap-2">
+                                            <BarChart3 size={14} className="text-indigo-400" />
+                                            <span>CONSOLIDADO - OBSERVACIONES POR AÑO</span>
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Vista unificada del estado geotécnico de control de calidad por campaña de perforación. Haz clic sobre una tipología para desplegar tendencias dinámicas e identificar anomalías.
+                                        </p>
+                                    </div>
+
+                                    <div className="overflow-x-auto rounded-lg border border-slate-800/80">
+                                        <table className="w-full text-xs text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-slate-800/80">
+                                                    <th className="py-3.5 px-4 text-xs">Tipo de Observación Geotécnica</th>
+                                                    {uniqueYears.map(yr => {
+                                                        const sev = kpis.consolidado_observaciones[yr].severity;
+                                                        const badgeColor = sev === 'CRÍTICO'
+                                                            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                            : sev === 'MODERADO'
+                                                                ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                                                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                                                        return (
+                                                            <th key={yr} className="py-3 px-4 text-center min-w-32 text-xs">
+                                                                <div className="font-black text-slate-200">{yr}</div>
+                                                                <div className={`mt-1 text-xs font-black tracking-widest px-2.5 py-1 rounded-lg uppercase ${badgeColor}`}>
+                                                                    {sev}
+                                                                </div>
+                                                            </th>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/40 text-slate-300 font-semibold text-xs">
+                                                {coreObservationTypes.map((obsType, oIdx) => (
+                                                    <tr
+                                                        key={oIdx}
+                                                        onClick={() => setSelectedObservation(obsType)}
+                                                        className="hover:bg-indigo-500/5 cursor-pointer transition-all border-b border-slate-900/60"
+                                                    >
+                                                        <td className="py-3.5 px-4 text-slate-100 font-black text-xs">{obsType}</td>
+                                                        {uniqueYears.map(yr => {
+                                                            const val = kpis.consolidado_observaciones[yr]?.[obsType]?.incidents || 0;
+                                                            return (
+                                                                <td key={yr} className="py-3.5 px-4 text-center font-mono">
+                                                                    <span className={`px-2.5 py-1 rounded text-xs font-black border ${val > 100
+                                                                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                                                        : val > 10
+                                                                            ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                                                            : val > 0
+                                                                                ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                                                : 'bg-slate-900/30 text-slate-600 border-transparent'}`}>
+                                                                        {val.toLocaleString()}
+                                                                    </span>
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-6 animate-fade-in text-xs">
+                                    {/* CABECERA DEL DRILLDOWN DETALLADO */}
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
+                                        <div>
+                                            <button
+                                                onClick={() => setSelectedObservation(null)}
+                                                className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-black uppercase tracking-wider mb-2"
+                                            >
+                                                <ArrowLeft size={14} />
+                                                <span>Volver al Consolidado General</span>
+                                            </button>
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
+                                                OBSERVACIÓN — {selectedObservation}
+                                            </h3>
+                                            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                                Visualizando tendencias analíticas de registros y estructuras afectadas a lo largo de las campañas activas.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* GRÁFICOS DE TENDENCIA CON ESCALAMIENTO ADAPTATIVO (CLAMPING DE ALTURA EN UN MÍNIMO DE 8%) */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Gráfico 1: Incidencias Totales */}
+                                        <div className="bg-[#02040a]/40 border border-slate-850 p-4 rounded-xl space-y-3">
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                Registros de la Observación por Año
+                                            </h4>
+                                            <div className="flex justify-between items-end h-40 border-b border-slate-850 pb-2">
+                                                {uniqueYears.map(yr => {
+                                                    const val = kpis.consolidado_observaciones[yr]?.[selectedObservation]?.incidents || 0;
+                                                    const maxVal = Math.max(...uniqueYears.map(y => kpis.consolidado_observaciones[y]?.[selectedObservation]?.incidents || 0), 1);
+
+                                                    // Fórmula de escalamiento adaptativo: si es mayor a 0, inicia en 8% de altura mínima
+                                                    const heightPct = val > 0 ? 8 + (val / maxVal) * 92 : 0;
+                                                    return (
+                                                        <div key={yr} className="flex flex-col items-center flex-1 group">
+                                                            <span className="text-xs font-bold text-indigo-400 opacity-0 group-hover:opacity-100 transition-all mb-1">
+                                                                {val}
+                                                            </span>
+                                                            <div
+                                                                style={{ height: `${heightPct}%` }}
+                                                                className={`w-8 rounded-t border-t-2 transition-all ${val > 100
+                                                                    ? 'bg-red-500/20 hover:bg-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                                                                    : val > 10
+                                                                        ? 'bg-orange-500/20 hover:bg-orange-500 border-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.15)]'
+                                                                        : val > 0
+                                                                            ? 'bg-yellow-500/20 hover:bg-yellow-500 border-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.1)]'
+                                                                            : 'bg-slate-900 border-transparent h-1'}`}
+                                                            />
+                                                            <span className="text-xs font-bold text-slate-500 mt-2">{yr}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Gráfico 2: Estaciones Afectadas */}
+                                        <div className="bg-[#02040a]/40 border border-slate-850 p-4 rounded-xl space-y-3">
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                Estaciones (Taladros) Afectadas por Año
+                                            </h4>
+                                            <div className="flex justify-between items-end h-40 border-b border-slate-850 pb-2">
+                                                {uniqueYears.map(yr => {
+                                                    const val = kpis.consolidado_observaciones[yr]?.[selectedObservation]?.affected_stations || 0;
+                                                    const maxVal = Math.max(...uniqueYears.map(y => kpis.consolidado_observaciones[y]?.[selectedObservation]?.affected_stations || 0), 1);
+
+                                                    // Fórmula de escalamiento adaptativo: si es mayor a 0, inicia en 8% de altura mínima
+                                                    const heightPct = val > 0 ? 8 + (val / maxVal) * 92 : 0;
+                                                    return (
+                                                        <div key={yr} className="flex flex-col items-center flex-1 group">
+                                                            <span className="text-xs font-bold text-indigo-400 opacity-0 group-hover:opacity-100 transition-all mb-1">
+                                                                {val}
+                                                            </span>
+                                                            <div
+                                                                style={{ height: `${heightPct}%` }}
+                                                                className={`w-8 rounded-t border-t-2 transition-all ${val > 20
+                                                                    ? 'bg-red-500/20 hover:bg-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                                                                    : val > 5
+                                                                        ? 'bg-orange-500/20 hover:bg-orange-500 border-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.15)]'
+                                                                        : val > 0
+                                                                            ? 'bg-yellow-500/20 hover:bg-yellow-500 border-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.1)]'
+                                                                            : 'bg-slate-900 border-transparent h-1'}`}
+                                                            />
+                                                            <span className="text-xs font-bold text-slate-500 mt-2">{yr}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* TABLA DE TOP 3 TALADROS MÁS CRÍTICOS POR AÑO */}
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                            TOP 3 TALADROS CON MÁS REGISTROS OBSERVADOS POR AÑO
+                                        </h4>
+                                        <div className="overflow-x-auto rounded-lg border border-slate-800/80">
+                                            <table className="w-full text-xs text-left border-collapse">
+                                                <thead>
+                                                    <tr className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-slate-800">
+                                                        <th className="py-2.5 px-3 text-center w-24 text-xs">Año</th>
+                                                        <th className="py-2.5 px-3 text-xs">1° Más Crítico</th>
+                                                        <th className="py-2.5 px-3 text-xs">2° Más Crítico</th>
+                                                        <th className="py-2.5 px-3 text-xs">3° Más Crítico</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                                                    {uniqueYears.map(yr => {
+                                                        const topList = kpis.consolidado_observaciones[yr]?.[selectedObservation]?.top_stations || [];
+                                                        return (
+                                                            <tr key={yr} className="hover:bg-slate-900/10 border-b border-slate-900/50">
+                                                                <td className="py-3 px-3 text-center font-black bg-[#02040a]/30 text-xs">{yr}</td>
+                                                                <td className="py-3 px-3">
+                                                                    {topList[0] ? (
+                                                                        <span className="font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg text-xs">
+                                                                            {topList[0].celda} <span className="font-mono font-black">({topList[0].count})</span>
+                                                                        </span>
+                                                                    ) : <span className="text-slate-600">—</span>}
+                                                                </td>
+                                                                <td className="py-3 px-3">
+                                                                    {topList[1] ? (
+                                                                        <span className="font-semibold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-lg text-xs">
+                                                                            {topList[1].celda} <span className="font-mono font-extrabold">({topList[1].count})</span>
+                                                                        </span>
+                                                                    ) : <span className="text-slate-600">—</span>}
+                                                                </td>
+                                                                <td className="py-3 px-3">
+                                                                    {topList[2] ? (
+                                                                        <span className="font-medium text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-lg text-xs">
+                                                                            {topList[2].celda} <span className="font-mono font-bold">({topList[2].count})</span>
+                                                                        </span>
+                                                                    ) : <span className="text-slate-600">—</span>}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -814,7 +1057,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     {/* CUADROS GEMELOS: ALERTAS DE INCOMPATIBILIDAD FISICA VS ADVERTENCIAS DE CONSISTENCIA */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                        {/* ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS */}
+                        {/* COMPONENTE IZQUIERDO: ALERTAS CRÍTICAS CON MAYOR CANTIDAD DE OCURRENCIAS */}
                         <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <AlertTriangle size={14} className="text-red-500" />
@@ -859,7 +1102,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </div>
                         </div>
 
-                        {/* ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS */}
+                        {/* COMPONENTE DERECHO: ADVERTENCIAS DE CONSISTENCIA CON MAYOR CANTIDAD DE OCURRENCIAS */}
                         <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/30 p-5 space-y-4 print:border-black shadow-lg">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <Settings size={14} className="text-amber-500" />

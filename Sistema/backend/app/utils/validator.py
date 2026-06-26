@@ -55,11 +55,24 @@ def get_row_val(row_dict, key):
 def sanitize_value(val, target_type):
     if val is None or pd.isna(val):
         return None
+    
     val_str = str(val).strip()
-    if val_str in ['', '-1', '-1.0']:
+    val_upper = val_str.upper()
+    
+    if val_str == '' or val_upper in ['-1', '-1.0', 'N/A', 'NONE', 'NAN']:
         return None
-    try: return target_type(val)
-    except (ValueError, TypeError): return None
+        
+    if target_type == str:
+        if val_str.endswith('.0'):
+            val_str = val_str[:-2]
+        return val_str.strip()
+        
+    try:
+        if target_type == int:
+            return int(float(val))
+        return target_type(val)
+    except (ValueError, TypeError):
+        return None
 
 # --- FUNCIONES AUXILIARES DE COINCIDENCIA DE LITOLOGÍAS ---
 
@@ -71,19 +84,16 @@ def match_lito_column(catalog_val, input_val):
     if c_val == '-' or c_val == '':
         return i_val in ['', '-', 'N/A', 'NONE']
     if c_val == 'INTRUSIVO':
-        # Grupo intrusivo válido si pertenece al catálogo de intrusivos
         return i_val in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]
     return c_val == i_val
 
 # --- SEGMENTACIÓN DE COMPROBACIONES DE INTEGRIDAD ---
 
 def validate_geotechnical_header(row_dict, registrar_error):
-    # Dip_Talud: rango entre -90 y 90 (Alerta)
     dip_talud = sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float)
     if dip_talud is not None and not (-90.0 <= dip_talud <= 90.0):
         registrar_error("DIP_TALUD", dip_talud, "ALERTA", "Ángulo del talud fuera del rango [-90, 90] grados.")
 
-    # Altura de celda: límite máximo de 30 metros (Alerta)
     altura_celda = sanitize_value(get_row_val(row_dict, 'Altura'), float)
     if altura_celda is not None and altura_celda > 30.0:
         registrar_error("Altura", altura_celda, "ALERTA", "Altura de la celda de estación excede el límite máximo de 30 metros.")
@@ -92,14 +102,14 @@ def validate_geomechanical_properties(row_dict, registrar_error):
     # 1. Validación de Condición de Agua (Códigos)
     agua_76 = sanitize_value(get_row_val(row_dict, "CONDICION DE AGUA  '76."), str)
     if agua_76 is not None:
-        agua_76_up = agua_76.upper()
-        if agua_76_up not in CONDICION_AGUA_CATALOG:
+        agua_76_clean = agua_76.upper()
+        if agua_76_clean not in CONDICION_AGUA_CATALOG:
             registrar_error("CONDICION DE AGUA  '76.", agua_76, "ALERTA", f"Código de agua '76 '{agua_76}' no admitido. Debe ser C, H, M, E o F.")
 
     agua_89 = sanitize_value(get_row_val(row_dict, "CONDICION DE AGUA  '89"), str)
     if agua_89 is not None:
-        agua_89_up = agua_89.upper()
-        if agua_89_up not in CONDICION_AGUA_CATALOG:
+        agua_89_clean = agua_89.upper()
+        if agua_89_clean not in CONDICION_AGUA_CATALOG:
             registrar_error("CONDICION DE AGUA  '89", agua_89, "ALERTA", f"Código de agua '89 '{agua_89}' no admitido. Debe ser C, H, M, E o F.")
 
     # 2. Validación de Ratings de Condición de Agua (Con advertencias de valor medio)
@@ -128,8 +138,8 @@ def validate_geomechanical_properties(row_dict, registrar_error):
     # 3. Validación de Dureza y Resistencia ISRM (Con advertencias de valor medio)
     dureza_76 = sanitize_value(get_row_val(row_dict, "DUREZA  '76"), str)
     if dureza_76 is not None:
-        dureza_76_up = dureza_76.upper()
-        if dureza_76_up not in RESISTENCIA_RATING_CATALOG:
+        dureza_76_clean = dureza_76.upper()
+        if dureza_76_clean not in RESISTENCIA_RATING_CATALOG:
             registrar_error("DUREZA  '76", dureza_76, "ALERTA", f"Dureza '76 '{dureza_76}' no admitida. Debe ser R0 a R6.")
 
     dureza_val_76 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR  '76"), int)
@@ -145,8 +155,8 @@ def validate_geomechanical_properties(row_dict, registrar_error):
 
     dureza_89 = sanitize_value(get_row_val(row_dict, "DUREZA '89"), str)
     if dureza_89 is not None:
-        dureza_89_up = dureza_89.upper()
-        if dureza_89_up not in RESISTENCIA_RATING_CATALOG:
+        dureza_89_clean = dureza_89.upper()
+        if dureza_89_clean not in RESISTENCIA_RATING_CATALOG:
             registrar_error("DUREZA '89", dureza_89, "ALERTA", f"Dureza '89 '{dureza_89}' no admitida. Debe ser R0 a R6.")
 
     dureza_val_89 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR '89"), int)
@@ -160,7 +170,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         elif dureza_val_89 not in [15, 12, 7, 4, 2, 1, 0]:
             registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ADVERTENCIA", f"Puntaje de resistencia '89 ({dureza_val_89}) es un valor medio no exacto.")
 
-    # 4. Control Estructural [1, 2, 3, 4, 5] (Es entero estricto de catálogo)
+    # 4. Control Estructural [1, 2, 3, 4, 5]
     ctrl_76 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL  '76"), int)
     if ctrl_76 is not None and ctrl_76 not in CONTROL_ESTRUCTURAL_CATALOG:
         registrar_error("CONTROL ESTRUCTURAL  '76", ctrl_76, "ALERTA", "Control estructural '76 fuera de límites permitidos [1, 5].")
@@ -244,46 +254,54 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                 registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ALERTA", f"Rating de espaciamiento '89 ({espac_val_89}) no se alinea con el promedio de {espac_prom_89}m (se esperaba {expected}).")
 
 def validate_structural_row(row_dict, dist_celda, registrar_error):
-    # 1. Tipo de estructura (Normalización de 'J' a 'ADVERTENCIA')
+    # 1. Tipo de estructura (Normalización de 'J' a 'ADVERTENCIA' y desinfección)
     tipo_junta = sanitize_value(get_row_val(row_dict, "TIPO"), str)
     if tipo_junta is not None:
-        tipo_junta_up = tipo_junta.upper()
-        if tipo_junta_up not in TIPO_ESTRUCTURA_CATALOG:
-            if tipo_junta_up == 'J':
+        tipo_junta_clean = tipo_junta.strip().upper()
+        if tipo_junta_clean not in TIPO_ESTRUCTURA_CATALOG:
+            if tipo_junta_clean == 'J':
                 registrar_error("TIPO", tipo_junta, "ADVERTENCIA", "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN' según catálogo estándar.")
             else:
                 registrar_error("TIPO", tipo_junta, "ALERTA", f"Tipo de estructura geológica '{tipo_junta}' no permitida.")
 
-    # 2. Relleno 1 y Relleno 2
+    # 2. Relleno 1 y Relleno 2 (Desinfección estricta contra espacios y minúsculas)
     rel1 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 1"), str)
-    if rel1 is not None and rel1.lower() not in TIPO_RELLENO_CATALOG:
-        registrar_error("TIPO DE  RELLENO 1", rel1, "ALERTA", f"Tipo de relleno 1 '{rel1}' no pertenece al catálogo.")
+    if rel1 is not None:
+        rel1_clean = rel1.strip().lower()
+        if rel1_clean not in TIPO_RELLENO_CATALOG:
+            registrar_error("TIPO DE  RELLENO 1", rel1, "ALERTA", f"Tipo de relleno 1 '{rel1}' no pertenece al catálogo.")
         
     rel2 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 2"), str)
-    if rel2 is not None and rel2.lower() not in TIPO_RELLENO_CATALOG:
-        registrar_error("TIPO DE  RELLENO 2", rel2, "ALERTA", f"Tipo de relleno 2 '{rel2}' no pertenece al catálogo.")
+    if rel2 is not None:
+        rel2_clean = rel2.strip().lower()
+        if rel2_clean not in TIPO_RELLENO_CATALOG:
+            registrar_error("TIPO DE  RELLENO 2", rel2, "ALERTA", f"Tipo de relleno 2 '{rel2}' no pertenece al catálogo.")
 
     # 3. JRC [0, 20]
     jrc_val = sanitize_value(get_row_val(row_dict, "JRC"), int)
     if jrc_val is not None and not (0 <= jrc_val <= 20):
         registrar_error("JRC", jrc_val, "ALERTA", f"Valor JRC ({jrc_val}) fuera de rango permitido [0, 20].")
 
-    # 4. Rugosidad de Estructuras [1, 9]
+    # 4. Rugosidad de Estructuras [1, 9] (Desinfectada)
     rug_val = sanitize_value(get_row_val(row_dict, "RUGOSIDAD DE ESTRUCTURAS"), int)
     if rug_val is not None and rug_val not in RUGOSIDAD_CATALOG:
         registrar_error("RUGOSIDAD DE ESTRUCTURAS", rug_val, "ALERTA", f"Clase de rugosidad de junta ({rug_val}) fuera de límites [1, 9].")
 
-    # 5. Forma de estructura
+    # 5. Forma de estructura (Desinfectada y mayúsculas)
     forma_estrucs = sanitize_value(get_row_val(row_dict, "FORMA DE ESTRUCTURA"), str)
-    if forma_estrucs is not None and forma_estrucs.upper() not in FORMA_ESTRUCTURA_CATALOG:
-        registrar_error("FORMA DE ESTRUCTURA", forma_estrucs, "ALERTA", f"Forma de estructura '{forma_estrucs}' inválida. Debe ser P, C, O, E o I.")
+    if forma_estrucs is not None:
+        forma_estrucs_clean = forma_estrucs.strip().upper()
+        if forma_estrucs_clean not in FORMA_ESTRUCTURA_CATALOG:
+            registrar_error("FORMA DE ESTRUCTURA", forma_estrucs, "ALERTA", f"Forma de estructura '{forma_estrucs}' inválida. Debe ser P, C, O, E o I.")
 
-    # 6. Alteración
+    # 6. Alteración (Meteorización - Desinfectada, sin espacios y minúsculas)
     alt_pared = sanitize_value(get_row_val(row_dict, "ALTERACION"), str)
-    if alt_pared is not None and alt_pared.lower() not in ALTERACION_CATALOG:
-        registrar_error("ALTERACION", alt_pared, "ALERTA", f"Código de alteración '{alt_pared}' inválido.")
+    if alt_pared is not None:
+        alt_pared_clean = alt_pared.strip().lower()
+        if alt_pared_clean not in ALTERACION_CATALOG:
+            registrar_error("ALTERACION", alt_pared, "ALERTA", f"Código de alteración '{alt_pared}' inválido.")
 
-    # 7. Espesor no puede superar abertura (Alerta)
+    # 7. Espesor no puede superar abertura
     espesor = sanitize_value(get_row_val(row_dict, "ESPESOR mm."), float)
     abertura = sanitize_value(get_row_val(row_dict, "ABERTURA mm."), float)
     if espesor is not None and abertura is not None and espesor > abertura:
@@ -291,16 +309,15 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
 
     # 8. Comprobaciones de abertura (Límite 10,000 / Excepción de Fallas)
     if abertura is not None:
-        is_falla = tipo_junta is not None and (tipo_junta.upper() in ['F', 'F+10', 'F-10'] or tipo_junta.upper().startswith('F'))
+        is_falla = tipo_junta is not None and (tipo_junta.strip().upper() in ['F', 'F+10', 'F-10'] or tipo_junta.strip().upper().startswith('F'))
         if is_falla:
-            # Límite físico: abertura en metros no puede superar el largo de celda
             if dist_celda is not None and (abertura / 1000.0) > dist_celda:
                 registrar_error("ABERTURA mm.", abertura, "ALERTA", f"Fallo físico: La abertura de la falla ({abertura}mm) supera la longitud de la celda ({dist_celda}m).")
         else:
             if abertura > 10000.0:
                 registrar_error("ABERTURA mm.", abertura, "ADVERTENCIA", f"La abertura ({abertura}mm) excede el máximo sugerido de 10000mm.")
 
-    # 9. Persistencia de discontinuidad (Continuidad) vs Ventana y límite de 25m (Advertencias)
+    # 9. Persistencia de discontinuidad (Continuidad) vs Ventana y límite de 25m
     cont_junta = sanitize_value(get_row_val(row_dict, "CONTINUIDAD m."), float)
     if cont_junta is not None:
         if dist_celda is not None and cont_junta > dist_celda:
@@ -309,7 +326,7 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
             registrar_error("CONTINUIDAD m.", cont_junta, "ADVERTENCIA", f"La persistencia ({cont_junta}m) es inusualmente elevada (> 25 metros).")
 
 def validate_lithology_correlation(row_dict, registrar_error):
-    # 1. Comprobación cruzada litológica lito1-lito2-lito3 y K-Factor
+    # Desinfectar cadenas de litología
     l1 = sanitize_value(get_row_val(row_dict, "Lito 1"), str)
     l2 = sanitize_value(get_row_val(row_dict, "Lito 2"), str)
     l3 = sanitize_value(row_dict.get("Lito 3"), str)
@@ -317,31 +334,48 @@ def validate_lithology_correlation(row_dict, registrar_error):
     
     matched_row = None
     if all(v is not None for v in [l1, l2, l3, u_lito]):
-        for row in LITHOLOGY_CLASSIFICATION:
-            l1_ok = match_lito_column(row["lito1"], l1)
-            l2_ok = match_lito_column(row["lito2"], l2)
-            l3_ok = match_lito_column(row["lito3"], l3)
-            if l1_ok and l2_ok and l3_ok:
-                matched_row = row
-                break
+        l1_clean = l1.strip().upper()
+        l2_clean = l2.strip().upper()
+        l3_clean = l3.strip().upper() if l3 else ""
+        u_lito_clean = u_lito.strip().upper()
+
+        group_input_norm = NORM_GROUP_MAP.get(u_lito_clean, u_lito_clean)
+
+        # --- REGLA LITOLÓGICA DE ENDOSKARN MEJORADA ---
+        if group_input_norm == "ENDOSKARN":
+            intrusivos_l1 = ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]
+            l1_ok = l1_clean in intrusivos_l1
+            l2_ok = l2_clean in ["EPG", "EGT"]
+            l3_ok = True # Acepta cualquier cosa o vacío para Lito 3
+            
+            if l1_ok and l2_ok:
+                matched_row = {"grupo": "ENDOSKARN", "lito1": l1_clean, "lito2": l2_clean, "lito3": l3_clean, "k": 9.87}
+        else:
+            # Búsqueda regular en el resto de litologías del catálogo
+            for row in LITHOLOGY_CLASSIFICATION:
+                l1_ok = match_lito_column(row["lito1"], l1_clean)
+                l2_ok = match_lito_column(row["lito2"], l2_clean)
+                l3_ok = match_lito_column(row["lito3"], l3_clean)
+                if l1_ok and l2_ok and l3_ok:
+                    matched_row = row
+                    break
                 
         if not matched_row:
             registrar_error("Lito 1", l1, "ALERTA", f"Combinación litológica inválida: Lito 1: '{l1}' | Lito 2: '{l2}' | Lito 3: '{l3}'.")
         else:
-            # 2. Comprobación de Unidad Litológica (Grupo)
+            # Comprobación de Unidad Litológica (Grupo)
             group_esperado = matched_row["grupo"]
-            group_input_norm = NORM_GROUP_MAP.get(str(u_lito).strip().upper(), str(u_lito).strip().upper())
             if group_input_norm != group_esperado:
                 registrar_error("Unidad Litologica", u_lito, "ALERTA", f"Unidad litológica '{u_lito}' es incongruente con la litología. Esperado: '{group_esperado}'.")
 
-    # 3. Validaciones de resistencia UCS vs is50
+    # Resistencia UCS vs is50
     ucs_val = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
     is50_val = sanitize_value(get_row_val(row_dict, "is50 (Mpa)"), float)
     if ucs_val is not None and is50_val is not None:
         if ucs_val <= is50_val:
             registrar_error("( UCS )  (Mpa)", ucs_val, "ALERTA", f"Fallo físico: UCS ({ucs_val} MPa) debe ser mayor a is50 ({is50_val} MPa).")
         
-        # 4. Multiplicación de UCS con Factor K de catálogo litológico (Advertencia)
+        # Multiplicación de UCS con Factor K de catálogo litológico
         if matched_row is not None:
             factor_k = matched_row["k"]
             expected_ucs = is50_val * factor_k
@@ -350,12 +384,9 @@ def validate_lithology_correlation(row_dict, registrar_error):
 
 # --- PROCESADOR CENTRAL DE PLANILLAS EXCEL ---
 
-# app/utils/validator.py
-
 def validate_bulk_excel(file_path, output_json_path):
     print(f"[*] Leyendo archivo Excel: {file_path}")
-    try: 
-        df = pd.read_excel(file_path, engine='openpyxl')
+    try: df = pd.read_excel(file_path, engine='openpyxl')
     except Exception as e:
         print(f"[-] Error al abrir el archivo Excel: {e}")
         sys.exit(1)
@@ -490,5 +521,10 @@ def validate_bulk_excel(file_path, output_json_path):
         "incidencias": incidencias, "resumen_por_celda_padre": resumen_celdas
     }
 
-    with open(output_json_path, 'w', encoding='utf-8') as f:
+    # --- ESCRITURA ATÓMICA SEGURA CON REEMPLAZO ---
+    tmp_path = output_json_path + ".tmp"
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(output_json, f, ensure_ascii=False)
+    
+    # Renombrado seguro a nivel de sistema operativo
+    os.replace(tmp_path, output_json_path)
