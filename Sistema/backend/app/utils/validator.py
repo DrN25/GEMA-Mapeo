@@ -422,7 +422,7 @@ def validate_bulk_excel(file_path, output_json_path):
         "RQD '89", "FRECUENCIA DE FRACTURAMIENTO x m. '89", "TAMAÑO DE BLOQUES  x m3 '89", 
         "ESPACIAMIENTO PROMEDIO '89", "ESPACIAMIENTO - VALOR '89", 
         "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89", "FECHA",
-        'GEOTECNICO', 'Nivel', 'Lito 1', 'Lito 2', 'Lito 3', 'Unidad Litologica', 'sector_geotecnico'
+        'GEOTECNICO', 'Nivel', 'Lito 1', 'Lito 2', 'Lito 3', 'Unidad Litologica', 'sector_geotecnico', 'sector_geotecnicos'
     ]
     for col in propagate_cols:
         if col in df.columns:
@@ -451,7 +451,17 @@ def validate_bulk_excel(file_path, output_json_path):
 
         camp = sanitize_value(get_row_val(row_dict, 'Campaña'), int)
         geo = sanitize_value(get_row_val(row_dict, 'GEOTECNICO'), str)
-        sector = sanitize_value(get_row_val(row_dict, 'sector_geotecnico'), str) or sanitize_value(get_row_val(row_dict, 'sector'), str) or "N/A"
+        
+        # Lectura robusta con y sin "S"
+        sector = sanitize_value(
+            get_row_val(row_dict, 'sector_geotecnicos') or 
+            get_row_val(row_dict, 'sector_geotecnico') or 
+            get_row_val(row_dict, 'sector') or
+            get_row_val(row_dict, 'Sector Geotecnico') or
+            get_row_val(row_dict, 'Sector Geotecnicos'),
+            str
+        ) or "N/A"
+        
         dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
         if camp: 

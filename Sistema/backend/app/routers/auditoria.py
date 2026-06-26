@@ -102,122 +102,136 @@ def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
     
-    if "ÁNGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
+    # 1. Ángulo del talud y Altura de celda
+    if "ÁNGULO DEL TALUD" in msg_up or "ANGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
         return "Ángulo del talud fuera del rango [-90, 90] grados."
     if "ALTURA DE LA CELDA" in msg_up or "ALTURA" in msg_up:
         return "Altura de la celda de estación excede el límite máximo de 30 metros."
-    if "CÓDIGO DE AGUA '76" in msg_up:
+        
+    # 2. Condición de Agua y Ratings de Agua
+    if "CÓDIGO DE AGUA '76" in msg_up or "CODIGO DE AGUA '76" in msg_up:
         return "Código de agua '76 no admitido. Debe ser C, H, M, E o F."
-    if "CÓDIGO DE AGUA '89" in msg_up:
+    if "CÓDIGO DE AGUA '89" in msg_up or "CODIGO DE AGUA '89" in msg_up:
         return "Código de agua '89 no admitido. Debe ser C, H, M, E o F."
     if "VALOR DE AGUA '76 EXCEDE" in msg_up:
         return "Valor de agua '76 excede los límites reales de la escala [0, 10]."
-    if "RATING DE AGUA '76" in msg_up and "INCONGRUENTE" in msg_up:
-        return "Rating de agua '76 es incongruente con el código."
     if "VALOR DE AGUA '89 EXCEDE" in msg_up:
         return "Valor de agua '89 excede los límites reales de la escala [0, 15]."
-    if "RATING DE AGUA '89" in msg_up and "INCONGRUENTE" in msg_up:
+    if "RATING DE AGUA" in msg_up and "INCONGRUENTE" in msg_up:
+        if "'76" in msg_up:
+            return "Rating de agua '76 es incongruente con el código."
         return "Rating de agua '89 es incongruente con el código."
-    if "DUREZA  '76" in msg_up:
-         return "Dureza '76 no admitida. Debe ser R0 a R6."
-    if "DUREZA '89" in msg_up:
-         return "Dureza '89 no admitida. Debe ser R0 a R6."
-    if "RESISTENCIA ESTIMADA VALOR  '76" in msg_up and "EXCEDE" in msg_up:
-        return "Rating de resistencia '76 fuera del límite real [0, 15]."
-    if "RESISTENCIA ESTIMADA VALOR '89" in msg_up and "EXCEDE" in msg_up:
-        return "Rating de resistencia '89 fuera del límite real [0, 15]."
-    if "RESISTENCIA '76" in msg_up and "INCONGRUENTE" in msg_up:
-        return "Resistencia '76 es incongruente con la dureza."
-    if "RESISTENCIA '89" in msg_up and "INCONGRUENTE" in msg_up:
+    if "VALOR MEDIO NO EXACTO" in msg_up and "AGUA" in msg_up:
+        if "'76" in msg_up:
+            return "El valor de agua '76 es un valor medio no exacto."
+        return "El valor de agua '89 es un valor medio no exacto."
+        
+    # 3. Dureza y Ratings de Resistencia
+    if "DUREZA" in msg_up and "ADMITIDA" in msg_up:
+        if "'76" in msg_up:
+             return "Dureza '76 no admitida. Debe ser R0 a R6."
+        return "Dureza '89 no admitida. Debe ser R0 a R6."
+    if "RESISTENCIA" in msg_up and "INCONGRUENTE" in msg_up:
+        if "'76" in msg_up:
+             return "Resistencia '76 es incongruente con la dureza."
         return "Resistencia '89 es incongruente con la dureza."
+    if "RESISTENCIA" in msg_up and ("LIMITE" in msg_up or "LÍMITE" in msg_up or "EXCEDE" in msg_up):
+        if "'76" in msg_up:
+             return "Rating de resistencia '76 fuera del límite real [0, 15]."
+        return "Rating de resistencia '89 fuera del límite real [0, 15]."
+    if "ALEJADO" in msg_up and "RESISTENCIA" in msg_up:
+        if "'76" in msg_up:
+             return "Puntaje de resistencia '76 es un valor alejado no válido."
+        return "Puntaje de resistencia '89 es un valor alejado no válido."
+        
+    # 4. Control Estructural y Efectos de Voladura
     if "CONTROL ESTRUCTURAL" in msg_up:
         if "'76" in msg_up: return "Control estructural '76 fuera de límites permitidos [1, 5]."
         return "Control estructural '89 fuera de límites permitidos [1, 5]."
-    if "EFECTOS DE VOLADURA" in msg_up:
+    if "EFECTO DE VOLADURA" in msg_up or "EFECTOS DE VOLADURA" in msg_up:
         if "'76" in msg_up: return "Efecto de voladura '76 excede los límites de la escala [1, 6]."
         return "Efecto de voladura '89 excede los límites de la escala [1, 6]."
-    if "RQD - VALOR" in msg_up:
-        if "LÍMITES REALES" in msg_up or "EXCEDE" in msg_up:
-            if "'76" in msg_up: return "Valor de RQD '76 excede los límites reales de la escala [0, 20]."
-            return "Valor de RQD '89 excede los límites reales de la escala [0, 20]."
-    if "PORCENTAJE DE RQD" in msg_up:
+    if "MEDIO NO EXACTO" in msg_up and "VOLADURA" in msg_up:
+        if "'76" in msg_up:
+            return "Puntaje de efectos de voladura '76 es un valor medio no exacto."
+        return "Puntaje de efectos de voladura '89 es un valor medio no exacto."
+        
+    # 5. RQD Ratings y Porcentajes (La regla de porcentaje precede para evitar solapes)
+    if "PORCENTAJE" in msg_up and "RQD" in msg_up:
         if "'76" in msg_up: return "Porcentaje de RQD '76 no puede ser superior al 100%."
         return "Porcentaje de RQD '89 no puede ser superior al 100%."
-    if "ESPACIAMIENTO PROMEDIO" in msg_up:
+    if "RQD" in msg_up:
+        if "'76" in msg_up: return "Puntaje de RQD '76 es un valor alejado no válido."
+        return "Puntaje de RQD '89 es un valor alejado no válido."
+
+    # 6. Espaciamiento Promedio y Ratings de Espaciamiento
+    if "ESPACIAMIENTO PROMEDIO" in msg_up and "POSITIVO" in msg_up:
         if "'76" in msg_up: return "El espaciamiento promedio '76 debe ser positivo."
         return "El espaciamiento promedio '89 debe ser positivo."
-    if "ESPACIAMIENTO - VALOR" in msg_up:
-        if "RANGO" in msg_up or "RANGO PERMITIDO" in msg_up:
-            if "'76" in msg_up: return "Valor de rating de espaciamiento '76 fuera del rango [5, 30]."
-            return "Valor de rating de espaciamiento '89 fuera del rango [5, 20]."
-        if "NO SE ALINEA" in msg_up:
-            if "'76" in msg_up: return "Rating de espaciamiento '76 no se alinea con el promedio."
-            return "Rating de espaciamiento '89 no se alinea con el promedio esperado."
-    if "ESTRUCTURA GEOLÓGICA" in msg_up or "ESTRUCTURA GEOLOGICA" in msg_up:
+    if "ESPACIAMIENTO" in msg_up and "RANGO" in msg_up:
+        if "'76" in msg_up: return "Valor de rating de espaciamiento '76 fuera del rango [5, 30]."
+        return "Valor de rating de espaciamiento '89 fuera del rango [5, 20]."
+    if "ESPACIAMIENTO" in msg_up and "ALINEA" in msg_up:
+        if "'76" in msg_up: return "Rating de espaciamiento '76 no se alinea con el promedio."
+        return "Rating de espaciamiento '89 no se alinea con el promedio esperado."
+    if "MEDIO NO EXACTO" in msg_up and "ESPACIAMIENTO" in msg_up:
+        if "'76" in msg_up: return "Puntaje de espaciamiento '76 es un valor medio no exacto."
+        return "Puntaje de espaciamiento '89 es un valor medio no exacto."
+        
+    # 7. Estructuras, Rellenos, JRC, Rugosidad, Forma, Alteración, Espesor
+    if "ESTRUCTURA GEOLÓGICA" in msg_up or "ESTRUCTURA GEOLOGICA" in msg_up or "TIPO DE ESTRUCT" in msg_up:
+        if "SUGERIDA" in msg_up or "JN" in msg_up or " 'J' " in msg_up:
+            return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
         return "Tipo de estructura geológica no permitida."
-    if "RELLENO 1" in msg_up or "RELLENO 2" in msg_up:
+    if "RELLENO" in msg_up and "CATÁLOGO" in msg_up or "RELLENO" in msg_up and "CATALOGO" in msg_up:
         return "Tipo de relleno no pertenece al catálogo."
-    if "VALOR JRC" in msg_up:
+    if "JRC" in msg_up and "RANGO" in msg_up:
         return "Valor JRC fuera de rango permitido [0, 20]."
-    if "RUGOSIDAD" in msg_up:
+    if "RUGOSIDAD" in msg_up and "LÍMITES" in msg_up or "RUGOSIDAD" in msg_up and "LIMITES" in msg_up:
         return "Clase de rugosidad de junta fuera de límites [1, 9]."
-    if "FORMA" in msg_up:
+    if "FORMA" in msg_up and "INVÁLIDA" in msg_up or "FORMA" in msg_up and "INVALIDA" in msg_up:
         return "Forma de estructura inválida. Debe ser P, C, O, E o I."
     if "ALTERACION" in msg_up or "ALTERACIÓN" in msg_up:
         return "Código de alteración inválido."
-    if "ESPESOR" in msg_up and "ABERTURA" in msg_up:
-         return "Espesor del relleno es superior a la abertura total."
-    if "ABERTURA DE LA FALLA" in msg_up:
-         return "La abertura de la falla supera la longitud de la celda."
-    if "UCS" in msg_up and "MAYOR A IS50" in msg_up:
-         return "UCS debe ser mayor a Is50."
+    if "ESPESOR" in msg_up and "SUPERIOR" in msg_up and "ABERTURA" in msg_up:
+        return "Espesor del relleno es superior a la abertura total."
+    if "ABERTURA DE LA FALLA" in msg_up or ("ABERTURA" in msg_up and "FALLA" in msg_up and "SUPERA" in msg_up):
+        return "La abertura de la falla supera la longitud de la celda."
+    if "ABERTURA" in msg_up and "10000" in msg_up:
+        return "La abertura excede el máximo sugerido de 10000mm."
+    if "PERSISTENCIA" in msg_up and "VENTANA" in msg_up:
+        return "La persistencia de discontinuidad supera el largo de ventana."
+    if "PERSISTENCIA" in msg_up and "25 METROS" in msg_up or "SUPERIOR A 25 METROS" in msg_up:
+        return "La persistencia es superior a 25 metros."
+    if "UCS" in msg_up and "IS50" in msg_up:
+        return "UCS debe ser mayor a Is50."
+    if "DIVERGENCIA" in msg_up and "UNIAXIAL" in msg_up or "UCS" in msg_up and "K" in msg_up:
+        return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
+        
+    # 8. Litologías y Consistencia
     if "COMBINACIÓN LITOLÓGICA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
          return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
-    if "UNIDAD LITOLÓGICA" in msg_up:
+    if "UNIDAD LITOLÓGICA" in msg_up or "UNIDAD LITOLOGICA" in msg_up:
          return "Unidad litológica es incongruente con la litología."
-    if "VALOR MEDIO NO EXACTO" in msg_up:
-        if "AGUA" in msg_up:
-            if "'76" in msg_up: return "El valor de agua '76 es un valor medio no exacto."
-            return "El valor de agua '89 es un valor medio no exacto."
-        if "VOLADURA" in msg_up:
-            if "'76" in msg_up: return "Puntaje de efectos de voladura '76 es un valor medio no exacto."
-            return "Puntaje de efectos de voladura '89 es un valor medio no exacto."
-        if "ESPACIAMIENTO" in msg_up:
-            if "'76" in msg_up: return "Puntaje de espaciamiento '76 es un valor medio no exacto."
-            return "Puntaje de espaciamiento '89 es un valor medio no exacto."
-    if "VALOR ALEJADO NO VÁLIDO" in msg_up or "VALOR ALEJADO NO VALIDO" in msg_up:
-        if "RQD" in msg_up:
-            if "'76" in msg_up: return "Puntaje de RQD '76 es un valor alejado no válido."
-            return "Puntaje de RQD '89 es un valor alejado no válido."
-        if "RESISTENCIA" in msg_up:
-            if "'76" in msg_up: return "Puntaje de resistencia '76 es un valor alejado no válido."
-            return "Puntaje de resistencia '89 es un valor alejado no válido."
-    if "NORMALIZAR POR 'JN'" in msg_up:
-        return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
-    if "EXCEDE EL MÁXIMO SUGERIDO" in msg_up:
-        return "La abertura excede el máximo sugerido de 10000mm."
-    if "SUPERA EL LARGO" in msg_up:
-        return "La persistencia de discontinuidad supera el largo de ventana."
-    if "SUPERIOR A 25 METROS" in msg_up or "ELEVADA" in msg_up:
-        return "La persistencia es superior a 25 metros."
-    if "DIVERGENCIA DE RESISTENCIA UNIAXIAL" in msg_up:
-        return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
     if "VACÍO" in msg_up or "VACIO" in msg_up:
         return "Campo obligatorio se encuentra vacío."
-    if "INCLINACIÓN (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
+    if "INCLINACIÓN (DIP) FUERA" in msg_up or "INCLINACION (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
         return "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados."
-    if "DIP DIRECTION" in msg_up or ("DIP DIR" in msg_up and "TALUD" not in msg_up):
+    if "DIP DIRECTION" in msg_up or "DIP DIR" in msg_up and "TALUD" not in msg_up:
         return "Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados."
     if "NÚMERO DE ESTRUCTURAS" in msg_up or "NUMERO DE ESTRUCTURAS" in msg_up:
         return "En número de estructuras solamente se permiten números enteros."
+        
+    # 9. Valores Negativos
     if "ESPESOR" in msg_up and "NEGATIVO" in msg_up:
         return "El espesor del relleno no puede ser un valor negativo."
     if "ABERTURA" in msg_up and "NEGATIVO" in msg_up:
         return "La abertura total no puede ser un valor negativo."
     if "PERSISTENCIA" in msg_up and "NEGATIVO" in msg_up or "CONTINUIDAD" in msg_up and "NEGATIVO" in msg_up:
         return "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo."
-    if "ESPACIAMIENTO DE DISCONTINUIDAD" in msg_up or ("ESPACIAMIENTO M." in msg_up and "NEGATIVO" in msg_up):
+    if "ESPACIAMIENTO" in msg_up and "NEGATIVO" in msg_up:
         return "El espaciamiento de discontinuidad no puede ser un valor negativo."
+        
     return msg_clean
 
 def get_safe_sheet_name(title, index):

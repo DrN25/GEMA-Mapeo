@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Eye, FileSpreadsheet } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Eye, FileSpreadsheet, Menu } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -80,6 +80,8 @@ export default function App() {
   const [activeWindow, setActiveWindow] = useState<WindowData | null>(null);
   const [pltEnsayos, setPltEnsayos] = useState<any[]>([]);
   const [showFormulas, setShowFormulas] = useState<boolean>(true);
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   // UI & Theme
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -695,6 +697,7 @@ export default function App() {
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         selectedWindow={activeWindow ? activeWindow.header.celda : null}
+        isCollapsed={sidebarCollapsed}
       />
 
       {/* 2. MAIN CONTAINER */}
@@ -702,6 +705,16 @@ export default function App() {
         {/* Sync Status Header */}
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
+
+            {/* BOTÓN INTERACTIVO DE COLAPSO (AÑADIR ESTE BOTÓN) */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
+              title={sidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
+            >
+              <Menu size={16} />
+            </button>
+
             {currentView !== 'dashboard' && (
               <button
                 onClick={() => setCurrentView('dashboard')}
@@ -710,19 +723,6 @@ export default function App() {
                 <ArrowLeft size={14} />
                 <span>Volver al Panel</span>
               </button>
-            )}
-
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest hidden lg:inline pr-3 border-r border-navy-800/80">
-              Mapeo de Ventanas Geomecánicas 2.0
-            </span>
-
-            {activeWindow && (
-              <div className="flex items-center gap-2 animate-fade-in pl-1">
-                <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Celda Activa:</span>
-                <span className="text-xs font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1 rounded-lg uppercase tracking-wider shadow-[0_0_10px_rgba(99,102,241,0.05)]">
-                  {activeWindow.header.celda}
-                </span>
-              </div>
             )}
           </div>
 
