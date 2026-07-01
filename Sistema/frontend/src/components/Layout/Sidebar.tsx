@@ -30,15 +30,15 @@ export default function Sidebar({
     { id: 'mapeo', label: 'Mapeo por Ventana', icon: Map, category: 'REGISTRO DE CAMPO' },
     { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' },
     { id: 'plt_ensayos', label: 'Ensayos PLT Irregulares', icon: TrendingUp, category: 'ENSAYOS' },
-    { id: 'auditoria_masiva', label: 'Auditoría de Ingesta', icon: FileSpreadsheet, category: 'AUDITORIA' }
+    { id: 'auditoria_masiva', label: 'Carga para Revision', icon: FileSpreadsheet, category: 'REVISION GENERAL' }
   ];
 
-  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'VISUALIZACIÓN', 'ENSAYOS', 'AUDITORIA'];
+  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'VISUALIZACIÓN', 'ENSAYOS', 'REVISION GENERAL'];
 
   return (
     <aside className={`glass-panel chrome-dark flex flex-col h-screen text-slate-300 select-none shadow-2xl relative z-20 transition-all duration-300 ease-in-out ${isCollapsed
-        ? 'w-0 opacity-0 border-r-0 pointer-events-none overflow-hidden'
-        : 'w-64 opacity-100 border-r border-navy-800/80'
+      ? 'w-0 opacity-0 border-r-0 pointer-events-none overflow-hidden'
+      : 'w-64 opacity-100 border-r border-navy-800/80'
       }`}>
       {/* Contenedor estático para evitar que los textos internos se amontonen o deformen durante la animación */}
       <div className="w-64 flex flex-col h-full shrink-0">

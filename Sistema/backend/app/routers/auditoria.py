@@ -24,7 +24,6 @@ uploads_dir = os.path.join(BASE_DIR, "uploads")
 MASTER_ERROR_RULES = [
     # Alertas Críticas (Física, Rangos y Catálogos obligatorios)
     {"msg": "Ángulo del talud fuera del rango [-90, 90] grados.", "severity": "ALERTA"},
-    {"msg": "Altura de la celda de estación excede el límite máximo de 30 metros.", "severity": "ALERTA"},
     {"msg": "Código de agua '76 no admitido. Debe ser C, H, M, E o F.", "severity": "ALERTA"},
     {"msg": "Código de agua '89 no admitido. Debe ser C, H, M, E o F.", "severity": "ALERTA"},
     {"msg": "Valor de agua '76 excede los límites reales de la escala [0, 10].", "severity": "ALERTA"},
@@ -61,7 +60,6 @@ MASTER_ERROR_RULES = [
     {"msg": "Combinación litológica Lito 1-2-3 inválida según el catálogo.", "severity": "ALERTA"},
     {"msg": "Unidad litológica es incongruente con la litología.", "severity": "ALERTA"},
     {"msg": "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados.", "severity": "ALERTA"},
-    {"msg": "Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados.", "severity": "ALERTA"},
     
     # Advertencias de Consistencia y Formato
     {"msg": "El valor de agua '76 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
@@ -75,9 +73,6 @@ MASTER_ERROR_RULES = [
     {"msg": "Puntaje de espaciamiento '76 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
     {"msg": "Puntaje de espaciamiento '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
     {"msg": "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'.", "severity": "ADVERTENCIA"},
-    {"msg": "La abertura excede el máximo sugerido de 10000mm.", "severity": "ADVERTENCIA"},
-    {"msg": "La persistencia de discontinuidad supera el largo de ventana.", "severity": "ADVERTENCIA"},
-    {"msg": "La persistencia es superior a 25 metros.", "severity": "ADVERTENCIA"},
     {"msg": "Divergencia de resistencia uniaxial (UCS vs Is50 * K).", "severity": "ADVERTENCIA"},
     {"msg": "En número de estructuras solamente se permiten números enteros.", "severity": "ADVERTENCIA"},
     {"msg": "Campo obligatorio se encuentra vacío.", "severity": "VACIO"},
@@ -86,6 +81,8 @@ MASTER_ERROR_RULES = [
     {"msg": "La abertura total no puede ser un valor negativo.", "severity": "ALERTA"},
     {"msg": "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo.", "severity": "ALERTA"},
     {"msg": "El espaciamiento de discontinuidad no puede ser un valor negativo.", "severity": "ALERTA"},
+    {"msg": "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
+    {"msg": "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
 ]
 
 def safe_int(val, default=0):
@@ -105,17 +102,15 @@ def simplify_message(msg):
     # 1. Ángulo del talud y Altura de celda
     if "ÁNGULO DEL TALUD" in msg_up or "ANGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
         return "Ángulo del talud fuera del rango [-90, 90] grados."
-    if "ALTURA DE LA CELDA" in msg_up or "ALTURA" in msg_up:
-        return "Altura de la celda de estación excede el límite máximo de 30 metros."
         
     # 2. Condición de Agua y Ratings de Agua
     if "CÓDIGO DE AGUA '76" in msg_up or "CODIGO DE AGUA '76" in msg_up:
         return "Código de agua '76 no admitido. Debe ser C, H, M, E o F."
     if "CÓDIGO DE AGUA '89" in msg_up or "CODIGO DE AGUA '89" in msg_up:
         return "Código de agua '89 no admitido. Debe ser C, H, M, E o F."
-    if "VALOR DE AGUA '76 EXCEDE" in msg_up:
+    if "VALOR DE AGUA '76 EXCEXE" in msg_up or "VALOR DE AGUA '76 EXCEDE" in msg_up:
         return "Valor de agua '76 excede los límites reales de la escala [0, 10]."
-    if "VALOR DE AGUA '89 EXCEDE" in msg_up:
+    if "VALOR DE AGUA '89 EXCEXE" in msg_up or "VALOR DE AGUA '89 EXCEDE" in msg_up:
         return "Valor de agua '89 excede los límites reales de la escala [0, 15]."
     if "RATING DE AGUA" in msg_up and "INCONGRUENTE" in msg_up:
         if "'76" in msg_up:
@@ -156,7 +151,7 @@ def simplify_message(msg):
             return "Puntaje de efectos de voladura '76 es un valor medio no exacto."
         return "Puntaje de efectos de voladura '89 es un valor medio no exacto."
         
-    # 5. RQD Ratings y Porcentajes (La regla de porcentaje precede para evitar solapes)
+    # 5. RQD Ratings y Porcentajes
     if "PORCENTAJE" in msg_up and "RQD" in msg_up:
         if "'76" in msg_up: return "Porcentaje de RQD '76 no puede ser superior al 100%."
         return "Porcentaje de RQD '89 no puede ser superior al 100%."
@@ -165,8 +160,14 @@ def simplify_message(msg):
         return "Puntaje de RQD '89 es un valor alejado no válido."
 
     # 6. Espaciamiento Promedio y Ratings de Espaciamiento
-    if "ESPACIAMIENTO PROMEDIO" in msg_up and "POSITIVO" in msg_up:
-        if "'76" in msg_up: return "El espaciamiento promedio '76 debe ser positivo."
+    if "0.0 M" in msg_up or "DEBE SER MAYOR A CERO" in msg_up:
+        if "'76" in msg_up: 
+            return "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero)."
+        return "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero)."
+
+    if "ESPACIAMIENTO PROMEDIO" in msg_up and ("POSITIVO" in msg_up or "NEGATIVO" in msg_up):
+        if "'76" in msg_up: 
+            return "El espaciamiento promedio '76 debe ser positivo."
         return "El espaciamiento promedio '89 debe ser positivo."
     if "ESPACIAMIENTO" in msg_up and "RANGO" in msg_up:
         if "'76" in msg_up: return "Valor de rating de espaciamiento '76 fuera del rango [5, 30]."
@@ -178,11 +179,12 @@ def simplify_message(msg):
         if "'76" in msg_up: return "Puntaje de espaciamiento '76 es un valor medio no exacto."
         return "Puntaje de espaciamiento '89 es un valor medio no exacto."
         
-    # 7. Estructuras, Rellenos, JRC, Rugosidad, Forma, Alteración, Espesor
-    if "ESTRUCTURA GEOLÓGICA" in msg_up or "ESTRUCTURA GEOLOGICA" in msg_up or "TIPO DE ESTRUCT" in msg_up:
-        if "SUGERIDA" in msg_up or "JN" in msg_up or " 'J' " in msg_up:
-            return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
+    # 7. Estructuras, Rellenos, JRC, Rugosidad, Forma, Alteración, Espesor (CON PATRONES DE DETECCIÓN EXACTOS PARA EVITAR TRASLAPOS)
+    if "SUGERIDA A NORMALIZAR POR 'JN'" in msg_up or "NORMALIZAR POR 'JN'" in msg_up:
+        return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
+    if "TIPO DE ESTRUCTURA GEOLÓGICA NO PERMITIDA" in msg_up or "TIPO DE ESTRUCTURA GEOLOGICA NO PERMITIDA" in msg_up:
         return "Tipo de estructura geológica no permitida."
+        
     if "RELLENO" in msg_up and "CATÁLOGO" in msg_up or "RELLENO" in msg_up and "CATALOGO" in msg_up:
         return "Tipo de relleno no pertenece al catálogo."
     if "JRC" in msg_up and "RANGO" in msg_up:
@@ -197,10 +199,6 @@ def simplify_message(msg):
         return "Espesor del relleno es superior a la abertura total."
     if "ABERTURA DE LA FALLA" in msg_up or ("ABERTURA" in msg_up and "FALLA" in msg_up and "SUPERA" in msg_up):
         return "La abertura de la falla supera la longitud de la celda."
-    if "ABERTURA" in msg_up and "10000" in msg_up:
-        return "La abertura excede el máximo sugerido de 10000mm."
-    if "PERSISTENCIA" in msg_up and "VENTANA" in msg_up:
-        return "La persistencia de discontinuidad supera el largo de ventana."
     if "PERSISTENCIA" in msg_up and "25 METROS" in msg_up or "SUPERIOR A 25 METROS" in msg_up:
         return "La persistencia es superior a 25 metros."
     if "UCS" in msg_up and "IS50" in msg_up:
@@ -217,8 +215,6 @@ def simplify_message(msg):
         return "Campo obligatorio se encuentra vacío."
     if "INCLINACIÓN (DIP) FUERA" in msg_up or "INCLINACION (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
         return "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados."
-    if "DIP DIRECTION" in msg_up or "DIP DIR" in msg_up and "TALUD" not in msg_up:
-        return "Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados."
     if "NÚMERO DE ESTRUCTURAS" in msg_up or "NUMERO DE ESTRUCTURAS" in msg_up:
         return "En número de estructuras solamente se permiten números enteros."
         
@@ -240,7 +236,6 @@ def get_safe_sheet_name(title, index):
     max_title_len = 31 - len(suffix)
     return f"{clean_title[:max_title_len].strip()}{suffix}"
 
-# --- HELPER SEGURO DE REEMPLAZO DE ARCHIVOS EN WINDOWS ---
 def safe_replace(src: str, dst: str, retries: int = 5, delay: float = 0.2):
     for i in range(retries):
         try:
@@ -257,7 +252,6 @@ def safe_replace(src: str, dst: str, retries: int = 5, delay: float = 0.2):
                     raise e
             time.sleep(delay)
 
-# --- GENERADOR CORE DE ALTO RENDIMIENTO EXTREMO ---
 def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     font_title = Font(name="Segoe UI", size=16, bold=True, color="1B365D")
     font_subtitle = Font(name="Segoe UI", size=10, italic=True, color="555555")
@@ -299,7 +293,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     wb = openpyxl.Workbook()
     
-    # Reutilización optimizada de KPI Cards
     def write_kpi_card_opt(ws, start_row, start_col, label, value, bg_fill, val_font):
         c1 = ws.cell(row=start_row, column=start_col, value=label)
         c1.font = font_kpi_lbl
@@ -334,7 +327,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
     pct_integridad = (total_correctos / max(1, total_fields)) * 100
 
-    # KPI Cards
     write_kpi_card_opt(ws_dash, 5, 2, "ESTACIONES EVALUADAS", len(compact.get("resumen_por_celda_padre", {})), fill_kpi_gray, font_kpi_val_blue)
     write_kpi_card_opt(ws_dash, 5, 4, "ESTRUCTURAS REGISTRADAS", total_filas, fill_kpi_gray, font_kpi_val_blue)
     write_kpi_card_opt(ws_dash, 5, 6, "INTEGRIDAD GLOBAL", f"{pct_integridad:.2f}%", fill_accent_green, font_kpi_val_green)
@@ -586,7 +578,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_detail.views.sheetView[0].showGridLines = True
     
     ws_detail.cell(row=2, column=2, value="DETALLE COMPLETO DE INCIDENCIAS").font = font_title
-    ws_detail.cell(row=3, column=2, value="Listado plano consolidado de todas las desviaciones y vacíos detectados. Use los filtros de Excel en las cabeceras para segmentar.").font = font_subtitle
+    ws_detail.cell(row=3, column=2, value="Listado plano consolidado de todas las desviaciones y vacíos detectados. Muestra las variables geomecánicas precisas que intervinieron en la inconsistencia.").font = font_subtitle
     
     headers_detail = [
         "Fila Excel", "Gravedad", "Estación Padre", "Estructura Hija", "Campaña", 
@@ -618,7 +610,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             inc_item.get("sector_geotecnico"),
             inc_item.get("columna"),
             inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-            simplify_message(inc_item.get("mensaje"))
+            inc_item.get("mensaje")  # <--- CORREGIDO: Muestra el mensaje detallado con las variables en vez del simplificado
         ]
         ws_detail.append(row_data)
         
@@ -783,7 +775,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 inc_item.get("sector_geotecnico"),
                 inc_item.get("columna"),
                 inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-                inc_item.get("mensaje")
+                inc_item.get("mensaje")  # <--- CORREGIDO: Muestra el mensaje detallado con todas las variables involucradas
             ]
             ws_err.append(row_data)
             
@@ -987,7 +979,6 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
     col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
     compact["top_column_errors"] = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
     
-    # Escritura segura de JSONs (Tmp + Replace)
     compact_json_tmp = compact_json_out + ".tmp"
     with open(compact_json_tmp, "w", encoding="utf-8") as f:
         json.dump(compact, f, ensure_ascii=False)
@@ -1003,7 +994,6 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
     shutil.copyfile(compact_json_out, public_compact_tmp)
     safe_replace(public_compact_tmp, public_compact)
 
-    # PRE-GENERACIÓN COMPLETA EN DISCO
     try:
         print(f"[*] Iniciando pre-generación asíncrona de reporte de Excel para {audit_id}...")
         wb = generar_excel_reporte_core(diag, compact, list(incidencias))
@@ -1012,7 +1002,6 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
         wb.save(excel_tmp)
         safe_replace(excel_tmp, excel_pregenerated_out)
         
-        # Sincronizar también con la copia pública
         public_excel = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
         public_excel_tmp = public_excel + ".tmp"
         shutil.copyfile(excel_pregenerated_out, public_excel_tmp)
@@ -1292,13 +1281,11 @@ def obtener_incidencias_paginadas(
     start_idx = (page - 1) * limit
     return {"page": page, "limit": limit, "total_records": total_records, "total_pages": math.ceil(total_records / limit), "data": filtered[start_idx:start_idx+limit]}
 
-# --- CONTROLADOR CENTRAL DE EXPORTACIÓN CON AUTOGUARDADO EN CACHÉ ---
 @router.get("/geomecanica/reporte-excel")
 def descargar_reporte_excel(
     tipo: str = None, celda: str = None, columna: str = None, campania: str = None,
     geotecnico: str = None, sector_geotecnico: str = None, search: str = None, audit_id: str = None
 ):
-    # Desinfectar y validar de forma estricta los filtros enviados
     filtered_vals = []
     for val in [tipo, celda, columna, campania, geotecnico, sector_geotecnico, search]:
         if val is not None:
@@ -1309,13 +1296,11 @@ def descargar_reporte_excel(
     is_filtered = len(filtered_vals) > 0
     filename = f"reporte_auditoria_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
-    # 1. EVALUAR RUTA DEL CACHÉ EN DISCO
     if audit_id:
         pregenerated_file = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_completo.xlsx")
     else:
         pregenerated_file = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
 
-    # 2. SI NO HAY FILTROS ACTIVOS Y EL REPORTE YA EXISTE COMPLETO, DEVOLVER AL INSTANTE (0.01s)
     if not is_filtered and os.path.exists(pregenerated_file):
         return FileResponse(
             pregenerated_file,
@@ -1323,7 +1308,6 @@ def descargar_reporte_excel(
             filename=filename
         )
 
-    # 3. SI NO EXISTE EN CACHÉ (Caso de auditorías históricas), COMPILAR DE FORMA ACELERADA EN VIVO
     if audit_id:
         raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
         compact_file = os.path.join(uploads_dir, "history", f"{audit_id}_compact.json")
@@ -1350,7 +1334,6 @@ def descargar_reporte_excel(
         
     incidencias = diag.get("incidencias", [])
     
-    # Procesar filtrados en vivo
     filtered = incidencias
     if tipo: filtered = [i for i in filtered if i.get("tipo_incidencia") == tipo.upper()]
     if celda:
@@ -1378,17 +1361,14 @@ def descargar_reporte_excel(
             or search_lower in i.get("celda_padre", "").lower()
         ]
 
-    # Generación acelerada utilizando el método 'append' nativo
     wb = generar_excel_reporte_core(diag, compact, filtered)
     
-    # 4. GUARDAR EN DISCO MEDIANTE PROTOCOLO ATÓMICO (Cachear para la próxima descarga de esta auditoría)
     if not is_filtered:
         os.makedirs(os.path.dirname(pregenerated_file), exist_ok=True)
         excel_tmp = pregenerated_file + ".tmp"
         wb.save(excel_tmp)
         safe_replace(excel_tmp, pregenerated_file)
         
-        # Sincronizar reporte estático general
         if not audit_id:
             public_excel = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
             public_excel_tmp = public_excel + ".tmp"
@@ -1401,7 +1381,6 @@ def descargar_reporte_excel(
             filename=filename
         )
 
-    # 5. RETORNO EN TIEMPO REAL DE FILTRADO DINÁMICO (Veloce por set de datos acotado)
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)

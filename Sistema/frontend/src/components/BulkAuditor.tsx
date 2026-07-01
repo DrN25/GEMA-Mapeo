@@ -360,7 +360,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-4 print:hidden">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
                     <Folder size={14} className="text-indigo-400" />
-                    <span>Historial de Importaciones Geotécnicas Auditadas</span>
+                    <span>Historial de Importaciones Geotécnicas Revisadas</span>
                 </h3>
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                     {history.map((audit) => {
@@ -950,11 +950,11 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     {/* TABLAS COMPARATIVAS DE DISTRIBUCIÓN POR CATEGORÍAS - CON ALTURA LIMITADA Y SCROLL */}
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-                        {/* DISTRIBUCIÓN POR CAMPAÑA DE LOGUEO */}
+                        {/* DISTRIBUCIÓN POR CAMPAÑA DE MAPEO */}
                         <div className="rounded-xl border border-slate-800/80 bg-[#090f1d]/50 backdrop-blur-md p-5 space-y-4 print:border-black">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 border-b border-slate-800/50 pb-2 flex items-center gap-2">
                                 <Calendar size={14} className="text-indigo-400" />
-                                <span>Distribución por Campaña de Logueo (Año)</span>
+                                <span>Distribución por Campaña de Mapeo (Año)</span>
                             </h3>
                             <div className="rounded-xl border border-slate-800/80 overflow-hidden">
                                 <div className="max-h-56 overflow-y-auto bg-[#02040a] scrollbar-thin scrollbar-thumb-slate-800">
