@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Eye, FileSpreadsheet, Menu } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -14,7 +14,9 @@ import ExcelImportModal from './components/ExcelImportModal';
 import CatalogsView from './components/CatalogsView';
 import CommentsPhotos from './components/CommentsPhotos';
 import PltEnsayosView from './components/PltEnsayosView';
-import BulkAuditor from './components/BulkAuditor';
+
+// --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
+import BulkAuditor from './features/auditor/BulkAuditor';
 
 import {
   calculateWindowGeomec,
@@ -115,7 +117,7 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // 1.5. Evitar de forma global que el scroll del mouse modifique los valores de inputs numéricos y desplegables sin bloquear el scroll de la página
+  // Evitar de forma global que el scroll del mouse modifique los valores de inputs numéricos y desplegables
   useEffect(() => {
     const handleGlobalWheel = (e: WheelEvent) => {
       const activeEl = document.activeElement;
@@ -154,11 +156,10 @@ export default function App() {
     }
   }, [activeWindow]);
 
-  // 3.5. Reevaluación en cascada de distancias (m) al largo máximo de la celda
+  // Reevaluación en cascada de distancias (m) al largo máximo de la celda
   useEffect(() => {
     if (!activeWindow) return;
 
-    // Determinamos el largo de referencia más confiable
     let maxLargo = 0;
     if (calculated && calculated.largo > 0) {
       maxLargo = calculated.largo;
@@ -192,7 +193,7 @@ export default function App() {
     }
   }, [activeWindow?.header, calculated?.largo]);
 
-  // 4. Synchronize photo loading from localStorage when the active window celda changes
+  // Synchronize photo loading from localStorage when the active window celda changes
   useEffect(() => {
     if (activeWindow?.header.celda) {
       fetch(`${API_BASE}/api/ventanas/${activeWindow.header.celda}/fotos`)
@@ -251,7 +252,7 @@ export default function App() {
         throw new Error();
       }
     } catch (e) {
-      console.warn("Backend offline, loading from local cache.");
+      console.warn("Backend offline, loading from local cache.", e);
       setSyncStatus('offline');
       setSyncMessage("Servidor backend desconectado. Operando en modo local temporal.");
       const cached = localStorage.getItem('geolog_windows_summaries');
@@ -269,7 +270,7 @@ export default function App() {
         setPltEnsayos(data);
       }
     } catch (e) {
-      console.warn("Failed to fetch PLT trials from database, checking localStorage.");
+      console.warn("Failed to fetch PLT trials from database, checking localStorage.", e);
       const cached = localStorage.getItem('plt_ensayos_v2');
       if (cached) {
         try {
@@ -303,19 +304,17 @@ export default function App() {
 
         const header: WindowHeader = {
           celda: v.codigo,
-          este_from: roundDec(v.este_ini, 4),   // <- 4 decimales
-          norte_from: roundDec(v.norte_ini, 3), // ... 3 decimales
+          este_from: roundDec(v.este_ini, 4),
+          norte_from: roundDec(v.norte_ini, 3),
           cota_from: roundDec(v.cota_ini, 2),
-          este_to: roundDec(v.este_fin, 4),     // <- 4 decimales
-          norte_to: roundDec(v.norte_fin, 3),   // ... 3 decimales
+          este_to: roundDec(v.este_fin, 4),
+          norte_to: roundDec(v.norte_fin, 3),
           cota_to: roundDec(v.cota_fin, 2),
           altura: roundDec(v.altura_m, 1) || 15.0,
           dip_talud: roundDec(v.dip_talud, 2) || 64.0,
-
           dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
           dip_hw: v.dip_hw !== null && v.dip_hw !== undefined ? roundDec(v.dip_hw, 2) : undefined,
           az_hw: v.az_hw !== null && v.az_hw !== undefined ? roundDec(v.az_hw, 2) : undefined,
-
           unidad_litologica: v.unidad_litologica || '',
           lito_1: v.lito_1 || '',
           lito_2: v.lito_2 || '',
@@ -362,25 +361,21 @@ export default function App() {
           return {
             id: idx + 1,
             familia: d.fam || d.familia_id || 1,
-            distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1, // Entero positivo
+            distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1,
             tipo_estructura: d.tipo || d.tipo_estructura || 'JN',
             dip: dip_val !== -1 ? roundDec(dip_val, 2) : -1,
             dip_dir: dip_dir_val !== -1 ? roundDec(dip_dir_val, 2) : -1,
-
-            // Cant (n): Solo enteros positivos o -1
             n_estructuras: nstr !== -1 ? (Math.round(nstr) > 0 ? Math.round(nstr) : -1) : -1,
-
-            abertura: aber !== -1 ? roundDec(aber, 1) : -1, // 1 decimal
-            espesor: esp !== -1 ? roundDec(esp, 1) : -1,   // 1 decimal
+            abertura: aber !== -1 ? roundDec(aber, 1) : -1,
+            espesor: esp !== -1 ? roundDec(esp, 1) : -1,
             continuidad: cont !== -1 ? roundDec(cont, 2) : -1,
-            espaciamiento: espac !== -1 ? roundDec(espac, 2) : -1, // 2 decimales
-
-            extremos_visibles: Math.min(2, Math.max(0, ext_val)), // 0 a 2 (removido 3)
-            terminacion: Math.min(3, Math.max(0, term_val)),     // 0 a 3 (removido 4 y 5)
+            espaciamiento: espac !== -1 ? roundDec(espac, 2) : -1,
+            extremos_visibles: Math.min(2, Math.max(0, ext_val)),
+            terminacion: Math.min(3, Math.max(0, term_val)),
             relleno1: r1_val === '-1' ? 'cwf' : r1_val,
             relleno2: r2_val === '-1' ? undefined : r2_val,
             jrc: d.jrc !== null && d.jrc !== undefined ? Math.min(20, Math.max(0, d.jrc)) : -1,
-            rugosidad: rug_val !== -1 ? Math.min(9, Math.max(0, rug_val)) : -1, // Rango 0-9
+            rugosidad: rug_val !== -1 ? Math.min(9, Math.max(0, rug_val)) : -1,
             forma: d.forma || d.forma_estructura || 'O',
             alteracion: d.alt || d.alteracion_codigo || 'd'
           };
@@ -394,7 +389,7 @@ export default function App() {
         throw new Error();
       }
     } catch (e) {
-      console.warn("Loading cached local window: ", name);
+      console.warn("Loading cached local window: ", name, e);
       const cached = localStorage.getItem(`geolog_window_${name}`);
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -418,11 +413,9 @@ export default function App() {
         cota_to: newWindow.cota_to,
         altura: newWindow.altura,
         dip_talud: newWindow.dip_talud,
-
         dipdir_talud: newWindow.dipdir_talud,
         dip_hw: newWindow.dip_hw,
         az_hw: newWindow.az_hw,
-
         unidad_litologica: newWindow.lito_model || '',
         lito_1: newWindow.lito_model || '',
         lito_2: '',
@@ -469,7 +462,7 @@ export default function App() {
         throw new Error();
       }
     } catch (e) {
-      console.warn("Failed to delete from DB, deleting locally.");
+      console.warn("Failed to delete from DB, deleting locally.", e);
       const updated = windows.filter(w => w.name !== name);
       setWindows(updated);
       localStorage.setItem('geolog_windows_summaries', JSON.stringify(updated));
@@ -622,7 +615,7 @@ export default function App() {
         throw new Error();
       }
     } catch (e) {
-      console.warn("Save database failed, saving locally in cache.");
+      console.warn("Save database failed, saving locally in cache.", e);
       localStorage.setItem(`geolog_window_${activeWindow.header.celda}`, JSON.stringify(activeWindow));
       localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
 
@@ -663,7 +656,7 @@ export default function App() {
         throw new Error();
       }
     } catch (e) {
-      console.warn("Save PLT failed, saving locally.");
+      console.warn("Save PLT failed, saving locally.", e);
       localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
       setSyncStatus('offline');
       setSyncMessage("No se pudo conectar al servidor. Ensayos PLT guardados localmente.");
@@ -706,7 +699,7 @@ export default function App() {
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
 
-            {/* BOTÓN INTERACTIVO DE COLAPSO (AÑADIR ESTE BOTÓN) */}
+            {/* BOTÓN INTERACTIVO DE COLAPSO */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
@@ -766,7 +759,6 @@ export default function App() {
                 <span>Catálogos</span>
               </button>
 
-              {/* NUEVO BOTÓN DE EXPORTACIÓN EXCEL */}
               {activeWindow && (
                 <button
                   onClick={handleExportExcel}
@@ -848,7 +840,7 @@ export default function App() {
                 showFormulas={showFormulas} // Nueva Prop
               />
 
-              {/* 📊 CENTRO DE MÉTRICAS GEOMECÁNICAS (KPIs) ALINEADOS Y DISEÑADOS SEGÚN LA MAQUETA */}
+              {/* CENTRO DE MÉTRICAS GEOMECÁNICA */}
               {(() => {
                 const getFamilyStyle = (fam: number) => {
                   const styles: Record<number, { dot: string; container: string; badge: string }> = {
@@ -986,8 +978,7 @@ export default function App() {
                 );
               })()}
 
-
-              {/* 💬 Comentarios y Fotografías Colapsable (Sincronizado con tono naranja geológico) */}
+              {/* Comentarios y Fotografías Colapsable */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between bg-navy-950/45 p-4 rounded-xl border border-navy-800/80">
                   <div className="flex items-center gap-2.5">
@@ -1032,7 +1023,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* 📊 ANÁLISIS GEOMECÁNICO RMR SIEMPRE EXPANDIDO */}
+              {/* ANÁLISIS GEOMECÁNICO RMR SIEMPRE EXPANDIDO */}
               <RmrAnalysis
                 header={activeWindow.header}
                 onChange={(header) => setActiveWindow({ ...activeWindow, header })}
@@ -1068,7 +1059,7 @@ export default function App() {
 
         </main>
 
-        {/* 3. QA/QC VALIDATION PANEL (Bottom-Right Floating) */}
+        {/* 3. QA/QC VALIDATION PANEL */}
         {activeWindow && alerts.length > 0 && (
           <div className="absolute bottom-6 right-6 z-50">
             <ValidationPanel

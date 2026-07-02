@@ -46,9 +46,14 @@ def clean_and_rename_columns(df):
 def get_row_val(row_dict, key):
     if key in row_dict:
         return row_dict[key]
-    key_norm = "".join(key.split()).replace(".", "").upper()
+    
+    # Normalización ultra-robusta de caracteres especiales y espaciado
+    def clean_k(s):
+        return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
+    
+    target_norm = clean_k(key)
     for k, v in row_dict.items():
-        if "".join(str(k).split()).replace(".", "").upper() == key_norm:
+        if clean_k(k) == target_norm:
             return v
     return None
 
@@ -59,7 +64,7 @@ def sanitize_value(val, target_type):
     val_str = str(val).strip()
     val_upper = val_str.upper()
     
-    if val_str == '' or val_upper in ['-1', '-1.0', 'N/A', 'NONE', 'NAN']:
+    if val_str == '' or val_upper in ['-1', '-1.0', 'N/A', 'NONE', 'NAN', 'NULL']:
         return None
         
     if target_type == str:
@@ -78,32 +83,37 @@ def is_within_tolerance(val, targets, tolerance):
     if val is None: return False
     return any(abs(val - t) <= tolerance for t in targets)
 
-def match_lito_column(catalog_val, input_val):
+def match_lito_column(catalog_val, input_val) -> bool:
     c_val = str(catalog_val or '').strip().upper()
     i_val = str(input_val or '').strip().upper()
-    if c_val == '-' or c_val == '':
-        return i_val in ['', '-', 'N/A', 'NONE']
     
-    # Maneja opciones múltiples separadas por '/' (ej. 'MBX / varios' o 'Intrusivo')
+    # Excepción del Guion (-): Si el catálogo contiene '-' o está vacío, 
+    # se permite que el valor quede vacío, o acepta cualquier otra litología sin restricción.
+    if c_val == '-' or c_val == '':
+        return True
+        
     options = [opt.strip() for opt in c_val.split('/')]
     for opt in options:
+        # Excepción Varios: Acepta cualquier tipo de litología, con la única condición de que no esté vacío.
         if opt == 'VARIOS' or opt == 'CUALQUIERA':
-            return True
+            return i_val not in ['', '-', 'N/A', 'NONE']
+            
+        # Excepción Intrusivo: Acepta cualquier código que pertenezca al tipo o clase Intrusivo
         if opt == 'INTRUSIVO' and i_val in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]:
             return True
+            
         if opt == i_val:
             return True
+            
     return False
 
 def normalize_geological_group(group_str):
     if not group_str:
         return ""
     
-    # Sanitiza el texto de entrada removiendo acentos y convirtiendo a mayúsculas
     val = str(group_str).strip().upper()
     val = val.replace("Á", "A").replace("É", "E").replace("Í", "I").replace("Ó", "O").replace("Ú", "U")
     
-    # Clasificación por similitud semántica geológica
     if "SEDIMENT" in val:
         return "SEDIMENTARIOS"
     if "METAMORF" in val:
@@ -196,35 +206,37 @@ def validate_geomechanical_properties(row_dict, registrar_error):
 
     # 4. Control Estructural [1, 5]
     ctrl_76 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL  '76"), int)
-    if ctrl_76 is not None and ctrl_76 not in CONTROL_ESTRUCTURAL_CATALOG:
-        registrar_error("CONTROL ESTRUCTURAL  '76", ctrl_76, "ALERTA", f"Control estructural '76 fuera de límites permitidos [1, 5]. Valor ingresado: {ctrl_76}.")
+    if ctrl_76 is not None and ctrl_76 != 0:
+        if ctrl_76 not in CONTROL_ESTRUCTURAL_CATALOG:
+            registrar_error("CONTROL ESTRUCTURAL  '76", ctrl_76, "ALERTA", f"Control estructural '76 fuera de límites permitidos [1, 5]. Valor ingresado: {ctrl_76}.")
     ctrl_89 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL '89"), int)
-    if ctrl_89 is not None and ctrl_89 not in CONTROL_ESTRUCTURAL_CATALOG:
-        registrar_error("CONTROL ESTRUCTURAL '89", ctrl_89, "ALERTA", f"Control estructural '89 fuera de límites permitidos [1, 5]. Valor ingresado: {ctrl_89}.")
+    if ctrl_89 is not None and ctrl_89 != 0:
+        if ctrl_89 not in CONTROL_ESTRUCTURAL_CATALOG:
+            registrar_error("CONTROL ESTRUCTURAL '89", ctrl_89, "ALERTA", f"Control estructural '89 fuera de límites permitidos [1, 5]. Valor ingresado: {ctrl_89}.")
 
-    # 5. Efectos de Voladura [1, 6]
+    # 5. Efectos de Voladura [1, 6] (Se excluye el valor 0 que representa un campo vacío/no mapeado)
     vol_76 = sanitize_value(get_row_val(row_dict, "EFECTOS DE VOLADURA  '76"), int)
-    if vol_76 is not None:
+    if vol_76 is not None and vol_76 != 0:
         if not (1 <= vol_76 <= 6):
             registrar_error("EFECTOS DE VOLADURA  '76", vol_76, "ALERTA", f"Efecto de voladura '76 excede los límites de la escala [1, 6]. Valor ingresado: {vol_76}.")
         elif vol_76 not in EFECTOS_VOLADURA_CATALOG:
             registrar_error("EFECTOS DE VOLADURA  '76", vol_76, "ADVERTENCIA", f"Puntaje de efectos de voladura '76 es un valor medio no exacto. Valor ingresado: {vol_76}. Se sugieren los valores estándar de catálogo: {EFECTOS_VOLADURA_CATALOG}.")
 
     vol_89 = sanitize_value(get_row_val(row_dict, "EFECTOS DE VOLADURA '89"), int)
-    if vol_89 is not None:
+    if vol_89 is not None and vol_89 != 0:
         if not (1 <= vol_89 <= 6):
             registrar_error("EFECTOS DE VOLADURA '89", vol_89, "ALERTA", f"Efecto de voladura '89 excede los límites de la escala [1, 6]. Valor ingresado: {vol_89}.")
         elif vol_89 not in EFECTOS_VOLADURA_CATALOG:
             registrar_error("EFECTOS DE VOLADURA '89", vol_89, "ADVERTENCIA", f"Puntaje de efectos de voladura '89 es un valor medio no exacto. Valor ingresado: {vol_89}. Se sugieren los valores estándar de catálogo: {EFECTOS_VOLADURA_CATALOG}.")
 
-    # 6. RQD Ratings por umbral discreto (Tolerancia ±1.5)
+    # 6. RQD Ratings por umbral discreto (Tolerancia ±1.5) (Se excluye el valor 0.0 que representa un campo vacío/no mapeado)
     rqd_val_76 = sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float)
-    if rqd_val_76 is not None:
+    if rqd_val_76 is not None and rqd_val_76 != 0.0:
         if not is_within_tolerance(rqd_val_76, [3, 8, 13, 17, 20], 1.5):
             registrar_error("RQD - VALOR  '76", rqd_val_76, "ADVERTENCIA", f"Puntaje de RQD '76 es un valor alejado no válido. Valor ingresado: {rqd_val_76}. Valores de catálogo esperados: [3, 8, 13, 17, 20].")
 
     rqd_val_89 = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
-    if rqd_val_89 is not None:
+    if rqd_val_89 is not None and rqd_val_89 != 0.0:
         if not is_within_tolerance(rqd_val_89, [3, 8, 13, 17, 20], 1.5):
             registrar_error("RQD - VALOR '89", rqd_val_89, "ADVERTENCIA", f"Puntaje de RQD '89 es un valor alejado no válido. Valor ingresado: {rqd_val_89}. Valores de catálogo esperados: [3, 8, 13, 17, 20].")
 
@@ -246,7 +258,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         elif espac_prom_76 == 0:
             registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ALERTA", f"Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).")
 
-    if espac_val_76 is not None:
+    if espac_val_76 is not None and espac_val_76 != 0:
         if not (5.0 <= espac_val_76 <= 30.0):
             registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ALERTA", f"Valor de rating de espaciamiento '76 fuera del rango [5, 30]. Valor ingresado: {espac_val_76}.")
         elif espac_val_76 % 1 == 0:  # Validar límites discretos tradicionales de catálogo únicamente si no tiene decimales
@@ -271,7 +283,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         elif espac_prom_89 == 0:
             registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ALERTA", f"Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).")
 
-    if espac_val_89 is not None:
+    if espac_val_89 is not None and espac_val_89 != 0:
         if not (5.0 <= espac_val_89 <= 20.0):
             registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ALERTA", f"Valor de rating de espaciamiento '89 fuera del rango [5, 20]. Valor ingresado: {espac_val_89}.")
         elif espac_val_89 % 1 == 0:  # Validar límites discretos tradicionales de catálogo únicamente si no tiene decimales
@@ -372,8 +384,6 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
     if cont_junta is not None:
         if cont_junta < 0:
             registrar_error("CONTINUIDAD m.", cont_junta, "ALERTA", f"La persistencia de discontinuidad (continuidad) no puede ser un valor negativo. Valor ingresado: {cont_junta} m.")
-        if cont_junta > 25.0:
-            registrar_error("CONTINUIDAD m.", cont_junta, "ADVERTENCIA", f"La persistencia es superior a 25 metros. Valor ingresado: {cont_junta} m.")
 
     # 10. Espaciamiento de discontinuidad estructural
     espac_struct = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO m."), float)
@@ -401,36 +411,66 @@ def validate_lithology_correlation(row_dict, registrar_error):
     l3 = sanitize_value(get_row_val(row_dict, "Lito 3"), str)
     u_lito = sanitize_value(get_row_val(row_dict, "Unidad Litologica"), str)
     
+    l1_clean = l1.strip().upper() if l1 else ""
+    l2_clean = l2.strip().upper() if l2 else ""
+    l3_clean = l3.strip().upper() if l3 else ""
+    group_input_norm = normalize_geological_group(u_lito) if u_lito else ""
+    
+    # --- BÚSQUEDA ROBUSTA DE LITOLOGÍA (CON FALLBACKS EN FILAS INCOMPLETAS) ---
     matched_row = None
-    if all(v is not None for v in [l1, l2, l3, u_lito]):
-        l1_clean = l1.strip().upper()
-        l2_clean = l2.strip().upper()
-        l3_clean = l3.strip().upper() if l3 else ""
-        
-        # Normalización robusta para evitar errores por variaciones de ingreso de texto ('Sedimentaria', 'Roca metamórfica', etc.)
-        group_input_norm = normalize_geological_group(u_lito)
-
-        # --- REGLA LITOLÓGICA DE ENDOSKARN MEJORADA ---
-        if group_input_norm == "ENDOSKARN":
-            intrusivos_l1 = ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]
-            l1_ok = l1_clean in intrusivos_l1
-            l2_ok = l2_clean in ["EPG", "EGT"]
-            l3_ok = True
+    
+    # Caso especial: Endoskarn
+    if group_input_norm == "ENDOSKARN" or l2_clean in ["EPG", "EGT"]:
+        intrusivos_l1 = ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]
+        if l1_clean in intrusivos_l1 or not l1_clean:
+            matched_row = {"grupo": "ENDOSKARN", "lito1": l1_clean or "INTRUSIVO", "lito2": l2_clean, "lito3": l3_clean, "k": 9.87}
             
-            if l1_ok and l2_ok:
-                matched_row = {"grupo": "ENDOSKARN", "lito1": l1_clean, "lito2": l2_clean, "lito3": l3_clean, "k": 9.87}
-        else:
+    if not matched_row and l1_clean:
+        # Intento 1: Coincidencia exacta con lo disponible (Lito 1, 2 y 3)
+        for row in LITHOLOGY_CLASSIFICATION:
+            l1_ok = match_lito_column(row["lito1"], l1_clean)
+            l2_ok = match_lito_column(row["lito2"], l2_clean)
+            l3_ok = match_lito_column(row["lito3"], l3_clean)
+            if l1_ok and l2_ok and l3_ok:
+                matched_row = row
+                break
+                
+        # Intento 2: Coincidencia por Lito 3 únicamente (si la celda l3 está poblada)
+        if not matched_row and l3_clean:
             for row in LITHOLOGY_CLASSIFICATION:
-                l1_ok = match_lito_column(row["lito1"], l1_clean)
-                l2_ok = match_lito_column(row["lito2"], l2_clean)
-                l3_ok = match_lito_column(row["lito3"], l3_clean)
-                if l1_ok and l2_ok and l3_ok:
+                if match_lito_column(row["lito3"], l3_clean):
                     matched_row = row
                     break
-                
+                    
+        # Intento 3: Coincidencia por Lito 1 y Lito 2 (si la celda l2 está poblada)
+        if not matched_row and l2_clean:
+            for row in LITHOLOGY_CLASSIFICATION:
+                if match_lito_column(row["lito1"], l1_clean) and match_lito_column(row["lito2"], l2_clean):
+                    matched_row = row
+                    break
+                    
+        # Intento 4: Coincidencia por Lito 1 únicamente (Fallback grueso para celdas con lito2/lito3 vacías)
         if not matched_row:
+            for row in LITHOLOGY_CLASSIFICATION:
+                if match_lito_column(row["lito1"], l1_clean):
+                    matched_row = row
+                    break
+
+    # --- VERIFICACIÓN RIGUROSA DE LA COMBINACIÓN ---
+    is_valid_combination = False
+    if matched_row is not None:
+        # Validar que la fila resultante del catálogo no contradiga ningún valor que el geólogo sí haya completado
+        l1_ok = match_lito_column(matched_row["lito1"], l1_clean) if l1_clean else True
+        l2_ok = match_lito_column(matched_row["lito2"], l2_clean) if l2_clean else True
+        l3_ok = match_lito_column(matched_row["lito3"], l3_clean) if l3_clean else True
+        if l1_ok and l2_ok and l3_ok:
+            is_valid_combination = True
+
+    # Emitir alertas litológicas correspondientes
+    if l1_clean or l2_clean or l3_clean:
+        if not is_valid_combination:
             registrar_error("Lito 1", l1, "ALERTA", f"Combinación litológica Lito 1-2-3 inválida según el catálogo. Litologías ingresadas -> Lito 1: '{l1}', Lito 2: '{l2}', Lito 3: '{l3}'.")
-        else:
+        elif u_lito:
             group_esperado = matched_row["grupo"]
             if group_input_norm != group_esperado:
                 registrar_error("Unidad Litologica", u_lito, "ALERTA", f"Unidad litológica es incongruente con la litología. Unidad ingresada: '{u_lito}'. Se esperaba la unidad geológica '{group_esperado}' basada en la litología.")
@@ -438,29 +478,35 @@ def validate_lithology_correlation(row_dict, registrar_error):
     # 13. Resistencia Uniaxial UCS vs Resistencia de Carga Puntual (Is50)
     ucs_val = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
     is50_val = sanitize_value(get_row_val(row_dict, "is50 (Mpa)"), float)
+    
     if ucs_val is not None and is50_val is not None:
         if ucs_val <= is50_val:
-            registrar_error("( UCS )  (Mpa)", ucs_val, "ALERTA", f"UCS debe ser mayor a Is50. UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa.")
-        
-        if matched_row is not None:
-            factor_k = matched_row["k"]
+            registrar_error("( UCS )  (Mpa)", ucs_val, "ALERTA", f"UCS es divergente a Is50. UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa.")
+        else:
+            # Si el emparejamiento litológico falló por ser una combinación inválida, se usa un factor K neutro de 10.0
+            factor_k = matched_row["k"] if (matched_row is not None and is_valid_combination) else 10.0
             expected_ucs = is50_val * factor_k
             if abs(ucs_val - expected_ucs) > 1.0:
                 registrar_error("( UCS )  (Mpa)", ucs_val, "ADVERTENCIA", f"Divergencia de resistencia uniaxial (UCS vs Is50 * K). UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa, factor K asociado: {factor_k}, UCS esperado (Is50 * K): {expected_ucs:.2f} MPa.")
 
 def validate_bulk_excel(file_path, output_json_path):
-    print(f"[*] Leyendo archivo Excel: {file_path}")
-    try: df = pd.read_excel(file_path, engine='openpyxl')
+    t_start = time.time()
+    print(f"    [*] [QA/QC] Iniciando lectura de archivo: {os.path.basename(file_path)}")
+    
+    try: 
+        df = pd.read_excel(file_path, engine='openpyxl')
+        print(f"    [+] [QA/QC] Archivo cargado con éxito. Filas físicas leídas: {len(df)}")
     except Exception as e:
-        print(f"[-] Error al abrir el archivo Excel: {e}")
-        sys.exit(1)
+        print(f"    [-] [QA/QC] Error crítico al leer el archivo Excel: {e}")
+        raise ValueError(f"No se pudo leer el archivo Excel. Verifique que no esté corrupto. Detalle: {str(e)}")
         
     df = clean_and_rename_columns(df)
+    print(f"    [*] [QA/QC] Columnas depuradas e indexadas. Aplicando propagación de datos secuenciales...")
     
     # Propagación ffill sobre columnas de cabecera
     propagate_cols = [
         'CELDA_PADRE', 'ESTE_FROM', 'NORTE_FROM', 'COTA_FROM', 'ESTE_TO', 'NORTE_TO', 
-        'COTA_TO', 'Dist.Celda', 'Altura', 'DIP', 'AZ_HOLE', 'DIP_TALUD', 'DIP DIR_TALUD', 
+        'COTA_TO', 'Dist.Celda', 'Altura', 'DIP', 'AZ_HOLE', 'DIP_TALUD', 'DIP_DIR_TALUD', 
         'INTEMPERISMO', "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", 
         "DUREZA  '76", "RESISTENCIA ESTIMADA VALOR  '76", "GSI VISUAL  '76", 
         "CONTROL ESTRUCTURAL  '76", "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", 
@@ -480,16 +526,31 @@ def validate_bulk_excel(file_path, output_json_path):
         df['CELDA_PADRE'] = df['CELDA_PADRE'].replace([-1, -1.0, '-1', '-1.0'], np.nan)
         df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
         
-        # Paso 2: Sanitizar el resto de columnas de cabecera colocándolas en NaN si vienen como -1
-        for col in propagate_cols:
-            if col in df.columns and col != 'CELDA_PADRE':
-                df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
+        # Normalización ultra-robusta de nombres de columnas para mapeo y propagación tolerante a espacios/caracteres
+        def clean_col_name(s):
+            return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
+
+        df_col_map = {clean_col_name(c): c for c in df.columns}
+        resolved_propagate_cols = []
+        for p_col in propagate_cols:
+            norm_p = clean_col_name(p_col)
+            if norm_p in df_col_map:
+                resolved_propagate_cols.append(df_col_map[norm_p])
+
+        # Asegurar que CELDA_PADRE no se duplique en la lista de ffill
+        resolved_propagate_cols = [c for c in resolved_propagate_cols if c != 'CELDA_PADRE']
+
+        # Paso 2: Sanitizar columnas mapeadas colocándolas en NaN si vienen como -1
+        for col in resolved_propagate_cols:
+            df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
         
         # Paso 3: Propagar el resto de cabeceras de forma aislada agrupando por la 'CELDA_PADRE' ya poblada
-        cols_to_fill = [c for c in propagate_cols if c in df.columns and c != 'CELDA_PADRE']
-        df[cols_to_fill] = df.groupby('CELDA_PADRE')[cols_to_fill].ffill()
+        if resolved_propagate_cols:
+            df[resolved_propagate_cols] = df.groupby('CELDA_PADRE')[resolved_propagate_cols].ffill()
 
     records = df.to_dict(orient='records')
+    print(f"    [+] [QA/QC] Propagación secuencial por CELDA_PADRE completada con éxito.")
+    print(f"    [*] [QA/QC] Ejecutando validaciones QA/QC sobre {len(records)} registros individuales...")
     incidencias, resumen_celdas = [], {}
     total_filas = len(records)
     total_vacios, total_advertencias, total_alertas, total_ok = 0, 0, 0, 0
@@ -572,6 +633,15 @@ def validate_bulk_excel(file_path, output_json_path):
         for col_key in df.columns:
             if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2']: continue
             v = sanitize_value(row_dict.get(col_key), str)
+            
+            # Si el valor es 0 o 0.0 en columnas que no admiten este rating, lo tratamos como VACÍO
+            col_key_norm = "".join(col_key.split()).replace(".", "").upper()
+            es_columna_rating_vacio = any(
+                x in col_key_norm for x in ["RQD", "EFECTOSDEVOLADURA", "CONTROLESTRUCTURAL", "ESPACIAMIENTOVALOR"]
+            )
+            if es_columna_rating_vacio and v in ["0", "0.0"]:
+                v = None
+                
             if v is None: 
                 registrar_error(col_key, None, "VACIO", f"Campo obligatorio se encuentra vacío. Columna: '{col_key}'.")
 
@@ -609,3 +679,6 @@ def validate_bulk_excel(file_path, output_json_path):
         json.dump(output_json, f, ensure_ascii=False)
     
     os.replace(tmp_path, output_json_path)
+
+    elapsed = time.time() - t_start
+    print(f"    [+] [QA/QC] Validación geomecánica finalizada en {elapsed:.2f}s. Alertas: {total_alertas} | Vacíos: {total_vacios} | Advertencias: {total_advertencias}")

@@ -1,5 +1,3 @@
-# app/core/catalogs.py
-
 MANDATORY_COLS_COUNT = 77
 
 NORM_GROUP_MAP = {

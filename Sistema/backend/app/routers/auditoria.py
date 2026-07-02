@@ -5,6 +5,7 @@ import shutil
 import math
 import openpyxl
 import time
+import traceback
 from datetime import datetime
 from collections import Counter, defaultdict
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
@@ -15,6 +16,7 @@ from openpyxl.utils import get_column_letter
 
 from app.database import get_db
 from app.utils.validator import validate_bulk_excel
+from app.core.catalogs import MANDATORY_COLS_COUNT
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -56,10 +58,16 @@ MASTER_ERROR_RULES = [
     {"msg": "Código de alteración inválido.", "severity": "ALERTA"},
     {"msg": "Espesor del relleno es superior a la abertura total.", "severity": "ALERTA"},
     {"msg": "La abertura de la falla supera la longitud de la celda.", "severity": "ALERTA"},
-    {"msg": "UCS debe ser mayor a Is50.", "severity": "ALERTA"},
+    {"msg": "UCS es divergente a Is50.", "severity": "ALERTA"},
     {"msg": "Combinación litológica Lito 1-2-3 inválida según el catálogo.", "severity": "ALERTA"},
     {"msg": "Unidad litológica es incongruente con la litología.", "severity": "ALERTA"},
     {"msg": "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados.", "severity": "ALERTA"},
+    {"msg": "El espesor del relleno no puede ser un valor negativo.", "severity": "ALERTA"},
+    {"msg": "La abertura total no puede ser un valor negativo.", "severity": "ALERTA"},
+    {"msg": "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo.", "severity": "ALERTA"},
+    {"msg": "El espaciamiento de discontinuidad no puede ser un valor negativo.", "severity": "ALERTA"},
+    {"msg": "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
+    {"msg": "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
     
     # Advertencias de Consistencia y Formato
     {"msg": "El valor de agua '76 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
@@ -76,13 +84,6 @@ MASTER_ERROR_RULES = [
     {"msg": "Divergencia de resistencia uniaxial (UCS vs Is50 * K).", "severity": "ADVERTENCIA"},
     {"msg": "En número de estructuras solamente se permiten números enteros.", "severity": "ADVERTENCIA"},
     {"msg": "Campo obligatorio se encuentra vacío.", "severity": "VACIO"},
-
-    {"msg": "El espesor del relleno no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "La abertura total no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "El espaciamiento de discontinuidad no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
-    {"msg": "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
 ]
 
 def safe_int(val, default=0):
@@ -98,12 +99,11 @@ def safe_float(val, default=0.0):
 def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
-    
-    # 1. Ángulo del talud y Altura de celda
+
+    if "VACÍO" in msg_up or "VACIO" in msg_up or "CAMPO OBLIGATORIO" in msg_up:
+        return "Campo obligatorio se encuentra vacío."
     if "ÁNGULO DEL TALUD" in msg_up or "ANGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
         return "Ángulo del talud fuera del rango [-90, 90] grados."
-        
-    # 2. Condición de Agua y Ratings de Agua
     if "CÓDIGO DE AGUA '76" in msg_up or "CODIGO DE AGUA '76" in msg_up:
         return "Código de agua '76 no admitido. Debe ser C, H, M, E o F."
     if "CÓDIGO DE AGUA '89" in msg_up or "CODIGO DE AGUA '89" in msg_up:
@@ -120,8 +120,6 @@ def simplify_message(msg):
         if "'76" in msg_up:
             return "El valor de agua '76 es un valor medio no exacto."
         return "El valor de agua '89 es un valor medio no exacto."
-        
-    # 3. Dureza y Ratings de Resistencia
     if "DUREZA" in msg_up and "ADMITIDA" in msg_up:
         if "'76" in msg_up:
              return "Dureza '76 no admitida. Debe ser R0 a R6."
@@ -138,8 +136,6 @@ def simplify_message(msg):
         if "'76" in msg_up:
              return "Puntaje de resistencia '76 es un valor alejado no válido."
         return "Puntaje de resistencia '89 es un valor alejado no válido."
-        
-    # 4. Control Estructural y Efectos de Voladura
     if "CONTROL ESTRUCTURAL" in msg_up:
         if "'76" in msg_up: return "Control estructural '76 fuera de límites permitidos [1, 5]."
         return "Control estructural '89 fuera de límites permitidos [1, 5]."
@@ -150,21 +146,16 @@ def simplify_message(msg):
         if "'76" in msg_up:
             return "Puntaje de efectos de voladura '76 es un valor medio no exacto."
         return "Puntaje de efectos de voladura '89 es un valor medio no exacto."
-        
-    # 5. RQD Ratings y Porcentajes
     if "PORCENTAJE" in msg_up and "RQD" in msg_up:
         if "'76" in msg_up: return "Porcentaje de RQD '76 no puede ser superior al 100%."
         return "Porcentaje de RQD '89 no puede ser superior al 100%."
     if "RQD" in msg_up:
         if "'76" in msg_up: return "Puntaje de RQD '76 es un valor alejado no válido."
         return "Puntaje de RQD '89 es un valor alejado no válido."
-
-    # 6. Espaciamiento Promedio y Ratings de Espaciamiento
-    if "0.0 M" in msg_up or "DEBE SER MAYOR A CERO" in msg_up:
+    if "ES DE 0.0 M (DEBE SER" in msg_up:
         if "'76" in msg_up: 
             return "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero)."
         return "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero)."
-
     if "ESPACIAMIENTO PROMEDIO" in msg_up and ("POSITIVO" in msg_up or "NEGATIVO" in msg_up):
         if "'76" in msg_up: 
             return "El espaciamiento promedio '76 debe ser positivo."
@@ -178,13 +169,10 @@ def simplify_message(msg):
     if "MEDIO NO EXACTO" in msg_up and "ESPACIAMIENTO" in msg_up:
         if "'76" in msg_up: return "Puntaje de espaciamiento '76 es un valor medio no exacto."
         return "Puntaje de espaciamiento '89 es un valor medio no exacto."
-        
-    # 7. Estructuras, Rellenos, JRC, Rugosidad, Forma, Alteración, Espesor (CON PATRONES DE DETECCIÓN EXACTOS PARA EVITAR TRASLAPOS)
     if "SUGERIDA A NORMALIZAR POR 'JN'" in msg_up or "NORMALIZAR POR 'JN'" in msg_up:
         return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
     if "TIPO DE ESTRUCTURA GEOLÓGICA NO PERMITIDA" in msg_up or "TIPO DE ESTRUCTURA GEOLOGICA NO PERMITIDA" in msg_up:
         return "Tipo de estructura geológica no permitida."
-        
     if "RELLENO" in msg_up and "CATÁLOGO" in msg_up or "RELLENO" in msg_up and "CATALOGO" in msg_up:
         return "Tipo de relleno no pertenece al catálogo."
     if "JRC" in msg_up and "RANGO" in msg_up:
@@ -201,24 +189,19 @@ def simplify_message(msg):
         return "La abertura de la falla supera la longitud de la celda."
     if "PERSISTENCIA" in msg_up and "25 METROS" in msg_up or "SUPERIOR A 25 METROS" in msg_up:
         return "La persistencia es superior a 25 metros."
-    if "UCS" in msg_up and "IS50" in msg_up:
-        return "UCS debe ser mayor a Is50."
-    if "DIVERGENCIA" in msg_up and "UNIAXIAL" in msg_up or "UCS" in msg_up and "K" in msg_up:
+    # Validación específica e inequívoca de UCS e Is50
+    if "DIVERGENTE" in msg_up:
+        return "UCS es divergente a Is50."
+    if "DIVERGENCIA" in msg_up or "IS50 * K" in msg_up or "UCS VS IS50 * K" in msg_up:
         return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
-        
-    # 8. Litologías y Consistencia
     if "COMBINACIÓN LITOLÓGICA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
          return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
     if "UNIDAD LITOLÓGICA" in msg_up or "UNIDAD LITOLOGICA" in msg_up:
          return "Unidad litológica es incongruente con la litología."
-    if "VACÍO" in msg_up or "VACIO" in msg_up:
-        return "Campo obligatorio se encuentra vacío."
     if "INCLINACIÓN (DIP) FUERA" in msg_up or "INCLINACION (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
         return "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados."
     if "NÚMERO DE ESTRUCTURAS" in msg_up or "NUMERO DE ESTRUCTURAS" in msg_up:
         return "En número de estructuras solamente se permiten números enteros."
-        
-    # 9. Valores Negativos
     if "ESPESOR" in msg_up and "NEGATIVO" in msg_up:
         return "El espesor del relleno no puede ser un valor negativo."
     if "ABERTURA" in msg_up and "NEGATIVO" in msg_up:
@@ -251,6 +234,173 @@ def safe_replace(src: str, dst: str, retries: int = 5, delay: float = 0.2):
                 except:
                     raise e
             time.sleep(delay)
+
+# --- FUNCIÓN DE AGREGACIÓN UNIFICADA ---
+def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
+    """
+    Centraliza el cálculo estadístico y cruzamiento de variables para evitar 
+    duplicación de código entre el pipeline asíncrono y los endpoints de API.
+    """
+    incidencias = diag.get("incidencias", [])
+    total_filas_original = diag.get("total_filas_procesadas", 0)
+    resumen_celdas_raw = diag.get("resumen_por_celda_padre", {})
+    
+    if years_filter and years_filter != "TODOS" and years_filter != "":
+        years_list = [y.strip() for y in years_filter.split(",") if y.strip()]
+        incidencias = [i for i in incidencias if str(i.get("campania")) in years_list]
+        resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if str(v.get("campania")) in years_list}
+        total_filas = len(incidencias)
+    else:
+        resumen_celdas = resumen_celdas_raw
+        total_filas = total_filas_original
+
+    num_celdas_padre = len(resumen_celdas)
+    promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
+    total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
+    
+    total_fields = total_filas * MANDATORY_COLS_COUNT
+    total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
+    total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+    total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
+    
+    row_errors = defaultdict(set)
+    for i in incidencias:
+        row_errors[i["fila_excel"]].add(i["tipo_incidencia"])
+        
+    discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
+    discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
+    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
+    discs_correctas = total_filas - len(row_errors)
+    
+    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    
+    observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
+    top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
+    
+    for i in incidencias:
+        c = i.get("campania", "N/A")
+        obs_key = simplify_message(i.get("mensaje", ""))
+        celda = i.get("celda_padre", "N/A")
+        
+        observaciones_por_año[c][obs_key]["incidents"] += 1
+        observaciones_por_año[c][obs_key]["stations"].add(celda)
+        top_stations_por_año[c][obs_key][celda] += 1
+        
+        camp_stats[c]["filas"].add(i["fila_excel"])
+        geo_stats[g := i.get("geotecnico", "N/A")]["filas"].add(i["fila_excel"])
+        sector_stats[s := i.get("sector_geotecnico", "N/A")]["filas"].add(i["fila_excel"])
+        
+        tipo = i.get("tipo_incidencia")
+        if tipo == "VACIO":
+            camp_stats[c]["vacios"] += 1
+            geo_stats[g]["vacios"] += 1
+            sector_stats[s]["vacios"] += 1
+        elif tipo == "ADVERTENCIA":
+            camp_stats[c]["advertencias"] += 1
+            geo_stats[g]["advertencias"] += 1
+            sector_stats[s]["advertencias"] += 1
+        elif tipo == "ALERTA":
+            camp_stats[c]["alertas"] += 1
+            geo_stats[g]["alertas"] += 1
+            sector_stats[s]["alertas"] += 1
+            
+    consolidado_tabla = {}
+    for year, types in observaciones_por_año.items():
+        consolidado_tabla[year] = {}
+        total_inc_año = sum(v["incidents"] for k, v in types.items())
+        severity = "LEVE" if total_inc_año < 100 else ("MODERADO" if total_inc_año < 1000 else "CRÍTICO")
+        consolidado_tabla[year]["severity"] = severity
+        consolidado_tabla[year]["total_incidents"] = total_inc_año
+        
+        for obs_key, stats in types.items():
+            worst = [{"celda": k, "count": v} for k, v in top_stations_por_año[year][obs_key].most_common(3)]
+            consolidado_tabla[year][obs_key] = {
+                "incidents": stats["incidents"],
+                "affected_stations": len(stats["stations"]),
+                "top_stations": worst
+            }
+            
+    distribucion_campania = []
+    for c, stats in camp_stats.items():
+        rows_count = len(stats["filas"])
+        total_fields_group = rows_count * MANDATORY_COLS_COUNT
+        distribucion_campania.append({
+            "campania": c, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
+        })
+        
+    distribucion_geotecnico = []
+    for g, stats in geo_stats.items():
+        rows_count = len(stats["filas"])
+        total_fields_group = rows_count * MANDATORY_COLS_COUNT
+        distribucion_geotecnico.append({
+            "geotecnico": g, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
+        })
+        
+    distribucion_sector = []
+    for s, stats in sector_stats.items():
+        rows_count = len(stats["filas"])
+        total_fields_group = rows_count * MANDATORY_COLS_COUNT
+        distribucion_sector.append({
+            "sector": s, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
+        })
+        
+    msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    
+    top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
+    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
+    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
+    
+    sorted_worst = sorted(resumen_celdas.items(), key=lambda x: (x[1].get("alertas", 0), x[1].get("vacios", 0), x[1].get("advertencias", 0)), reverse=True)[:20]
+    worst_cells = [{"celda": k, **v} for k, v in sorted_worst]
+    col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
+    top_column_errors = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
+    
+    return {
+        "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "consolidado_observaciones": consolidado_tabla,
+        "resumen_por_celda_padre": resumen_celdas,
+        "status": "completado",
+        "familia1": {
+            "num_celdas_padre": num_celdas_padre,
+            "promedio_hijas": round(promedio_hijas, 2),
+            "total_discontinuidades": total_filas,
+            "total_metros": round(total_metros, 2)
+        },
+        "familia2": {
+            "total_fields": total_fields, 
+            "total_vacios": total_vacios, 
+            "total_advertencias": total_advertencias, 
+            "total_alertas": total_alertas, 
+            "total_correctos": total_correctos
+        },
+        "familia3": {
+            "total_discontinuidades": total_filas, 
+            "discontinuidades_alertas": discs_con_alerta, 
+            "discontinuidades_advertencias": discs_con_advertencia, 
+            "discontinuidades_vacios": discs_con_vacio, 
+            "discontinuidades_correctas": discs_correctas
+        },
+        "distribucion_campania": distribucion_campania,
+        "distribucion_sector": distribucion_sector,
+        "distribucion_geotecnico": distribucion_geotecnico,
+        "top_5_alertas": top_5_alertas,
+        "error_types_detailed": {"alertas": lista_alertas, "advertencias": lista_advertencias},
+        "worst_cells": worst_cells,
+        "top_column_errors": top_column_errors
+    }
 
 def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     font_title = Font(name="Segoe UI", size=16, bold=True, color="1B365D")
@@ -610,13 +760,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             inc_item.get("sector_geotecnico"),
             inc_item.get("columna"),
             inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-            inc_item.get("mensaje")  # <--- CORREGIDO: Muestra el mensaje detallado con las variables en vez del simplificado
+            inc_item.get("mensaje")
         ]
         ws_detail.append(row_data)
         
     end_detail_row = ws_detail.max_row
     
-    # Renderizado ultra veloz
     for r_idx in range(start_detail_row, end_detail_row + 1):
         if r_idx <= start_detail_row + 150:
             ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
@@ -650,7 +799,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             
     ws_detail.auto_filter.ref = f"B{grid_heading_row}:K{end_detail_row}"
 
-    # --- HOJAS 4+: DETALLES INDIVIDUALES POR REGLA DE ERROR (CON DASHBOARD Y KPIS) ---
+    # --- HOJAS 4+: DETALLES INDIVIDUALES POR REGLA DE ERROR ---
     for orig_msg, mapping_data in active_sheets_mapping.items():
         sh_name = mapping_data["tab_name"]
         err_records = mapping_data["records"]
@@ -709,7 +858,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             
             curr_y_r += 1
             
-        # Distribución por Geotécnico / Responsable (Logger Geotécnico)
+        # Distribución por Geotécnico / Responsable
         ws_err.cell(row=10, column=6, value="DISTRIBUCIÓN POR GEOTÉCNICO / RESPONSABLE").font = font_section
         for idx, col in enumerate(["Logger Geotécnico", "Ocurrencias (N)", "% Contribución"], start=6):
             cell = ws_err.cell(row=11, column=idx, value=col)
@@ -742,7 +891,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             
             curr_s_r += 1
 
-        # Renglones Libres y Escritura por Ráfagas
         ws_err.append([])
         ws_err.append([None, "REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)"])
         title_row_idx = ws_err.max_row
@@ -775,13 +923,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 inc_item.get("sector_geotecnico"),
                 inc_item.get("columna"),
                 inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-                inc_item.get("mensaje")  # <--- CORREGIDO: Muestra el mensaje detallado con todas las variables involucradas
+                inc_item.get("mensaje")
             ]
             ws_err.append(row_data)
             
         end_data_row = ws_err.max_row
         
-        # Formateado de datos optimizado por lotes
         for r_idx in range(start_data_row, end_data_row + 1):
             if r_idx <= start_data_row + 150:
                 ws_err.cell(row=r_idx, column=2).alignment = alignment_center
@@ -826,177 +973,51 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     return wb
 
-# --- PIPELINE DE PROCESAMIENTO ASÍNCRONO ---
 def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
+    t_start = time.time()
+    print(f"\n======================================================================")
+    print(f"[*] [AUDITORÍA {audit_id}] INICIANDO PIPELINE DE PROCESAMIENTO ASÍNCRONO")
+    print(f"[*] Archivo cargado: {os.path.basename(file_path)}")
+    print(f"======================================================================")
+    
     history_dir = os.path.join(uploads_dir, "history")
     os.makedirs(history_dir, exist_ok=True)
     raw_json_out = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
     compact_json_out = os.path.join(history_dir, f"{audit_id}_compact.json")
     excel_pregenerated_out = os.path.join(history_dir, f"{audit_id}_reporte_completo.xlsx")
     
-    validate_bulk_excel(file_path, raw_json_out)
-    shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
-    
-    with open(raw_json_out, "r", encoding="utf-8") as f:
-        diag = json.load(f)
-        
-    compact = {k: v for k, v in diag.items() if k != "incidencias"}
-    incidencias = diag.get("incidencias", [])
-    total_filas = diag.get("total_filas_procesadas", 0)
-    
-    resumen_celdas = diag.get("resumen_por_celda_padre", {})
-    num_celdas_padre = len(resumen_celdas)
-    promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
-    total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
-    
-    total_fields = total_filas * 77
-    total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
-    total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
-    total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
-    
-    row_errors = defaultdict(set)
-    for i in incidencias:
-        row_errors[i["fila_excel"]].add(i["tipo_incidencia"])
-        
-    discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
-    discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
-    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
-    discs_correctas = total_filas - len(row_errors)
-    
-    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    
-    observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
-    top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
-    
-    for i in incidencias:
-        c = i.get("campania", "N/A")
-        if c == "N/A": continue
-        obs_key = simplify_message(i.get("mensaje", ""))
-        celda = i.get("celda_padre", "N/A")
-        
-        observaciones_por_año[c][obs_key]["incidents"] += 1
-        observaciones_por_año[c][obs_key]["stations"].add(celda)
-        top_stations_por_año[c][obs_key][celda] += 1
-        
-        camp_stats[c]["filas"].add(i["fila_excel"])
-        geo_stats[g := i.get("geotecnico", "N/A")]["filas"].add(i["fila_excel"])
-        sector_stats[s := i.get("sector_geotecnico", "N/A")]["filas"].add(i["fila_excel"])
-        
-        tipo = i.get("tipo_incidencia")
-        if tipo == "VACIO":
-            camp_stats[c]["vacios"] += 1
-            geo_stats[g]["vacios"] += 1
-            sector_stats[s]["vacios"] += 1
-        elif tipo == "ADVERTENCIA":
-            camp_stats[c]["advertencias"] += 1
-            geo_stats[g]["advertencias"] += 1
-            sector_stats[s]["advertencias"] += 1
-        elif tipo == "ALERTA":
-            camp_stats[c]["alertas"] += 1
-            geo_stats[g]["alertas"] += 1
-            sector_stats[s]["alertas"] += 1
-            
-    consolidado_tabla = {}
-    for year, types in observaciones_por_año.items():
-        consolidado_tabla[year] = {}
-        total_inc_año = sum(v["incidents"] for k, v in types.items())
-        severity = "LEVE" if total_inc_año < 100 else ("MODERADO" if total_inc_año < 1000 else "CRÍTICO")
-        consolidado_tabla[year]["severity"] = severity
-        consolidado_tabla[year]["total_incidents"] = total_inc_año
-        
-        for obs_key, stats in types.items():
-            worst = [{"celda": k, "count": v} for k, v in top_stations_por_año[year][obs_key].most_common(3)]
-            consolidado_tabla[year][obs_key] = {
-                "incidents": stats["incidents"],
-                "affected_stations": len(stats["stations"]),
-                "top_stations": worst
-            }
-            
-    distribucion_campania = []
-    for c, stats in camp_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * 77
-        distribucion_campania.append({
-            "campania": c, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    distribucion_geotecnico = []
-    for g, stats in geo_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * 77
-        distribucion_geotecnico.append({
-            "geotecnico": g, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    distribucion_sector = []
-    for s, stats in sector_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * 77
-        distribucion_sector.append({
-            "sector": s, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
-    
-    top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
-    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
-    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
-    
-    compact["audit_id"] = audit_id
-    compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    compact["nombre_archivo"] = os.path.basename(file_path)
-    compact["consolidado_observaciones"] = consolidado_tabla
-    
-    compact["familia1"] = {
-        "num_celdas_padre": num_celdas_padre,
-        "promedio_hijas": round(promedio_hijas, 2),
-        "total_discontinuidades": total_filas,
-        "total_metros": round(total_metros, 2)
-    }
-    compact["familia2"] = {"total_fields": total_fields, "total_vacios": total_vacios, "total_advertencias": total_advertencias, "total_alertas": total_alertas, "total_correctos": total_correctos}
-    compact["familia3"] = {"total_discontinuidades": total_filas, "discontinuidades_alertas": discs_con_alerta, "discontinuidades_advertencias": discs_con_advertencia, "discontinuidades_vacios": discs_con_vacio, "discontinuidades_correctas": discs_correctas}
-    compact["distribucion_campania"] = distribucion_campania
-    compact["distribucion_sector"] = distribucion_sector
-    compact["distribucion_geotecnico"] = distribucion_geotecnico
-    compact["top_5_alertas"] = top_5_alertas
-    compact["error_types_detailed"] = {"alertas": lista_alertas, "advertencias": lista_advertencias}
-    
-    sorted_worst = sorted(resumen_celdas.items(), key=lambda x: (x[1].get("alertas", 0), x[1].get("vacios", 0), x[1].get("advertencias", 0)), reverse=True)[:20]
-    compact["worst_cells"] = [{"celda": k, **v} for k, v in sorted_worst]
-    col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
-    compact["top_column_errors"] = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
-    
-    compact_json_tmp = compact_json_out + ".tmp"
-    with open(compact_json_tmp, "w", encoding="utf-8") as f:
-        json.dump(compact, f, ensure_ascii=False)
-    safe_replace(compact_json_tmp, compact_json_out)
-    
-    public_diag = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
-    public_diag_tmp = public_diag + ".tmp"
-    shutil.copyfile(raw_json_out, public_diag_tmp)
-    safe_replace(public_diag_tmp, public_diag)
-    
-    public_compact = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
-    public_compact_tmp = public_compact + ".tmp"
-    shutil.copyfile(compact_json_out, public_compact_tmp)
-    safe_replace(public_compact_tmp, public_compact)
-
     try:
-        print(f"[*] Iniciando pre-generación asíncrona de reporte de Excel para {audit_id}...")
-        wb = generar_excel_reporte_core(diag, compact, list(incidencias))
+        # Paso 1: Ejecutar la validación masiva en validator.py
+        print(f"[*] [AUDITORÍA {audit_id}] Paso 1/5: Ejecutando motor de validación QA/QC geomecánica...")
+        validate_bulk_excel(file_path, raw_json_out)
+        
+        # Paso 2: Copiar al diagnóstico público estático
+        print(f"[*] [AUDITORÍA {audit_id}] Paso 2/5: Publicando diagnóstico en caché pública...")
+        shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
+        
+        # Paso 3: Cargar resultados y compactar métricas para la UI mediante la función unificada
+        print(f"[*] [AUDITORÍA {audit_id}] Paso 3/5: Compilando métricas compactas para Dashboard...")
+        with open(raw_json_out, "r", encoding="utf-8") as f:
+            diag = json.load(f)
+            
+        diag["nombre_archivo"] = os.path.basename(file_path)
+        compact = aggregate_audit_metrics(diag)
+        compact["audit_id"] = audit_id
+        
+        print(f"[*] [AUDITORÍA {audit_id}] Paso 4/5: Escribiendo JSON de resumen ligero...")
+        compact_json_tmp = compact_json_out + ".tmp"
+        with open(compact_json_tmp, "w", encoding="utf-8") as f:
+            json.dump(compact, f, ensure_ascii=False)
+        safe_replace(compact_json_tmp, compact_json_out)
+        
+        public_compact = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
+        public_compact_tmp = public_compact + ".tmp"
+        shutil.copyfile(compact_json_out, public_compact_tmp)
+        safe_replace(public_compact_tmp, public_compact)
+
+        # Paso 4: Generar archivo Excel cacheado
+        print(f"[*] [AUDITORÍA {audit_id}] Paso 5/5: Pre-generando reporte de Excel (.xlsx) en segundo plano...")
+        wb = generar_excel_reporte_core(diag, compact, list(diag.get("incidencias", [])))
         
         excel_tmp = excel_pregenerated_out + ".tmp"
         wb.save(excel_tmp)
@@ -1006,9 +1027,37 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
         public_excel_tmp = public_excel + ".tmp"
         shutil.copyfile(excel_pregenerated_out, public_excel_tmp)
         safe_replace(public_excel_tmp, public_excel)
-        print(f"[+] Reporte completo pre-generado y cacheado en disk sin errores.")
+        
+        elapsed = time.time() - t_start
+        print(f"======================================================================")
+        print(f"[+] [AUDITORÍA {audit_id}] PIPELINE COMPLETADO EXITOSAMENTE")
+        print(f"[*] Tiempo total: {elapsed:.2f} segundos")
+        print(f"======================================================================\n")
+
     except Exception as e:
-        print(f"[-] Error al pre-generar reporte de Excel en segundo plano: {e}")
+        elapsed = time.time() - t_start
+        print(f"\n======================================================================")
+        print(f"[-] [AUDITORÍA {audit_id}] PIPELINE ABORTADO POR ERROR CRÍTICO")
+        print(f"[-] Detalle del error: {str(e)}")
+        print(f"[-] Tiempo ejecutado antes del fallo: {elapsed:.2f} segundos")
+        print(f"======================================================================")
+        traceback.print_exc()
+        
+        error_data = {
+            "audit_id": audit_id,
+            "status": "error",
+            "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "nombre_archivo": os.path.basename(file_path),
+            "error_message": str(e),
+            "familia1": {"total_discontinuidades": 0},
+            "familia2": {"total_vacios": 0, "total_advertencias": 0, "total_alertas": 0}
+        }
+        try:
+            with open(compact_json_out, "w", encoding="utf-8") as f:
+                json.dump(error_data, f, ensure_ascii=False)
+            shutil.copyfile(compact_json_out, os.path.join(uploads_dir, "resumen_geomecanico_ligero.json"))
+        except Exception as write_err:
+            print(f"[-] Error al guardar JSON de contingencia para error de auditoría: {write_err}")
 
 @router.post("/geomecanica/importar-excel-bulk")
 async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -1048,6 +1097,7 @@ def listar_auditorias():
 
 @router.get("/geomecanica/resumen-ligero")
 def obtener_resumen_ligero(audit_id: str = None, years: str = None):
+    # 1. Resolver rutas de archivos correspondientes
     if audit_id:
         raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
         compact_file = os.path.join(uploads_dir, "history", f"{audit_id}_compact.json")
@@ -1078,155 +1128,22 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
                     status_code=202, 
                     content={"status": "procesando", "message": "Esperando inicialización de datos de auditoría..."}
                 )
-        
+
+    # 2. FAST PATH: Cargar el reporte compacto directamente si no hay filtros aplicados
+    if (not years or years == "TODOS" or years == "") and os.path.exists(compact_file):
+        try:
+            with open(compact_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass # Si falla la lectura, se cae en el cálculo bajo demanda inferior
+
+    # 3. BAJO DEMANDA / FILTRADO: Procesar dinámicamente si se especificaron años o falla la caché
     with open(raw_file, "r", encoding="utf-8") as f:
         diag = json.load(f)
         
-    incidencias = diag.get("incidencias", [])
-    total_filas_original = diag.get("total_filas_procesadas", 0)
-    
-    if years and years != "TODOS" and years != "":
-        years_list = [y.strip() for y in years.split(",") if y.strip()]
-        incidencias = [i for i in incidencias if str(i.get("campania")) in years_list]
-        resumen_celdas_raw = diag.get("resumen_por_celda_padre", {})
-        resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if str(v.get("campania")) in years_list}
-        total_filas = len(incidencias)
-    else:
-        resumen_celdas = diag.get("resumen_por_celda_padre", {})
-        total_filas = total_filas_original
-
-    num_celdas_padre = len(resumen_celdas)
-    promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
-    total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
-    
-    total_fields = total_filas * 77
-    total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
-    total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
-    total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
-    
-    row_errors = defaultdict(set)
-    for i in incidencias:
-        row_errors[i["fila_excel"]].add(i["tipo_incidencia"])
-        
-    discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
-    discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
-    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
-    discs_correctas = total_filas - len(row_errors)
-    
-    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
-    top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
-    
-    for i in incidencias:
-        c = i.get("campania", "N/A")
-        obs_key = simplify_message(i.get("mensaje", ""))
-        celda = i.get("celda_padre", "N/A")
-        
-        observaciones_por_año[c][obs_key]["incidents"] += 1
-        observaciones_por_año[c][obs_key]["stations"].add(celda)
-        top_stations_por_año[c][obs_key][celda] += 1
-        
-        camp_stats[c]["filas"].add(i["fila_excel"])
-        geo_stats[i.get("geotecnico", "N/A")]["filas"].add(i["fila_excel"])
-        sector_stats[i.get("sector_geotecnico", "N/A")]["filas"].add(i["fila_excel"])
-        
-        tipo = i.get("tipo_incidencia")
-        if tipo == "VACIO":
-            camp_stats[c]["vacios"] += 1
-            geo_stats[i.get("geotecnico", "N/A")]["vacios"] += 1
-            sector_stats[i.get("sector_geotecnico", "N/A")]["vacios"] += 1
-        elif tipo == "ADVERTENCIA":
-            camp_stats[c]["advertencias"] += 1
-            geo_stats[i.get("geotecnico", "N/A")]["advertencias"] += 1
-            sector_stats[i.get("sector_geotecnico", "N/A")]["advertencias"] += 1
-        elif tipo == "ALERTA":
-            camp_stats[c]["alertas"] += 1
-            geo_stats[i.get("geotecnico", "N/A")]["alertas"] += 1
-            sector_stats[i.get("sector_geotecnico", "N/A")]["alertas"] += 1
-            
-    consolidado_tabla = {}
-    for year, types in observaciones_por_año.items():
-        consolidado_tabla[year] = {}
-        total_inc_año = sum(v["incidents"] for k, v in types.items())
-        severity = "LEVE" if total_inc_año < 100 else ("MODERADO" if total_inc_año < 1000 else "CRÍTICO")
-        consolidado_tabla[year]["severity"] = severity
-        consolidado_tabla[year]["total_incidents"] = total_inc_año
-        for obs_key, stats in types.items():
-            worst = [{"celda": k, "count": v} for k, v in top_stations_por_año[year][obs_key].most_common(3)]
-            consolidado_tabla[year][obs_key] = {
-                "incidents": stats["incidents"],
-                "affected_stations": len(stats["stations"]),
-                "top_stations": worst
-            }
-            
-    distribucion_campania = []
-    for c, stats in camp_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * 77
-        distribucion_campania.append({
-            "campania": c, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    distribucion_geotecnico = []
-    for g, stats in geo_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * 77
-        distribucion_geotecnico.append({
-            "geotecnico": g, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    distribucion_sector = []
-    for s, stats in sector_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * 77
-        distribucion_sector.append({
-            "sector": s, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
-    
-    top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
-    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
-    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
-    
-    compact = {}
+    diag["nombre_archivo"] = os.path.basename(raw_file)
+    compact = aggregate_audit_metrics(diag, years_filter=years)
     compact["audit_id"] = audit_id or "default"
-    compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    compact["nombre_archivo"] = os.path.basename(raw_file)
-    compact["consolidado_observaciones"] = consolidado_tabla
-    compact["resumen_por_celda_padre"] = resumen_celdas
-    
-    compact["familia1"] = {
-        "num_celdas_padre": num_celdas_padre,
-        "promedio_hijas": round(promedio_hijas, 2),
-        "total_discontinuidades": total_filas,
-        "total_metros": round(total_metros, 2)
-    }
-    compact["familia2"] = {"total_fields": total_fields, "total_vacios": total_vacios, "total_advertencias": total_advertencias, "total_alertas": total_alertas, "total_correctos": total_correctos}
-    compact["familia3"] = {"total_discontinuidades": total_filas, "discontinuidades_alertas": discs_con_alerta, "discontinuidades_advertencias": discs_con_advertencia, "discontinuidades_vacios": discs_con_vacio, "discontinuidades_correctas": discs_correctas}
-    compact["distribucion_campania"] = distribucion_campania
-    compact["distribucion_sector"] = distribucion_sector
-    compact["distribucion_geotecnico"] = distribucion_geotecnico
-    compact["top_5_alertas"] = top_5_alertas
-    compact["error_types_detailed"] = {"alertas": lista_alertas, "advertencias": lista_advertencias}
-    
-    sorted_worst = sorted(resumen_celdas.items(), key=lambda x: (x[1].get("alertas", 0), x[1].get("vacios", 0), x[1].get("advertencias", 0)), reverse=True)[:20]
-    compact["worst_cells"] = [{"celda": k, **v} for k, v in sorted_worst]
-    col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
-    compact["top_column_errors"] = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
     
     return compact
 

@@ -201,5 +201,30 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     }
   });
 
+  // --- VALIDACIONES DE RESISTENCIA UCS VS IS50 ---
+  const ucs = header.ucs_mpa;
+  const is50 = header.is50_mpa;
+
+  if (ucs !== undefined && ucs !== null && is50 !== undefined && is50 !== null) {
+    if (ucs <= is50) {
+      // Inconsistencia física fundamental (Se reporta como ERROR en el frontend)
+      alerts.push({
+        fieldId: "header-ucs_mpa",
+        type: "ERROR",
+        message: `UCS es divergente a Is50. El valor de resistencia UCS (${ucs} MPa) debe ser mayor que la carga puntual Is50 (${is50} MPa).`
+      });
+    } else {
+      // Si la física es coherente, se evalúa la desviación con un factor K promedio estándar de 10 (Se reporta como WARNING)
+      const expectedUcs = is50 * 10;
+      if (Math.abs(ucs - expectedUcs) > 1.5) {
+        alerts.push({
+          fieldId: "header-ucs_mpa",
+          type: "WARNING",
+          message: `Divergencia de resistencia uniaxial (UCS vs Is50 * K). El UCS ingresado (${ucs} MPa) se desvía del estimado teórico promedio (${expectedUcs.toFixed(1)} MPa) para un Is50 de ${is50} MPa.`
+        });
+      }
+    }
+  }
+
   return alerts;
 }

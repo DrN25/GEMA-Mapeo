@@ -1,12 +1,4 @@
-import {
-  Home,
-  Map,
-  TrendingUp,
-  Share2,
-  Moon,
-  Sun,
-  FileSpreadsheet
-} from 'lucide-react';
+import { Home, Map, TrendingUp, Share2, Moon, Sun, FileSpreadsheet } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
