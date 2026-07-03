@@ -2,15 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 
 export const COLUMN_NAMES = {
-    distancia: "Dist Est. (m)",
+    distancia: "Distancia Estructura (m)",
     dip: "Dip (°)",
     dip_dir: "DipDir (°)",
-    tipo_estructura: "Tipo Estruc.",
-    n_estructuras: "Cant (n)",
-    abertura: "Abert (mm)",
-    espesor: "Espes (mm)",
-    continuidad: "Cont (m)",
-    espaciamiento: "Espac (m)",
+    tipo_estructura: "Tipo de Estructura",
+    n_estructuras: "Cantidad (n)",
+    abertura: "Abertura (mm)",
+    espesor: "Espesor (mm)",
+    continuidad: "Continuidad (m)",
+    espaciamiento: "Espaciamiento (m)",
     extremos_visibles: "Ext Vis",
     terminacion: "Term",
     relleno1: "Relleno 1",

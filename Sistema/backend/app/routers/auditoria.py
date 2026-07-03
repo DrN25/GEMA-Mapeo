@@ -26,30 +26,19 @@ uploads_dir = os.path.join(BASE_DIR, "uploads")
 MASTER_ERROR_RULES = [
     # Alertas Críticas (Física, Rangos y Catálogos obligatorios)
     {"msg": "Ángulo del talud fuera del rango [-90, 90] grados.", "severity": "ALERTA"},
-    {"msg": "Código de agua '76 no admitido. Debe ser C, H, M, E o F.", "severity": "ALERTA"},
-    {"msg": "Código de agua '89 no admitido. Debe ser C, H, M, E o F.", "severity": "ALERTA"},
-    {"msg": "Valor de agua '76 excede los límites reales de la escala [0, 10].", "severity": "ALERTA"},
-    {"msg": "Rating de agua '76 es incongruente con el código.", "severity": "ALERTA"},
-    {"msg": "Valor de agua '89 excede los límites reales de la escala [0, 15].", "severity": "ALERTA"},
-    {"msg": "Rating de agua '89 es incongruente con el código.", "severity": "ALERTA"},
-    {"msg": "Dureza '76 no admitida. Debe ser R0 a R6.", "severity": "ALERTA"},
-    {"msg": "Rating de resistencia '76 fuera del límite real [0, 15].", "severity": "ALERTA"},
-    {"msg": "Resistencia '76 es incongruente con la dureza.", "severity": "ALERTA"},
-    {"msg": "Dureza '89 no admitida. Debe ser R0 a R6.", "severity": "ALERTA"},
-    {"msg": "Rating de resistencia '89 fuera del límite real [0, 15].", "severity": "ALERTA"},
-    {"msg": "Resistencia '89 es incongruente con la dureza.", "severity": "ALERTA"},
-    {"msg": "Control estructural '76 fuera de límites permitidos [1, 5].", "severity": "ALERTA"},
-    {"msg": "Control estructural '89 fuera de límites permitidos [1, 5].", "severity": "ALERTA"},
-    {"msg": "Efecto de voladura '76 excede los límites de la escala [1, 6].", "severity": "ALERTA"},
-    {"msg": "Efecto de voladura '89 excede los límites de la escala [1, 6].", "severity": "ALERTA"},
-    {"msg": "Porcentaje de RQD '76 no puede ser superior al 100%.", "severity": "ALERTA"},
-    {"msg": "Porcentaje de RQD '89 no puede ser superior al 100%.", "severity": "ALERTA"},
-    {"msg": "El espaciamiento promedio '76 debe ser positivo.", "severity": "ALERTA"},
-    {"msg": "Valor de rating de espaciamiento '76 fuera del rango [5, 30].", "severity": "ALERTA"},
-    {"msg": "Rating de espaciamiento '76 no se alinea con el promedio.", "severity": "ALERTA"},
-    {"msg": "El espaciamiento promedio '89 debe ser positivo.", "severity": "ALERTA"},
-    {"msg": "Valor de rating de espaciamiento '89 fuera del rango [5, 20].", "severity": "ALERTA"},
-    {"msg": "Rating de espaciamiento '89 no se alinea con el promedio esperado.", "severity": "ALERTA"},
+    {"msg": "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F.", "severity": "ALERTA"},
+    {"msg": "Valor de agua '76 / '89 excede los límites reales de la escala.", "severity": "ALERTA"},
+    {"msg": "Rating de agua '76 / '89 es incongruente con el código.", "severity": "ALERTA"},
+    {"msg": "Dureza '76 / '89 no admitida. Debe ser R0 a R6.", "severity": "ALERTA"},
+    {"msg": "Rating de resistencia '76 / '89 fuera del límite real.", "severity": "ALERTA"},
+    {"msg": "Resistencia '76 / '89 es incongruente con la dureza.", "severity": "ALERTA"},
+    {"msg": "Control estructural '76 / '89 fuera de límites permitidos [1, 5].", "severity": "ALERTA"},
+    {"msg": "Efecto de voladura '76 / '89 excede los límites de la escala.", "severity": "ALERTA"},
+    {"msg": "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.", "severity": "ALERTA"},
+    {"msg": "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
+    {"msg": "El espaciamiento promedio '76 / '89 debe ser positivo.", "severity": "ALERTA"},
+    {"msg": "Valor de rating de espaciamiento '76 / '89 fuera de rango.", "severity": "ALERTA"},
+    {"msg": "Rating de espaciamiento '76 / '89 no se alinea con el promedio.", "severity": "ALERTA"},
     {"msg": "Tipo de estructura geológica no permitida.", "severity": "ALERTA"},
     {"msg": "Tipo de relleno no pertenece al catálogo.", "severity": "ALERTA"},
     {"msg": "Valor JRC fuera de rango permitido [0, 20].", "severity": "ALERTA"},
@@ -66,20 +55,13 @@ MASTER_ERROR_RULES = [
     {"msg": "La abertura total no puede ser un valor negativo.", "severity": "ALERTA"},
     {"msg": "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo.", "severity": "ALERTA"},
     {"msg": "El espaciamiento de discontinuidad no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
-    {"msg": "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
     
     # Advertencias de Consistencia y Formato
-    {"msg": "El valor de agua '76 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "El valor de agua '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de resistencia '76 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de resistencia '89 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de efectos de voladura '76 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de efectos de voladura '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de RQD '76 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de RQD '89 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de espaciamiento '76 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de espaciamiento '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
+    {"msg": "El valor de agua '76 / '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
+    {"msg": "Puntaje de resistencia '76 / '89 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
+    {"msg": "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
+    {"msg": "Puntaje de RQD '76 / '89 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
+    {"msg": "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
     {"msg": "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'.", "severity": "ADVERTENCIA"},
     {"msg": "Divergencia de resistencia uniaxial (UCS vs Is50 * K).", "severity": "ADVERTENCIA"},
     {"msg": "En número de estructuras solamente se permiten números enteros.", "severity": "ADVERTENCIA"},
@@ -104,71 +86,57 @@ def simplify_message(msg):
         return "Campo obligatorio se encuentra vacío."
     if "ÁNGULO DEL TALUD" in msg_up or "ANGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
         return "Ángulo del talud fuera del rango [-90, 90] grados."
-    if "CÓDIGO DE AGUA '76" in msg_up or "CODIGO DE AGUA '76" in msg_up:
-        return "Código de agua '76 no admitido. Debe ser C, H, M, E o F."
-    if "CÓDIGO DE AGUA '89" in msg_up or "CODIGO DE AGUA '89" in msg_up:
-        return "Código de agua '89 no admitido. Debe ser C, H, M, E o F."
-    if "VALOR DE AGUA '76 EXCEXE" in msg_up or "VALOR DE AGUA '76 EXCEDE" in msg_up:
-        return "Valor de agua '76 excede los límites reales de la escala [0, 10]."
-    if "VALOR DE AGUA '89 EXCEXE" in msg_up or "VALOR DE AGUA '89 EXCEDE" in msg_up:
-        return "Valor de agua '89 excede los límites reales de la escala [0, 15]."
-    if "RATING DE AGUA" in msg_up and "INCONGRUENTE" in msg_up:
-        if "'76" in msg_up:
-            return "Rating de agua '76 es incongruente con el código."
-        return "Rating de agua '89 es incongruente con el código."
-    if "VALOR MEDIO NO EXACTO" in msg_up and "AGUA" in msg_up:
-        if "'76" in msg_up:
-            return "El valor de agua '76 es un valor medio no exacto."
-        return "El valor de agua '89 es un valor medio no exacto."
+        
+    if "AGUA" in msg_up:
+        if "CÓDIGO" in msg_up or "CODIGO" in msg_up or "NO ADMITIDO" in msg_up:
+            return "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F."
+        if "EXCEDE" in msg_up or "LÍMITES REALES" in msg_up or "LIMITES REALES" in msg_up:
+            return "Valor de agua '76 / '89 excede los límites reales de la escala."
+        if "INCONGRUENTE" in msg_up or "RATING" in msg_up:
+            return "Rating de agua '76 / '89 es incongruente con el código."
+        if "MEDIO NO EXACTO" in msg_up:
+            return "El valor de agua '76 / '89 es un valor medio no exacto."
+
     if "DUREZA" in msg_up and "ADMITIDA" in msg_up:
-        if "'76" in msg_up:
-             return "Dureza '76 no admitida. Debe ser R0 a R6."
-        return "Dureza '89 no admitida. Debe ser R0 a R6."
-    if "RESISTENCIA" in msg_up and "INCONGRUENTE" in msg_up:
-        if "'76" in msg_up:
-             return "Resistencia '76 es incongruente con la dureza."
-        return "Resistencia '89 es incongruente con la dureza."
-    if "RESISTENCIA" in msg_up and ("LIMITE" in msg_up or "LÍMITE" in msg_up or "EXCEDE" in msg_up):
-        if "'76" in msg_up:
-             return "Rating de resistencia '76 fuera del límite real [0, 15]."
-        return "Rating de resistencia '89 fuera del límite real [0, 15]."
-    if "ALEJADO" in msg_up and "RESISTENCIA" in msg_up:
-        if "'76" in msg_up:
-             return "Puntaje de resistencia '76 es un valor alejado no válido."
-        return "Puntaje de resistencia '89 es un valor alejado no válido."
+        return "Dureza '76 / '89 no admitida. Debe ser R0 a R6."
+        
+    if "RESISTENCIA" in msg_up:
+        if "INCONGRUENTE" in msg_up:
+            return "Resistencia '76 / '89 es incongruente con la dureza."
+        if "LÍMITE REAL" in msg_up or "LIMITE REAL" in msg_up or "EXCEDE" in msg_up or "LÍMITE" in msg_up or "FUERA DEL" in msg_up:
+            return "Rating de resistencia '76 / '89 fuera del límite real."
+        if "ALEJADO" in msg_up or "PUNTAJE DE RESISTENCIA" in msg_up:
+            return "Puntaje de resistencia '76 / '89 es un valor alejado no válido."
+
     if "CONTROL ESTRUCTURAL" in msg_up:
-        if "'76" in msg_up: return "Control estructural '76 fuera de límites permitidos [1, 5]."
-        return "Control estructural '89 fuera de límites permitidos [1, 5]."
-    if "EFECTO DE VOLADURA" in msg_up or "EFECTOS DE VOLADURA" in msg_up:
-        if "'76" in msg_up: return "Efecto de voladura '76 excede los límites de la escala [1, 6]."
-        return "Efecto de voladura '89 excede los límites de la escala [1, 6]."
-    if "MEDIO NO EXACTO" in msg_up and "VOLADURA" in msg_up:
-        if "'76" in msg_up:
-            return "Puntaje de efectos de voladura '76 es un valor medio no exacto."
-        return "Puntaje de efectos de voladura '89 es un valor medio no exacto."
-    if "PORCENTAJE" in msg_up and "RQD" in msg_up:
-        if "'76" in msg_up: return "Porcentaje de RQD '76 no puede ser superior al 100%."
-        return "Porcentaje de RQD '89 no puede ser superior al 100%."
+         return "Control estructural '76 / '89 fuera de límites permitidos [1, 5]."
+
+    if "EFECTO" in msg_up or "VOLADURA" in msg_up:
+        if "EXCEDE" in msg_up or "ESCALA" in msg_up:
+            return "Efecto de voladura '76 / '89 excede los límites de la escala."
+        if "MEDIO NO EXACTO" in msg_up:
+            return "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto."
+
     if "RQD" in msg_up:
-        if "'76" in msg_up: return "Puntaje de RQD '76 es un valor alejado no válido."
-        return "Puntaje de RQD '89 es un valor alejado no válido."
-    if "ES DE 0.0 M (DEBE SER" in msg_up:
-        if "'76" in msg_up: 
-            return "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero)."
-        return "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero)."
-    if "ESPACIAMIENTO PROMEDIO" in msg_up and ("POSITIVO" in msg_up or "NEGATIVO" in msg_up):
-        if "'76" in msg_up: 
-            return "El espaciamiento promedio '76 debe ser positivo."
-        return "El espaciamiento promedio '89 debe ser positivo."
-    if "ESPACIAMIENTO" in msg_up and "RANGO" in msg_up:
-        if "'76" in msg_up: return "Valor de rating de espaciamiento '76 fuera del rango [5, 30]."
-        return "Valor de rating de espaciamiento '89 fuera del rango [5, 20]."
-    if "ESPACIAMIENTO" in msg_up and "ALINEA" in msg_up:
-        if "'76" in msg_up: return "Rating de espaciamiento '76 no se alinea con el promedio."
-        return "Rating de espaciamiento '89 no se alinea con el promedio esperado."
-    if "MEDIO NO EXACTO" in msg_up and "ESPACIAMIENTO" in msg_up:
-        if "'76" in msg_up: return "Puntaje de espaciamiento '76 es un valor medio no exacto."
-        return "Puntaje de espaciamiento '89 es un valor medio no exacto."
+        if "SUPERIOR AL 100%" in msg_up or "SUPERIOR" in msg_up:
+            return "Porcentaje de RQD '76 / '89 no puede ser superior al 100%."
+        if "ALEJADO" in msg_up or "PUNTAJE DE RQD" in msg_up:
+            return "Puntaje de RQD '76 / '89 es un valor alejado no válido."
+
+    if "ESPACIAMIENTO PROMEDIO" in msg_up:
+        if "ES DE 0.0 M" in msg_up or "CERO" in msg_up:
+            return "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero)."
+        if "POSITIVO" in msg_up or "NEGATIVO" in msg_up:
+            return "El espaciamiento promedio '76 / '89 debe ser positivo."
+
+    if "ESPACIAMIENTO" in msg_up:
+        if "RANGO" in msg_up or "FUERA DEL" in msg_up:
+            return "Valor de rating de espaciamiento '76 / '89 fuera de rango."
+        if "ALINEA" in msg_up:
+            return "Rating de espaciamiento '76 / '89 no se alinea con el promedio."
+        if "MEDIO NO EXACTO" in msg_up:
+            return "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto."
+
     if "SUGERIDA A NORMALIZAR POR 'JN'" in msg_up or "NORMALIZAR POR 'JN'" in msg_up:
         return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
     if "TIPO DE ESTRUCTURA GEOLÓGICA NO PERMITIDA" in msg_up or "TIPO DE ESTRUCTURA GEOLOGICA NO PERMITIDA" in msg_up:
@@ -189,11 +157,14 @@ def simplify_message(msg):
         return "La abertura de la falla supera la longitud de la celda."
     if "PERSISTENCIA" in msg_up and "25 METROS" in msg_up or "SUPERIOR A 25 METROS" in msg_up:
         return "La persistencia es superior a 25 metros."
-    # Validación específica e inequívoca de UCS e Is50
-    if "DIVERGENTE" in msg_up:
-        return "UCS es divergente a Is50."
-    if "DIVERGENCIA" in msg_up or "IS50 * K" in msg_up or "UCS VS IS50 * K" in msg_up:
-        return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
+        
+    # Validación específica de UCS e Is50
+    if "UCS" in msg_up and "IS50" in msg_up:
+        if "DIVERGENTE" in msg_up:
+            return "UCS es divergente a Is50."
+        if "DIVERGENCIA" in msg_up or "IS50 * K" in msg_up or "UCS VS IS50 * K" in msg_up:
+            return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
+            
     if "COMBINACIÓN LITOLÓGICA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
          return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
     if "UNIDAD LITOLÓGICA" in msg_up or "UNIDAD LITOLOGICA" in msg_up:
@@ -857,39 +828,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             c_yp.border = border_thin
             
             curr_y_r += 1
-            
-        # Distribución por Geotécnico / Responsable
-        ws_err.cell(row=10, column=6, value="DISTRIBUCIÓN POR GEOTÉCNICO / RESPONSABLE").font = font_section
-        for idx, col in enumerate(["Logger Geotécnico", "Ocurrencias (N)", "% Contribución"], start=6):
-            cell = ws_err.cell(row=11, column=idx, value=col)
-            cell.font = font_header
-            cell.fill = fill_primary
-            cell.alignment = alignment_center
-            cell.border = border_thin
-            
-        r_dist_sc = defaultdict(int)
-        for r in err_records:
-            r_dist_sc[str(r.get("geotecnico", "N/A"))] += 1
-            
-        curr_s_r = 12
-        for sc, s_qty in sorted(r_dist_sc.items()):
-            ws_err.cell(row=curr_s_r, column=6, value=sc).font = font_bold
-            ws_err.cell(row=curr_s_r, column=6).alignment = alignment_center
-            ws_err.cell(row=curr_s_r, column=6).border = border_thin
-            
-            c_sq = ws_err.cell(row=curr_s_r, column=7, value=s_qty)
-            c_sq.font = font_regular
-            c_sq.alignment = alignment_right
-            c_sq.number_format = '#,##0'
-            c_sq.border = border_thin
-            
-            c_sp = ws_err.cell(row=curr_s_r, column=8, value=s_qty / max(1, tot_affected))
-            c_sp.font = font_regular
-            c_sp.alignment = alignment_right
-            c_sp.number_format = '0.00%'
-            c_sp.border = border_thin
-            
-            curr_s_r += 1
 
         ws_err.append([])
         ws_err.append([None, "REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)"])
@@ -1154,14 +1092,13 @@ def obtener_incidencias_paginadas(
 ):
     if audit_id: 
         raw_file = os.path.join(uploads_dir, "history", f"{audit_id}_diagnostico.json")
-        compact_file = os.path.join(uploads_dir, "history", f"{audit_id}_compact.json")
-        if not os.path.exists(raw_file) or not os.path.exists(compact_file):
-            raise HTTPException(status_code=202, detail="La auditoría se encuentra en procesamiento...")
+        if not os.path.exists(raw_file):
+            return {"data": [], "page": 1, "total_pages": 1, "total_records": 0}
     else: 
         raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
         
     if not os.path.exists(raw_file): 
-        raise HTTPException(status_code=404, detail="El diagnóstico solicitado no existe.")
+        return {"data": [], "page": 1, "total_pages": 1, "total_records": 0}
         
     with open(raw_file, "r", encoding="utf-8") as f:
         diag_data = json.load(f)

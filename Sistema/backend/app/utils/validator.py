@@ -47,7 +47,6 @@ def get_row_val(row_dict, key):
     if key in row_dict:
         return row_dict[key]
     
-    # Normalización ultra-robusta de caracteres especiales y espaciado
     def clean_k(s):
         return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
     
@@ -87,18 +86,14 @@ def match_lito_column(catalog_val, input_val) -> bool:
     c_val = str(catalog_val or '').strip().upper()
     i_val = str(input_val or '').strip().upper()
     
-    # Excepción del Guion (-): Si el catálogo contiene '-' o está vacío, 
-    # se permite que el valor quede vacío, o acepta cualquier otra litología sin restricción.
     if c_val == '-' or c_val == '':
         return True
         
     options = [opt.strip() for opt in c_val.split('/')]
     for opt in options:
-        # Excepción Varios: Acepta cualquier tipo de litología, con la única condición de que no esté vacío.
         if opt == 'VARIOS' or opt == 'CUALQUIERA':
             return i_val not in ['', '-', 'N/A', 'NONE']
             
-        # Excepción Intrusivo: Acepta cualquier código que pertenezca al tipo o clase Intrusivo
         if opt == 'INTRUSIVO' and i_val in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]:
             return True
             
@@ -129,8 +124,10 @@ def normalize_geological_group(group_str):
 
 def validate_geotechnical_header(row_dict, registrar_error):
     dip_talud = sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float)
-    if dip_talud is not None and not (-90.0 <= dip_talud <= 90.0):
-        registrar_error("DIP_TALUD", dip_talud, "ALERTA", f"Ángulo del talud fuera del rango [-90, 90] grados. Valor actual de DIP_TALUD: {dip_talud}°.")
+    if dip_talud is not None:
+        dip_talud = round(dip_talud, 2)
+        if not (-90.0 <= dip_talud <= 90.0):
+            registrar_error("DIP_TALUD", dip_talud, "ALERTA", f"Ángulo del talud fuera del rango [-90, 90] grados. Valor actual de DIP_TALUD: {dip_talud}°.")
 
 def validate_geomechanical_properties(row_dict, registrar_error):
     # 1. Validación de Condición de Agua (Códigos)
@@ -169,7 +166,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         elif agua_val_89 not in [15, 10, 7, 4, 0]:
             registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "ADVERTENCIA", f"El valor de agua '89 es un valor medio no exacto. Valor ingresado: {agua_val_89}. Valores permitidos: [15, 10, 7, 4, 0].")
 
-    # 3. Dureza y Ratings de Resistencia ISRM (Tolerancia ±0.5)
+    # 3. Dureza y Ratings de Resistencia ISRM
     dureza_76 = sanitize_value(get_row_val(row_dict, "DUREZA  '76"), str)
     if dureza_76 is not None:
         dureza_76_clean = dureza_76.upper()
@@ -178,6 +175,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
 
     dureza_val_76 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR  '76"), float)
     if dureza_val_76 is not None:
+        dureza_val_76 = round(dureza_val_76, 2)
         if not (0 <= dureza_val_76 <= 15):
             registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "ALERTA", f"Rating de resistencia '76 fuera del límite real [0, 15]. Valor ingresado: {dureza_val_76}.")
         elif dureza_76 is not None and dureza_76.upper() in RESISTENCIA_RATING_CATALOG:
@@ -195,6 +193,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
 
     dureza_val_89 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR '89"), float)
     if dureza_val_89 is not None:
+        dureza_val_89 = round(dureza_val_89, 2)
         if not (0 <= dureza_val_89 <= 15):
             registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ALERTA", f"Rating de resistencia '89 fuera del límite real [0, 15]. Valor ingresado: {dureza_val_89}.")
         elif dureza_89 is not None and dureza_89.upper() in RESISTENCIA_RATING_CATALOG:
@@ -229,39 +228,48 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         elif vol_89 not in EFECTOS_VOLADURA_CATALOG:
             registrar_error("EFECTOS DE VOLADURA '89", vol_89, "ADVERTENCIA", f"Puntaje de efectos de voladura '89 es un valor medio no exacto. Valor ingresado: {vol_89}. Se sugieren los valores estándar de catálogo: {EFECTOS_VOLADURA_CATALOG}.")
 
-    # 6. RQD Ratings por umbral discreto (Tolerancia ±1.5) (Se excluye el valor 0.0 que representa un campo vacío/no mapeado)
+    # 6. RQD Ratings por umbral discreto
     rqd_val_76 = sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float)
     if rqd_val_76 is not None and rqd_val_76 != 0.0:
+        rqd_val_76 = round(rqd_val_76, 2)
         if not is_within_tolerance(rqd_val_76, [3, 8, 13, 17, 20], 1.5):
             registrar_error("RQD - VALOR  '76", rqd_val_76, "ADVERTENCIA", f"Puntaje de RQD '76 es un valor alejado no válido. Valor ingresado: {rqd_val_76}. Valores de catálogo esperados: [3, 8, 13, 17, 20].")
 
     rqd_val_89 = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
     if rqd_val_89 is not None and rqd_val_89 != 0.0:
+        rqd_val_89 = round(rqd_val_89, 2)
         if not is_within_tolerance(rqd_val_89, [3, 8, 13, 17, 20], 1.5):
             registrar_error("RQD - VALOR '89", rqd_val_89, "ADVERTENCIA", f"Puntaje de RQD '89 es un valor alejado no válido. Valor ingresado: {rqd_val_89}. Valores de catálogo esperados: [3, 8, 13, 17, 20].")
 
     # 7. Porcentaje de RQD (Límite físico del 100%)
     rqd_76 = sanitize_value(get_row_val(row_dict, "RQD  '76"), float)
-    if rqd_76 is not None and rqd_76 > 100.0:
-        registrar_error("RQD  '76", rqd_76, "ALERTA", f"Porcentaje de RQD '76 no puede ser superior al 100%. Porcentaje actual: {rqd_76}%.")
+    if rqd_76 is not None:
+        rqd_76 = round(rqd_76, 2)
+        if rqd_76 > 100.0:
+            registrar_error("RQD  '76", rqd_76, "ALERTA", f"Porcentaje de RQD '76 no puede ser superior al 100%. Porcentaje actual: {rqd_76}%.")
+            
     rqd_89 = sanitize_value(get_row_val(row_dict, "RQD '89"), float)
-    if rqd_89 is not None and rqd_89 > 100.0:
-        registrar_error("RQD '89", rqd_89, "ALERTA", f"Porcentaje de RQD '89 no puede ser superior al 100%. Porcentaje actual: {rqd_89}%.")
+    if rqd_89 is not None:
+        rqd_89 = round(rqd_89, 2)
+        if rqd_89 > 100.0:
+            registrar_error("RQD '89", rqd_89, "ALERTA", f"Porcentaje de RQD '89 no puede ser superior al 100%. Porcentaje actual: {rqd_89}%.")
 
     # 8. Espaciamiento Promedio y Coherencia de Ratings
     espac_prom_76 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO PROMEDIO   '76"), float)
-    espac_val_76 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR    '76"), float) # Toleramos decimales
+    espac_val_76 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR    '76"), float)
 
     if espac_prom_76 is not None:
+        espac_prom_76 = round(espac_prom_76, 2)
         if espac_prom_76 < 0:
             registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ALERTA", f"El espaciamiento promedio '76 no puede ser negativo. Valor ingresado: {espac_prom_76} m.")
         elif espac_prom_76 == 0:
             registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ALERTA", f"Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).")
 
     if espac_val_76 is not None and espac_val_76 != 0:
+        espac_val_76 = round(espac_val_76, 2)
         if not (5.0 <= espac_val_76 <= 30.0):
             registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ALERTA", f"Valor de rating de espaciamiento '76 fuera del rango [5, 30]. Valor ingresado: {espac_val_76}.")
-        elif espac_val_76 % 1 == 0:  # Validar límites discretos tradicionales de catálogo únicamente si no tiene decimales
+        elif espac_val_76 % 1 == 0:
             val_int = int(espac_val_76)
             if val_int not in [5, 10, 20, 25, 30]:
                 registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ADVERTENCIA", f"Puntaje de espaciamiento '76 es un valor medio no exacto. Valor ingresado: {val_int}. Valores de catálogo estándar: [5, 10, 20, 25, 30].")
@@ -275,18 +283,20 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                     registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ALERTA", f"Rating de espaciamiento '76 no se alinea con el promedio. Valor ingresado: {val_int}, Espaciamiento promedio: {espac_prom_76} m. Se esperaba {expected} según la escala discreta R76.")
 
     espac_prom_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO PROMEDIO '89"), float)
-    espac_val_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR '89"), float) # Toleramos decimales
+    espac_val_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR '89"), float)
 
     if espac_prom_89 is not None:
+        espac_prom_89 = round(espac_prom_89, 2)
         if espac_prom_89 < 0:
             registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ALERTA", f"El espaciamiento promedio '89 no puede ser negativo. Valor ingresado: {espac_prom_89} m.")
         elif espac_prom_89 == 0:
             registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ALERTA", f"Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).")
 
     if espac_val_89 is not None and espac_val_89 != 0:
+        espac_val_89 = round(espac_val_89, 2)
         if not (5.0 <= espac_val_89 <= 20.0):
             registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ALERTA", f"Valor de rating de espaciamiento '89 fuera del rango [5, 20]. Valor ingresado: {espac_val_89}.")
-        elif espac_val_89 % 1 == 0:  # Validar límites discretos tradicionales de catálogo únicamente si no tiene decimales
+        elif espac_val_89 % 1 == 0:
             val_int = int(espac_val_89)
             if val_int not in [5, 8, 10, 15, 20]:
                 registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ADVERTENCIA", f"Puntaje de espaciamiento '89 es un valor medio no exacto. Valor ingresado: {val_int}. Valores de catálogo estándar: [5, 8, 10, 15, 20].")
@@ -352,29 +362,28 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
         if alt_pared_clean not in ALTERACION_CATALOG:
             registrar_error("ALTERACION", alt_pared, "ALERTA", f"Código de alteración inválido. Código ingresado: '{alt_pared}'. Debe ser uno de {ALTERACION_CATALOG}.")
 
-    # 7. Espesor y Abertura (Inconsistencia física y validaciones de negativos)
+    # 7. Espesor y Abertura
     espesor = sanitize_value(get_row_val(row_dict, "ESPESOR mm."), float)
+    if espesor is not None:
+        espesor = round(espesor, 2)
     abertura = sanitize_value(get_row_val(row_dict, "ABERTURA mm."), float)
+    if abertura is not None:
+        abertura = round(abertura, 2)
 
-    # Estructuras exceptuadas explícitamente de la regla de espesor vs abertura
     tipo_junta_clean = tipo_junta.strip().upper() if tipo_junta is not None else ""
     es_estructura_exceptuada = tipo_junta_clean in ['F', 'RF', 'VN', 'SZ', 'F+10', 'BED']
 
-    # Validar que no sean valores negativos
     if espesor is not None and espesor < 0:
         registrar_error("ESPESOR mm.", espesor, "ALERTA", f"El espesor del relleno no puede ser un valor negativo. Valor ingresado: {espesor} mm.")
     if abertura is not None and abertura < 0:
         registrar_error("ABERTURA mm.", abertura, "ALERTA", f"La abertura total no puede ser un valor negativo. Valor ingresado: {abertura} mm.")
 
-    # Si el espesor supera a la abertura, lanzamos ALERTA excepto si es una de las estructuras exceptuadas
     if espesor is not None and abertura is not None and espesor > abertura:
         if not es_estructura_exceptuada:
             registrar_error("ESPESOR mm.", espesor, "ALERTA", f"Espesor del relleno es superior a la abertura total y no pertenece a F, RF, VN, SZ, F+10, BED. Estructura geológica: '{tipo_junta_clean or 'N/A'}', Espesor: {espesor} mm, Abertura total: {abertura} mm.")
 
-
     # 8. Comprobaciones de escala física de la abertura
     if abertura is not None:
-        
         if es_estructura_exceptuada:
             if dist_celda is not None and (abertura / 1000.0) > dist_celda:
                 registrar_error("ABERTURA mm.", abertura, "ALERTA", f"La abertura de la falla supera la longitud de la celda y no pertenece a F, RF, VN, SZ, F+10, BED. Tipo de junta: '{tipo_junta_clean}', Abertura: {abertura} mm, Longitud de la celda (Dist.Celda): {dist_celda} m.")
@@ -382,24 +391,31 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
     # 9. Persistencia de discontinuidad (Continuidad física vs celda - ERROR DE SUPERACIÓN ELIMINADO)
     cont_junta = sanitize_value(get_row_val(row_dict, "CONTINUIDAD m."), float)
     if cont_junta is not None:
+        cont_junta = round(cont_junta, 2)
         if cont_junta < 0:
             registrar_error("CONTINUIDAD m.", cont_junta, "ALERTA", f"La persistencia de discontinuidad (continuidad) no puede ser un valor negativo. Valor ingresado: {cont_junta} m.")
 
     # 10. Espaciamiento de discontinuidad estructural
     espac_struct = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO m."), float)
-    if espac_struct is not None and espac_struct < 0:
-        registrar_error("ESPACIAMIENTO m.", espac_struct, "ALERTA", f"El espaciamiento de discontinuidad no puede ser un valor negativo. Valor ingresado: {espac_struct} m.")
+    if espac_struct is not None:
+        espac_struct = round(espac_struct, 2)
+        if espac_struct < 0:
+            registrar_error("ESPACIAMIENTO m.", espac_struct, "ALERTA", f"El espaciamiento de discontinuidad no puede ser un valor negativo. Valor ingresado: {espac_struct} m.")
 
-    # 11. Inclinación y Dirección de Estructura (Rangos geográficos reales de orientación)
+    # 11. Inclinación y Dirección de Estructura
     dip_estruc = sanitize_value(get_row_val(row_dict, 'DIP'), float)
-    if dip_estruc is not None and not (-90.0 <= dip_estruc <= 90.0):
-        registrar_error("DIP", dip_estruc, "ALERTA", f"Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados. Valor ingresado: {dip_estruc}°.")
+    if dip_estruc is not None:
+        dip_estruc = round(dip_estruc, 2)
+        if not (-90.0 <= dip_estruc <= 90.0):
+            registrar_error("DIP", dip_estruc, "ALERTA", f"Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados. Valor ingresado: {dip_estruc}°.")
 
     dipdir_estruc = sanitize_value(get_row_val(row_dict, 'DIP DIR'), float)
-    if dipdir_estruc is not None and not (0.0 <= dipdir_estruc <= 360.0):
-        registrar_error("DIP DIR", dipdir_estruc, "ALERTA", f"Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados. Valor ingresado: {dipdir_estruc}°.")
+    if dipdir_estruc is not None:
+        dipdir_estruc = round(dipdir_estruc, 2)
+        if not (0.0 <= dipdir_estruc <= 360.0):
+            registrar_error("DIP DIR", dipdir_estruc, "ALERTA", f"Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados. Valor ingresado: {dipdir_estruc}°.")
 
-    # 12. Consistencia en conteo de estructuras estructurales (Debe ser un valor discreto)
+    # 12. Consistencia en conteo de estructuras estructurales
     num_estrucs = sanitize_value(get_row_val(row_dict, "NUMERO DE ESTRUCTURAS") or get_row_val(row_dict, "N_ESTRUCTURAS"), float)
     if num_estrucs is not None:
         if num_estrucs % 1 != 0:
@@ -435,21 +451,21 @@ def validate_lithology_correlation(row_dict, registrar_error):
                 matched_row = row
                 break
                 
-        # Intento 2: Coincidencia por Lito 3 únicamente (si la celda l3 está poblada)
+        # Intento 2: Coincidencia por Lito 3 (es muy específica)
         if not matched_row and l3_clean:
             for row in LITHOLOGY_CLASSIFICATION:
                 if match_lito_column(row["lito3"], l3_clean):
                     matched_row = row
                     break
                     
-        # Intento 3: Coincidencia por Lito 1 y Lito 2 (si la celda l2 está poblada)
+        # Intento 3: Coincidencia por Lito 1 y Lito 2
         if not matched_row and l2_clean:
             for row in LITHOLOGY_CLASSIFICATION:
                 if match_lito_column(row["lito1"], l1_clean) and match_lito_column(row["lito2"], l2_clean):
                     matched_row = row
                     break
                     
-        # Intento 4: Coincidencia por Lito 1 únicamente (Fallback grueso para celdas con lito2/lito3 vacías)
+        # Intento 4: Coincidencia por Lito 1 únicamente (Fallback grueso)
         if not matched_row:
             for row in LITHOLOGY_CLASSIFICATION:
                 if match_lito_column(row["lito1"], l1_clean):
@@ -459,7 +475,6 @@ def validate_lithology_correlation(row_dict, registrar_error):
     # --- VERIFICACIÓN RIGUROSA DE LA COMBINACIÓN ---
     is_valid_combination = False
     if matched_row is not None:
-        # Validar que la fila resultante del catálogo no contradiga ningún valor que el geólogo sí haya completado
         l1_ok = match_lito_column(matched_row["lito1"], l1_clean) if l1_clean else True
         l2_ok = match_lito_column(matched_row["lito2"], l2_clean) if l2_clean else True
         l3_ok = match_lito_column(matched_row["lito3"], l3_clean) if l3_clean else True
@@ -477,13 +492,16 @@ def validate_lithology_correlation(row_dict, registrar_error):
 
     # 13. Resistencia Uniaxial UCS vs Resistencia de Carga Puntual (Is50)
     ucs_val = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
+    if ucs_val is not None:
+        ucs_val = round(ucs_val, 2)
     is50_val = sanitize_value(get_row_val(row_dict, "is50 (Mpa)"), float)
+    if is50_val is not None:
+        is50_val = round(is50_val, 2)
     
     if ucs_val is not None and is50_val is not None:
         if ucs_val <= is50_val:
             registrar_error("( UCS )  (Mpa)", ucs_val, "ALERTA", f"UCS es divergente a Is50. UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa.")
         else:
-            # Si el emparejamiento litológico falló por ser una combinación inválida, se usa un factor K neutro de 10.0
             factor_k = matched_row["k"] if (matched_row is not None and is_valid_combination) else 10.0
             expected_ucs = is50_val * factor_k
             if abs(ucs_val - expected_ucs) > 1.0:
@@ -501,12 +519,20 @@ def validate_bulk_excel(file_path, output_json_path):
         raise ValueError(f"No se pudo leer el archivo Excel. Verifique que no esté corrupto. Detalle: {str(e)}")
         
     df = clean_and_rename_columns(df)
-    print(f"    [*] [QA/QC] Columnas depuradas e indexadas. Aplicando propagación de datos secuenciales...")
+    print(f"    [*] [QA/QC] Columnas depuradas. Aplicando propagación de estación y sanitización de vacíos...")
     
-    # Propagación ffill sobre columnas de cabecera
+    # 1. Solo propagar CELDA_PADRE para poder asociar las celdas hijas a su estación
+    if 'CELDA_PADRE' in df.columns:
+        df['CELDA_PADRE'] = df['CELDA_PADRE'].replace([-1, -1.0, '-1', '-1.0'], np.nan)
+        df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
+        
+    # Normalización ultra-robusta de nombres de columnas para sanitizar con seguridad
+    def clean_col_name(s):
+        return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
+
     propagate_cols = [
-        'CELDA_PADRE', 'ESTE_FROM', 'NORTE_FROM', 'COTA_FROM', 'ESTE_TO', 'NORTE_TO', 
-        'COTA_TO', 'Dist.Celda', 'Altura', 'DIP', 'AZ_HOLE', 'DIP_TALUD', 'DIP_DIR_TALUD', 
+        'ESTE_FROM', 'NORTE_FROM', 'COTA_FROM', 'ESTE_TO', 'NORTE_TO', 'COTA_TO', 
+        'Dist.Celda', 'Altura', 'DIP', 'AZ_HOLE', 'DIP_TALUD', 'DIP_DIR_TALUD', 
         'INTEMPERISMO', "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", 
         "DUREZA  '76", "RESISTENCIA ESTIMADA VALOR  '76", "GSI VISUAL  '76", 
         "CONTROL ESTRUCTURAL  '76", "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", 
@@ -521,42 +547,63 @@ def validate_bulk_excel(file_path, output_json_path):
         "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89", "FECHA",
         'GEOTECNICO', 'Nivel', 'Lito 1', 'Lito 2', 'Lito 3', 'Unidad Litologica', 'sector_geotecnico', 'sector_geotecnicos'
     ]
-    if 'CELDA_PADRE' in df.columns:
-        # Paso 1: Propagar la columna de control 'CELDA_PADRE' globalmente para asignar la estación a cada fila
-        df['CELDA_PADRE'] = df['CELDA_PADRE'].replace([-1, -1.0, '-1', '-1.0'], np.nan)
-        df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
-        
-        # Normalización ultra-robusta de nombres de columnas para mapeo y propagación tolerante a espacios/caracteres
-        def clean_col_name(s):
-            return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
 
-        df_col_map = {clean_col_name(c): c for c in df.columns}
-        resolved_propagate_cols = []
-        for p_col in propagate_cols:
-            norm_p = clean_col_name(p_col)
-            if norm_p in df_col_map:
-                resolved_propagate_cols.append(df_col_map[norm_p])
+    df_col_map = {clean_col_name(c): c for c in df.columns}
+    resolved_propagate_cols = []
+    for p_col in propagate_cols:
+        norm_p = clean_col_name(p_col)
+        if norm_p in df_col_map:
+            resolved_propagate_cols.append(df_col_map[norm_p])
 
-        # Asegurar que CELDA_PADRE no se duplique en la lista de ffill
-        resolved_propagate_cols = [c for c in resolved_propagate_cols if c != 'CELDA_PADRE']
-
-        # Paso 2: Sanitizar columnas mapeadas colocándolas en NaN si vienen como -1
-        for col in resolved_propagate_cols:
-            df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
-        
-        # Paso 3: Propagar el resto de cabeceras de forma aislada agrupando por la 'CELDA_PADRE' ya poblada
-        if resolved_propagate_cols:
-            df[resolved_propagate_cols] = df.groupby('CELDA_PADRE')[resolved_propagate_cols].ffill()
+    # Sanitizar valores de Excel sin propagar con ffill, previniendo duplicados falsos en celdas hijas
+    for col in resolved_propagate_cols:
+        df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
 
     records = df.to_dict(orient='records')
-    print(f"    [+] [QA/QC] Propagación secuencial por CELDA_PADRE completada con éxito.")
+    
+    # Agrupar los índices de las filas por CELDA_PADRE para analizar el bloque completo de la estación
+    from collections import defaultdict
+    estacion_records = defaultdict(list)
+    for idx, row_dict in enumerate(records):
+        celda_padre = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
+        if celda_padre:
+            estacion_records[celda_padre].append((idx, row_dict))
+
+    # Determinar para cada estación y cada columna si cumple el patrón de "repetido por omisión"
+    station_col_status = defaultdict(dict)
+    for celda_padre, rows in estacion_records.items():
+        if not rows:
+            continue
+        # El primer registro es el padre
+        parent_idx, parent_row = rows[0]
+        daughter_rows = rows[1:]
+        
+        for col_key in df.columns:
+            if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2', 'CELDA_PADRE']:
+                continue
+                
+            parent_val = sanitize_value(parent_row.get(col_key), str)
+            parent_has_value = parent_val is not None
+            
+            all_daughters_empty = True
+            for d_idx, d_row in daughter_rows:
+                d_val = sanitize_value(d_row.get(col_key), str)
+                if d_val is not None:
+                    all_daughters_empty = False
+                    break
+                    
+            # Si el padre tiene valor, y todos los hijos de la columna están vacíos en el Excel, se asume patrón maestro
+            station_col_status[celda_padre][col_key] = parent_has_value and all_daughters_empty
+
     print(f"    [*] [QA/QC] Ejecutando validaciones QA/QC sobre {len(records)} registros individuales...")
     incidencias, resumen_celdas = [], {}
     total_filas = len(records)
     total_vacios, total_advertencias, total_alertas, total_ok = 0, 0, 0, 0
     filas_por_campana, filas_por_geotecnico = {}, {}
     vacios_por_campana, vacios_por_geotecnico = {}, {}
+    
     current_parent, daughter_counter = None, 0
+    parent_properties = {}
 
     for idx, row_dict in enumerate(records):
         fila_excel = idx + 2 
@@ -572,7 +619,6 @@ def validate_bulk_excel(file_path, output_json_path):
 
         camp = sanitize_value(get_row_val(row_dict, 'Campaña'), int)
         geo = sanitize_value(get_row_val(row_dict, 'GEOTECNICO'), str)
-        
         sector = sanitize_value(
             get_row_val(row_dict, 'sector_geotecnicos') or 
             get_row_val(row_dict, 'sector_geotecnico') or 
@@ -581,13 +627,32 @@ def validate_bulk_excel(file_path, output_json_path):
             get_row_val(row_dict, 'Sector Geotecnicos'),
             str
         ) or "N/A"
-        
         dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
-        if camp: 
-            filas_por_campana[str(camp)] = filas_por_campana.get(str(camp), 0) + 1
-        if geo: 
-            filas_por_geotecnico[geo] = filas_por_geotecnico.get(geo, 0) + 1
+        if celda_padre != current_parent:
+            current_parent = celda_padre
+            daughter_counter = 1
+            is_parent_row = True
+            parent_properties[celda_padre] = {
+                "camp": camp,
+                "geo": geo,
+                "sector": sector,
+                "dist_celda": dist_celda
+            }
+        else:
+            daughter_counter += 1
+            is_parent_row = False
+
+        props = parent_properties.get(celda_padre, {})
+        resolved_camp = props.get("camp") or camp
+        resolved_geo = props.get("geo") or geo
+        resolved_sector = props.get("sector") or sector
+        resolved_dist_celda = props.get("dist_celda") or dist_celda
+
+        if resolved_camp: 
+            filas_por_campana[str(resolved_camp)] = filas_por_campana.get(str(resolved_camp), 0) + 1
+        if resolved_geo: 
+            filas_por_geotecnico[resolved_geo] = filas_por_geotecnico.get(resolved_geo, 0) + 1
 
         if celda_padre not in resumen_celdas:
             resumen_celdas[celda_padre] = {
@@ -596,14 +661,9 @@ def validate_bulk_excel(file_path, output_json_path):
                 "advertencias": 0,
                 "alertas": 0,
                 "estado_celda": "OK",
-                "dist_celda": dist_celda if dist_celda is not None else 0.0,
-                "campania": str(camp) if camp else "N/A"
+                "dist_celda": resolved_dist_celda if resolved_dist_celda is not None else 0.0,
+                "campania": str(resolved_camp) if resolved_camp else "N/A"
             }
-
-        if celda_padre != current_parent:
-            current_parent, daughter_counter = celda_padre, 1
-        else:
-            daughter_counter += 1
 
         celda_hija = f"{celda_padre}-{daughter_counter}"
         resumen_celdas[celda_padre]["total_hijas"] += 1
@@ -614,13 +674,15 @@ def validate_bulk_excel(file_path, output_json_path):
             incidencias.append({
                 "fila_excel": fila_excel, "celda_padre": celda_padre, "celda_hija": celda_hija,
                 "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg,
-                "campania": str(camp) if camp else "N/A", "geotecnico": geo if geo else "N/A", "sector_geotecnico": sector
+                "campania": str(resolved_camp) if resolved_camp else "N/A", 
+                "geotecnico": resolved_geo if resolved_geo else "N/A", 
+                "sector_geotecnico": resolved_sector
             })
             if tipo == "VACIO":
                 total_vacios += 1
                 resumen_celdas[celda_padre]["vacios"] += 1
-                if camp: vacios_por_campana[str(camp)] = vacios_por_campana.get(str(camp), 0) + 1
-                if geo: vacios_por_geotecnico[geo] = vacios_por_geotecnico.get(geo, 0) + 1
+                if resolved_camp: vacios_por_campana[str(resolved_camp)] = vacios_por_campana.get(str(resolved_camp), 0) + 1
+                if resolved_geo: vacios_por_geotecnico[resolved_geo] = vacios_por_geotecnico.get(resolved_geo, 0) + 1
             elif tipo == "ADVERTENCIA":
                 total_advertencias += 1
                 resumen_celdas[celda_padre]["advertencias"] += 1
@@ -630,11 +692,23 @@ def validate_bulk_excel(file_path, output_json_path):
                 row_has_errors = True
 
         # 1. Validar campos obligatorios vacíos (RELLENO 2 es OPCIONAL)
+        structural_mandatory_cols = [
+            'TIPO', 'TIPO DE ESTRUCT', 'TIPO DE ESTRUCTURA', 'JRC', 'RUGOSIDAD DE ESTRUCTURAS', 
+            'FORMA DE ESTRUCTURA', 'ALTERACION', 'ESPESOR mm.', 'ABERTURA mm.', 'CONTINUIDAD m.', 
+            'ESPACIAMIENTO m.', 'DIP', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS'
+        ]
+        structural_mandatory_clean = [clean_col_name(c) for c in structural_mandatory_cols]
+
         for col_key in df.columns:
-            if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2']: continue
+            if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2']: 
+                continue
+                
+            # Omisión Inteligente de Vacíos: Si es celda secundaria (hija) y la columna NO es de tipo estructural,
+            # omitimos por completo el chequeo de vacío, ya que las columnas de cabecera/geomecánica solo son obligatorias en la fila maestra (padre).
+            if not is_parent_row and clean_col_name(col_key) not in structural_mandatory_clean:
+                continue
+
             v = sanitize_value(row_dict.get(col_key), str)
-            
-            # Si el valor es 0 o 0.0 en columnas que no admiten este rating, lo tratamos como VACÍO
             col_key_norm = "".join(col_key.split()).replace(".", "").upper()
             es_columna_rating_vacio = any(
                 x in col_key_norm for x in ["RQD", "EFECTOSDEVOLADURA", "CONTROLESTRUCTURAL", "ESPACIAMIENTOVALOR"]
@@ -646,10 +720,23 @@ def validate_bulk_excel(file_path, output_json_path):
                 registrar_error(col_key, None, "VACIO", f"Campo obligatorio se encuentra vacío. Columna: '{col_key}'.")
 
         # 2. Desglose de validaciones estructuradas
-        validate_geotechnical_header(row_dict, registrar_error)
-        validate_geomechanical_properties(row_dict, registrar_error)
-        validate_structural_row(row_dict, dist_celda, registrar_error)
-        validate_lithology_correlation(row_dict, registrar_error)
+        # Omisión Inteligente de Reglas Cruzadas: Si la celda es secundaria y hereda sus datos por omisión,
+        # evitamos re-evaluar las validaciones globales de cabecera y propiedades geomecánicas.
+        # Solo se validan si el usuario ingresó explícitamente información en esta fila secundaria.
+        debe_validar_global = is_parent_row
+        if not is_parent_row:
+            # Verificamos si hay alguna columna de cabecera o geomecánica que tenga un valor explícito en esta fila secundaria
+            for col in resolved_propagate_cols:
+                if sanitize_value(row_dict.get(col), str) is not None:
+                    debe_validar_global = True
+                    break
+
+        if debe_validar_global:
+            validate_geotechnical_header(row_dict, registrar_error)
+            validate_geomechanical_properties(row_dict, registrar_error)
+            validate_lithology_correlation(row_dict, registrar_error)
+            
+        validate_structural_row(row_dict, resolved_dist_celda, registrar_error)
 
         if not row_has_errors: total_ok += 1
 
