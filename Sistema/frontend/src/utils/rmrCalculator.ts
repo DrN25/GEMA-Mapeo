@@ -9,23 +9,23 @@ import {
 export interface JointRow {
   id: number;
   familia: number; // 1 to 9
-  distancia?: number; // meters, can be undefined/-1
-  tipo_estructura: string; // JN, BED, F, SZ, CON
-  dip?: number; // degrees, can be undefined/-1
-  dip_dir?: number; // degrees, can be undefined/-1
-  n_estructuras?: number; // can be undefined/-1
-  abertura?: number; // mm, can be undefined/-1
-  espesor?: number; // mm, can be undefined/-1
-  continuidad?: number; // m, can be undefined/-1
-  espaciamiento?: number; // m, can be undefined/-1
-  extremos_visibles: number; // 0, 1, 2, 3
-  terminacion: number; // 0 to 5
-  relleno1: string; // ca, sand, ch, cl, gy, etc.
+  distancia?: number;
+  tipo_estructura: string;
+  dip?: number;
+  dip_dir?: number;
+  n_estructuras?: number;
+  abertura?: number;
+  espesor?: number;
+  continuidad?: number;
+  espaciamiento?: number;
+  extremos_visibles: number;
+  terminacion: number;
+  relleno1: string;
   relleno2?: string;
-  jrc?: number; // 0-20, can be undefined/-1
-  rugosidad: number; // 1-9
-  forma: string; // P, C, O, E, I
-  alteracion: string; // f, d, m, a, c, s
+  jrc?: number;
+  rugosidad: number;
+  forma: string;
+  alteracion: string;
 }
 
 export interface WindowHeader {
@@ -36,7 +36,7 @@ export interface WindowHeader {
   este_to: number;
   norte_to: number;
   cota_to: number;
-  largo?: number | string; // manual override length
+  largo?: number | string;
   altura: number;
   dip_talud: number;
   dipdir_talud?: number;
@@ -54,8 +54,8 @@ export interface WindowHeader {
   sect_geot?: string;
   intemperia?: string;
   alt_zona?: string;
-  condicion_agua: string; // C, H, M, E, F
-  resistencia_ucs: string; // R0 to R6
+  condicion_agua: string;
+  resistencia_ucs: string;
   comentario?: string;
   campania?: number;
   turno?: string;
@@ -73,10 +73,9 @@ export interface CalculatedJoint {
   x: number;
   y: number;
   z: number;
-  theta: number; // Ángulo teta en grados (azimut proyectado de celda)
-  alpha: number; // Ángulo alfa en grados (inclinación de celda)
-  inBounds: boolean; // Indica si se encuentra dentro de la longitud física de la celda
-  // Ratings (can be null if parameters are vacant)
+  theta: number;
+  alpha: number;
+  inBounds: boolean;
   alteracion_76: number | null;
   alteracion_89: number | null;
   relleno_76: number | null;
@@ -100,8 +99,7 @@ export interface CalculatorResult {
   dip_hole: number;
   az_hole: number;
   dip_dir_talud: number;
-  // Averages
-  familias_spacing: Record<number, number>; // simple average spacing per family
+  familias_spacing: Record<number, number>;
   jv: number;
   rqd_est: number;
   rqd_rating_76: number;
@@ -115,7 +113,6 @@ export interface CalculatorResult {
   water_rating_89: number;
   ucs_rating_76: number;
   ucs_rating_89: number;
-  // RMR Finals
   rmr_76: number;
   rmr_89: number;
   class_76: string;
@@ -123,7 +120,6 @@ export interface CalculatorResult {
   joints: CalculatedJoint[];
 }
 
-// 1. Individual parameter rating calculations
 export function getContinuidadRating(val: number | undefined | null): { r76: number | null; r89: number | null } {
   if (val === undefined || val === null || val === -1) return { r76: null, r89: null };
   if (val < 1.0) return { r76: 5, r89: 6 };
@@ -171,7 +167,6 @@ export function getRqdRating76(rqd: number): number {
 export function getRqdRating89(rqd: number): number {
   if (rqd < 0) return 3;
   if (rqd > 100) return 20;
-  // Bieniawski cubic continuous equation
   const val = -0.000006 * Math.pow(rqd, 3) + 0.0015 * Math.pow(rqd, 2) + 0.0806 * rqd + 3.0282;
   const rating = Math.round(val);
   return Math.max(3, Math.min(20, rating));
@@ -201,13 +196,11 @@ export function getRockClass(rmr: number): string {
   return "Muy Mala";
 }
 
-// 2. Comprehensive Calculator Engine
 export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]): CalculatorResult {
   const dx = header.este_to - header.este_from;
   const dy = header.norte_to - header.norte_from;
   const dz = header.cota_to - header.cota_from;
 
-  // 3D Distance (Window Largo)
   let largo = Math.sqrt(dx * dx + dy * dy + dz * dz);
   const isCoordsValid = [header.este_from, header.norte_from, header.cota_from, header.este_to, header.norte_to, header.cota_to].every(c => c !== undefined && c !== null && !isNaN(c) && c !== 0);
   if (!isCoordsValid || largo <= 0) {
@@ -216,58 +209,42 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   }
   largo = Math.round(largo);
 
-  // Inclinacion (Dip hole)
   const dip_hole = largo > 0 && isCoordsValid ? Math.asin((header.cota_from - header.cota_to) / largo) * (180 / Math.PI) : 0;
 
-  // Azimut (Az hole)
   let az_hole = largo > 0 && isCoordsValid ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
   if (az_hole < 0) az_hole += 360;
 
-  // DipDir Talud = manual override or Az_hole + 90
   const dip_dir_talud = header.dipdir_talud !== undefined && header.dipdir_talud !== -1
     ? header.dipdir_talud
     : (az_hole + 90) % 360;
 
-  // Fórmulas matemáticas de proyección angular del Excel (ACOT)
-  // Definición de arccot que coincide exactamente con el comportamiento de Excel (rango [0, PI])
   const acot = (val: number) => {
     if (val === 0) return Math.PI / 2;
     const atanVal = Math.atan(1 / val);
     return val < 0 ? Math.PI + atanVal : atanVal;
   };
 
-  // Ángulo Theta (Teta): ACOT((NORTE_TO-NORTE_FROM)/(ESTE_TO-ESTE_FROM))
-  const theta_rad = dx === 0
-    ? (dy >= 0 ? 0 : Math.PI)
-    : acot(dy / dx);
-
-  // Ángulo Alfa (Incl): SI(COTA_TO=COTA_FROM;0;ACOT((ESTE_TO-ESTE_FROM)/(COTA_TO-COTA_FROM)))
-  const alpha_rad = dz === 0
-    ? 0
-    : acot(dx / dz);
+  const theta_rad = dx === 0 ? (dy >= 0 ? 0 : Math.PI) : acot(dy / dx);
+  const alpha_rad = dz === 0 ? 0 : acot(dx / dz);
 
   const theta_deg = (theta_rad * 180) / Math.PI;
   const alpha_deg = (alpha_rad * 180) / Math.PI;
 
-  // Calculate each joint coordinates and ratings
   const calculatedJoints: CalculatedJoint[] = joints.map(j => {
     const hasDist = j.distancia !== undefined && j.distancia !== -1 && j.distancia >= 0;
     const dist = hasDist ? j.distancia! : 0.0;
 
-    // Proyecciones espaciales exactas alineadas 100% con las fórmulas de tu Excel
     const x = dist * Math.sin(theta_rad) + header.este_from;
     const y = dist * Math.cos(theta_rad) + header.norte_from;
     const z = dist * Math.cos(theta_rad) * Math.sin(alpha_rad) + header.cota_from;
 
     const inBounds = dist >= 0 && dist <= largo;
 
-    // Alteracion
     const hasAlt = j.alteracion && j.alteracion !== '-1';
     const altItem = hasAlt ? ALTERACION_CATALOG[j.alteracion] : null;
     const alt76 = altItem ? altItem.r76 : null;
     const alt89 = altItem ? altItem.r89 : null;
 
-    // Relleno (Conservador: toma el menor puntaje entre Relleno 1 y Relleno 2)
     const hasR1 = j.relleno1 && j.relleno1 !== '-1';
     const hasR2 = j.relleno2 && j.relleno2 !== '-1';
 
@@ -288,25 +265,21 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
       rel89 = rel2_ratings.r89;
     }
 
-    // Continuidad
     const hasCont = j.continuidad !== undefined && j.continuidad !== -1;
     const contRatings = hasCont ? getContinuidadRating(j.continuidad) : null;
     const cont76 = contRatings ? contRatings.r76 : null;
     const cont89 = contRatings ? contRatings.r89 : null;
 
-    // Abertura
     const hasAber = j.abertura !== undefined && j.abertura !== -1;
     const abRatings = hasAber ? getAberturaRating(j.abertura) : null;
     const ab76 = abRatings ? abRatings.r76 : null;
     const ab89 = abRatings ? abRatings.r89 : null;
 
-    // Rugosidad
     const hasRug = j.rugosidad && j.rugosidad !== -1;
     const rugItem = hasRug ? RUGOSIDAD_CATALOG[j.rugosidad] : null;
     const rug76 = rugItem ? rugItem.r76 : null;
     const rug89 = rugItem ? rugItem.r89 : null;
 
-    // Rating is only calculated if all required components are defined
     const hasAll89 = alt89 !== null && rel89 !== null && cont89 !== null && ab89 !== null && rug89 !== null;
     const hasAll76 = alt76 !== null && rel76 !== null && cont76 !== null && ab76 !== null && rug76 !== null;
 
@@ -338,7 +311,6 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     };
   });
 
-  // Simple Average per family: Σ(espac_i) / N (Mapea exactamente "=AVERAGE(J15:J17)" del Excel)
   const familias_spacing: Record<number, number> = {};
   const familias_sum_pond: Record<number, number> = {};
   const familias_sum_n: Record<number, number> = {};
@@ -352,8 +324,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
         familias_sum_pond[fam] = 0;
         familias_sum_n[fam] = 0;
       }
-      familias_sum_pond[fam] += sp; // Suma acumulada simple de espaciamientos
-      familias_sum_n[fam] += 1;     // Contador simple de registros válidos
+      familias_sum_pond[fam] += sp;
+      familias_sum_n[fam] += 1;
     }
   });
 
@@ -363,7 +335,6 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     }
   }
 
-  // Joint Volumetric Count (Jv): sum of 1/spacing for all active families
   let jv = 0;
   Object.keys(familias_spacing).forEach(k => {
     const avgSp = familias_spacing[parseInt(k)];
@@ -372,14 +343,11 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     }
   });
 
-  // RQD estimation (Palmström: 115 - 3.3 * Jv)
   const rqd_est = Math.max(0, Math.min(100, jv > 0 ? 115 - 3.3 * jv : 100));
 
-  // RQD Ratings
   const rqd_rating_76 = getRqdRating76(rqd_est);
   const rqd_rating_89 = getRqdRating89(rqd_est);
 
-  // Global Spacing (weighted average by number of structures of each row - Column AW in Excel)
   let totalStructures = 0;
   let spacingWeightedSum = 0;
   calculatedJoints.forEach(cj => {
@@ -387,7 +355,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     if (sp !== undefined && sp !== -1 && sp > 0) {
       let n = cj.row.n_estructuras;
       if (n === undefined || n === null || n === -1) {
-        n = 0; // -1 indica nulidad, no aporta a la ponderación
+        n = 0;
       }
       totalStructures += n;
       spacingWeightedSum += sp * n;
@@ -398,7 +366,6 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const spacing_rating_76 = getSpacingRating76(global_spacing);
   const spacing_rating_89 = getSpacingRating89(global_spacing);
 
-  // Global Condition Rating (weighted average by number of structures)
   let totalCond76Structures = 0;
   let totalCond89Structures = 0;
   let cond76WeightedSum = 0;
@@ -407,7 +374,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   calculatedJoints.forEach(cj => {
     let n = cj.row.n_estructuras;
     if (n === undefined || n === null || n === -1) {
-      n = 0; // -1 indica nulidad
+      n = 0;
     }
 
     if (cj.total_condicion_76 !== null) {
@@ -423,34 +390,28 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 20;
   const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 25;
 
-  // Water Ratings
   const waterItem = GROUNDWATER_CATALOG[header.condicion_agua] || GROUNDWATER_CATALOG['C'];
   const water_rating_76 = waterItem.rmr76;
   const water_rating_89 = waterItem.rmr89;
 
-  // UCS Strength Ratings
-  let ucs_rating_76 = 5;
+  // CORRECCIÓN MATEMÁTICA DE RATINGS DE RESISTENCIA (UCS) ALINEADA AL ESTÁNDAR EXCEL
+  let ucs_rating_76 = 7;
   let ucs_rating_89 = 7;
   if (header.ucs_mpa !== undefined && header.ucs_mpa !== null && !isNaN(header.ucs_mpa)) {
-    const ucs = header.ucs_mpa;
-    if (ucs > 250) { ucs_rating_89 = 15; ucs_rating_76 = 10; }
-    else if (ucs > 100) { ucs_rating_89 = 12; ucs_rating_76 = 8; }
-    else if (ucs > 50) { ucs_rating_89 = 7; ucs_rating_76 = 5; }
-    else if (ucs > 25) { ucs_rating_89 = 4; ucs_rating_76 = 2; }
-    else if (ucs > 5) { ucs_rating_89 = 2; ucs_rating_76 = 1; }
-    else { ucs_rating_89 = 1; ucs_rating_76 = 0; }
+    const ucsValue = header.ucs_mpa;
+    if (ucsValue > 250) { ucs_rating_89 = 15; ucs_rating_76 = 15; }
+    else if (ucsValue > 100) { ucs_rating_89 = 12; ucs_rating_76 = 12; }
+    else if (ucsValue > 50) { ucs_rating_89 = 7; ucs_rating_76 = 7; }
+    else if (ucsValue > 25) { ucs_rating_89 = 4; ucs_rating_76 = 4; }
+    else if (ucsValue > 5) { ucs_rating_89 = 2; ucs_rating_76 = 2; }
+    else if (ucsValue > 1) { ucs_rating_89 = 1; ucs_rating_76 = 1; }
+    else { ucs_rating_89 = 0; ucs_rating_76 = 0; }
   } else {
     const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
     ucs_rating_89 = strengthItem.score;
-    if (header.resistencia_ucs === 'R6') ucs_rating_76 = 10;
-    else if (header.resistencia_ucs === 'R5') ucs_rating_76 = 8;
-    else if (header.resistencia_ucs === 'R4') ucs_rating_76 = 5;
-    else if (header.resistencia_ucs === 'R3') ucs_rating_76 = 2;
-    else if (header.resistencia_ucs === 'R2') ucs_rating_76 = 1;
-    else ucs_rating_76 = 0;
+    ucs_rating_76 = strengthItem.score; // Se remueven los límites manuales incorrectos de R76
   }
 
-  // RMR Finals
   const rmr_76 = ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
   const rmr_89 = ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;
 

@@ -29,13 +29,56 @@ RESISTENCIA_RATING_CATALOG = {
     "R0": {"min_ucs": 0.25,  "r89": 0,  "r76": 0,  "denom": "Extremadamente débil"}
 }
 
-# 3. TABLA CONTROL ESTRUCTURAL
+# 3. VALORES DE ALTERACION (Unificado de calculator.py)
+ALTERACION_RATING_CATALOG = {
+    "f": {"r89": 6, "r76": 5},
+    "d": {"r89": 5, "r76": 5},
+    "m": {"r89": 3, "r76": 4},
+    "a": {"r89": 3, "r76": 3},
+    "c": {"r89": 2, "r76": 2},
+    "s": {"r89": 1, "r76": 1},
+}
+
+# 4. VALORES DE RUGOSIDAD (Unificado de calculator.py)
+RUGOSIDAD_RATING_CATALOG = {
+    1: {"r89": 6, "r76": 5},
+    2: {"r89": 5, "r76": 4},
+    3: {"r89": 5, "r76": 4},
+    4: {"r89": 3, "r76": 2},
+    5: {"r89": 3, "r76": 2},
+    6: {"r89": 1, "r76": 0},
+    7: {"r89": 1, "r76": 0},
+    8: {"r89": 0, "r76": 0},
+    9: {"r89": 0, "r76": 0},
+}
+
+# 5. CONSTANTES DE RELLENO (Unificado de calculator.py)
+RELLENO_TIPO = {
+    "cwf": 3,
+    "si": 1,
+    "sf": 1,
+    "ep": 1,
+    "ox": 1,
+    "g": 2,
+    "cl": 2,
+    "ca": 2,
+}
+
+RELLENO_VALORES = {
+    1: {"r89": 4, "r76": 4}, # Duro < 5mm
+    2: {"r89": 2, "r76": 3}, # Duro >= 5mm
+    3: {"r89": 2, "r76": 2}, # Blando < 5mm
+    4: {"r89": 0, "r76": 0}, # Blando >= 5mm
+    5: {"r89": 6, "r76": 5}, # Sin relleno (cwf)
+}
+
+# 6. TABLA CONTROL ESTRUCTURAL
 CONTROL_ESTRUCTURAL_CATALOG = [1, 2, 3, 4, 5]
 
-# 4. TABLA EFECTOS DE VOLADURA
+# 7. TABLA EFECTOS DE VOLADURA
 EFECTOS_VOLADURA_CATALOG = [1, 2, 3, 5, 6]
 
-# 5. TABLA RQD% (Ratings por umbral discreto)
+# 8. TABLA RQD% (Ratings por umbral discreto)
 RQD_RATINGS_CATALOG = [
     {"limit": 25,  "r76": 3,  "r89": 3},
     {"limit": 50,  "r76": 8,  "r89": 8},
@@ -44,7 +87,7 @@ RQD_RATINGS_CATALOG = [
     {"limit": 100, "r76": 20, "r89": 20}
 ]
 
-# 6. TABLA ESPACIAMIENTO (Puntajes límites)
+# 9. TABLA ESPACIAMIENTO (Puntajes límites)
 ESPACIAMIENTO_R89_CATALOG = [
     {"limit": 0.06, "rating": 5},   # < 60 mm
     {"limit": 0.20, "rating": 8},   # 60-200 mm
@@ -61,22 +104,22 @@ ESPACIAMIENTO_R76_CATALOG = [
     {"limit": float('inf'), "rating": 30} # > 3000 mm
 ]
 
-# 7. TABLA TIPO DE ESTRUCTURA
-TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'DQ', 'F', 'JN', 'SZ', 'VN', 'SE', 'F+10', 'F-10', '-1', 'RF']
-
-# 8. TABLA TIPO DE RELLENO ACTUALIZADA CON NOMBRES REALES DE EXCEL
+# 10. TABLA TIPO DE ESTRUCTURA
+TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'F', 'JN', 'SZ', '-1']
+    
+# 11. TABLA TIPO DE RELLENO ACTUALIZADA CON NOMBRES REALES DE EXCEL
 TIPO_RELLENO_CATALOG = ['ca', 'sand', 'ch', 'cl', 'gy', 'rxf', 'fbx', 'gou', 'g', 'pat', 'sio', 'si', 'qz', 'su', 'sf', 'ox', 'ep', 'c', '-1']
 
-# 9. TABLA PERFILES DE RUGOSIDAD TIPICOS (ISRM, 1989)
+# 12. TABLA PERFILES DE RUGOSIDAD TIPICOS (ISRM, 1989)
 RUGOSIDAD_CATALOG = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-# 10. TABLA FORMA DE ESTRUCTURA
+# 13. TABLA FORMA DE ESTRUCTURA
 FORMA_ESTRUCTURA_CATALOG = ['P', 'C', 'O', 'E', 'I']
 
-# 11. TABLA TIPOS DE ALTERACION
+# 14. TABLA TIPOS DE ALTERACION
 ALTERACION_CATALOG = ['f', 'd', 'm', 'a', 'c', 's', '-1']
 
-# 12. TABLA LITOLOGÍAS Y FACTOR K
+# 15. TABLA LITOLOGÍAS Y FACTOR K
 LITHOLOGY_CLASSIFICATION = [
     {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_EQ", "k": 8.29},
     {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_P", "k": 8.53},

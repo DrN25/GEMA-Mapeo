@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { Compass } from 'lucide-react';
 import { FormulaTooltipTrigger } from './FormulaTooltip';
+import { COLUMN_LABELS, ISRM_TABLE } from '../utils/geomecColumns';
 
 interface RmrAnalysisProps {
   header: WindowHeader;
@@ -29,21 +30,16 @@ const handleNumberInputLimit = (value: string, intDigits: number, decDigits: num
   return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
 };
 
-// Sanitizador global de entrada decimal para unificar de coma a punto en tiempo real
-const sanitizeDecimalInput = (val: string, intDigits: number, decDigits: number): string => {
-  const sanitized = val.replace(',', '.');
-  return handleNumberInputLimit(sanitized, intDigits, decDigits);
+// Obtiene dinámicamente el índice de resistencia ISRM (R0 - R6) basado en el UCS en MPa
+const getIsrmGrade = (val: number): string => {
+  if (val > 250) return 'R6';
+  if (val > 100) return 'R5';
+  if (val > 50) return 'R4';
+  if (val > 25) return 'R3';
+  if (val > 5) return 'R2';
+  if (val > 1) return 'R1';
+  return 'R0';
 };
-
-export const ISRM_TABLE = [
-  { indice: "R0", minUcs: 0.25, maxUcs: 1, denominacion: "Extremadamente débil" },
-  { indice: "R1", minUcs: 1, maxUcs: 5, denominacion: "Muy débil" },
-  { indice: "R2", minUcs: 5, maxUcs: 25, denominacion: "Débil" },
-  { indice: "R3", minUcs: 25, maxUcs: 50, denominacion: "Moderadamente resistente" },
-  { indice: "R4", minUcs: 50, maxUcs: 100, denominacion: "Resistente" },
-  { indice: "R5", minUcs: 100, maxUcs: 250, denominacion: "Muy resistente" },
-  { indice: "R6", minUcs: 250, maxUcs: Infinity, denominacion: "Extremadamente resistente" },
-];
 
 export default function RmrAnalysis({
   header,
@@ -71,7 +67,6 @@ export default function RmrAnalysis({
   };
 
   const handleNumericInputChange = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', val: string, intDigits: number, decDigits: number) => {
-    // CORREGIDO: Sanitizador global de comas decimales regionales en tiempo real
     const sanitized = val.replace(',', '.');
     const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits);
     setLocalValues(prev => ({ ...prev, [field]: restricted }));
@@ -79,15 +74,7 @@ export default function RmrAnalysis({
     const num = parseFloat(restricted);
     if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
       if (field === 'ucs_mpa') {
-        let resistencia_ucs = 'R4';
-        if (num > 250) resistencia_ucs = 'R6';
-        else if (num > 100) resistencia_ucs = 'R5';
-        else if (num > 50) resistencia_ucs = 'R4';
-        else if (num > 25) resistencia_ucs = 'R3';
-        else if (num > 5) resistencia_ucs = 'R2';
-        else if (num > 1) resistencia_ucs = 'R1';
-        else resistencia_ucs = 'R0';
-
+        const resistencia_ucs = getIsrmGrade(num);
         onChange({
           ...header,
           ucs_mpa: num,
@@ -118,15 +105,7 @@ export default function RmrAnalysis({
       onChange({ ...header, [field]: 0 });
     } else {
       if (field === 'ucs_mpa') {
-        let resistencia_ucs = 'R4';
-        if (num > 250) resistencia_ucs = 'R6';
-        else if (num > 100) resistencia_ucs = 'R5';
-        else if (num > 50) resistencia_ucs = 'R4';
-        else if (num > 25) resistencia_ucs = 'R3';
-        else if (num > 5) resistencia_ucs = 'R2';
-        else if (num > 1) resistencia_ucs = 'R1';
-        else resistencia_ucs = 'R0';
-
+        const resistencia_ucs = getIsrmGrade(num);
         onChange({
           ...header,
           ucs_mpa: num,
@@ -159,11 +138,17 @@ export default function RmrAnalysis({
   const ctrl = header.control_estructural !== undefined ? header.control_estructural : 3;
   const vol = header.efectos_voladura !== undefined ? header.efectos_voladura : 3;
 
-  const resistLetter = ucs > 250 ? 'A' : ucs > 100 ? 'B' : ucs > 50 ? 'C' : 'D';
+  // Se determina el código de grado ISRM correspondiente para la tabla (R0 - R6)
+  const currentResistGrade = header.ucs_mpa !== undefined && header.ucs_mpa !== null && !isNaN(header.ucs_mpa)
+    ? getIsrmGrade(header.ucs_mpa)
+    : (header.resistencia_ucs || 'R4');
 
   const p1 = calculated.familias_spacing[1] ? calculated.familias_spacing[1].toFixed(2) : '0.00';
   const p2 = calculated.familias_spacing[2] ? calculated.familias_spacing[2].toFixed(2) : '0.00';
   const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(2) : '0.00';
+
+  const ucsIs50Divergent = ucs !== undefined && is50 !== undefined && ucs <= is50;
+  const gsiVisualInvalid = gsiVisual < 0 || gsiVisual > 100;
 
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 border-l-4 border-l-violet-500 space-y-6 text-left select-none animate-fade-in shadow-xl">
@@ -194,11 +179,11 @@ export default function RmrAnalysis({
         )}
       </div>
 
-      {/* INPUTS DE CONTROL (CORREGIDO: Tipografía text-xs y pesos normales estandarizados) */}
+      {/* INPUTS DE CONTROL */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 bg-navy-950/45 p-4 rounded-xl border border-navy-900">
         <div className="col-span-2 space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            Condición de Agua
+            {COLUMN_LABELS.condicion_agua}
           </label>
           <select
             value={header.condicion_agua}
@@ -215,7 +200,7 @@ export default function RmrAnalysis({
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            UCS (MPa)
+            {COLUMN_LABELS.ucs_mpa}
           </label>
           <input
             type="text"
@@ -223,13 +208,14 @@ export default function RmrAnalysis({
             value={getInputValue('ucs_mpa', ucs)}
             onChange={(e) => handleNumericInputChange('ucs_mpa', e.target.value, 4, 2)}
             onBlur={(e) => handleNumericInputBlur('ucs_mpa', e.target.value)}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${ucsIs50Divergent ? 'border-red-500/80 bg-red-950/20 shadow-[0_0_8px_rgba(239,68,68,0.15)] text-red-300 font-bold' : 'border-navy-700/80'
+              }`}
           />
         </div>
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            is50 (MPa)
+            {COLUMN_LABELS.is50_mpa}
           </label>
           <input
             type="text"
@@ -237,13 +223,14 @@ export default function RmrAnalysis({
             value={getInputValue('is50_mpa', is50)}
             onChange={(e) => handleNumericInputChange('is50_mpa', e.target.value, 4, 2)}
             onBlur={(e) => handleNumericInputBlur('is50_mpa', e.target.value)}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${ucsIs50Divergent ? 'border-red-500/80 bg-red-950/20 shadow-[0_0_8px_rgba(239,68,68,0.15)] text-red-300 font-bold' : 'border-navy-700/80'
+              }`}
           />
         </div>
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            Cond. SUP
+            {COLUMN_LABELS.gsi_superficie}
           </label>
           <input
             type="text"
@@ -255,7 +242,7 @@ export default function RmrAnalysis({
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            Estruc.
+            {COLUMN_LABELS.gsi_estructura}
           </label>
           <input
             type="text"
@@ -267,7 +254,7 @@ export default function RmrAnalysis({
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            GSI Vis.
+            {COLUMN_LABELS.gsi_visual}
           </label>
           <input
             type="text"
@@ -275,75 +262,72 @@ export default function RmrAnalysis({
             value={getInputValue('gsi_visual', gsiVisual)}
             onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 2)}
             onBlur={(e) => handleNumericInputBlur('gsi_visual', e.target.value)}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${gsiVisualInvalid ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300' : 'border-navy-700/80'
+              }`}
           />
         </div>
       </div>
 
-      {/* LOS 4 KPIS DE VALIDACIÓN: CORREGIDOS CON GRADIENTES DE NEÓN SÓLIDOS Y NOTABLES */}
+      {/* KPIS DE VALIDACIÓN */}
       <div className="flex flex-wrap justify-center items-center gap-6 my-6 select-none animate-fade-in">
-        {/* RQD% — Gradiente Azul Celeste */}
         <div className="bg-gradient-to-r from-sky-600/90 to-sky-500/80 text-white px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(14,165,233,0.3)] border border-sky-400 hover:scale-[1.02] transition-all cursor-default">
           <div className="w-2.5 h-2.5 rounded-full bg-sky-200 shadow-[0_0_8px_rgba(255,255,255,1)] animate-pulse" />
           <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-100/90">RQD Estimado</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-100/90">{COLUMN_LABELS.rqd_est}</span>
             <span className="text-2xl font-black font-mono leading-none mt-1">{calculated.rqd_est.toFixed(2)}%</span>
           </div>
         </div>
 
-        {/* GSI Visual — Gradiente Violeta de Neón */}
         <div className="bg-gradient-to-r from-violet-600/90 to-violet-500/80 text-white px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-violet-400 hover:scale-[1.02] transition-all cursor-default">
           <div className="w-2.5 h-2.5 rounded-full bg-violet-200 shadow-[0_0_8px_rgba(255,255,255,1)]" />
           <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wider text-violet-100/90">GSI Visual</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-violet-100/90">{COLUMN_LABELS.gsi_visual}</span>
             <span className="text-2xl font-black font-mono leading-none mt-1">{gsiVisual}</span>
           </div>
         </div>
 
-        {/* RMR'76 — Gradiente Oro de Neón */}
         <div className="bg-gradient-to-r from-amber-600/90 to-amber-500/80 text-white px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(245,158,11,0.3)] border border-amber-400 hover:scale-[1.02] transition-all cursor-default">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-200 shadow-[0_0_8px_rgba(255,255,255,1)]" />
           <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-100/90">RMR 1976</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-100/90">{COLUMN_LABELS.rmr_76}</span>
             <span className="text-2xl font-black font-mono leading-none mt-1">{calculated.rmr_76.toFixed(2)}</span>
           </div>
         </div>
 
-        {/* RMR'89 — Gradiente Rosa de Neón */}
         <div className="bg-gradient-to-r from-pink-600/90 to-pink-500/80 text-white px-6 py-3.5 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(236,72,153,0.3)] border border-pink-400 hover:scale-[1.02] transition-all cursor-default">
           <div className="w-2.5 h-2.5 rounded-full bg-pink-200 shadow-[0_0_8px_rgba(255,255,255,1)]" />
           <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wider text-pink-100/90">RMR 1989</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-pink-100/90">{COLUMN_LABELS.rmr_89}</span>
             <span className="text-2xl font-black font-mono leading-none mt-1">{calculated.rmr_89.toFixed(2)}</span>
           </div>
         </div>
       </div>
 
-      {/* TABLA DE VALORACIÓN (CORREGIDA: Tipografía text-xs estandarizada y padding pulido) */}
+      {/* TABLA DE VALORACIÓN DINÁMICA */}
       <div className="overflow-x-auto rounded-xl border border-navy-800 bg-navy-950/40 shadow-inner">
         <table className="w-full text-left text-xs border-collapse border-separate border-spacing-0" style={{ minWidth: '1200px' }}>
           <thead>
             <tr className="bg-navy-900/80 text-slate-300 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
               <th className="py-3 px-3 text-center sticky left-0 bg-navy-900 z-10 w-20 border-r border-b border-navy-800/80">RATING</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Cond. Agua</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Valor Agua</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Resistencia</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Val Resist.</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Cond. SUP</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Estruc. GSI</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">GSI Visual</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Ctrl. Estruc.</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Ef. Voladura</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">RQD Valor</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">RQD (%)</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Frec. Frac.</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Tam. Bloque</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Espac. Prom</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Espac. Val</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">Val ConDisc</th>
-              <th className="py-3 px-3 text-center border-r border-b border-navy-800/80 bg-navy-900/40 text-slate-200 font-extrabold shadow-[inset_0_0_10px_rgba(255,255,255,0.05)]">RMR FINAL</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">UCS (MPa)</th>
-              <th className="py-3 px-2 text-center border-b border-navy-800/80 bg-navy-900/20">is50 (MPa)</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.condicion_agua_short}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.val_agua_sub}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.resistencia_ucs}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.val_resist_sub}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.gsi_superficie}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.gsi_estructura}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.gsi_visual}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.control_estructural_short}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.efectos_voladura_short}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.rqd_valor_sub}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.rqd_est}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.jv}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.block_size}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.global_spacing}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.espac_val_sub}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.condicion_rating_sub}</th>
+              <th className="py-3 px-3 text-center border-r border-b border-navy-800/80 bg-navy-900/40 text-slate-200 font-extrabold shadow-[inset_0_0_10px_rgba(255,255,255,0.05)]">{COLUMN_LABELS.rmr_final_sub}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.ucs_mpa}</th>
+              <th className="py-3 px-2 text-center border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.is50_mpa}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-navy-900/50 text-slate-300 font-medium text-xs">
@@ -357,8 +341,8 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold">
-                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: resistLetter }} position="bottom" enabled={showFormulas}>
-                  <span>{resistLetter}</span>
+                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: currentResistGrade }} position="bottom" enabled={showFormulas}>
+                  <span>{currentResistGrade}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
@@ -425,8 +409,8 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold">
-                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: resistLetter }} position="bottom" enabled={showFormulas}>
-                  <span>{resistLetter}</span>
+                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: currentResistGrade }} position="bottom" enabled={showFormulas}>
+                  <span>{currentResistGrade}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">

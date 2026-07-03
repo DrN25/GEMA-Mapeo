@@ -12,373 +12,23 @@ import {
 import { FormulaTooltipTrigger } from './FormulaTooltip';
 import PltExcelImportModal from './PltExcelImportModal';
 import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
-
-export const CAT_TIPO_LITOLOGICO = ["INTRUSIVOS", "SEDIMENTARIOS", "METAMORFICAS", "BRECHAS", "ENDOSKARN"];
-export const CAT_TIPO_FRACTURA = ["M", "E", "C"];
-export const CAT_DIRECCION_ROTURA = ["Pa", "Pe", "NA"];
-
-export const ISRM_TABLE = [
-  { indice: "R0", minUcs: 0.25, maxUcs: 1, denominacion: "Extremadamente débil" },
-  { indice: "R1", minUcs: 1, maxUcs: 5, denominacion: "Muy débil" },
-  { indice: "R2", minUcs: 5, maxUcs: 25, denominacion: "Débil" },
-  { indice: "R3", minUcs: 25, maxUcs: 50, denominacion: "Moderadamente resistente" },
-  { indice: "R4", minUcs: 50, maxUcs: 100, denominacion: "Resistente" },
-  { indice: "R5", minUcs: 100, maxUcs: 250, denominacion: "Muy resistente" },
-  { indice: "R6", minUcs: 250, maxUcs: Infinity, denominacion: "Extremadamente resistente" },
-];
-
-function getLito2Options(l1: string) {
-  if (!l1) return [];
-  return Array.from(new Set(
-    LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === l1).map(item => item.litologia)
-  )).sort();
-}
-
-function getLito3Options(l1: string, l2: string | null | undefined) {
-  if (!l1 || !l2) return [];
-  return Array.from(new Set(
-    LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === l1 && item.litologia === l2).map(item => item.codigo)
-  )).sort();
-}
-
-function getIsrmClass(ucs: number | null) {
-  if (ucs === null || ucs === undefined || isNaN(ucs)) return null;
-  const match = ISRM_TABLE.find(r => ucs >= r.minUcs && ucs < r.maxUcs);
-  return match ? { indice: match.indice, denominacion: match.denominacion } : null;
-}
-
-export function applyPltFormulas(row: any) {
-  const r = { ...row };
-  const num = (v: any) => (v !== null && v !== undefined && v !== "" && !isNaN(Number(v))) ? Number(v) : null;
-
-  const celdaStr = String(r.celda_mapeo || "").trim().toUpperCase();
-  const muestraStr = String(r.muestra || "").trim();
-  r.codigo_muestra = celdaStr && muestraStr ? `${celdaStr}-${muestraStr}` : "";
-
-  const w1 = num(r.ancho_w1);
-  const w2 = num(r.ancho_w2);
-  r.ancho_w = (w1 !== null && w2 !== null) ? Math.round((w1 + w2) / 2 * 100) / 100 : null;
-
-  const L = num(r.longitud_l);
-  const D = num(r.espesor_d);
-  const W = r.ancho_w;
-
-  r.muestra_valida_longitud = (L !== null && D !== null) ? (L >= D ? "SÍ" : "NO") : null;
-  r.muestra_valida_ancho = (D !== null && W !== null) ? (D > 0.3 * W && D < W ? "SÍ" : "NO") : null;
-  r.diametro_equivalente = (D !== null && W !== null) ? Math.round(Math.sqrt(4 * D * W / Math.PI) * 100) / 100 : null;
-  r.f = (r.diametro_equivalente !== null) ? Math.round(Math.pow((r.diametro_equivalente * 10) / 50, 0.45) * 10000) / 10000 : null;
-
-  const P = num(r.fuerza_p);
-  r.is_mpa = (P !== null && r.diametro_equivalente !== null && r.diametro_equivalente > 0)
-    ? Math.round((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2) * 10000) / 10000
-    : null;
-  r.is_50 = (r.is_mpa !== null && r.f !== null) ? Math.round(r.is_mpa * r.f * 10000) / 10000 : null;
-
-  const K = num(r.factor_conversion_k);
-  r.ucs = (r.is_50 !== null && K !== null) ? Math.round(r.is_50 * K * 100) / 100 : null;
-
-  const cls = getIsrmClass(r.ucs);
-  r.resistencia_isrm = cls ? cls.indice : null;
-  r.denominacion_isrm = cls ? cls.denominacion : null;
-
-  return r;
-}
-
-export function applyLitoCascade(key: string, val: any, row: any) {
-  const r = { ...row, [key]: val };
-
-  if (key === "litologia_1") {
-    r.litologia_2 = "";
-    r.litologia_3 = "";
-    r.factor_conversion_k = null;
-    r.tipo_litologico = "";
-
-    if (val) {
-      const matches = LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === val);
-      if (matches.length > 0) {
-        const uniqueL2 = Array.from(new Set(matches.map(m => m.litologia)));
-        if (uniqueL2.length === 1) {
-          r.litologia_2 = uniqueL2[0];
-          const matchesL2 = matches.filter(m => m.litologia === uniqueL2[0]);
-          const uniqueL3 = Array.from(new Set(matchesL2.map(m => m.codigo)));
-          if (uniqueL3.length === 1) {
-            r.litologia_3 = uniqueL3[0];
-            r.factor_conversion_k = matchesL2[0].k;
-          }
-        }
-        const uniqueGroups = Array.from(new Set(matches.map(m => m.grupo)));
-        if (uniqueGroups.length === 1) {
-          r.tipo_litologico = uniqueGroups[0];
-        }
-      }
-    }
-  }
-
-  else if (key === "litologia_2") {
-    r.litologia_3 = "";
-    r.factor_conversion_k = null;
-
-    if (val) {
-      const matches = LITHOLOGY_CLASSIFICATION.filter(
-        item => item.unidad === r.litologia_1 && item.litologia === val
-      );
-      if (matches.length > 0) {
-        const uniqueL3 = Array.from(new Set(matches.map(m => m.codigo)));
-        if (uniqueL3.length === 1) {
-          r.litologia_3 = uniqueL3[0];
-          r.factor_conversion_k = matches[0].k;
-        }
-        const uniqueGroups = Array.from(new Set(matches.map(m => m.grupo)));
-        if (uniqueGroups.length === 1) {
-          r.tipo_litologico = uniqueGroups[0];
-        }
-      }
-    }
-  }
-
-  else if (key === "litologia_3") {
-    if (val) {
-      const match = LITHOLOGY_CLASSIFICATION.find(
-        item => item.unidad === r.litologia_1 && item.litologia === r.litologia_2 && item.codigo === val
-      ) || LITHOLOGY_CLASSIFICATION.find(item => item.codigo === val);
-
-      if (match) {
-        r.litologia_1 = match.unidad;
-        r.litologia_2 = match.litologia;
-        r.litologia_3 = match.codigo;
-        r.tipo_litologico = match.grupo;
-        r.factor_conversion_k = match.k;
-      }
-    } else {
-      r.factor_conversion_k = null;
-    }
-  }
-
-  return r;
-}
-
-export function normalizeCeldaCode(celda: string): string {
-  if (!celda) return "";
-  const raw = celda.trim().toUpperCase();
-  const matches = raw.match(/[A-Z]+|[0-9]+/g);
-  if (!matches) return raw;
-
-  const normalizedSegments = matches.map(segment => {
-    if (/^[0-9]+$/.test(segment)) {
-      const parsed = parseInt(segment, 10);
-      return isNaN(parsed) ? segment : String(parsed);
-    }
-    return segment;
-  });
-
-  let result = "";
-  normalizedSegments.forEach((seg, idx) => {
-    if (idx === 0) {
-      result += seg;
-    } else {
-      const prev = normalizedSegments[idx - 1];
-      const isCurrentNum = /^[0-9]+$/.test(seg);
-      const isPrevNum = /^[0-9]+$/.test(prev);
-
-      if (isCurrentNum && isPrevNum) {
-        result += "-" + seg;
-      } else if (!isCurrentNum && isPrevNum) {
-        result += "-" + seg;
-      } else {
-        result += seg;
-      }
-    }
-  });
-
-  return result;
-}
-
-function getPltConstraints(key: string): { intDigits: number; decDigits: number } | null {
-  if (key === "este") return { intDigits: 6, decDigits: 4 };
-  if (key === "norte") return { intDigits: 7, decDigits: 3 };
-  if (key === "elevacion") return { intDigits: 4, decDigits: 2 };
-  if (key === "espesor_d") return { intDigits: 4, decDigits: 1 };
-  if (key === "nivel") return { intDigits: 4, decDigits: 2 };
-
-  const decCols = ["longitud_l", "ancho_w1", "ancho_w2", "fuerza_p", "factor_conversion_k", "campana"];
-  if (decCols.includes(key)) {
-    return { intDigits: 5, decDigits: 2 };
-  }
-  return null;
-}
-
-const handlePltNumberLimit = (value: string, intDigits: number, decDigits: number): string => {
-  const cleaned = value.replace(/[^0-9.]/g, '');
-  const parts = cleaned.split('.');
-  if (parts.length > 2) return cleaned.slice(0, -1);
-
-  let integerPart = parts[0];
-  let decimalPart = parts[1];
-
-  if (integerPart.length > intDigits) {
-    integerPart = integerPart.slice(0, intDigits);
-  }
-  if (decimalPart !== undefined && decimalPart.length > decDigits) {
-    decimalPart = decimalPart.slice(0, decDigits);
-  }
-
-  return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
-};
-
-const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
-  const activeElement = e.currentTarget;
-  const key = e.key;
-
-  const allowedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"];
-  if (!allowedKeys.includes(key)) return;
-
-  const td = activeElement.closest("td");
-  const tr = activeElement.closest("tr");
-  if (!td || !tr) return;
-
-  const cellIndex = td.cellIndex;
-  let targetInput: HTMLInputElement | HTMLSelectElement | null = null;
-
-  if (key === "ArrowUp") {
-    e.preventDefault();
-    const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
-    if (prevTr) {
-      const targetTd = prevTr.cells[cellIndex];
-      if (targetDataInput(targetTd)) {
-        targetDataInput(targetTd).focus();
-        if (targetDataInput(targetTd) instanceof HTMLInputElement) {
-          (targetDataInput(targetTd) as HTMLInputElement).select();
-        }
-      }
-    }
-  } else if (key === "ArrowDown" || key === "Enter") {
-    e.preventDefault();
-    const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
-    if (nextTr) {
-      const targetTd = nextTr.cells[cellIndex];
-      if (targetDataInput(targetTd)) {
-        targetDataInput(targetTd).focus();
-        if (targetDataInput(targetTd) instanceof HTMLInputElement) {
-          (targetDataInput(targetTd) as HTMLInputElement).select();
-        }
-      }
-    }
-  } else if (key === "ArrowLeft") {
-    let shouldMove = true;
-    if (activeElement instanceof HTMLInputElement) {
-      try {
-        if (activeElement.selectionStart !== null && activeElement.selectionStart > 0) {
-          shouldMove = false;
-        }
-      } catch {
-        // Safe
-      }
-    }
-    if (shouldMove) {
-      let prevTd = td.previousElementSibling as HTMLTableCellElement | null;
-      while (prevTd) {
-        const input = prevTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
-        if (input) {
-          e.preventDefault();
-          targetInput = input;
-          break;
-        }
-        prevTd = prevTd.previousElementSibling as HTMLTableCellElement | null;
-      }
-    }
-  } else if (key === "ArrowRight") {
-    let shouldMove = true;
-    if (activeElement instanceof HTMLInputElement) {
-      try {
-        if (activeElement.selectionStart !== null && activeElement.selectionEnd !== activeElement.value.length) {
-          shouldMove = false;
-        }
-      } catch {
-        // Safe
-      }
-    }
-    if (shouldMove) {
-      let nextTd = td.nextElementSibling as HTMLTableCellElement | null;
-      while (nextTd) {
-        const input = nextTd.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
-        if (input) {
-          e.preventDefault();
-          targetInput = input;
-          break;
-        }
-        nextTd = nextTd.nextElementSibling as HTMLTableCellElement | null;
-      }
-    }
-  }
-
-  if (targetInput) {
-    targetInput.focus();
-    if (targetInput instanceof HTMLInputElement && targetInput.type !== "date") {
-      targetInput.select();
-    }
-  }
-};
-
-const targetDataInput = (td: HTMLTableCellElement | null): HTMLInputElement | HTMLSelectElement | null => {
-  if (!td) return null;
-  return td.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
-};
-
-const GROUP_META: Record<number, { label: string; bg: string }> = {
-  1: { label: "Información General del Ensayo", bg: "rgba(30, 41, 59, 0.7)" },
-  2: { label: "Identificación de Muestra", bg: "rgba(13, 148, 136, 0.15)" },
-  3: { label: "Coordenadas WGS84", bg: "rgba(16, 185, 129, 0.15)" },
-  4: { label: "Geometría del bloque irregular", bg: "rgba(59, 130, 246, 0.15)" },
-  5: { label: "Datos del ensayo", bg: "rgba(99, 102, 241, 0.15)" },
-  6: { label: "Cálculo de índice de carga puntual", bg: "rgba(139, 92, 246, 0.15)" },
-  7: { label: "Resistencia de la roca intacta", bg: "rgba(100, 116, 139, 0.15)" },
-  8: { label: "Observaciones", bg: "rgba(30, 41, 59, 0.3)" },
-};
-
-const COLS = [
-  { key: "campana", label: "Campaña", type: "int", width: 80, group: 1, required: true, synonyms: ["campana", "campaña"] },
-  { key: "fecha_ensayo", label: "Fecha de ensayo", type: "date", width: 120, group: 1, required: true, synonyms: ["fecha de ensayo", "fechaensayo", "fecha_ensayo"] },
-  { key: "sector_geotecnico", label: "Sector Geotécnico", type: "text", width: 110, group: 1, synonyms: ["sector geotécnico", "sectorgeotecnico", "sector_geotecnico", "sector", "sectorgeot"] },
-  { key: "ejecutado_por", label: "Ejecutado por", type: "text", width: 110, group: 1, required: true, synonyms: ["ejecutado por", "ejecutadopor", "ejecución de ensayo", "ejecucion de ensayo", "ejecutado"] },
-
-  { key: "zona_mapeo", label: "Zona de muestreo", type: "text", width: 130, group: 2, required: true, synonyms: ["zona de muestreo", "zonademuestreo", "zona", "zona_mapeo", "zonamapeo", "identificación de muestra", "identificacion de muestra"] },
-  { key: "nivel", label: "Nivel", type: "decimal", width: 80, group: 2, required: true, synonyms: ["nivel"] },
-  { key: "celda_mapeo", label: "Celda de mapeo", type: "text", width: 110, group: 2, required: true, synonyms: ["celda de mapeo", "celdamapeo", "celda_mapeo", "celda"] },
-  { key: "muestra", label: "Muestra", type: "text", width: 80, group: 2, required: true, synonyms: ["muestra"] },
-  { key: "codigo_muestra", label: "Código muestra", type: "text", width: 110, group: 2, computed: true, synonyms: ["codigo muestra", "códigomuestra", "codigo_muestra", "codigomuestra"] },
-  { key: "litologia_1", label: "Litología 1", type: "lito1", width: 90, group: 2, required: true, synonyms: ["litologia 1", "litología 1", "litologia_1", "lito1"] },
-  { key: "litologia_2", label: "Litología 2", type: "lito2", width: 90, group: 2, synonyms: ["litologia 2", "litología 2", "litologia_2", "lito2"] },
-  { key: "litologia_3", label: "Litología 3", type: "lito3", width: 90, group: 2, synonyms: ["litologia 3", "litología 3", "litologia_3", "lito3", "litho 3 - modelo2022", "litho 3"] },
-  { key: "tipo_litologico", label: "Tipo litológico", type: "select", width: 130, group: 2, required: true, options: CAT_TIPO_LITOLOGICO, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litólico", "tipo litológico"] },
-
-  { key: "este", label: "Este (m)", type: "decimal", width: 100, group: 3, synonyms: ["este", "este (m)", "east", "este(m)"] },
-  { key: "norte", label: "Norte (m)", type: "decimal", width: 110, group: 3, synonyms: ["norte", "norte (m)", "north", "norte(m)"] },
-  { key: "elevacion", label: "Elevación (msnm)", type: "decimal", width: 100, group: 3, synonyms: ["elevacion", "elevación", "elevación (msnm)", "elevacion(msnm)", "elevacion (msnm)", "z"] },
-
-  { key: "espesor_d", label: "Espesor D (cm)", type: "decimal", width: 90, group: 4, synonyms: ["espesor d", "espesord", "espesor d (cm)", "espesord(cm)", "espesor\nd\n(cm)", "espesor d", "espesor"] },
-  { key: "longitud_l", label: "Longitud L (cm)", type: "decimal", width: 90, group: 4, synonyms: ["longitud l", "longitudl", "longitud l (cm)", "longitudl(cm)", "longitud\nl\n(cm)", "longitud l", "longitud"] },
-  { key: "ancho_w1", label: "Ancho W1 (cm)", type: "decimal", width: 95, group: 4, synonyms: ["ancho w1", "anchow1", "ancho w1 (cm)", "anchow1(cm)", "ancho\nw1\n(cm)"] },
-  { key: "ancho_w2", label: "Ancho W2 (cm)", type: "decimal", width: 95, group: 4, synonyms: ["ancho w2", "anchow2", "ancho w2 (cm)", "anchow2(cm)", "ancho\nw2\n(cm)"] },
-  { key: "ancho_w", label: "Ancho W (cm)", type: "decimal", width: 95, group: 4, computed: true, synonyms: ["ancho w", "anchow", "ancho w (cm)", "anchow(cm)", "ancho\nw\n(cm)"] },
-  { key: "muestra_valida_longitud", label: "Muestra válida - L", type: "text", width: 115, group: 4, computed: true, synonyms: ["muestra valida - longitud", "muestra válida - longitud"] },
-  { key: "muestra_valida_ancho", label: "Muestra válida - W", type: "text", width: 115, group: 4, computed: true, synonyms: ["muestra valida - ancho", "muestra válida - ancho"] },
-
-  { key: "fuerza_p", label: "Fuerza P (kN)", type: "decimal", width: 90, group: 5, synonyms: ["fuerza p", "fuerzap", "fuerza p (kn)", "fuerzap(kn)", "fuerza\np\n(kn)", "fuerza p (kn)"] },
-  { key: "direccion_rotura", label: "Dirección rotura", type: "select", width: 110, group: 5, options: CAT_DIRECCION_ROTURA, synonyms: ["direccion rotura", "dirección rotura", "dirección de ruptura", "direccion_rotura"] },
-  { key: "tipo_fractura", label: "Tipo fractura", type: "select", width: 110, group: 5, options: CAT_TIPO_FRACTURA, synonyms: ["tipo fractura", "tipo de fractura", "tipo_fractura"] },
-
-  { key: "diametro_equivalente", label: "Diám. Equiv De (cm)", type: "decimal", width: 120, group: 6, computed: true, synonyms: ["diametro equivalente", "diámetro equiv de (cm)", "diametro equivalente\n(cm)"] },
-  { key: "f", label: "Fact. Correc.", type: "decimal", width: 85, group: 6, computed: true, synonyms: ["f", "fact correc", "fact. correc."] },
-  { key: "is_mpa", label: "Is (MPa)", type: "decimal", width: 80, group: 6, computed: true, synonyms: ["is", "is (mpa)", "is(mpa)"] },
-  { key: "is_50", label: "Is(50) (MPa)", type: "decimal", width: 85, group: 6, computed: true, synonyms: ["is50", "is(50)", "is(50) (mpa)", "is50(mpa)"] },
-
-  { key: "factor_conversion_k", label: "Factor K", type: "decimal", width: 80, group: 7, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
-  { key: "ucs", label: "UCS (MPa)", type: "decimal", width: 80, group: 7, computed: true, synonyms: ["ucs", "ucs (mpa)", "ucs(mpa)"] },
-  { key: "resistencia_isrm", label: "Resist. ISRM", type: "text", width: 90, group: 7, computed: true, synonyms: ["resistencia isrm", "resist. isrm"] },
-  { key: "denominacion_isrm", label: "Denominación ISRM", type: "text", width: 220, group: 7, computed: true, synonyms: ["denominacion isrm", "denominación isrm", "denominación isrm de la resistencia de la roca"] },
-
-  { key: "observaciones", label: "Observaciones", type: "text", width: 180, group: 8, synonyms: ["observaciones"] },
-];
+import {
+  PLT_COLUMN_DEFS as COLS,
+  CAT_DIRECCION_ROTURA,
+  CAT_TIPO_FRACTURA,
+  CAT_TIPO_LITOLOGICO,
+  ISRM_TABLE,
+  applyLitoCascade,
+  applyPltFormulas,
+  normalizeCeldaCode,
+  getPltConstraints,
+  handlePltNumberLimit,
+  handleGridKeyDown,
+  getCellClassName,
+  formatCellValue,
+  getLito2Options,
+  getLito3Options
+} from '../utils/geomecColumns';
 
 interface PltEnsayosViewProps {
   pltEnsayos: any[];
@@ -555,46 +205,6 @@ export default function PltEnsayosView({
     onChange(updated);
   };
 
-  const getCellClassName = (c: any, val: any) => {
-    const base = "border-r border-b border-navy-800 text-xs px-2 min-h-[34px] flex items-center select-text font-normal text-center justify-center leading-none";
-
-    if (c.key === "is_mpa" || c.key === "is_50") {
-      return `${base} outline outline-1 outline-offset-[-2px] outline-dashed outline-cyan-500/50 bg-cyan-500/10 text-cyan-300 font-bold justify-center`;
-    }
-
-    if (c.computed) {
-      if (c.key === "muestra_valida_longitud" || c.key === "muestra_valida_ancho") {
-        if (val === "SÍ") return `${base} text-emerald-400 font-bold bg-emerald-500/5 justify-center`;
-        if (val === "NO") return `${base} text-rose-400 font-bold bg-rose-500/5 justify-center`;
-        return `${base} text-slate-500 italic bg-navy-950/10 justify-center`;
-      }
-      if (c.key === "resistencia_isrm" && val) {
-        const isrmColors: Record<string, string> = {
-          r0: "text-rose-400 font-bold",
-          r1: "text-orange-400 font-bold",
-          r2: "text-amber-400 font-bold",
-          r3: "text-yellow-400 font-bold",
-          r4: "text-emerald-400 font-bold",
-          r5: "text-cyan-400 font-extrabold",
-          r6: "text-blue-400 font-extrabold",
-        };
-        return `${base} ${isrmColors[val.toLowerCase()] || "text-slate-400"} justify-center`;
-      }
-
-      return `${base} outline outline-1 outline-offset-[-2px] outline-dashed outline-indigo-500/35 bg-indigo-500/[0.03] text-indigo-300 font-semibold`;
-    }
-
-    return `${base} text-slate-300 font-normal`;
-  };
-
-  const formatCellValue = (val: any, c: any) => {
-    if (val === null || val === undefined || val === "") return "";
-    if (c.type === "decimal" && typeof val === "number") {
-      return val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
-    }
-    return String(val);
-  };
-
   const handleExportExcel = () => {
     const dataToExport = computedRows.map((r, idx) => {
       const obj: Record<string, any> = { "#": idx + 1 };
@@ -706,7 +316,6 @@ export default function PltEnsayosView({
 
   return (
     <div className="space-y-6 select-none animate-fade-in text-left">
-      {/* TOOLBAR RE-ESTILIZADO CON BOTONES ESTANDARIZADOS */}
       <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
@@ -758,7 +367,6 @@ export default function PltEnsayosView({
 
           <div className="h-6 w-[1px] bg-navy-800 mx-2" />
 
-          {/* Control QA/QC — Estilo Cian/Cielo Neón */}
           <button
             onClick={() => setActiveModal('qaqc')}
             className="px-4 py-2 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(14,165,233,0.12)] rounded-lg flex items-center justify-center gap-2"
@@ -767,7 +375,6 @@ export default function PltEnsayosView({
             <span>Control QA/QC</span>
           </button>
 
-          {/* Reporte Resumen — Estilo Violeta Eléctrico Neón */}
           <button
             onClick={() => setActiveModal('reporte')}
             className="px-4 py-2 bg-violet-500/10 border border-violet-500/40 hover:bg-violet-500/20 hover:border-violet-400 text-violet-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] rounded-lg flex items-center justify-center gap-2"
@@ -776,7 +383,6 @@ export default function PltEnsayosView({
             <span>Reporte Resumen</span>
           </button>
 
-          {/* Importar Excel — Estilo Esmeralda Neón */}
           <button
             onClick={() => setActiveModal('import_excel')}
             className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)] rounded-lg flex items-center justify-center gap-2"
@@ -785,7 +391,6 @@ export default function PltEnsayosView({
             <span>Importar Excel</span>
           </button>
 
-          {/* Exportar Excel — Estilo Esmeralda Neón */}
           <button
             onClick={handleExportExcel}
             className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)] rounded-lg flex items-center justify-center gap-2"
@@ -794,7 +399,6 @@ export default function PltEnsayosView({
             <span>Exportar Excel</span>
           </button>
 
-          {/* Nueva Fila — Estilo Violeta Eléctrico Neón */}
           <button
             onClick={handleAddRow}
             className="px-4 py-2 bg-violet-500/10 border border-violet-500/40 hover:bg-violet-500/20 hover:border-violet-400 text-violet-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] rounded-lg flex items-center justify-center gap-2"
@@ -805,7 +409,6 @@ export default function PltEnsayosView({
         </div>
       </div>
 
-      {/* HORIZONTAL SCROLLABLE GRID */}
       <div className="overflow-x-auto relative rounded-lg border border-navy-700 bg-navy-950/20">
         <table className="w-max min-w-full border-collapse border-separate border-spacing-0" style={{ minWidth: '3500px' }}>
           <thead>
@@ -815,8 +418,7 @@ export default function PltEnsayosView({
                 <th
                   key={c.key}
                   style={{ width: c.width, minWidth: c.width }}
-                  className={`py-3 px-2 text-center border-r border-b border-navy-800 text-[10px] select-none font-bold uppercase tracking-wider ${c.important ? "text-cyan-400" :
-                    c.computed ? "text-slate-500" : "text-slate-400"
+                  className={`py-3 px-2 text-center border-r border-b border-navy-800 text-[10px] select-none font-bold uppercase tracking-wider ${c.computed ? "text-slate-500" : "text-slate-400"
                     }`}
                 >
                   {c.label}

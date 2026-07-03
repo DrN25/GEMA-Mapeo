@@ -1,8 +1,13 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { X, FileSpreadsheet, Upload, AlertTriangle, Check, ArrowRight, Filter } from 'lucide-react';
-import { normalizeCeldaCode } from './PltEnsayosView';
 import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
+import {
+    PLT_COLUMN_DEFS as EXPECTED_FIELDS,
+    getPltConstraints,
+    normalizeTipoLitologico,
+    normalizeCeldaCode
+} from '../utils/geomecColumns';
 
 interface PltExcelImportModalProps {
     isOpen: boolean;
@@ -10,65 +15,6 @@ interface PltExcelImportModalProps {
     onImport: (importedRows: any[]) => void;
     activeWindowCelda: string | null;
 }
-
-interface MappingField {
-    key: string;
-    label: string;
-    required: boolean;
-    synonyms: string[];
-}
-
-const EXPECTED_FIELDS: MappingField[] = [
-    { key: "campana", label: "Campaña", required: true, synonyms: ["campana", "campaña", "campana "] },
-    { key: "fecha_ensayo", label: "Fecha de Ensayo", required: true, synonyms: ["fecha de ensayo", "fechaensayo", "fecha_ensayo", "fecha"] },
-    { key: "sector_geotecnico", label: "Sector Geotécnico", required: false, synonyms: ["sector geotécnico", "sectorgeotecnico", "sector_geotecnico", "sector", "sectorgeot"] },
-    { key: "ejecutado_por", label: "Ejecutado por", required: true, synonyms: ["ejecutado por", "ejecutadopor", "ejecución de ensayo", "ejecucion de ensayo", "ejecutado"] },
-    { key: "zona_mapeo", label: "Zona de Muestreo", required: true, synonyms: ["zona de muestreo", "zonademuestreo", "zona", "zona_mapeo", "zonamapeo", "identificación de muestra", "identificacion de muestra"] },
-    { key: "nivel", label: "Nivel", required: true, synonyms: ["nivel"] },
-    { key: "celda_mapeo", label: "Celda de Mapeo", required: true, synonyms: ["celda de mapeo", "celdamapeo", "celda_mapeo", "celda"] },
-    { key: "muestra", label: "Muestra", required: true, synonyms: ["muestra"] },
-    { key: "litologia_1", label: "Litología 1", required: true, synonyms: ["litologia 1", "litología 1", "litologia_1", "lito1"] },
-    { key: "litologia_2", label: "Litología 2", required: false, synonyms: ["litologia 2", "litología 2", "litologia_2", "lito2"] },
-    { key: "litologia_3", label: "Litología 3", required: false, synonyms: ["litologia 3", "litología 3", "litologia_3", "lito3", "litho 3 - modelo2022", "litho 3"] },
-    { key: "tipo_litologico", label: "Tipo Litológico", required: true, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litólico", "tipo litológico"] },
-    { key: "este", label: "Este (m)", required: false, synonyms: ["este", "este (m)", "east", "este(m)"] },
-    { key: "norte", label: "Norte (m)", required: false, synonyms: ["norte", "norte (m)", "north", "norte(m)"] },
-    { key: "elevacion", label: "Elevación (msnm)", required: false, synonyms: ["elevacion", "elevación", "elevación (msnm)", "elevacion(msnm)", "elevacion (msnm)", "z"] },
-    { key: "espesor_d", label: "Espesor D (cm)", required: false, synonyms: ["espesor d", "espesord", "espesor d (cm)", "espesord(cm)", "espesor\nd\n(cm)", "espesor d", "espesor"] },
-    { key: "longitud_l", label: "Longitud L (cm)", required: false, synonyms: ["longitud l", "longitudl", "longitud l (cm)", "longitudl(cm)", "longitud\nl\n(cm)", "longitud l", "longitud"] },
-    { key: "ancho_w1", label: "Ancho W1 (cm)", required: false, synonyms: ["ancho w1", "anchow1", "ancho w1 (cm)", "anchow1(cm)", "ancho\nw1\n(cm)"] },
-    { key: "ancho_w2", label: "Ancho W2 (cm)", required: false, synonyms: ["ancho w2", "anchow2", "ancho w2 (cm)", "anchow2(cm)", "ancho\nw2\n(cm)"] },
-    { key: "fuerza_p", label: "Fuerza P (kN)", required: false, synonyms: ["fuerza p", "fuerzap", "fuerza p (kn)", "fuerzap(kn)", "fuerza\np\n(kn)", "fuerza p (kn)"] },
-    { key: "direccion_rotura", label: "Dirección Rotura", required: false, synonyms: ["direccion rotura", "dirección rotura", "dirección de ruptura", "direccion_rotura"] },
-    { key: "tipo_fractura", label: "Tipo Fractura", required: false, synonyms: ["tipo fractura", "tipo de fractura", "tipo_fractura"] },
-    { key: "factor_conversion_k", label: "Factor K", required: false, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
-    { key: "observaciones", label: "Observaciones", required: false, synonyms: ["observaciones"] }
-];
-
-function getPltConstraints(key: string): { intDigits: number; decDigits: number } | null {
-    if (key === "este") return { intDigits: 6, decDigits: 4 }; // <- 4 decimales
-    if (key === "norte") return { intDigits: 7, decDigits: 3 }; // <- 3 decimales
-    if (key === "elevacion") return { intDigits: 4, decDigits: 2 };
-    if (key === "espesor_d") return { intDigits: 4, decDigits: 1 };
-    if (key === "nivel") return { intDigits: 4, decDigits: 2 };
-
-    const decCols = ["longitud_l", "ancho_w1", "ancho_w2", "fuerza_p", "factor_conversion_k", "campana"];
-    if (decCols.includes(key)) {
-        return { intDigits: 5, decDigits: 2 };
-    }
-    return null;
-}
-
-// Normalización estricta de Tipo Litológico descriptivo a grupos canónicos
-const normalizeTipoLitologico = (val: string): string => {
-    const s = String(val || "").trim().toLowerCase();
-    if (s.includes("intrusiv") || s.includes("pluton") || s.includes("volcan")) return "INTRUSIVOS";
-    if (s.includes("sedimentar") || s.includes("caliz")) return "SEDIMENTARIOS";
-    if (s.includes("metamorf") || s.includes("marmor") || s.includes("skarn")) return "METAMORFICAS";
-    if (s.includes("brecha")) return "BRECHAS";
-    if (s.includes("endoskarn")) return "ENDOSKARN";
-    return "INTRUSIVOS"; // Fallback consistente
-};
 
 export default function PltExcelImportModal({
     isOpen,
@@ -157,8 +103,10 @@ export default function PltExcelImportModal({
             const normalizedCells = row.map(c => normalize(c));
 
             EXPECTED_FIELDS.forEach(f => {
-                const hasMatch = f.synonyms.some(s => normalizedCells.includes(normalize(s)));
-                if (hasMatch) matches++;
+                if (f.synonyms) {
+                    const hasMatch = f.synonyms.some(s => normalizedCells.includes(normalize(s)));
+                    if (hasMatch) matches++;
+                }
             });
 
             if (matches > maxMatches) {
@@ -178,7 +126,7 @@ export default function PltExcelImportModal({
         EXPECTED_FIELDS.forEach(f => {
             for (let i = 0; i < normalizedHeaders.length; i++) {
                 if (used.has(i)) continue;
-                if (normalizedHeaders[i] === normalize(f.key) || f.synonyms.some(s => normalize(s) === normalizedHeaders[i])) {
+                if (normalizedHeaders[i] === normalize(f.key) || (f.synonyms && f.synonyms.some(s => normalize(s) === normalizedHeaders[i]))) {
                     suggested[f.key] = i;
                     used.add(i);
                     break;
@@ -187,7 +135,7 @@ export default function PltExcelImportModal({
         });
 
         EXPECTED_FIELDS.forEach(f => {
-            if (suggested[f.key] !== undefined) return;
+            if (suggested[f.key] !== undefined || !f.synonyms) return;
             for (const syn of f.synonyms) {
                 let found = false;
                 for (let i = 0; i < normalizedHeaders.length; i++) {
@@ -292,8 +240,8 @@ export default function PltExcelImportModal({
                 litologia_2: getStr(row, 'litologia_2'),
                 litologia_3: getStr(row, 'litologia_3'),
                 tipo_litologico: getStr(row, 'tipo_litologico', 'INTRUSIVOS'),
-                este: getVal(row, 'este') !== null && getVal(row, 'este') !== "" ? Math.round(Math.abs(getNum(row, 'este')) * 10000) / 10000 : null, // <- Redondeo a 4 decimales
-                norte: getVal(row, 'norte') !== null && getVal(row, 'norte') !== "" ? Math.round(Math.abs(getNum(row, 'norte')) * 1000) / 1000 : null, // <- Redondeo a 3 decimales
+                este: getVal(row, 'este') !== null && getVal(row, 'este') !== "" ? Math.round(Math.abs(getNum(row, 'este')) * 10000) / 10000 : null,
+                norte: getVal(row, 'norte') !== null && getVal(row, 'norte') !== "" ? Math.round(Math.abs(getNum(row, 'norte')) * 1000) / 1000 : null,
                 elevacion: getVal(row, 'elevacion') !== null && getVal(row, 'elevacion') !== "" ? Math.round(Math.abs(getNum(row, 'elevacion')) * 100) / 100 : null,
                 espesor_d: getVal(row, 'espesor_d') !== null && getVal(row, 'espesor_d') !== "" ? Math.round(Math.abs(getNum(row, 'espesor_d')) * 10) / 10 : null,
                 longitud_l: getVal(row, 'longitud_l') !== null && getVal(row, 'longitud_l') !== "" ? Math.round(Math.abs(getNum(row, 'longitud_l')) * 100) / 100 : null,
@@ -358,13 +306,13 @@ export default function PltExcelImportModal({
     const handleImportClick = () => {
         const rowsToImport = importMode === 'filtered' ? matchingRows : importedRowsState;
         if (rowsToImport.length === 0) {
-            alert("No se encontraron registros válidos para importar.");
+            alert("No se encontraron registros de ensayo PLT válidos para importar.");
             return;
         }
 
         if (rowsToImport.length > 500) {
             const confirmBigImport = window.confirm(
-                `¡ADVERTENCIA DE RENDIMIENTO!\n\nVas a importar ${rowsToImport.length} registros. Cargar planillas masivas de golpe puede ralentizar la pestaña del navegador.\n\n¿Deseas continuar?`
+                `¡ADVERTENCIA DE RENDIMIENTO!\n\nVas a importar ${rowsToImport.length} registros de golpe. Cargar planillas masivas puede ralentizar el rendimiento del navegador.\n\n¿Deseas continuar?`
             );
             if (!confirmBigImport) return;
         }

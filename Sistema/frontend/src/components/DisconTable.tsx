@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { JointRow } from '../utils/rmrCalculator';
 import GeomecTable from './Common/GeomecTable';
-import { DISCON_COLUMNS } from '../utils/geomecColumns';
+import { DISCON_COLUMNS, COLUMN_LABELS } from '../utils/geomecColumns';
 import {
   ALTERACION_CATALOG,
   RELLENO_CATALOG,
@@ -25,7 +25,6 @@ interface DisconTableProps {
   showFormulas?: boolean;
 }
 
-// Catálogo cromático idéntico al del módulo de visualización 3D
 const getFamilyColor = (famNum: number): string => {
   const colors = [
     '#fb923c', // Naranja (F1)
@@ -57,7 +56,6 @@ export default function DisconTable({
     return Array.from(new Set(joints.map(j => j.familia))).sort((a, b) => a - b);
   }, [joints]);
 
-  // ENRIQUECIMIENTO MODULAR DE COLUMNAS: Teñido dinámico de celdas y estandarización a peso normal (regular)
   const enrichedColumns = useMemo(() => {
     return DISCON_COLUMNS.map(col => {
       const pinkKeys = ['r1_89', 'r2_89', 'altR89', 'relR89', 'contR89', 'abR89', 'rugR89'];
@@ -94,7 +92,6 @@ export default function DisconTable({
     });
   }, [DISCON_COLUMNS]);
 
-  // RESTAURADO: Cómputo geomecánico de valoraciones RMR por fila
   const computedJoints = useMemo(() => {
     return joints.map(j => {
       const altItem = j.alteracion && j.alteracion !== '-1' ? ALTERACION_CATALOG[j.alteracion] : null;
@@ -136,27 +133,13 @@ export default function DisconTable({
 
       const hasAll89 = altR89 !== null && relR89 !== null && contR89 !== null && abR89 !== null && rugR89 !== null;
       const hasAll76 = altR76 !== null && relR76 !== null && contR76 !== null && abR76 !== null && rugR76 !== null;
+
       const totalR89 = hasAll89 ? Math.min(30, altR89! + relR89! + contR89! + abR89! + rugR89!) : null;
       const totalR76 = hasAll76 ? Math.min(25, altR76! + relR76! + contR76! + abR76! + rugR76!) : null;
 
       return {
         ...j,
-        altR89,
-        altR76,
-        r1_89,
-        r2_89,
-        r1_76,
-        r2_76,
-        relR89,
-        relR76,
-        contR89,
-        contR76,
-        abR89,
-        abR76,
-        rugR89,
-        rugR76,
-        totalR89,
-        totalR76
+        altR89, altR76, r1_89, r2_89, r1_76, r2_76, relR89, relR76, contR89, contR76, abR89, abR76, rugR89, rugR76, totalR89, totalR76
       };
     });
   }, [joints]);
@@ -232,7 +215,6 @@ export default function DisconTable({
     onChange(updated);
   };
 
-  // ASIGNACIÓN DINÁMICA DE CLASES DE FILA: Tonalidad sutil del color de familia y divisor cada 3 registros
   const getRowClassName = (_row: any, idx: number) => {
     const famId = Math.floor(idx / 3) + 1;
     const borderClass = (idx + 1) % 3 === 0 ? "border-b-2 border-navy-700/80" : "border-b border-navy-900/25";
@@ -265,51 +247,50 @@ export default function DisconTable({
     );
   };
 
-  // CORREGIDO: "Dist Est. (m)" ya no tiene las clases de stickiness left z-20 ni shadow.
   const customHeader = (
     <thead>
       <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[11px] h-9">
         <th rowSpan={2} className="py-2 px-2 text-center sticky left-0 bg-navy-950 z-30 border-r border-b border-navy-800/80 w-[52px] min-w-[52px] shadow-[2px_0_5px_rgba(0,0,0,0.15)] h-9">Fam</th>
-        <th rowSpan={2} className="py-2 px-2 text-center border-r border-b border-navy-800/80 w-[85px] min-w-[85px] h-9">Dist Est. (m)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">Dip (&deg;)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">DipDir (&deg;)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">Tipo Estruc.</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">Cant (n)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-36 border-r border-b border-navy-800/80 h-9">Abert (mm)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">Espes (mm)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">Cont (m)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">Espac (m)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">Ext Vis</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">Term</th>
-        <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">Relleno 1</th>
-        <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">Relleno 2</th>
+        <th rowSpan={2} className="py-2 px-2 text-center border-r border-b border-navy-800/80 w-[85px] min-w-[85px] h-9">{COLUMN_LABELS.distancia}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.dip}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.dip_dir}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.tipo_estructura}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.n_estructuras}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-36 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.abertura}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.espesor}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.continuidad}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.espaciamiento}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-24 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.extremos_visibles}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.terminacion}</th>
+        <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.relleno1}</th>
+        <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.relleno2}</th>
         <th colSpan={2} className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400 bg-pink-950/15 text-[11px] font-black tracking-widest h-5">Valor Relleno (R89)</th>
         <th colSpan={2} className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400 bg-amber-950/15 text-[11px] font-black tracking-widest h-5">Valor Relleno (R76)</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">JRC</th>
-        <th rowSpan={2} className="py-2 px-2 w-36 text-center border-r border-b border-navy-800/80 h-9">Rugosidad</th>
-        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">Forma</th>
-        <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">Alteración</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.jrc}</th>
+        <th rowSpan={2} className="py-2 px-2 w-36 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.rugosidad}</th>
+        <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.forma}</th>
+        <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.alteracion}</th>
         <th colSpan={6} className="py-1 px-2 text-center bg-pink-950/15 border-r border-b border-navy-800/80 text-pink-400 text-[11px] font-black tracking-widest h-5">Condición Discontinuidades (RMR'89)</th>
         <th colSpan={6} className="py-1 px-2 text-center bg-amber-950/15 border-r border-b border-navy-800/80 text-amber-400 text-[11px] font-black tracking-widest h-5">Condición Discontinuidades (RMR'76)</th>
         <th rowSpan={2} className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-30 border-l border-b border-navy-800/80 w-[70px] min-w-[70px] shadow-[-2px_0_5px_rgba(0,0,0,0.15)] h-9">Acción</th>
       </tr>
       <tr className="bg-navy-950 text-slate-500 font-extrabold uppercase tracking-wider text-[10px] h-4">
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400/85 bg-pink-950/10 h-4">V. R1</th>
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400/85 bg-pink-950/10 h-4">V. R2</th>
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400/85 bg-amber-950/10 h-4">V. R1</th>
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400/85 bg-amber-950/10 h-4">V. R2</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">Alt</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">Rel</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">Cont</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">Aber</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">Rug</th>
-        <th className="py-1 px-2 text-center bg-pink-500/20 border-r border-b border-navy-800/80 text-pink-300 font-black h-4 shadow-[inset_0_0_8px_rgba(236,72,153,0.1)]">Val</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">Alt</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">Rel</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">Cont</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">Aber</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">Rug</th>
-        <th className="py-1 px-2 text-center bg-amber-500/20 border-r border-b border-navy-800/80 text-amber-300 font-black h-4 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]">Val</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400/85 bg-pink-950/10 h-4">{COLUMN_LABELS.r1_sub_89}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400/85 bg-pink-950/10 h-4">{COLUMN_LABELS.r2_sub_89}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400/85 bg-amber-950/10 h-4">{COLUMN_LABELS.r1_sub_76}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400/85 bg-amber-950/10 h-4">{COLUMN_LABELS.r2_sub_76}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.alt_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.rel_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.cont_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.aber_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.rug_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-500/20 border-r border-b border-navy-800/80 text-pink-300 font-black h-4 shadow-[inset_0_0_8px_rgba(236,72,153,0.1)]">{COLUMN_LABELS.val_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.alt_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.rel_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.cont_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.aber_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.rug_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-500/20 border-r border-b border-navy-800/80 text-amber-300 font-black h-4 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]">{COLUMN_LABELS.val_sub}</th>
       </tr>
     </thead>
   );
@@ -339,7 +320,6 @@ export default function DisconTable({
         renderRowIndex={renderRowIndex}
       />
 
-      {/* Control Deck de Acciones */}
       <div className="add-bar flex flex-wrap items-center gap-4 bg-navy-950/40 p-4 border-t border-navy-800 rounded-b-xl justify-between shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)]">
         <span className="text-xs text-slate-400 italic font-medium">
           * Nota: F1, F2 y F3 son obligatorias para calcular el Jv y promedios volumétricos ponderados.
@@ -368,7 +348,7 @@ export default function DisconTable({
             </select>
             <button
               onClick={() => onDeleteFamily(familyToDelete)}
-              className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 hover:border-red-400 text-red-400 px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 shadow-[0_0_12px_rgba(239,68,68,0.12)]"
+              className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 hover:text-red-400 text-red-400 px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 shadow-[0_0_12px_rgba(239,68,68,0.12)]"
             >
               <Trash2 size={14} />
               <span>Eliminar</span>

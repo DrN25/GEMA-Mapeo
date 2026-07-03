@@ -371,7 +371,7 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
         abertura = round(abertura, 2)
 
     tipo_junta_clean = tipo_junta.strip().upper() if tipo_junta is not None else ""
-    es_estructura_exceptuada = tipo_junta_clean in ['F', 'RF', 'VN', 'SZ', 'F+10', 'BED']
+    es_estructura_exceptuada = tipo_junta_clean in ['F', 'SZ', 'BED']
 
     if espesor is not None and espesor < 0:
         registrar_error("ESPESOR mm.", espesor, "ALERTA", f"El espesor del relleno no puede ser un valor negativo. Valor ingresado: {espesor} mm.")
@@ -380,13 +380,13 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
 
     if espesor is not None and abertura is not None and espesor > abertura:
         if not es_estructura_exceptuada:
-            registrar_error("ESPESOR mm.", espesor, "ALERTA", f"Espesor del relleno es superior a la abertura total y no pertenece a F, RF, VN, SZ, F+10, BED. Estructura geológica: '{tipo_junta_clean or 'N/A'}', Espesor: {espesor} mm, Abertura total: {abertura} mm.")
+            registrar_error("ESPESOR mm.", espesor, "ALERTA", f"Espesor del relleno es superior a la abertura total y no pertenece a F, SZ, BED. Estructura geológica: '{tipo_junta_clean or 'N/A'}', Espesor: {espesor} mm, Abertura total: {abertura} mm.")
 
     # 8. Comprobaciones de escala física de la abertura
     if abertura is not None:
         if es_estructura_exceptuada:
             if dist_celda is not None and (abertura / 1000.0) > dist_celda:
-                registrar_error("ABERTURA mm.", abertura, "ALERTA", f"La abertura de la falla supera la longitud de la celda y no pertenece a F, RF, VN, SZ, F+10, BED. Tipo de junta: '{tipo_junta_clean}', Abertura: {abertura} mm, Longitud de la celda (Dist.Celda): {dist_celda} m.")
+                registrar_error("ABERTURA mm.", abertura, "ALERTA", f"La abertura de la falla supera la longitud de la celda y no pertenece a F, SZ, BED. Tipo de junta: '{tipo_junta_clean}', Abertura: {abertura} mm, Longitud de la celda (Dist.Celda): {dist_celda} m.")
 
     # 9. Persistencia de discontinuidad (Continuidad física vs celda - ERROR DE SUPERACIÓN ELIMINADO)
     cont_junta = sanitize_value(get_row_val(row_dict, "CONTINUIDAD m."), float)
