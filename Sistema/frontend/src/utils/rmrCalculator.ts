@@ -394,23 +394,10 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const water_rating_76 = waterItem.rmr76;
   const water_rating_89 = waterItem.rmr89;
 
-  // CORRECCIÓN MATEMÁTICA DE RATINGS DE RESISTENCIA (UCS) ALINEADA AL ESTÁNDAR EXCEL
-  let ucs_rating_76 = 7;
-  let ucs_rating_89 = 7;
-  if (header.ucs_mpa !== undefined && header.ucs_mpa !== null && !isNaN(header.ucs_mpa)) {
-    const ucsValue = header.ucs_mpa;
-    if (ucsValue > 250) { ucs_rating_89 = 15; ucs_rating_76 = 15; }
-    else if (ucsValue > 100) { ucs_rating_89 = 12; ucs_rating_76 = 12; }
-    else if (ucsValue > 50) { ucs_rating_89 = 7; ucs_rating_76 = 7; }
-    else if (ucsValue > 25) { ucs_rating_89 = 4; ucs_rating_76 = 4; }
-    else if (ucsValue > 5) { ucs_rating_89 = 2; ucs_rating_76 = 2; }
-    else if (ucsValue > 1) { ucs_rating_89 = 1; ucs_rating_76 = 1; }
-    else { ucs_rating_89 = 0; ucs_rating_76 = 0; }
-  } else {
-    const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
-    ucs_rating_89 = strengthItem.score;
-    ucs_rating_76 = strengthItem.score; // Se remueven los límites manuales incorrectos de R76
-  }
+  // RATING DE RESISTENCIA ESTIMADA (UCS) OBTENIDO EXCLUSIVAMENTE DEL INPUT DE CAMPO (ISRM GRADE R0-R6)
+  const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
+  const ucs_rating_76 = strengthItem.score;
+  const ucs_rating_89 = strengthItem.score;
 
   const rmr_76 = ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
   const rmr_89 = ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;

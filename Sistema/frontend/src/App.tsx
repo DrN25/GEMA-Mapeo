@@ -327,18 +327,18 @@ export default function App() {
           intemperia: v.intemperismo_codigo || '',
           alt_zona: v.alteracion_codigo || '',
           fecha: v.fecha_mapeo || new Date().toISOString().split('T')[0],
-          condicion_agua: v.rmr_input?.agua_codigo || 'C',
-          resistencia_ucs: v.rmr_input?.resistencia_codigo || 'R4',
+          condicion_agua: v.rmr_input?.agua_codigo || '',
+          resistencia_ucs: v.rmr_input?.resistencia_codigo || '',
           comentario: v.rmr_input?.comentario || '',
           campania: v.campania !== null && v.campania !== undefined ? v.campania : 2026,
           turno: v.turno || 'Día',
-          gsi_estructura: v.rmr_input?.gsi_estructura || 'VB',
-          gsi_superficie: v.rmr_input?.gsi_superficie || 'G',
-          gsi_visual: v.rmr_input?.gsi_visual !== null && v.rmr_input?.gsi_visual !== undefined ? v.rmr_input.gsi_visual : 56,
-          control_estructural: v.rmr_input?.control_estructural !== null && v.rmr_input?.control_estructural !== undefined ? v.rmr_input.control_estructural : 3,
-          efectos_voladura: v.rmr_input?.efectos_voladura !== null && v.rmr_input?.efectos_voladura !== undefined ? v.rmr_input.efectos_voladura : 3,
-          ucs_mpa: v.rmr_input?.ucs_mpa !== null && v.rmr_input?.ucs_mpa !== undefined ? parseFloat(v.rmr_input.ucs_mpa) : 73,
-          is50_mpa: v.rmr_input?.is50_mpa !== null && v.rmr_input?.is50_mpa !== undefined ? parseFloat(v.rmr_input.is50_mpa) : 5
+          gsi_estructura: v.rmr_input?.gsi_estructura || '',
+          gsi_superficie: v.rmr_input?.gsi_superficie || '',
+          gsi_visual: v.rmr_input?.gsi_visual !== null && v.rmr_input?.gsi_visual !== undefined ? v.rmr_input.gsi_visual : 0,
+          control_estructural: v.rmr_input?.control_estructural !== null && v.rmr_input?.control_estructural !== undefined ? v.rmr_input.control_estructural : 0,
+          efectos_voladura: v.rmr_input?.efectos_voladura !== null && v.rmr_input?.efectos_voladura !== undefined ? v.rmr_input.efectos_voladura : 0,
+          ucs_mpa: v.rmr_input?.ucs_mpa !== null && v.rmr_input?.ucs_mpa !== undefined ? parseFloat(v.rmr_input.ucs_mpa) : 0,
+          is50_mpa: v.rmr_input?.is50_mpa !== null && v.rmr_input?.is50_mpa !== undefined ? parseFloat(v.rmr_input.is50_mpa) : 0
         };
 
         const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => {
@@ -426,18 +426,18 @@ export default function App() {
         nivel: newWindow.nivel,
         sect_geot: newWindow.sect_geot,
         fecha: newWindow.fecha,
-        condicion_agua: newWindow.condicion_agua || 'C',
-        resistencia_ucs: newWindow.resistencia_ucs || 'R4',
+        condicion_agua: newWindow.condicion_agua || '',
+        resistencia_ucs: newWindow.resistencia_ucs || '',
         comentario: '',
         campania: newWindow.campania,
         turno: newWindow.turno,
-        gsi_estructura: 'VB',
-        gsi_superficie: 'G',
-        gsi_visual: 56,
-        control_estructural: 3,
-        efectos_voladura: 3,
-        ucs_mpa: 73,
-        is50_mpa: 5
+        gsi_estructura: '',
+        gsi_superficie: '',
+        gsi_visual: 0,
+        control_estructural: 0,
+        efectos_voladura: 0,
+        ucs_mpa: 0,
+        is50_mpa: 0
       },
       joints: normalizeJoints([])
     };
@@ -581,15 +581,15 @@ export default function App() {
         alt: j.alteracion
       })),
       rmr_input: {
-        agua_codigo: activeWindow.header.condicion_agua,
-        resistencia_codigo: activeWindow.header.resistencia_ucs,
-        gsi_estructura: activeWindow.header.gsi_estructura || 'VB',
-        gsi_superficie: activeWindow.header.gsi_superficie || 'G',
-        gsi_visual: activeWindow.header.gsi_visual !== undefined ? activeWindow.header.gsi_visual : 56,
-        control_estructural: activeWindow.header.control_estructural !== undefined ? activeWindow.header.control_estructural : 3,
-        efectos_voladura: activeWindow.header.efectos_voladura !== undefined ? activeWindow.header.efectos_voladura : 3,
-        ucs_mpa: activeWindow.header.ucs_mpa !== undefined ? activeWindow.header.ucs_mpa : 73,
-        is50_mpa: activeWindow.header.is50_mpa !== undefined ? activeWindow.header.is50_mpa : 5,
+        agua_codigo: activeWindow.header.condicion_agua || null,
+        resistencia_codigo: activeWindow.header.resistencia_ucs || null,
+        gsi_estructura: activeWindow.header.gsi_estructura || null,
+        gsi_superficie: activeWindow.header.gsi_superficie || null,
+        gsi_visual: activeWindow.header.gsi_visual !== undefined ? activeWindow.header.gsi_visual : 0,
+        control_estructural: activeWindow.header.control_estructural !== undefined ? activeWindow.header.control_estructural : 0,
+        efectos_voladura: activeWindow.header.efectos_voladura !== undefined ? activeWindow.header.efectos_voladura : 0,
+        ucs_mpa: activeWindow.header.ucs_mpa !== undefined ? activeWindow.header.ucs_mpa : 0,
+        is50_mpa: activeWindow.header.is50_mpa !== undefined ? activeWindow.header.is50_mpa : 0,
         comentario: activeWindow.header.comentario || ""
       }
     };
@@ -1038,6 +1038,7 @@ export default function App() {
               header={activeWindow.header}
               calculatedJoints={calculated.joints}
               largo={calculated.largo}
+              showFormulas={showFormulas}
             />
           )}
 

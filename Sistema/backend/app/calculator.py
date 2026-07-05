@@ -249,29 +249,11 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
     condisc_r89 = sum_v89 / sum_n_cond if sum_n_cond > 0 else 25.0
     condisc_r76 = sum_v76 / sum_n_cond if sum_n_cond > 0 else 20.0
 
-    w_code = rmr_input.get("agua_codigo", "C")
+    w_code = rmr_input.get("agua_codigo") or "C"
     w_ratings = AGUA_RATING.get(w_code, {"r89": 15, "r76": 10})
     
-    ucs_val = rmr_input.get("ucs_mpa")
-    if ucs_val is not None and ucs_val > 0:
-        # Resuelve el código ISRM correspondiente en base al valor numérico de UCS
-        if ucs_val > 250.0:
-            res_code = "R6"
-        elif ucs_val > 100.0:
-            res_code = "R5"
-        elif ucs_val > 50.0:
-            res_code = "R4"
-        elif ucs_val > 25.0:
-            res_code = "R3"
-        elif ucs_val > 5.0:
-            res_code = "R2"
-        elif ucs_val > 1.0:
-            res_code = "R1"
-        else:
-            res_code = "R0"
-    else:
-        # Fallback al código de resistencia explícito seleccionado
-        res_code = rmr_input.get("resistencia_codigo", "R4")
+    # Código de resistencia obtenido directamente de la estimación de campo (ISRM R0-R6)
+    res_code = rmr_input.get("resistencia_codigo") or "R4"
 
     # Obtención del rating unificado desde las constantes compartidas
     res_ratings = RESISTENCIA_RATING.get(res_code, {"r89": 7, "r76": 7})

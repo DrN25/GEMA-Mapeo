@@ -22,71 +22,29 @@ router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 uploads_dir = os.path.join(BASE_DIR, "uploads")
 
-# --- CATÁLOGO MAESTRO ACTUALIZADO Y SINCRONIZADO DE REGLAS DE CONSISTENCIA ---
-MASTER_ERROR_RULES = [
-    # Alertas Críticas (Física, Rangos y Catálogos obligatorios)
-    {"msg": "Ángulo del talud fuera del rango [-90, 90] grados.", "severity": "ALERTA"},
-    {"msg": "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F.", "severity": "ALERTA"},
-    {"msg": "Valor de agua '76 / '89 excede los límites reales de la escala.", "severity": "ALERTA"},
-    {"msg": "Rating de agua '76 / '89 es incongruente con el código.", "severity": "ALERTA"},
-    {"msg": "Dureza '76 / '89 no admitida. Debe ser R0 a R6.", "severity": "ALERTA"},
-    {"msg": "Rating de resistencia '76 / '89 fuera del límite real.", "severity": "ALERTA"},
-    {"msg": "Resistencia '76 / '89 es incongruente con la dureza.", "severity": "ALERTA"},
-    {"msg": "Control estructural '76 / '89 fuera de límites permitidos [1, 5].", "severity": "ALERTA"},
-    {"msg": "Efecto de voladura '76 / '89 excede los límites de la escala.", "severity": "ALERTA"},
-    {"msg": "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.", "severity": "ALERTA"},
-    {"msg": "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero).", "severity": "ALERTA"},
-    {"msg": "El espaciamiento promedio '76 / '89 debe ser positivo.", "severity": "ALERTA"},
-    {"msg": "Valor de rating de espaciamiento '76 / '89 fuera de rango.", "severity": "ALERTA"},
-    {"msg": "Rating de espaciamiento '76 / '89 no se alinea con el promedio.", "severity": "ALERTA"},
-    {"msg": "Tipo de estructura geológica no permitida.", "severity": "ALERTA"},
-    {"msg": "Tipo de relleno no pertenece al catálogo.", "severity": "ALERTA"},
-    {"msg": "Valor JRC fuera de rango permitido [0, 20].", "severity": "ALERTA"},
-    {"msg": "Clase de rugosidad de junta fuera de límites [1, 9].", "severity": "ALERTA"},
-    {"msg": "Forma de estructura inválida. Debe ser P, C, O, E o I.", "severity": "ALERTA"},
-    {"msg": "Código de alteración inválido.", "severity": "ALERTA"},
-    {"msg": "Espesor del relleno es superior a la abertura total.", "severity": "ALERTA"},
-    {"msg": "La abertura de la falla supera la longitud de la celda.", "severity": "ALERTA"},
-    {"msg": "UCS es divergente a Is50.", "severity": "ALERTA"},
-    {"msg": "Combinación litológica Lito 1-2-3 inválida según el catálogo.", "severity": "ALERTA"},
-    {"msg": "Unidad litológica es incongruente con la litología.", "severity": "ALERTA"},
-    {"msg": "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados.", "severity": "ALERTA"},
-    {"msg": "El espesor del relleno no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "La abertura total no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo.", "severity": "ALERTA"},
-    {"msg": "El espaciamiento de discontinuidad no puede ser un valor negativo.", "severity": "ALERTA"},
+# --- SISTEMA CENTRALIZADO (SSOT) DE REGLAS DE VALIDACIÓN GEOMECÁNICA ---
+from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
+
+def get_incidence_category_name(i: dict) -> str:
+    rule_code = i.get("rule_code")
+    rule = RULES_REGISTRY.get(rule_code) if rule_code else None
+    if rule:
+        cat = CATEGORIES_REGISTRY.get(rule.category_code)
+        if cat:
+            return cat.name
     
-    # Advertencias de Consistencia y Formato
-    {"msg": "El valor de agua '76 / '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de resistencia '76 / '89 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de RQD '76 / '89 es un valor alejado no válido.", "severity": "ADVERTENCIA"},
-    {"msg": "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto.", "severity": "ADVERTENCIA"},
-    {"msg": "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'.", "severity": "ADVERTENCIA"},
-    {"msg": "Divergencia de resistencia uniaxial (UCS vs Is50 * K).", "severity": "ADVERTENCIA"},
-    {"msg": "En número de estructuras solamente se permiten números enteros.", "severity": "ADVERTENCIA"},
-    {"msg": "Campo obligatorio se encuentra vacío.", "severity": "VACIO"},
-]
-
-def safe_int(val, default=0):
-    if val is None: return default
-    try: return int(val)
-    except: return default
-
-def safe_float(val, default=0.0):
-    if val is None: return default
-    try: return float(val)
-    except: return default
-
-def simplify_message(msg):
-    msg_clean = str(msg or "").strip()
-    msg_up = msg_clean.upper()
-
+    # Fallback/Backward compatibility for legacy records
+    msg = i.get("mensaje", "")
+    msg_up = msg.upper()
+    for cat_code, cat_obj in CATEGORIES_REGISTRY.items():
+        if cat_obj.name.upper() in msg_up:
+            return cat_obj.name
+            
+    # Substring heuristics for legacy messages
     if "VACÍO" in msg_up or "VACIO" in msg_up or "CAMPO OBLIGATORIO" in msg_up:
         return "Campo obligatorio se encuentra vacío."
     if "ÁNGULO DEL TALUD" in msg_up or "ANGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
         return "Ángulo del talud fuera del rango [-90, 90] grados."
-        
     if "AGUA" in msg_up:
         if "CÓDIGO" in msg_up or "CODIGO" in msg_up or "NO ADMITIDO" in msg_up:
             return "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F."
@@ -96,10 +54,8 @@ def simplify_message(msg):
             return "Rating de agua '76 / '89 es incongruente con el código."
         if "MEDIO NO EXACTO" in msg_up:
             return "El valor de agua '76 / '89 es un valor medio no exacto."
-
     if "DUREZA" in msg_up and "ADMITIDA" in msg_up:
         return "Dureza '76 / '89 no admitida. Debe ser R0 a R6."
-        
     if "RESISTENCIA" in msg_up:
         if "INCONGRUENTE" in msg_up:
             return "Resistencia '76 / '89 es incongruente con la dureza."
@@ -107,28 +63,23 @@ def simplify_message(msg):
             return "Rating de resistencia '76 / '89 fuera del límite real."
         if "ALEJADO" in msg_up or "PUNTAJE DE RESISTENCIA" in msg_up:
             return "Puntaje de resistencia '76 / '89 es un valor alejado no válido."
-
     if "CONTROL ESTRUCTURAL" in msg_up:
          return "Control estructural '76 / '89 fuera de límites permitidos [1, 5]."
-
     if "EFECTO" in msg_up or "VOLADURA" in msg_up:
         if "EXCEDE" in msg_up or "ESCALA" in msg_up:
             return "Efecto de voladura '76 / '89 excede los límites de la escala."
         if "MEDIO NO EXACTO" in msg_up:
             return "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto."
-
     if "RQD" in msg_up:
         if "SUPERIOR AL 100%" in msg_up or "SUPERIOR" in msg_up:
             return "Porcentaje de RQD '76 / '89 no puede ser superior al 100%."
         if "ALEJADO" in msg_up or "PUNTAJE DE RQD" in msg_up:
             return "Puntaje de RQD '76 / '89 es un valor alejado no válido."
-
     if "ESPACIAMIENTO PROMEDIO" in msg_up:
         if "ES DE 0.0 M" in msg_up or "CERO" in msg_up:
             return "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero)."
         if "POSITIVO" in msg_up or "NEGATIVO" in msg_up:
             return "El espaciamiento promedio '76 / '89 debe ser positivo."
-
     if "ESPACIAMIENTO" in msg_up:
         if "RANGO" in msg_up or "FUERA DEL" in msg_up:
             return "Valor de rating de espaciamiento '76 / '89 fuera de rango."
@@ -136,7 +87,6 @@ def simplify_message(msg):
             return "Rating de espaciamiento '76 / '89 no se alinea con el promedio."
         if "MEDIO NO EXACTO" in msg_up:
             return "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto."
-
     if "SUGERIDA A NORMALIZAR POR 'JN'" in msg_up or "NORMALIZAR POR 'JN'" in msg_up:
         return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
     if "TIPO DE ESTRUCTURA GEOLÓGICA NO PERMITIDA" in msg_up or "TIPO DE ESTRUCTURA GEOLOGICA NO PERMITIDA" in msg_up:
@@ -155,22 +105,19 @@ def simplify_message(msg):
         return "Espesor del relleno es superior a la abertura total."
     if "ABERTURA DE LA FALLA" in msg_up or ("ABERTURA" in msg_up and "FALLA" in msg_up and "SUPERA" in msg_up):
         return "La abertura de la falla supera la longitud de la celda."
-    if "PERSISTENCIA" in msg_up and "25 METROS" in msg_up or "SUPERIOR A 25 METROS" in msg_up:
-        return "La persistencia es superior a 25 metros."
-        
-    # Validación específica de UCS e Is50
     if "UCS" in msg_up and "IS50" in msg_up:
         if "DIVERGENTE" in msg_up:
             return "UCS es divergente a Is50."
         if "DIVERGENCIA" in msg_up or "IS50 * K" in msg_up or "UCS VS IS50 * K" in msg_up:
             return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
-            
     if "COMBINACIÓN LITOLÓGICA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
          return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
     if "UNIDAD LITOLÓGICA" in msg_up or "UNIDAD LITOLOGICA" in msg_up:
          return "Unidad litológica es incongruente con la litología."
     if "INCLINACIÓN (DIP) FUERA" in msg_up or "INCLINACION (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
         return "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados."
+    if "INCLINACIÓN (DIP DIRECTION) FUERA" in msg_up or "DIP DIR" in msg_up:
+        return "Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados."
     if "NÚMERO DE ESTRUCTURAS" in msg_up or "NUMERO DE ESTRUCTURAS" in msg_up:
         return "En número de estructuras solamente se permiten números enteros."
     if "ESPESOR" in msg_up and "NEGATIVO" in msg_up:
@@ -182,7 +129,17 @@ def simplify_message(msg):
     if "ESPACIAMIENTO" in msg_up and "NEGATIVO" in msg_up:
         return "El espaciamiento de discontinuidad no puede ser un valor negativo."
         
-    return msg_clean
+    return msg
+
+def safe_int(val, default=0):
+    if val is None: return default
+    try: return int(val)
+    except: return default
+
+def safe_float(val, default=0.0):
+    if val is None: return default
+    try: return float(val)
+    except: return default
 
 def get_safe_sheet_name(title, index):
     clean_title = "".join(c for c in title if c not in r':\/?*[]\'"').strip()
@@ -253,7 +210,7 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
     
     for i in incidencias:
         c = i.get("campania", "N/A")
-        obs_key = simplify_message(i.get("mensaje", ""))
+        obs_key = get_incidence_category_name(i)
         celda = i.get("celda_padre", "N/A")
         
         observaciones_por_año[c][obs_key]["incidents"] += 1
@@ -327,8 +284,8 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
             "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
         })
         
-    msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    msg_alertas = Counter(get_incidence_category_name(i) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+    msg_advertencias = Counter(get_incidence_category_name(i) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
     
     top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
     lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
@@ -580,7 +537,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    top_errs_list = Counter(simplify_message(i.get("mensaje")) for i in filtered if i.get("tipo_incidencia") == "ALERTA").most_common(5)
+    top_errs_list = Counter(get_incidence_category_name(i) for i in filtered if i.get("tipo_incidencia") == "ALERTA").most_common(5)
     r_graph = 11
     for msg, qty in top_errs_list:
         ws_dash.cell(row=r_graph, column=9, value=msg).font = font_regular
@@ -636,16 +593,16 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     incidencias_por_error = defaultdict(list)
     for inc in filtered:
-        msg_simplificado = simplify_message(inc.get("mensaje", ""))
+        msg_simplificado = get_incidence_category_name(inc)
         incidencias_por_error[msg_simplificado].append(inc)
 
     catalog_frequencies = []
-    for rule in MASTER_ERROR_RULES:
-        rule_msg = rule["msg"]
+    for cat in CATEGORIES_REGISTRY.values():
+        rule_msg = cat.name
         matches = incidencias_por_error[rule_msg]
         catalog_frequencies.append({
             "msg": rule_msg,
-            "severity": rule["severity"],
+            "severity": cat.severity,
             "matches": matches,
             "count": len(matches)
         })
@@ -703,7 +660,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     
     headers_detail = [
         "Fila Excel", "Gravedad", "Estación Padre", "Estructura Hija", "Campaña", 
-        "Logger Geotécnico", "Sector Geotécnico", "Columna de Falla", 
+        "Logger Geotécnico", "Sector Geotécnico", "Tipo de Mapeo", "Columna de Falla", 
         "Valor Actual", "Mensaje de Inconsistencia Geomecánica"
     ]
     
@@ -711,7 +668,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_detail.append([None] + headers_detail) 
     grid_heading_row = ws_detail.max_row
     
-    for idx in range(2, 12):
+    for idx in range(2, 13):
         cell = ws_detail.cell(row=grid_heading_row, column=idx)
         cell.font = font_header
         cell.fill = fill_primary
@@ -729,6 +686,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             inc_item.get("campania"),
             inc_item.get("geotecnico"),
             inc_item.get("sector_geotecnico"),
+            inc_item.get("tipo_mapeo", "Mapeo de Celdas"),
             inc_item.get("columna"),
             inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
             inc_item.get("mensaje")
@@ -746,12 +704,13 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             ws_detail.cell(row=r_idx, column=6).alignment = alignment_center
             ws_detail.cell(row=r_idx, column=7).alignment = alignment_left
             ws_detail.cell(row=r_idx, column=8).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=9).alignment = alignment_left
-            ws_detail.cell(row=r_idx, column=10).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=11).alignment = alignment_left
+            ws_detail.cell(row=r_idx, column=9).alignment = alignment_center
+            ws_detail.cell(row=r_idx, column=10).alignment = alignment_left
+            ws_detail.cell(row=r_idx, column=11).alignment = alignment_center
+            ws_detail.cell(row=r_idx, column=12).alignment = alignment_left
             
             if r_idx % 2 == 0:
-                for col_idx in range(2, 12):
+                for col_idx in range(2, 13):
                     if col_idx != 3:
                         ws_detail.cell(row=r_idx, column=col_idx).fill = fill_zebra
         else:
@@ -765,10 +724,10 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         else: cell_sev.fill = fill_accent_yellow
         cell_sev.font = font_bold
         
-        for col_idx in range(2, 12):
+        for col_idx in range(2, 13):
             ws_detail.cell(row=r_idx, column=col_idx).border = border_thin
             
-    ws_detail.auto_filter.ref = f"B{grid_heading_row}:K{end_detail_row}"
+    ws_detail.auto_filter.ref = f"B{grid_heading_row}:L{end_detail_row}"
 
     # --- HOJAS 4+: DETALLES INDIVIDUALES POR REGLA DE ERROR ---
     for orig_msg, mapping_data in active_sheets_mapping.items():
@@ -829,43 +788,134 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             
             curr_y_r += 1
 
-        ws_err.append([])
-        ws_err.append([None, "REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)"])
-        title_row_idx = ws_err.max_row
-        ws_err.cell(row=title_row_idx, column=2).font = font_section
+        unique_years = sorted(list(set(str(r.get("campania", "N/A")) for r in err_records)))
+        rule_group = defaultdict(list)
+        for r in err_records:
+            rule_group[r.get("rule_code", "Desconocido")].append(r)
+            
+        rule_stats = []
+        for rule_code, recs in rule_group.items():
+            yr_counts = defaultdict(int)
+            for r in recs:
+                yr_counts[str(r.get("campania", "N/A"))] += 1
+            rule_stats.append({
+                "rule_code": rule_code,
+                "total": len(recs),
+                "yr_counts": yr_counts
+            })
+        rule_stats.sort(key=lambda x: x["total"], reverse=True)
+        
+        # 2. Agrupar por Mensaje Único (Tabla B)
+        msg_group = defaultdict(list)
+        for r in err_records:
+            msg_group[r.get("mensaje", "Desconocido")].append(r)
+            
+        msg_stats = []
+        for msg_val, recs in msg_group.items():
+            yr_counts = defaultdict(int)
+            for r in recs:
+                yr_counts[str(r.get("campania", "N/A"))] += 1
+            msg_stats.append({
+                "message": msg_val,
+                "total": len(recs),
+                "yr_counts": yr_counts
+            })
+        msg_stats.sort(key=lambda x: x["total"], reverse=True)
+
+        # Precalcular coordenadas de las secciones para los hipervínculos de navegación
+        dist_table_height = len(r_dist_yr)
+        jump_link_row = 12 + dist_table_height + 1
+        
+        table_a_start = jump_link_row + 2
+        table_a_height = 2 + len(rule_stats)
+        
+        indiv_start = table_a_start + table_a_height + 2
+        indiv_height = 2 + len(err_records)
+        
+        table_b_start = indiv_start + indiv_height + 2
+
+        # --- ENLACE DIRECTO DE NAVEGACIÓN RÁPIDA ---
+        c_jump = ws_err.cell(row=jump_link_row, column=2)
+        c_jump.value = f'=HYPERLINK("#\'{sh_name}\'!B{table_b_start}", "🔍 Ir a Métricas de Mensajes de Inconsistencia Únicos (al final de la hoja)")'
+        c_jump.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+        c_jump.alignment = alignment_left
+
+        # --- TABLA A: RESUMEN POR REGLA ESPECÍFICA ---
+        ws_err.cell(row=table_a_start, column=2, value="MÉTRICAS POR REGLA ESPECÍFICA (CÓDIGO)").font = font_section
+        
+        ws_err.cell(row=table_a_start + 1, column=2, value="Código de Regla").font = font_header
+        ws_err.cell(row=table_a_start + 1, column=2).fill = fill_primary
+        ws_err.cell(row=table_a_start + 1, column=2).alignment = alignment_center
+        
+        ws_err.merge_cells(start_row=table_a_start + 1, start_column=2, end_row=table_a_start + 1, end_column=4)
+        for c_idx in [3, 4]:
+            ws_err.cell(row=table_a_start + 1, column=c_idx).fill = fill_primary
+            
+        headers_a = ["Ocurrencias Totales"] + [f"Año {y}" if y != "N/A" else "N/A" for y in unique_years]
+        for col_offset, h_name in enumerate(headers_a, start=5):
+            cell = ws_err.cell(row=table_a_start + 1, column=col_offset, value=h_name)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            
+        for col_idx in range(2, 5 + len(unique_years) + 1):
+            ws_err.cell(row=table_a_start + 1, column=col_idx).border = border_thin
+            
+        for idx, stat in enumerate(rule_stats):
+            r_row = table_a_start + 2 + idx
+            ws_err.cell(row=r_row, column=2, value=stat["rule_code"]).font = font_bold
+            ws_err.cell(row=r_row, column=2).alignment = alignment_center
+            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=4)
+            
+            c_tot = ws_err.cell(row=r_row, column=5, value=stat["total"])
+            c_tot.font = font_bold
+            c_tot.alignment = alignment_right
+            c_tot.number_format = '#,##0'
+            
+            for y_idx, yr in enumerate(unique_years):
+                val = stat["yr_counts"].get(yr, 0)
+                c_val = ws_err.cell(row=r_row, column=6 + y_idx, value=val)
+                c_val.font = font_regular
+                c_val.alignment = alignment_right
+                c_val.number_format = '#,##0'
+                
+            for col_idx in range(2, 5 + len(unique_years) + 1):
+                cell = ws_err.cell(row=r_row, column=col_idx)
+                cell.border = border_thin
+                if r_row % 2 == 0:
+                    cell.fill = fill_zebra
+
+        # --- LISTADO DETALLADO INDIVIDUAL DE INCIDENCIAS (CON COLUMNA 4 SWAP) ---
+        ws_err.cell(row=indiv_start, column=2, value="REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)").font = font_section
         
         headers_inc = [
-            "Fila Excel", "Estación Padre", "Estructura Hija", "Campaña", 
+            "Fila Excel", "Estación Padre", "Estructura Hija", "Tipo de Mapeo", "Campaña", 
             "Logger Geotécnico", "Sector Geotécnico", "Columna de Falla", 
             "Valor Actual", "Mensaje de Inconsistencia Geomecánica"
         ]
-        ws_err.append([None] + headers_inc)
-        header_row_idx = ws_err.max_row
-        
-        for col_idx in range(2, 11):
-            cell = ws_err.cell(row=header_row_idx, column=col_idx)
+        header_row_idx = indiv_start + 1
+        for col_idx, h_name in enumerate(headers_inc, start=2):
+            cell = ws_err.cell(row=header_row_idx, column=col_idx, value=h_name)
             cell.font = font_header
             cell.fill = fill_primary
             cell.alignment = alignment_center
             cell.border = border_thin
             
-        start_data_row = ws_err.max_row + 1
-        for inc_item in err_records:
-            row_data = [
-                None,
-                safe_int(inc_item.get("fila_excel")),
-                inc_item.get("celda_padre"),
-                inc_item.get("celda_hija"),
-                inc_item.get("campania"),
-                inc_item.get("geotecnico"),
-                inc_item.get("sector_geotecnico"),
-                inc_item.get("columna"),
-                inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-                inc_item.get("mensaje")
-            ]
-            ws_err.append(row_data)
+        start_data_row = indiv_start + 2
+        for idx, inc_item in enumerate(err_records):
+            curr_row = start_data_row + idx
+            ws_err.cell(row=curr_row, column=2, value=safe_int(inc_item.get("fila_excel")))
+            ws_err.cell(row=curr_row, column=3, value=inc_item.get("celda_padre"))
+            ws_err.cell(row=curr_row, column=4, value=inc_item.get("celda_hija"))
+            ws_err.cell(row=curr_row, column=5, value=inc_item.get("tipo_mapeo", "Mapeo de Celdas"))
+            ws_err.cell(row=curr_row, column=6, value=inc_item.get("campania"))
+            ws_err.cell(row=curr_row, column=7, value=inc_item.get("geotecnico"))
+            ws_err.cell(row=curr_row, column=8, value=inc_item.get("sector_geotecnico"))
+            ws_err.cell(row=curr_row, column=9, value=inc_item.get("columna"))
+            ws_err.cell(row=curr_row, column=10, value=inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—")
+            ws_err.cell(row=curr_row, column=11, value=inc_item.get("mensaje"))
             
-        end_data_row = ws_err.max_row
+        end_data_row = start_data_row + len(err_records) - 1
         
         for r_idx in range(start_data_row, end_data_row + 1):
             if r_idx <= start_data_row + 150:
@@ -873,41 +923,105 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 ws_err.cell(row=r_idx, column=3).alignment = alignment_center
                 ws_err.cell(row=r_idx, column=4).alignment = alignment_center
                 ws_err.cell(row=r_idx, column=5).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=6).alignment = alignment_left
-                ws_err.cell(row=r_idx, column=7).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=8).alignment = alignment_left
-                ws_err.cell(row=r_idx, column=9).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=10).alignment = alignment_left
+                ws_err.cell(row=r_idx, column=6).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=7).alignment = alignment_left
+                ws_err.cell(row=r_idx, column=8).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=9).alignment = alignment_left
+                ws_err.cell(row=r_idx, column=10).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=11).alignment = alignment_left
                 
                 if r_idx % 2 == 0:
-                    for col_idx in range(2, 11):
+                    for col_idx in range(2, 12):
                         ws_err.cell(row=r_idx, column=col_idx).fill = fill_zebra
             else:
                 ws_err.cell(row=r_idx, column=2).alignment = alignment_center
                 ws_err.cell(row=r_idx, column=3).alignment = alignment_center
                 
-            for col_idx in range(2, 11):
+            for col_idx in range(2, 12):
                 ws_err.cell(row=r_idx, column=col_idx).border = border_thin
                 
-        ws_err.auto_filter.ref = f"B{header_row_idx}:J{end_data_row}"
+        ws_err.auto_filter.ref = f"B{header_row_idx}:K{end_data_row}"
+
+        # --- TABLA B: RESUMEN POR MENSAJE DE INCONSISTENCIA ÚNICO ---
+        ws_err.cell(row=table_b_start, column=2, value="MÉTRICAS POR MENSAJE DE INCONSISTENCIA GEOMECÁNICA ÚNICO").font = font_section
+        
+        c_ret = ws_err.cell(row=table_b_start, column=5)
+        c_ret.value = f'=HYPERLINK("#\'{sh_name}\'!B2", "⬅ Volver al Inicio de la Hoja")'
+        c_ret.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+        c_ret.alignment = alignment_left
+
+        ws_err.cell(row=table_b_start + 1, column=2, value="Mensaje de Inconsistencia Geomecánica Único").font = font_header
+        ws_err.cell(row=table_b_start + 1, column=2).fill = fill_primary
+        ws_err.cell(row=table_b_start + 1, column=2).alignment = alignment_center
+        
+        ws_err.merge_cells(start_row=table_b_start + 1, start_column=2, end_row=table_b_start + 1, end_column=7)
+        for c_idx in range(3, 8):
+            ws_err.cell(row=table_b_start + 1, column=c_idx).fill = fill_primary
+            
+        headers_b = ["Ocurrencias Totales"] + [f"Año {y}" if y != "N/A" else "N/A" for y in unique_years]
+        for col_offset, h_name in enumerate(headers_b, start=8):
+            cell = ws_err.cell(row=table_b_start + 1, column=col_offset, value=h_name)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            
+        for col_idx in range(2, 8 + len(unique_years) + 1):
+            ws_err.cell(row=table_b_start + 1, column=col_idx).border = border_thin
+            
+        for idx, stat in enumerate(msg_stats):
+            r_row = table_b_start + 2 + idx
+            ws_err.cell(row=r_row, column=2, value=stat["message"]).font = font_regular
+            ws_err.cell(row=r_row, column=2).alignment = alignment_left
+            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=7)
+            
+            c_tot = ws_err.cell(row=r_row, column=8, value=stat["total"])
+            c_tot.font = font_bold
+            c_tot.alignment = alignment_right
+            c_tot.number_format = '#,##0'
+            
+            for y_idx, yr in enumerate(unique_years):
+                val = stat["yr_counts"].get(yr, 0)
+                c_val = ws_err.cell(row=r_row, column=9 + y_idx, value=val)
+                c_val.font = font_regular
+                c_val.alignment = alignment_right
+                c_val.number_format = '#,##0'
+                
+            for col_idx in range(2, 8 + len(unique_years) + 1):
+                cell = ws_err.cell(row=r_row, column=col_idx)
+                cell.border = border_thin
+                if r_row % 2 == 0:
+                    cell.fill = fill_zebra
 
     # --- AUTO-AJUSTE DINÁMICO DE COLUMNAS ---
     for ws in wb.worksheets:
         ws.column_dimensions['A'].width = 3
-        for col_idx in range(2, ws.max_column + 1):
-            vals = []
-            for row_idx in range(1, min(15, ws.max_row + 1)):
-                val = ws.cell(row=row_idx, column=col_idx).value
-                if val is not None:
-                    val_str = str(val)
-                    if val_str.startswith("=HYPERLINK"):
-                        vals.append("Ver Registros")
-                    else:
-                        vals.append(val_str)
-            if not vals: continue
-            max_len = max(len(v) for v in vals)
-            col_letter = get_column_letter(col_idx)
-            ws.column_dimensions[col_letter].width = min(max(max_len + 4, 11), 52)
+        if ws.title not in ["❌ Catálogo de Errores", "📋 Detalle de Incidencias", "📊 Panel de Control"]:
+            # Hojas de error con anchos específicos optimizados
+            ws.column_dimensions['B'].width = 11  # Fila Excel
+            ws.column_dimensions['C'].width = 14  # Estación Padre
+            ws.column_dimensions['D'].width = 14  # Estructura Hija
+            ws.column_dimensions['E'].width = 20  # Tipo de Mapeo
+            ws.column_dimensions['F'].width = 9   # Campaña
+            ws.column_dimensions['G'].width = 16  # Logger Geotécnico
+            ws.column_dimensions['H'].width = 16  # Sector Geotécnico
+            ws.column_dimensions['I'].width = 24  # Columna de Falla
+            ws.column_dimensions['J'].width = 12  # Valor Actual
+            ws.column_dimensions['K'].width = 60  # Mensaje de Inconsistencia
+        else:
+            for col_idx in range(2, ws.max_column + 1):
+                vals = []
+                for row_idx in range(1, min(15, ws.max_row + 1)):
+                    val = ws.cell(row=row_idx, column=col_idx).value
+                    if val is not None:
+                        val_str = str(val)
+                        if val_str.startswith("=HYPERLINK"):
+                            vals.append("Ver Registros")
+                        else:
+                            vals.append(val_str)
+                if not vals: continue
+                max_len = max(len(v) for v in vals)
+                col_letter = get_column_letter(col_idx)
+                ws.column_dimensions[col_letter].width = min(max(max_len + 4, 11), 52)
 
     return wb
 
@@ -1126,7 +1240,7 @@ def obtener_incidencias_paginadas(
         filtered = [
             i for i in filtered 
             if search_lower in i.get("mensaje", "").lower() 
-            or search_lower in simplify_message(i.get("mensaje", "")).lower()
+            or search_lower in get_incidence_category_name(i).lower()
             or search_lower in i.get("columna", "").lower()
             or search_lower in i.get("celda_padre", "").lower()
         ]
@@ -1210,7 +1324,7 @@ def descargar_reporte_excel(
         filtered = [
             i for i in filtered 
             if search_lower in i.get("mensaje", "").lower() 
-            or search_lower in simplify_message(i.get("mensaje", "")).lower()
+            or search_lower in get_incidence_category_name(i).lower()
             or search_lower in i.get("columna", "").lower()
             or search_lower in i.get("celda_padre", "").lower()
         ]

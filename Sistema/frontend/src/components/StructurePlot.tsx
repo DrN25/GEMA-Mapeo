@@ -2,17 +2,20 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { CalculatedJoint, WindowHeader } from '../utils/rmrCalculator';
 import { Download, ZoomIn, ZoomOut, RefreshCw, Layers, Compass } from 'lucide-react';
 import { STRUCTURE_CATALOG } from '../utils/catalogData';
+import { FormulaTooltipTrigger } from './FormulaTooltip';
 
 interface StructurePlotProps {
   header: WindowHeader;
   calculatedJoints: CalculatedJoint[];
   largo: number;
+  showFormulas?: boolean;
 }
 
 export default function StructurePlot({
   header,
   calculatedJoints,
-  largo
+  largo,
+  showFormulas = true
 }: StructurePlotProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -591,11 +594,31 @@ export default function StructurePlot({
                     <td className="py-2 px-2 text-center font-extrabold" style={{ color }}>F{fam}</td>
                     <td className="py-2 px-2 font-bold text-slate-400">{cj.row.tipo_estructura}</td>
                     <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber3(cj.row.distancia)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber4(cj.x)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber2(cj.y)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber6(cj.z)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">{formatNumber6(cj.theta)}&deg;</td>
-                    <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">{formatNumber6(cj.alpha)}&deg;</td>
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">
+                      <FormulaTooltipTrigger formulaId="utm_x_proj" params={{ dist: cj.row.distancia, theta: cj.theta, este_from: parseLocaleFloat(header?.este_from), val: cj.x }} position="top" enabled={showFormulas}>
+                        <span>{formatNumber4(cj.x)}</span>
+                      </FormulaTooltipTrigger>
+                    </td>
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">
+                      <FormulaTooltipTrigger formulaId="utm_y_proj" params={{ dist: cj.row.distancia, theta: cj.theta, norte_from: parseLocaleFloat(header?.norte_from), val: cj.y }} position="top" enabled={showFormulas}>
+                        <span>{formatNumber2(cj.y)}</span>
+                      </FormulaTooltipTrigger>
+                    </td>
+                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">
+                      <FormulaTooltipTrigger formulaId="utm_z_proj" params={{ dist: cj.row.distancia, theta: cj.theta, alpha: cj.alpha, cota_from: parseLocaleFloat(header?.cota_from), val: cj.z }} position="top" enabled={showFormulas}>
+                        <span>{formatNumber6(cj.z)}</span>
+                      </FormulaTooltipTrigger>
+                    </td>
+                    <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">
+                      <FormulaTooltipTrigger formulaId="theta_angle" params={{ val: cj.theta, norte_to: parseLocaleFloat(header?.norte_to), norte_from: parseLocaleFloat(header?.norte_from), este_to: parseLocaleFloat(header?.este_to), este_from: parseLocaleFloat(header?.este_from) }} position="top" enabled={showFormulas}>
+                        <span>{formatNumber6(cj.theta)}&deg;</span>
+                      </FormulaTooltipTrigger>
+                    </td>
+                    <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">
+                      <FormulaTooltipTrigger formulaId="alpha_angle" params={{ val: cj.alpha, este_to: parseLocaleFloat(header?.este_to), este_from: parseLocaleFloat(header?.este_from), cota_to: parseLocaleFloat(header?.cota_to), cota_from: parseLocaleFloat(header?.cota_from) }} position="top" enabled={showFormulas}>
+                        <span>{formatNumber6(cj.alpha)}&deg;</span>
+                      </FormulaTooltipTrigger>
+                    </td>
                     <td className="py-2 px-2 text-center font-mono text-slate-400">{cj.row.dip ?? '—'}&deg; / {cj.row.dip_dir ?? '—'}&deg;</td>
                     <td className={`py-2 px-3 text-center font-bold ${cj.inBounds ? 'text-emerald-400' : 'text-slate-500'}`}>
                       {cj.inBounds ? '✓ Dentro' : '✗ Fuera'}

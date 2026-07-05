@@ -219,25 +219,25 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         calcExplanation: (params) => `Condición: "${params?.code || '—'}" ➔ Rating: ${params?.val ?? '—'}`
     },
     resistencia_ucs: {
-        title: `Código de Letra de ${COLUMN_NAMES.resistencia_ucs}`,
-        equation: `Clase = Rango(${COLUMN_NAMES.ucs_mpa})`,
-        description: "Determina el código de letra según el rango de resistencia en MPa de la roca intacta (A: >250, B: 100-250, C: 50-100, D: <50).",
-        inputs: [COLUMN_NAMES.ucs_mpa],
-        calcExplanation: (params) => `UCS: ${params?.ucs !== undefined ? `${params.ucs} MPa` : '—'} ➔ Letra: "${params?.val ?? '—'}"`
+        title: `Código de ${COLUMN_NAMES.resistencia_ucs}`,
+        equation: `Clase = Catálogo(${COLUMN_NAMES.resistencia_ucs})`,
+        description: "Determina el código de resistencia a partir de la estimación manual de campo en rango R0 a R6.",
+        inputs: [COLUMN_NAMES.resistencia_ucs],
+        calcExplanation: (params) => `Código ISRM: "${params?.val ?? '—'}"`
     },
     val_resist_r89: {
         title: `Rating Resistencia (R89)`,
-        equation: `Rating = Rango(${COLUMN_NAMES.ucs_mpa} o ${COLUMN_NAMES.resistencia_ucs})`,
-        description: "Determina el rating de resistencia a compresión simple. Si el UCS en MPa está definido, se calcula el rating numérico exacto.",
-        inputs: [COLUMN_NAMES.ucs_mpa, COLUMN_NAMES.resistencia_ucs],
-        calcExplanation: (params) => `UCS: ${params?.ucs || '—'} MPa (Código: ${params?.code || '—'}) ➔ Rating: ${params?.val ?? '—'}`
+        equation: `Rating = Catálogo(${COLUMN_NAMES.resistencia_ucs})`,
+        description: "Determina el rating de resistencia geomecánica en base al catálogo estándar de resistencia estimada para RMR'89.",
+        inputs: [COLUMN_NAMES.resistencia_ucs],
+        calcExplanation: (params) => `Grado: "${params?.code || '—'}" ➔ Rating: ${params?.val ?? '—'}`
     },
     val_resist_r76: {
         title: `Rating Resistencia (R76)`,
-        equation: `Rating = Rango(${COLUMN_NAMES.ucs_mpa} o ${COLUMN_NAMES.resistencia_ucs})`,
-        description: "Determina el rating de resistencia uniaxial adaptado a RMR'76.",
-        inputs: [COLUMN_NAMES.ucs_mpa, COLUMN_NAMES.resistencia_ucs],
-        calcExplanation: (params) => `UCS: ${params?.ucs || '—'} MPa (Código: ${params?.code || '—'}) ➔ Rating: ${params?.val ?? '—'}`
+        equation: `Rating = Catálogo(${COLUMN_NAMES.resistencia_ucs})`,
+        description: "Determina el rating de resistencia geomecánica en base al catálogo estándar de resistencia estimada para RMR'76.",
+        inputs: [COLUMN_NAMES.resistencia_ucs],
+        calcExplanation: (params) => `Grado: "${params?.code || '—'}" ➔ Rating: ${params?.val ?? '—'}`
     },
     rqd_est: {
         title: `Porcentaje de ${COLUMN_NAMES.rqd_est}`,
@@ -429,6 +429,53 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         description: "Clasifica la resistencia del macizo de roca intacta en los grados normalizados (R0 a R6) según el UCS estimado.",
         inputs: [COLUMN_NAMES.ucs],
         calcExplanation: (params) => `UCS: ${params?.ucs !== undefined ? params.ucs.toFixed(2) : '—'} ➔ ISRM: ${params?.val ?? '—'}`
+    },
+    utm_x_proj: {
+        title: "Proyección UTM Este (X)",
+        equation: "X = Distancia * sin(θ) + Este_FROM",
+        description: "Calcula la coordenada Este (X) del plano de la discontinuidad proyectada a lo largo del scanline 3D.",
+        inputs: ["Distancia", "Ángulo θ", "Este FROM"],
+        calcExplanation: (params) => `X = ${params?.dist?.toFixed(3) ?? '—'} * sin(${params?.theta?.toFixed(2) ?? '—'}°) + ${params?.este_from?.toFixed(2) ?? '—'} = ${params?.val?.toFixed(4) ?? '—'}`
+    },
+    utm_y_proj: {
+        title: "Proyección UTM Norte (Y)",
+        equation: "Y = Distancia * cos(θ) + Norte_FROM",
+        description: "Calcula la coordenada Norte (Y) de la discontinuidad proyectada.",
+        inputs: ["Distancia", "Ángulo θ", "Norte FROM"],
+        calcExplanation: (params) => `Y = ${params?.dist?.toFixed(3) ?? '—'} * cos(${params?.theta?.toFixed(2) ?? '—'}°) + ${params?.norte_from?.toFixed(2) ?? '—'} = ${params?.val?.toFixed(2) ?? '—'}`
+    },
+    utm_z_proj: {
+        title: "Proyección UTM Cota (Z)",
+        equation: "Z = Distancia * cos(θ) * sin(α) + Cota_FROM",
+        description: "Calcula la cota o elevación (Z) de la discontinuidad proyectada.",
+        inputs: ["Distancia", "Ángulo θ", "Ángulo α", "Cota FROM"],
+        calcExplanation: (params) => `Z = ${params?.dist?.toFixed(3) ?? '—'} * cos(${params?.theta?.toFixed(2) ?? '—'}°) * sin(${params?.alpha?.toFixed(2) ?? '—'}°) + ${params?.cota_from?.toFixed(2) ?? '—'} = ${params?.val?.toFixed(6) ?? '—'}`
+    },
+    theta_angle: {
+        title: "Ángulo de Proyección θ (Azimut Aparente)",
+        equation: "θ = acot((Norte_TO - Norte_FROM) / (Este_TO - Este_FROM))",
+        description: "Representa la dirección azimutal aparente en planta (ángulo horizontal) del scanline 3D calculado a partir de las coordenadas del extremo de inicio (FROM) y fin (TO).",
+        inputs: ["Este (FROM/TO)", "Norte (FROM/TO)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { norte_to, norte_from, este_to, este_from, val } = params;
+            const dy = (norte_to ?? 0) - (norte_from ?? 0);
+            const dx = (este_to ?? 0) - (este_from ?? 0);
+            return `θ = acot((${norte_to?.toFixed(2)} - ${norte_from?.toFixed(2)}) / (${este_to?.toFixed(2)} - ${este_from?.toFixed(2)})) = acot(${dy.toFixed(2)} / ${dx.toFixed(2)}) = ${val?.toFixed(6)}°`;
+        }
+    },
+    alpha_angle: {
+        title: "Ángulo de Proyección α (Plunge Aparente)",
+        equation: "α = acot((Este_TO - Este_FROM) / (Cota_TO - Cota_FROM))",
+        description: "Representa el plunge o inclinación vertical aparente del scanline 3D respecto al plano horizontal de referencia.",
+        inputs: ["Este (FROM/TO)", "Cota (FROM/TO)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { este_to, este_from, cota_to, cota_from, val } = params;
+            const dx = (este_to ?? 0) - (este_from ?? 0);
+            const dz = (cota_to ?? 0) - (cota_from ?? 0);
+            return `α = acot((${este_to?.toFixed(2)} - ${este_from?.toFixed(2)}) / (${cota_to?.toFixed(2)} - ${cota_from?.toFixed(2)})) = acot(${dx.toFixed(2)} / ${dz.toFixed(2)}) = ${val?.toFixed(6)}°`;
+        }
     }
 };
 

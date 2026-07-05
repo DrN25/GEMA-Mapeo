@@ -66,26 +66,17 @@ export default function RmrAnalysis({
     });
   };
 
-  const handleNumericInputChange = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', val: string, intDigits: number, decDigits: number) => {
+  const handleNumericInputChange = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual' | 'control_estructural' | 'efectos_voladura', val: string, intDigits: number, decDigits: number) => {
     const sanitized = val.replace(',', '.');
     const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits);
     setLocalValues(prev => ({ ...prev, [field]: restricted }));
 
     const num = parseFloat(restricted);
     if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
-      if (field === 'ucs_mpa') {
-        const resistencia_ucs = getIsrmGrade(num);
-        onChange({
-          ...header,
-          ucs_mpa: num,
-          resistencia_ucs
-        });
-      } else {
-        onChange({
-          ...header,
-          [field]: num
-        });
-      }
+      onChange({
+        ...header,
+        [field]: num
+      });
     } else if (restricted === '') {
       onChange({
         ...header,
@@ -94,7 +85,7 @@ export default function RmrAnalysis({
     }
   };
 
-  const handleNumericInputBlur = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', val: string) => {
+  const handleNumericInputBlur = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual' | 'control_estructural' | 'efectos_voladura', val: string) => {
     setLocalValues(prev => {
       const copy = { ...prev };
       delete copy[field];
@@ -104,20 +95,11 @@ export default function RmrAnalysis({
     if (isNaN(num)) {
       onChange({ ...header, [field]: 0 });
     } else {
-      if (field === 'ucs_mpa') {
-        const resistencia_ucs = getIsrmGrade(num);
-        onChange({
-          ...header,
-          ucs_mpa: num,
-          resistencia_ucs
-        });
-      } else {
-        onChange({ ...header, [field]: num });
-      }
+      onChange({ ...header, [field]: num });
     }
   };
 
-  const getInputValue = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual', stateVal: any): string => {
+  const getInputValue = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual' | 'control_estructural' | 'efectos_voladura', stateVal: any): string => {
     if (localValues[field] !== undefined) return localValues[field];
     if (stateVal === undefined || stateVal === null) return '';
     return String(stateVal);
@@ -130,25 +112,23 @@ export default function RmrAnalysis({
     });
   };
 
-  const ucs = header.ucs_mpa !== undefined ? header.ucs_mpa : 73;
-  const is50 = header.is50_mpa !== undefined ? header.is50_mpa : 5;
-  const gsiCond = header.gsi_superficie || 'G';
-  const gsiEstruc = header.gsi_estructura || 'VB';
-  const gsiVisual = header.gsi_visual !== undefined ? header.gsi_visual : 56;
-  const ctrl = header.control_estructural !== undefined ? header.control_estructural : 3;
-  const vol = header.efectos_voladura !== undefined ? header.efectos_voladura : 3;
+  const ucs = header.ucs_mpa !== undefined && header.ucs_mpa !== 0 ? header.ucs_mpa : undefined;
+  const is50 = header.is50_mpa !== undefined && header.is50_mpa !== 0 ? header.is50_mpa : undefined;
+  const gsiCond = header.gsi_superficie || '';
+  const gsiEstruc = header.gsi_estructura || '';
+  const gsiVisual = header.gsi_visual !== undefined && header.gsi_visual !== 0 ? header.gsi_visual : undefined;
+  const ctrl = header.control_estructural !== undefined && header.control_estructural !== 0 ? header.control_estructural : undefined;
+  const vol = header.efectos_voladura !== undefined && header.efectos_voladura !== 0 ? header.efectos_voladura : undefined;
 
-  // Se determina el código de grado ISRM correspondiente para la tabla (R0 - R6)
-  const currentResistGrade = header.ucs_mpa !== undefined && header.ucs_mpa !== null && !isNaN(header.ucs_mpa)
-    ? getIsrmGrade(header.ucs_mpa)
-    : (header.resistencia_ucs || 'R4');
+  // Resistencia estimada ingresada manualmente por el usuario
+  const currentResistGrade = header.resistencia_ucs || '';
 
   const p1 = calculated.familias_spacing[1] ? calculated.familias_spacing[1].toFixed(2) : '0.00';
   const p2 = calculated.familias_spacing[2] ? calculated.familias_spacing[2].toFixed(2) : '0.00';
   const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(2) : '0.00';
 
   const ucsIs50Divergent = ucs !== undefined && is50 !== undefined && ucs <= is50;
-  const gsiVisualInvalid = gsiVisual < 0 || gsiVisual > 100;
+  const gsiVisualInvalid = gsiVisual !== undefined && (gsiVisual < 0 || gsiVisual > 100);
 
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 border-l-4 border-l-violet-500 space-y-6 text-left select-none animate-fade-in shadow-xl">
@@ -180,16 +160,17 @@ export default function RmrAnalysis({
       </div>
 
       {/* INPUTS DE CONTROL */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 bg-navy-950/45 p-4 rounded-xl border border-navy-900">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3 bg-navy-950/45 pt-2 pb-4 px-4 rounded-xl border border-navy-900">
         <div className="col-span-2 space-y-1">
-          <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.condicion_agua}
           </label>
           <select
-            value={header.condicion_agua}
+            value={header.condicion_agua || ''}
             onChange={handleWaterChange}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
+            <option value="" className="bg-navy-950">-- Seleccione --</option>
             <option value="C" className="bg-navy-950">C — Completamente seco</option>
             <option value="H" className="bg-navy-950">H — Húmedo</option>
             <option value="M" className="bg-navy-950">M — Mojado</option>
@@ -199,22 +180,27 @@ export default function RmrAnalysis({
         </div>
 
         <div className="space-y-1">
-          <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
-            {COLUMN_LABELS.ucs_mpa}
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
+            {COLUMN_LABELS.resistencia_ucs}
           </label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={getInputValue('ucs_mpa', ucs)}
-            onChange={(e) => handleNumericInputChange('ucs_mpa', e.target.value, 4, 2)}
-            onBlur={(e) => handleNumericInputBlur('ucs_mpa', e.target.value)}
-            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${ucsIs50Divergent ? 'border-red-500/80 bg-red-950/20 shadow-[0_0_8px_rgba(239,68,68,0.15)] text-red-300 font-bold' : 'border-navy-700/80'
-              }`}
-          />
+          <select
+            value={header.resistencia_ucs || ''}
+            onChange={(e) => handleFieldChange('resistencia_ucs', e.target.value)}
+            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+          >
+            <option value="" className="bg-navy-950">--</option>
+            <option value="R6" className="bg-navy-950">R6</option>
+            <option value="R5" className="bg-navy-950">R5</option>
+            <option value="R4" className="bg-navy-950">R4</option>
+            <option value="R3" className="bg-navy-950">R3</option>
+            <option value="R2" className="bg-navy-950">R2</option>
+            <option value="R1" className="bg-navy-950">R1</option>
+            <option value="R0" className="bg-navy-950">R0</option>
+          </select>
         </div>
 
         <div className="space-y-1">
-          <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.is50_mpa}
           </label>
           <input
@@ -229,7 +215,7 @@ export default function RmrAnalysis({
         </div>
 
         <div className="space-y-1">
-          <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.gsi_superficie}
           </label>
           <input
@@ -241,7 +227,7 @@ export default function RmrAnalysis({
         </div>
 
         <div className="space-y-1">
-          <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.gsi_estructura}
           </label>
           <input
@@ -253,7 +239,7 @@ export default function RmrAnalysis({
         </div>
 
         <div className="space-y-1">
-          <label className="block text-slate-500 font-bold uppercase tracking-wider text-xs">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.gsi_visual}
           </label>
           <input
@@ -265,6 +251,48 @@ export default function RmrAnalysis({
             className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${gsiVisualInvalid ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300' : 'border-navy-700/80'
               }`}
           />
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
+            {COLUMN_LABELS.control_estructural}
+          </label>
+          <select
+            value={ctrl !== undefined ? String(ctrl) : ''}
+            onChange={(e) => {
+              const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+              handleFieldChange('control_estructural', val);
+            }}
+            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+          >
+            <option value="" className="bg-navy-950">--</option>
+            <option value="1" className="bg-navy-950">1</option>
+            <option value="2" className="bg-navy-950">2</option>
+            <option value="3" className="bg-navy-950">3</option>
+            <option value="4" className="bg-navy-950">4</option>
+            <option value="5" className="bg-navy-950">5</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
+            {COLUMN_LABELS.efectos_voladura}
+          </label>
+          <select
+            value={vol !== undefined ? String(vol) : ''}
+            onChange={(e) => {
+              const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+              handleFieldChange('efectos_voladura', val);
+            }}
+            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+          >
+            <option value="" className="bg-navy-950">--</option>
+            <option value="1" className="bg-navy-950">1</option>
+            <option value="2" className="bg-navy-950">2</option>
+            <option value="3" className="bg-navy-950">3</option>
+            <option value="5" className="bg-navy-950">5</option>
+            <option value="6" className="bg-navy-950">6</option>
+          </select>
         </div>
       </div>
 
@@ -341,12 +369,12 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold">
-                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: currentResistGrade }} position="bottom" enabled={showFormulas}>
+                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ val: currentResistGrade }} position="bottom" enabled={showFormulas}>
                   <span>{currentResistGrade}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
-                <FormulaTooltipTrigger formulaId="val_resist_r76" params={{ ucs, code: header.resistencia_ucs, val: calculated.ucs_rating_76 }} position="bottom" enabled={showFormulas}>
+                <FormulaTooltipTrigger formulaId="val_resist_r76" params={{ code: header.resistencia_ucs, val: calculated.ucs_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.ucs_rating_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
@@ -395,8 +423,8 @@ export default function RmrAnalysis({
                   <span>{calculated.rmr_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 text-slate-400">{ucs.toFixed(2)}</td>
-              <td className="py-3 px-2 text-center border-b border-navy-800/80 text-slate-400">{is50.toFixed(2)}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 text-slate-400">{ucs !== undefined ? ucs.toFixed(2) : '—'}</td>
+              <td className="py-3 px-2 text-center border-b border-navy-800/80 text-slate-400">{is50 !== undefined ? is50.toFixed(2) : '—'}</td>
             </tr>
 
             {/* RMR'89 */}
@@ -409,12 +437,12 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold">
-                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ ucs, val: currentResistGrade }} position="bottom" enabled={showFormulas}>
+                <FormulaTooltipTrigger formulaId="resistencia_ucs" params={{ val: currentResistGrade }} position="bottom" enabled={showFormulas}>
                   <span>{currentResistGrade}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
-                <FormulaTooltipTrigger formulaId="val_resist_r89" params={{ ucs, code: header.resistencia_ucs, val: calculated.ucs_rating_89 }} position="bottom" enabled={showFormulas}>
+                <FormulaTooltipTrigger formulaId="val_resist_r89" params={{ code: header.resistencia_ucs, val: calculated.ucs_rating_89 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.ucs_rating_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
@@ -463,8 +491,8 @@ export default function RmrAnalysis({
                   <span>{calculated.rmr_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 text-slate-400">{ucs.toFixed(2)}</td>
-              <td className="py-3 px-2 text-center border-b border-navy-800/80 text-slate-400">{is50.toFixed(2)}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 text-slate-400">{ucs !== undefined ? ucs.toFixed(2) : '—'}</td>
+              <td className="py-3 px-2 text-center border-b border-navy-800/80 text-slate-400">{is50 !== undefined ? is50.toFixed(2) : '—'}</td>
             </tr>
           </tbody>
         </table>

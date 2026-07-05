@@ -127,7 +127,7 @@ def validate_geotechnical_header(row_dict, registrar_error):
     if dip_talud is not None:
         dip_talud = round(dip_talud, 2)
         if not (-90.0 <= dip_talud <= 90.0):
-            registrar_error("DIP_TALUD", dip_talud, "ALERTA", f"Ángulo del talud fuera del rango [-90, 90] grados. Valor actual de DIP_TALUD: {dip_talud}°.")
+            registrar_error("DIP_TALUD", dip_talud, "ERR_DIP_TALUD_RANGO", value=dip_talud)
 
 def validate_geomechanical_properties(row_dict, registrar_error):
     # 1. Validación de Condición de Agua (Códigos)
@@ -135,124 +135,124 @@ def validate_geomechanical_properties(row_dict, registrar_error):
     if agua_76 is not None:
         agua_76_clean = agua_76.upper()
         if agua_76_clean not in CONDICION_AGUA_CATALOG:
-            registrar_error("CONDICION DE AGUA  '76.", agua_76, "ALERTA", f"Código de agua '76 no admitido. Valor ingresado: '{agua_76}'. Debe ser uno de {list(CONDICION_AGUA_CATALOG.keys())} (C, H, M, E, F).")
+            registrar_error("CONDICION DE AGUA  '76.", agua_76, "ERR_AGUA_76_CODIGO_INVALIDO", value=agua_76, allowed_codes=list(CONDICION_AGUA_CATALOG.keys()))
 
     agua_89 = sanitize_value(get_row_val(row_dict, "CONDICION DE AGUA  '89"), str)
     if agua_89 is not None:
         agua_89_clean = agua_89.upper()
         if agua_89_clean not in CONDICION_AGUA_CATALOG:
-            registrar_error("CONDICION DE AGUA  '89", agua_89, "ALERTA", f"Código de agua '89 no admitido. Valor ingresado: '{agua_89}'. Debe ser uno de {list(CONDICION_AGUA_CATALOG.keys())} (C, H, M, E, F).")
+            registrar_error("CONDICION DE AGUA  '89", agua_89, "ERR_AGUA_89_CODIGO_INVALIDO", value=agua_89, allowed_codes=list(CONDICION_AGUA_CATALOG.keys()))
 
     # 2. Rating y Coherencia de Condición de Agua
     agua_val_76 = sanitize_value(get_row_val(row_dict, "CONDICION DE AGUA VALOR  '76"), int)
     if agua_val_76 is not None:
         if not (0 <= agua_val_76 <= 10):
-            registrar_error("CONDICION DE AGUA VALOR  '76", agua_val_76, "ALERTA", f"Valor de agua '76 excede los límites reales de la escala [0, 10]. Valor ingresado: {agua_val_76}.")
+            registrar_error("CONDICION DE AGUA VALOR  '76", agua_val_76, "ERR_AGUA_76_LIMITE_EXCEDIDO", value=agua_val_76)
         elif agua_76 is not None and agua_76.upper() in CONDICION_AGUA_CATALOG:
             expected = CONDICION_AGUA_CATALOG[agua_76.upper()]["r76"]
             if agua_val_76 != expected:
-                registrar_error("CONDICION DE AGUA VALOR  '76", agua_val_76, "ALERTA", f"Rating de agua '76 es incongruente con el código. Valor ingresado: {agua_val_76}, Código: '{agua_76}'. Se esperaba {expected} según catálogo.")
+                registrar_error("CONDICION DE AGUA VALOR  '76", agua_val_76, "ERR_AGUA_76_INCONGRUENTE", value=agua_val_76, code_val=agua_76, expected=expected)
         elif agua_val_76 not in [10, 7, 4, 0]:
-            registrar_error("CONDICION DE AGUA VALOR  '76", agua_val_76, "ADVERTENCIA", f"El valor de agua '76 es un valor medio no exacto. Valor ingresado: {agua_val_76}. Valores permitidos: [10, 7, 4, 0].")
+            registrar_error("CONDICION DE AGUA VALOR  '76", agua_val_76, "WRN_AGUA_76_VALOR_MEDIO", value=agua_val_76)
 
     agua_val_89 = sanitize_value(get_row_val(row_dict, "CONDICION DE AGUA VALOR '89"), int)
     if agua_val_89 is not None:
         if not (0 <= agua_val_89 <= 15):
-            registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "ALERTA", f"Valor de agua '89 excede los límites reales de la escala [0, 15]. Valor ingresado: {agua_val_89}.")
+            registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "ERR_AGUA_89_LIMITE_EXCEDIDO", value=agua_val_89)
         elif agua_89 is not None and agua_89.upper() in CONDICION_AGUA_CATALOG:
             expected = CONDICION_AGUA_CATALOG[agua_89.upper()]["r89"]
             if agua_val_89 != expected:
-                registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "ALERTA", f"Rating de agua '89 es incongruente con el código. Valor ingresado: {agua_val_89}, Código: '{agua_89}'. Se esperaba {expected} según catálogo.")
+                registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "ERR_AGUA_89_INCONGRUENTE", value=agua_val_89, code_val=agua_89, expected=expected)
         elif agua_val_89 not in [15, 10, 7, 4, 0]:
-            registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "ADVERTENCIA", f"El valor de agua '89 es un valor medio no exacto. Valor ingresado: {agua_val_89}. Valores permitidos: [15, 10, 7, 4, 0].")
+            registrar_error("CONDICION DE AGUA VALOR '89", agua_val_89, "WRN_AGUA_89_VALOR_MEDIO", value=agua_val_89)
 
     # 3. Dureza y Ratings de Resistencia ISRM
     dureza_76 = sanitize_value(get_row_val(row_dict, "DUREZA  '76"), str)
     if dureza_76 is not None:
         dureza_76_clean = dureza_76.upper()
         if dureza_76_clean not in RESISTENCIA_RATING_CATALOG:
-            registrar_error("DUREZA  '76", dureza_76, "ALERTA", f"Dureza '76 '{dureza_76}' no admitida. Debe ser R0 a R6.")
+            registrar_error("DUREZA  '76", dureza_76, "ERR_DUREZA_76_INVALIDA", value=dureza_76)
 
     dureza_val_76 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR  '76"), float)
     if dureza_val_76 is not None:
         dureza_val_76 = round(dureza_val_76, 2)
         if not (0 <= dureza_val_76 <= 15):
-            registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "ALERTA", f"Rating de resistencia '76 fuera del límite real [0, 15]. Valor ingresado: {dureza_val_76}.")
+            registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "ERR_RESISTENCIA_76_LIMITE_EXCEDIDO", value=dureza_val_76)
         elif dureza_76 is not None and dureza_76.upper() in RESISTENCIA_RATING_CATALOG:
             expected = RESISTENCIA_RATING_CATALOG[dureza_76.upper()]["r76"]
             if abs(dureza_val_76 - expected) > 0.5:
-                registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "ALERTA", f"Resistencia '76 es incongruente con la dureza. Valor ingresado: {dureza_val_76}, Dureza: '{dureza_76}'. Se esperaba {expected} (Tolerancia ±0.5).")
+                registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "ERR_RESISTENCIA_76_INCONGRUENTE", value=dureza_val_76, dureza_val=dureza_76, expected=expected)
         elif not is_within_tolerance(dureza_val_76, [0, 1, 2, 4, 7, 12, 15], 0.5):
-            registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "ADVERTENCIA", f"Puntaje de resistencia '76 es un valor alejado no válido. Valor ingresado: {dureza_val_76}. Valores discretos estándar: [0, 1, 2, 4, 7, 12, 15].")
+            registrar_error("RESISTENCIA ESTIMADA VALOR  '76", dureza_val_76, "WRN_RESISTENCIA_76_VALOR_ALEJADO", value=dureza_val_76)
 
     dureza_89 = sanitize_value(get_row_val(row_dict, "DUREZA '89"), str)
     if dureza_89 is not None:
         dureza_89_clean = dureza_89.upper()
         if dureza_89_clean not in RESISTENCIA_RATING_CATALOG:
-            registrar_error("DUREZA '89", dureza_89, "ALERTA", f"Dureza '89 '{dureza_89}' no admitida. Debe ser R0 a R6.")
+            registrar_error("DUREZA '89", dureza_89, "ERR_DUREZA_89_INVALIDA", value=dureza_89)
 
     dureza_val_89 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR '89"), float)
     if dureza_val_89 is not None:
         dureza_val_89 = round(dureza_val_89, 2)
         if not (0 <= dureza_val_89 <= 15):
-            registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ALERTA", f"Rating de resistencia '89 fuera del límite real [0, 15]. Valor ingresado: {dureza_val_89}.")
+            registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_LIMITE_EXCEDIDO", value=dureza_val_89)
         elif dureza_89 is not None and dureza_89.upper() in RESISTENCIA_RATING_CATALOG:
             expected = RESISTENCIA_RATING_CATALOG[dureza_89.upper()]["r89"]
             if abs(dureza_val_89 - expected) > 0.5:
-                registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ALERTA", f"Resistencia '89 es incongruente con la dureza. Valor ingresado: {dureza_val_89}, Dureza: '{dureza_89}'. Se esperaba {expected} (Tolerancia ±0.5).")
+                registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=expected)
         elif not is_within_tolerance(dureza_val_89, [0, 1, 2, 4, 7, 12, 15], 0.5):
-            registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ADVERTENCIA", f"Puntaje de resistencia '89 es un valor alejado no válido. Valor ingresado: {dureza_val_89}. Valores discretos estándar: [0, 1, 2, 4, 7, 12, 15].")
+            registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "WRN_RESISTENCIA_89_VALOR_ALEJADO", value=dureza_val_89)
 
     # 4. Control Estructural [1, 5]
     ctrl_76 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL  '76"), int)
     if ctrl_76 is not None and ctrl_76 != 0:
         if ctrl_76 not in CONTROL_ESTRUCTURAL_CATALOG:
-            registrar_error("CONTROL ESTRUCTURAL  '76", ctrl_76, "ALERTA", f"Control estructural '76 fuera de límites permitidos [1, 5]. Valor ingresado: {ctrl_76}.")
+            registrar_error("CONTROL ESTRUCTURAL  '76", ctrl_76, "ERR_CONTROL_ESTRUCTURAL_76_FUERA_LIMITES", value=ctrl_76)
     ctrl_89 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL '89"), int)
     if ctrl_89 is not None and ctrl_89 != 0:
         if ctrl_89 not in CONTROL_ESTRUCTURAL_CATALOG:
-            registrar_error("CONTROL ESTRUCTURAL '89", ctrl_89, "ALERTA", f"Control estructural '89 fuera de límites permitidos [1, 5]. Valor ingresado: {ctrl_89}.")
+            registrar_error("CONTROL ESTRUCTURAL '89", ctrl_89, "ERR_CONTROL_ESTRUCTURAL_89_FUERA_LIMITES", value=ctrl_89)
 
     # 5. Efectos de Voladura [1, 6] (Se excluye el valor 0 que representa un campo vacío/no mapeado)
     vol_76 = sanitize_value(get_row_val(row_dict, "EFECTOS DE VOLADURA  '76"), int)
     if vol_76 is not None and vol_76 != 0:
         if not (1 <= vol_76 <= 6):
-            registrar_error("EFECTOS DE VOLADURA  '76", vol_76, "ALERTA", f"Efecto de voladura '76 excede los límites de la escala [1, 6]. Valor ingresado: {vol_76}.")
+            registrar_error("EFECTOS DE VOLADURA  '76", vol_76, "ERR_EFECTOS_VOLADURA_76_EXCEDE_ESCALA", value=vol_76)
         elif vol_76 not in EFECTOS_VOLADURA_CATALOG:
-            registrar_error("EFECTOS DE VOLADURA  '76", vol_76, "ADVERTENCIA", f"Puntaje de efectos de voladura '76 es un valor medio no exacto. Valor ingresado: {vol_76}. Se sugieren los valores estándar de catálogo: {EFECTOS_VOLADURA_CATALOG}.")
+            registrar_error("EFECTOS DE VOLADURA  '76", vol_76, "WRN_EFECTOS_VOLADURA_76_VALOR_MEDIO", value=vol_76, allowed_values=EFECTOS_VOLADURA_CATALOG)
 
     vol_89 = sanitize_value(get_row_val(row_dict, "EFECTOS DE VOLADURA '89"), int)
     if vol_89 is not None and vol_89 != 0:
         if not (1 <= vol_89 <= 6):
-            registrar_error("EFECTOS DE VOLADURA '89", vol_89, "ALERTA", f"Efecto de voladura '89 excede los límites de la escala [1, 6]. Valor ingresado: {vol_89}.")
+            registrar_error("EFECTOS DE VOLADURA '89", vol_89, "ERR_EFECTOS_VOLADURA_89_EXCEDE_ESCALA", value=vol_89)
         elif vol_89 not in EFECTOS_VOLADURA_CATALOG:
-            registrar_error("EFECTOS DE VOLADURA '89", vol_89, "ADVERTENCIA", f"Puntaje de efectos de voladura '89 es un valor medio no exacto. Valor ingresado: {vol_89}. Se sugieren los valores estándar de catálogo: {EFECTOS_VOLADURA_CATALOG}.")
+            registrar_error("EFECTOS DE VOLADURA '89", vol_89, "WRN_EFECTOS_VOLADURA_89_VALOR_MEDIO", value=vol_89, allowed_values=EFECTOS_VOLADURA_CATALOG)
 
     # 6. RQD Ratings por umbral discreto
     rqd_val_76 = sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float)
     if rqd_val_76 is not None and rqd_val_76 != 0.0:
         rqd_val_76 = round(rqd_val_76, 2)
         if not is_within_tolerance(rqd_val_76, [3, 8, 13, 17, 20], 1.5):
-            registrar_error("RQD - VALOR  '76", rqd_val_76, "ADVERTENCIA", f"Puntaje de RQD '76 es un valor alejado no válido. Valor ingresado: {rqd_val_76}. Valores de catálogo esperados: [3, 8, 13, 17, 20].")
+            registrar_error("RQD - VALOR  '76", rqd_val_76, "WRN_RQD_VAL_76_VALOR_ALEJADO", value=rqd_val_76)
 
     rqd_val_89 = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
     if rqd_val_89 is not None and rqd_val_89 != 0.0:
         rqd_val_89 = round(rqd_val_89, 2)
         if not is_within_tolerance(rqd_val_89, [3, 8, 13, 17, 20], 1.5):
-            registrar_error("RQD - VALOR '89", rqd_val_89, "ADVERTENCIA", f"Puntaje de RQD '89 es un valor alejado no válido. Valor ingresado: {rqd_val_89}. Valores de catálogo esperados: [3, 8, 13, 17, 20].")
+            registrar_error("RQD - VALOR '89", rqd_val_89, "WRN_RQD_VAL_89_VALOR_ALEJADO", value=rqd_val_89)
 
     # 7. Porcentaje de RQD (Límite físico del 100%)
     rqd_76 = sanitize_value(get_row_val(row_dict, "RQD  '76"), float)
     if rqd_76 is not None:
         rqd_76 = round(rqd_76, 2)
         if rqd_76 > 100.0:
-            registrar_error("RQD  '76", rqd_76, "ALERTA", f"Porcentaje de RQD '76 no puede ser superior al 100%. Porcentaje actual: {rqd_76}%.")
+            registrar_error("RQD  '76", rqd_76, "ERR_RQD_76_SUPERIOR_100", value=rqd_76)
             
     rqd_89 = sanitize_value(get_row_val(row_dict, "RQD '89"), float)
     if rqd_89 is not None:
         rqd_89 = round(rqd_89, 2)
         if rqd_89 > 100.0:
-            registrar_error("RQD '89", rqd_89, "ALERTA", f"Porcentaje de RQD '89 no puede ser superior al 100%. Porcentaje actual: {rqd_89}%.")
+            registrar_error("RQD '89", rqd_89, "ERR_RQD_89_SUPERIOR_100", value=rqd_89)
 
     # 8. Espaciamiento Promedio y Coherencia de Ratings
     espac_prom_76 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO PROMEDIO   '76"), float)
@@ -261,18 +261,18 @@ def validate_geomechanical_properties(row_dict, registrar_error):
     if espac_prom_76 is not None:
         espac_prom_76 = round(espac_prom_76, 2)
         if espac_prom_76 < 0:
-            registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ALERTA", f"El espaciamiento promedio '76 no puede ser negativo. Valor ingresado: {espac_prom_76} m.")
+            registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ERR_ESPACIAMIENTO_PROMEDIO_76_NEGATIVO", value=espac_prom_76)
         elif espac_prom_76 == 0:
-            registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ALERTA", f"Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero).")
+            registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ERR_ESPACIAMIENTO_PROMEDIO_76_CERO")
 
     if espac_val_76 is not None and espac_val_76 != 0:
         espac_val_76 = round(espac_val_76, 2)
         if not (5.0 <= espac_val_76 <= 30.0):
-            registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ALERTA", f"Valor de rating de espaciamiento '76 fuera del rango [5, 30]. Valor ingresado: {espac_val_76}.")
+            registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ERR_ESPACIAMIENTO_VALOR_76_RANGO", value=espac_val_76)
         elif espac_val_76 % 1 == 0:
             val_int = int(espac_val_76)
             if val_int not in [5, 10, 20, 25, 30]:
-                registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ADVERTENCIA", f"Puntaje de espaciamiento '76 es un valor medio no exacto. Valor ingresado: {val_int}. Valores de catálogo estándar: [5, 10, 20, 25, 30].")
+                registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO", value=val_int)
             elif espac_prom_76 is not None and espac_prom_76 > 0:
                 if espac_prom_76 < 0.05: expected = 5
                 elif espac_prom_76 < 0.3: expected = 10
@@ -280,7 +280,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                 elif espac_prom_76 < 3.0: expected = 25
                 else: expected = 30
                 if val_int != expected:
-                    registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ALERTA", f"Rating de espaciamiento '76 no se alinea con el promedio. Valor ingresado: {val_int}, Espaciamiento promedio: {espac_prom_76} m. Se esperaba {expected} según la escala discreta R76.")
+                    registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO", value=val_int, promedio=espac_prom_76, expected=expected)
 
     espac_prom_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO PROMEDIO '89"), float)
     espac_val_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR '89"), float)
@@ -288,18 +288,18 @@ def validate_geomechanical_properties(row_dict, registrar_error):
     if espac_prom_89 is not None:
         espac_prom_89 = round(espac_prom_89, 2)
         if espac_prom_89 < 0:
-            registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ALERTA", f"El espaciamiento promedio '89 no puede ser negativo. Valor ingresado: {espac_prom_89} m.")
+            registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ERR_ESPACIAMIENTO_PROMEDIO_89_NEGATIVO", value=espac_prom_89)
         elif espac_prom_89 == 0:
-            registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ALERTA", f"Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero).")
+            registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ERR_ESPACIAMIENTO_PROMEDIO_89_CERO")
 
     if espac_val_89 is not None and espac_val_89 != 0:
         espac_val_89 = round(espac_val_89, 2)
         if not (5.0 <= espac_val_89 <= 20.0):
-            registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ALERTA", f"Valor de rating de espaciamiento '89 fuera del rango [5, 20]. Valor ingresado: {espac_val_89}.")
+            registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ERR_ESPACIAMIENTO_VALOR_89_RANGO", value=espac_val_89)
         elif espac_val_89 % 1 == 0:
             val_int = int(espac_val_89)
             if val_int not in [5, 8, 10, 15, 20]:
-                registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ADVERTENCIA", f"Puntaje de espaciamiento '89 es un valor medio no exacto. Valor ingresado: {val_int}. Valores de catálogo estándar: [5, 8, 10, 15, 20].")
+                registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO", value=val_int)
             elif espac_prom_89 is not None and espac_prom_89 > 0:
                 if espac_prom_89 < 0.06: expected = 5
                 elif espac_prom_89 < 0.2: expected = 8
@@ -307,7 +307,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                 elif espac_prom_89 < 2.0: expected = 15
                 else: expected = 20
                 if val_int != expected:
-                    registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ALERTA", f"Rating de espaciamiento '89 no se alinea con el promedio esperado. Valor ingresado: {val_int}, Espaciamiento promedio: {espac_prom_89} m. Se esperaba {expected} según la escala discreta R89.")
+                    registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO", value=val_int, promedio=espac_prom_89, expected=expected)
 
 def validate_structural_row(row_dict, dist_celda, registrar_error):
     # 1. Tipo de estructura geológica
@@ -321,46 +321,46 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
         tipo_junta_clean = tipo_junta.strip().upper()
         if tipo_junta_clean not in TIPO_ESTRUCTURA_CATALOG:
             if tipo_junta_clean == 'J':
-                registrar_error("TIPO", tipo_junta, "ADVERTENCIA", "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN' según catálogo estándar. Código ingresado: 'J'.")
+                registrar_error("TIPO", tipo_junta, "WRN_TIPO_ESTRUCTURA_J")
             else:
-                registrar_error("TIPO", tipo_junta, "ALERTA", f"Tipo de estructura geológica no permitida. Valor ingresado: '{tipo_junta}'. Debe ser uno de {TIPO_ESTRUCTURA_CATALOG}.")
+                registrar_error("TIPO", tipo_junta, "ERR_TIPO_ESTRUCTURA_INVALIDO", value=tipo_junta, allowed_types=TIPO_ESTRUCTURA_CATALOG)
 
     # 2. Rellenos de junta (Opcionales)
     rel1 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 1"), str)
     if rel1 is not None:
         rel1_clean = rel1.strip().lower()
         if rel1_clean not in TIPO_RELLENO_CATALOG:
-            registrar_error("TIPO DE  RELLENO 1", rel1, "ALERTA", f"Tipo de relleno no pertenece al catálogo. Relleno 1 ingresado: '{rel1}'. Catálogo permitido: {TIPO_RELLENO_CATALOG}.")
+            registrar_error("TIPO DE  RELLENO 1", rel1, "ERR_RELLENO_1_INVALIDO", value=rel1, allowed_fill_types=TIPO_RELLENO_CATALOG)
         
     rel2 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 2"), str)
     if rel2 is not None:
         rel2_clean = rel2.strip().lower()
         if rel2_clean not in TIPO_RELLENO_CATALOG:
-            registrar_error("TIPO DE  RELLENO 2", rel2, "ALERTA", f"Tipo de relleno no pertenece al catálogo. Relleno 2 ingresado: '{rel2}'. Catálogo permitido: {TIPO_RELLENO_CATALOG}.")
+            registrar_error("TIPO DE  RELLENO 2", rel2, "ERR_RELLENO_2_INVALIDO", value=rel2, allowed_fill_types=TIPO_RELLENO_CATALOG)
 
     # 3. JRC [0, 20]
     jrc_val = sanitize_value(get_row_val(row_dict, "JRC"), int)
     if jrc_val is not None and not (0 <= jrc_val <= 20):
-        registrar_error("JRC", jrc_val, "ALERTA", f"Valor JRC fuera de rango permitido [0, 20]. Valor ingresado: {jrc_val}.")
+        registrar_error("JRC", jrc_val, "ERR_JRC_RANGO", value=jrc_val)
 
     # 4. Clase de Rugosidad ISRM [1, 9]
     rug_val = sanitize_value(get_row_val(row_dict, "RUGOSIDAD DE ESTRUCTURAS"), int)
     if rug_val is not None and rug_val not in RUGOSIDAD_CATALOG:
-        registrar_error("RUGOSIDAD DE ESTRUCTURAS", rug_val, "ALERTA", f"Clase de rugosidad de junta fuera de límites [1, 9]. Valor ingresado: {rug_val}.")
+        registrar_error("RUGOSIDAD DE ESTRUCTURAS", rug_val, "ERR_RUGOSIDAD_RANGO", value=rug_val)
 
     # 5. Forma de estructura
     forma_estrucs = sanitize_value(get_row_val(row_dict, "FORMA DE ESTRUCTURA"), str)
     if forma_estrucs is not None:
         forma_estrucs_clean = forma_estrucs.strip().upper()
         if forma_estrucs_clean not in FORMA_ESTRUCTURA_CATALOG:
-            registrar_error("FORMA DE ESTRUCTURA", forma_estrucs, "ALERTA", f"Forma de estructura inválida. Debe ser P, C, O, E o I. Valor ingresado: '{forma_estrucs}'.")
+            registrar_error("FORMA DE ESTRUCTURA", forma_estrucs, "ERR_FORMA_ESTRUCTURA_INVALIDA", value=forma_estrucs)
 
     # 6. Alteración de Pared de Junta
     alt_pared = sanitize_value(get_row_val(row_dict, "ALTERACION"), str)
     if alt_pared is not None:
         alt_pared_clean = alt_pared.strip().lower()
         if alt_pared_clean not in ALTERACION_CATALOG:
-            registrar_error("ALTERACION", alt_pared, "ALERTA", f"Código de alteración inválido. Código ingresado: '{alt_pared}'. Debe ser uno de {ALTERACION_CATALOG}.")
+            registrar_error("ALTERACION", alt_pared, "ERR_ALTERACION_INVALIDA", value=alt_pared, allowed_alteration_types=ALTERACION_CATALOG)
 
     # 7. Espesor y Abertura
     espesor = sanitize_value(get_row_val(row_dict, "ESPESOR mm."), float)
@@ -374,52 +374,48 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
     es_estructura_exceptuada = tipo_junta_clean in ['F', 'SZ', 'BED']
 
     if espesor is not None and espesor < 0:
-        registrar_error("ESPESOR mm.", espesor, "ALERTA", f"El espesor del relleno no puede ser un valor negativo. Valor ingresado: {espesor} mm.")
+        registrar_error("ESPESOR mm.", espesor, "ERR_ESPESOR_NEGATIVO", value=espesor)
     if abertura is not None and abertura < 0:
-        registrar_error("ABERTURA mm.", abertura, "ALERTA", f"La abertura total no puede ser un valor negativo. Valor ingresado: {abertura} mm.")
+        registrar_error("ABERTURA mm.", abertura, "ERR_ABERTURA_NEGATIVO", value=abertura)
 
     if espesor is not None and abertura is not None and espesor > abertura:
         if not es_estructura_exceptuada:
-            registrar_error("ESPESOR mm.", espesor, "ALERTA", f"Espesor del relleno es superior a la abertura total y no pertenece a F, SZ, BED. Estructura geológica: '{tipo_junta_clean or 'N/A'}', Espesor: {espesor} mm, Abertura total: {abertura} mm.")
+            registrar_error("ESPESOR mm.", espesor, "ERR_ESPESOR_SUPERIOR_ABERTURA", struct_type=(tipo_junta_clean or 'N/A'), thickness=espesor, aperture=abertura)
 
     # 8. Comprobaciones de escala física de la abertura
     if abertura is not None:
         if es_estructura_exceptuada:
             if dist_celda is not None and (abertura / 1000.0) > dist_celda:
-                registrar_error("ABERTURA mm.", abertura, "ALERTA", f"La abertura de la falla supera la longitud de la celda y no pertenece a F, SZ, BED. Tipo de junta: '{tipo_junta_clean}', Abertura: {abertura} mm, Longitud de la celda (Dist.Celda): {dist_celda} m.")
+                registrar_error("ABERTURA mm.", abertura, "ERR_ABERTURA_EXCEDE_CELDA", struct_type=tipo_junta_clean, aperture=abertura, cell_len=dist_celda)
 
     # 9. Persistencia de discontinuidad (Continuidad física vs celda - ERROR DE SUPERACIÓN ELIMINADO)
     cont_junta = sanitize_value(get_row_val(row_dict, "CONTINUIDAD m."), float)
     if cont_junta is not None:
         cont_junta = round(cont_junta, 2)
         if cont_junta < 0:
-            registrar_error("CONTINUIDAD m.", cont_junta, "ALERTA", f"La persistencia de discontinuidad (continuidad) no puede ser un valor negativo. Valor ingresado: {cont_junta} m.")
+            registrar_error("CONTINUIDAD m.", cont_junta, "ERR_CONTINUIDAD_NEGATIVA", value=cont_junta)
 
     # 10. Espaciamiento de discontinuidad estructural
     espac_struct = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO m."), float)
     if espac_struct is not None:
         espac_struct = round(espac_struct, 2)
         if espac_struct < 0:
-            registrar_error("ESPACIAMIENTO m.", espac_struct, "ALERTA", f"El espaciamiento de discontinuidad no puede ser un valor negativo. Valor ingresado: {espac_struct} m.")
+            registrar_error("ESPACIAMIENTO m.", espac_struct, "ERR_ESPACIAMIENTO_NEGATIVO", value=espac_struct)
 
     # 11. Inclinación y Dirección de Estructura
     dip_estruc = sanitize_value(get_row_val(row_dict, 'DIP'), float)
     if dip_estruc is not None:
         dip_estruc = round(dip_estruc, 2)
         if not (-90.0 <= dip_estruc <= 90.0):
-            registrar_error("DIP", dip_estruc, "ALERTA", f"Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados. Valor ingresado: {dip_estruc}°.")
+            registrar_error("DIP", dip_estruc, "ERR_DIP_ESTRUC_RANGO", value=dip_estruc)
 
-    dipdir_estruc = sanitize_value(get_row_val(row_dict, 'DIP DIR'), float)
-    if dipdir_estruc is not None:
-        dipdir_estruc = round(dipdir_estruc, 2)
-        if not (0.0 <= dipdir_estruc <= 360.0):
-            registrar_error("DIP DIR", dipdir_estruc, "ALERTA", f"Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados. Valor ingresado: {dipdir_estruc}°.")
+
 
     # 12. Consistencia en conteo de estructuras estructurales
     num_estrucs = sanitize_value(get_row_val(row_dict, "NUMERO DE ESTRUCTURAS") or get_row_val(row_dict, "N_ESTRUCTURAS"), float)
     if num_estrucs is not None:
         if num_estrucs % 1 != 0:
-            registrar_error("NUMERO DE ESTRUCTURAS", num_estrucs, "ALERTA", f"En número de estructuras solamente se permiten números enteros. Valor ingresado: {num_estrucs}.")
+            registrar_error("NUMERO DE ESTRUCTURAS", num_estrucs, "ERR_NUMERO_ESTRUCTURAS_DECIMAL", value=num_estrucs)
 
 def validate_lithology_correlation(row_dict, registrar_error):
     l1 = sanitize_value(get_row_val(row_dict, "Lito 1"), str)
@@ -484,11 +480,11 @@ def validate_lithology_correlation(row_dict, registrar_error):
     # Emitir alertas litológicas correspondientes
     if l1_clean or l2_clean or l3_clean:
         if not is_valid_combination:
-            registrar_error("Lito 1", l1, "ALERTA", f"Combinación litológica Lito 1-2-3 inválida según el catálogo. Litologías ingresadas -> Lito 1: '{l1}', Lito 2: '{l2}', Lito 3: '{l3}'.")
+            registrar_error("Lito 1", l1, "ERR_LITOLOGIA_COMBINACION_INVALIDA", l1=l1, l2=l2, l3=l3)
         elif u_lito:
             group_esperado = matched_row["grupo"]
             if group_input_norm != group_esperado:
-                registrar_error("Unidad Litologica", u_lito, "ALERTA", f"Unidad litológica es incongruente con la litología. Unidad ingresada: '{u_lito}'. Se esperaba la unidad geológica '{group_esperado}' basada en la litología.")
+                registrar_error("Unidad Litologica", u_lito, "ERR_UNIDAD_LITOLOGICA_INCONGRUENTE", value=u_lito, expected_group=group_esperado)
 
     # 13. Resistencia Uniaxial UCS vs Resistencia de Carga Puntual (Is50)
     ucs_val = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
@@ -500,12 +496,12 @@ def validate_lithology_correlation(row_dict, registrar_error):
     
     if ucs_val is not None and is50_val is not None:
         if ucs_val <= is50_val:
-            registrar_error("( UCS )  (Mpa)", ucs_val, "ALERTA", f"UCS es divergente a Is50. UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa.")
+            registrar_error("( UCS )  (Mpa)", ucs_val, "ERR_UCS_DIVERGENTE_IS50", ucs_val=ucs_val, is50_val=is50_val)
         else:
             factor_k = matched_row["k"] if (matched_row is not None and is_valid_combination) else 10.0
             expected_ucs = is50_val * factor_k
             if abs(ucs_val - expected_ucs) > 1.0:
-                registrar_error("( UCS )  (Mpa)", ucs_val, "ADVERTENCIA", f"Divergencia de resistencia uniaxial (UCS vs Is50 * K). UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa, factor K asociado: {factor_k}, UCS esperado (Is50 * K): {expected_ucs:.2f} MPa.")
+                registrar_error("( UCS )  (Mpa)", ucs_val, "WRN_UCS_VS_IS50_K_DIVERGENTE", ucs_val=ucs_val, is50_val=is50_val, factor_k=factor_k, expected_ucs=expected_ucs)
 
 def validate_bulk_excel(file_path, output_json_path):
     t_start = time.time()
@@ -611,8 +607,11 @@ def validate_bulk_excel(file_path, output_json_path):
         if not celda_padre:
             incidencias.append({
                 "fila_excel": fila_excel, "celda_padre": "N/A", "celda_hija": "N/A",
-                "columna": "CELDA_PADRE", "valor_actual": None, "tipo_incidencia": "ALERTA",
-                "mensaje": "La fila no posee una estación de mapeo válida asociada."
+                "columna": "CELDA_PADRE", "valor_actual": None, 
+                "rule_code": "ERR_CELDA_PADRE_MISSING",
+                "tipo_incidencia": "ALERTA",
+                "mensaje": "La fila no posee una estación de mapeo válida asociada.",
+                "tipo_mapeo": "Mapeo de Celdas"
             })
             total_alertas += 1
             continue
@@ -669,14 +668,49 @@ def validate_bulk_excel(file_path, output_json_path):
         resumen_celdas[celda_padre]["total_hijas"] += 1
         row_has_errors = False
 
-        def registrar_error(col, val, tipo, msg):
+        def registrar_error(col, val, rule_code, **msg_kwargs):
             nonlocal row_has_errors, total_vacios, total_advertencias, total_alertas
+            from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
+            rule = RULES_REGISTRY.get(rule_code)
+            if not rule:
+                raise ValueError(f"Código de regla desconocido: {rule_code}")
+            cat = CATEGORIES_REGISTRY.get(rule.category_code)
+            tipo = cat.severity if cat else "ALERTA"
+            msg = rule.format_message(**msg_kwargs)
+            
+            # Clasificación de Tipo de Mapeo
+            col_clean = str(col).strip()
+            mapeo_estructural_cols = {
+                "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP DIR_TALUD", "INTEMPERISMO",
+                "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", "DUREZA  '76",
+                "RESISTENCIA ESTIMADA VALOR  '76", "GSI VISUAL  '76", "CONTROL ESTRUCTURAL  '76",
+                "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", "RQD  '76",
+                "FRECUENCIA DE FRACTURAMIENTO x m.  '76", "TAMAÑO DE BLOQUES  x m3  '76",
+                "ESPACIAMIENTO PROMEDIO   '76", "ESPACIAMIENTO - VALOR    '76",
+                "CONDICIÓN DE DISCONTINUIDAD - VALOR     '76", "RMR '76", "( UCS )  (Mpa)", "is50 (Mpa)",
+                "CONDICION DE AGUA  '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89",
+                "RESISTENCIA ESTIMADA VALOR '89", "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89",
+                "EFECTOS DE VOLADURA '89", "RQD - VALOR '89", "RQD '89",
+                "FRECUENCIA DE FRACTURAMIENTO x m. '89", "TAMAÑO DE BLOQUES  x m3 '89",
+                "ESPACIAMIENTO PROMEDIO '89", "ESPACIAMIENTO - VALOR '89",
+                "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89", "FECHA", "COMENTARIO GEOTECNICO",
+                "Nivel", "Lito 1", "Lito 2", "Lito 3", "Unidad Litologica"
+            }
+            def norm_col(c):
+                return "".join(c.upper().split()).replace(".", "").replace("'", "").replace("\"", "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
+            
+            mapeo_estructural_norm = {norm_col(x) for x in mapeo_estructural_cols}
+            tipo_mapeo = "Mapeo Estructural" if norm_col(col_clean) in mapeo_estructural_norm else "Mapeo de Celdas"
+            
             incidencias.append({
                 "fila_excel": fila_excel, "celda_padre": celda_padre, "celda_hija": celda_hija,
-                "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg,
+                "columna": col, "valor_actual": val, 
+                "rule_code": rule_code,
+                "tipo_incidencia": tipo, "mensaje": msg,
                 "campania": str(resolved_camp) if resolved_camp else "N/A", 
                 "geotecnico": resolved_geo if resolved_geo else "N/A", 
-                "sector_geotecnico": resolved_sector
+                "sector_geotecnico": resolved_sector,
+                "tipo_mapeo": tipo_mapeo
             })
             if tipo == "VACIO":
                 total_vacios += 1
@@ -717,7 +751,7 @@ def validate_bulk_excel(file_path, output_json_path):
                 v = None
                 
             if v is None: 
-                registrar_error(col_key, None, "VACIO", f"Campo obligatorio se encuentra vacío. Columna: '{col_key}'.")
+                registrar_error(col_key, None, "ERR_CAMPO_OBLIGATORIO_VACIO", col_key=col_key)
 
         # 2. Desglose de validaciones estructuradas
         # Omisión Inteligente de Reglas Cruzadas: Si la celda es secundaria y hereda sus datos por omisión,
