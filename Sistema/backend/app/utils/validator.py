@@ -19,13 +19,18 @@ from app.core.catalogs import (
 def clean_and_rename_columns(df):
     cols = []
     cota_seen, celda_seen = 0, 0
+    dip_seen = 0
     for col in df.columns:
         col_str = str(col).strip()
         if '.' in col_str:
             parts = col_str.split('.')
             base_name = ".".join(parts[:-1]).strip()
-            if base_name in ['CELDA', 'COTA'] and parts[-1].isdigit():
-                col_str = base_name
+            if parts[-1].isdigit():
+                if base_name == 'DIP':
+                    cols.append('DIP_ESTRUC')
+                    continue
+                elif base_name in ['CELDA', 'COTA']:
+                    col_str = base_name
         if col_str == 'COTA':
             if cota_seen == 0:
                 cols.append('COTA_FROM')
@@ -38,6 +43,12 @@ def clean_and_rename_columns(df):
                 celda_seen += 1
             else:
                 cols.append('CELDA_DUPLICADA_IGNORE')
+        elif col_str == 'DIP':
+            if dip_seen == 0:
+                cols.append('DIP')
+                dip_seen += 1
+            else:
+                cols.append('DIP_ESTRUC')
         else:
             cols.append(col_str)
     df.columns = cols
@@ -56,14 +67,18 @@ def get_row_val(row_dict, key):
             return v
     return None
 
-def sanitize_value(val, target_type):
+def sanitize_value(val, target_type, allow_negative=False):
     if val is None or pd.isna(val):
         return None
     
     val_str = str(val).strip()
     val_upper = val_str.upper()
     
-    if val_str == '' or val_upper in ['-1', '-1.0', 'N/A', 'NONE', 'NAN', 'NULL']:
+    empty_markers = ['N/A', 'NONE', 'NAN', 'NULL']
+    if not allow_negative:
+        empty_markers.extend(['-1', '-1.0'])
+        
+    if val_str == '' or val_upper in empty_markers:
         return None
         
     if target_type == str:
@@ -123,7 +138,7 @@ def normalize_geological_group(group_str):
     return NORM_GROUP_MAP.get(val, val)
 
 def validate_geotechnical_header(row_dict, registrar_error):
-    dip_talud = sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float)
+    dip_talud = sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float, allow_negative=True)
     if dip_talud is not None:
         dip_talud = round(dip_talud, 2)
         if not (-90.0 <= dip_talud <= 90.0):
@@ -309,6 +324,15 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                 if val_int != expected:
                     registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO", value=val_int, promedio=espac_prom_89, expected=expected)
 
+    # 9. RMR no nulo
+    rmr_76 = sanitize_value(get_row_val(row_dict, "RMR '76"), float)
+    if rmr_76 is not None and rmr_76 <= 0.0:
+        registrar_error("RMR '76", rmr_76, "ERR_RMR_76_CERO")
+        
+    rmr_89 = sanitize_value(get_row_val(row_dict, "RMR '89"), float)
+    if rmr_89 is not None and rmr_89 <= 0.0:
+        registrar_error("RMR '89", rmr_89, "ERR_RMR_89_CERO")
+
 def validate_structural_row(row_dict, dist_celda, registrar_error):
     # 1. Tipo de estructura geológica
     tipo_junta = sanitize_value(
@@ -403,11 +427,11 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
             registrar_error("ESPACIAMIENTO m.", espac_struct, "ERR_ESPACIAMIENTO_NEGATIVO", value=espac_struct)
 
     # 11. Inclinación y Dirección de Estructura
-    dip_estruc = sanitize_value(get_row_val(row_dict, 'DIP'), float)
+    dip_estruc = sanitize_value(get_row_val(row_dict, 'DIP_ESTRUC') or get_row_val(row_dict, 'DIP.1') or get_row_val(row_dict, 'DIP'), float, allow_negative=False)
     if dip_estruc is not None:
         dip_estruc = round(dip_estruc, 2)
-        if not (-90.0 <= dip_estruc <= 90.0):
-            registrar_error("DIP", dip_estruc, "ERR_DIP_ESTRUC_RANGO", value=dip_estruc)
+        if not (0.0 <= dip_estruc <= 90.0):
+            registrar_error("DIP_ESTRUC", dip_estruc, "ERR_DIP_ESTRUC_RANGO", value=dip_estruc)
 
 
 
@@ -503,6 +527,37 @@ def validate_lithology_correlation(row_dict, registrar_error):
             if abs(ucs_val - expected_ucs) > 1.0:
                 registrar_error("( UCS )  (Mpa)", ucs_val, "WRN_UCS_VS_IS50_K_DIVERGENTE", ucs_val=ucs_val, is50_val=is50_val, factor_k=factor_k, expected_ucs=expected_ucs)
 
+def format_raw_value_for_report(raw_val):
+    if raw_val is None or pd.isna(raw_val):
+        return None
+        
+    # Si es float o numpy float, redondear a 2 decimales
+    if isinstance(raw_val, (float, np.floating)):
+        if math.isnan(raw_val):
+            return None
+        if raw_val.is_integer():
+            return int(raw_val)
+        return round(float(raw_val), 2)
+        
+    # Si es int o numpy int, mantener
+    if isinstance(raw_val, (int, np.integer)):
+        return int(raw_val)
+        
+    if isinstance(raw_val, str):
+        val_str = raw_val.strip()
+        if val_str == '':
+            return None
+        # Verificar si es numérico decimal o entero
+        try:
+            f_val = float(val_str)
+            if f_val.is_integer():
+                return int(f_val)
+            return round(f_val, 2)
+        except ValueError:
+            return val_str
+            
+    return str(raw_val)
+
 def validate_bulk_excel(file_path, output_json_path):
     t_start = time.time()
     print(f"    [*] [QA/QC] Iniciando lectura de archivo: {os.path.basename(file_path)}")
@@ -553,7 +608,9 @@ def validate_bulk_excel(file_path, output_json_path):
 
     # Sanitizar valores de Excel sin propagar con ffill, previniendo duplicados falsos en celdas hijas
     for col in resolved_propagate_cols:
-        df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
+        col_clean = clean_col_name(col)
+        if col_clean not in ['DIP', 'DIPTALUD']:
+            df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
 
     records = df.to_dict(orient='records')
     
@@ -636,7 +693,8 @@ def validate_bulk_excel(file_path, output_json_path):
                 "camp": camp,
                 "geo": geo,
                 "sector": sector,
-                "dist_celda": dist_celda
+                "dist_celda": dist_celda,
+                "dip_talud": sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float, allow_negative=True)
             }
         else:
             daughter_counter += 1
@@ -700,11 +758,22 @@ def validate_bulk_excel(file_path, output_json_path):
                 return "".join(c.upper().split()).replace(".", "").replace("'", "").replace("\"", "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
             
             mapeo_estructural_norm = {norm_col(x) for x in mapeo_estructural_cols}
-            tipo_mapeo = "Mapeo Estructural" if norm_col(col_clean) in mapeo_estructural_norm else "Mapeo de Celdas"
+            is_estructural_specific = (col_clean == "DIP_ESTRUC") or (col_clean == "DIP" and rule_code.startswith("ERR_DIP_ESTRUC"))
+            if is_estructural_specific:
+                tipo_mapeo = "Mapeo de Estructuras"
+            else:
+                tipo_mapeo = "Mapeo de Celdas" if norm_col(col_clean) in mapeo_estructural_norm else "Mapeo de Estructuras"
+            
+            # Obtener el valor real e íntegro de la celda de la planilla original
+            actual_col = col
+            if col == "DIP" and rule_code.startswith("ERR_DIP_ESTRUC") and "DIP_ESTRUC" in row_dict:
+                actual_col = "DIP_ESTRUC"
+            raw_excel_val = get_row_val(row_dict, actual_col)
+            formatted_val = format_raw_value_for_report(raw_excel_val)
             
             incidencias.append({
                 "fila_excel": fila_excel, "celda_padre": celda_padre, "celda_hija": celda_hija,
-                "columna": col, "valor_actual": val, 
+                "columna": col, "valor_actual": formatted_val, 
                 "rule_code": rule_code,
                 "tipo_incidencia": tipo, "mensaje": msg,
                 "campania": str(resolved_camp) if resolved_camp else "N/A", 
@@ -729,7 +798,7 @@ def validate_bulk_excel(file_path, output_json_path):
         structural_mandatory_cols = [
             'TIPO', 'TIPO DE ESTRUCT', 'TIPO DE ESTRUCTURA', 'JRC', 'RUGOSIDAD DE ESTRUCTURAS', 
             'FORMA DE ESTRUCTURA', 'ALTERACION', 'ESPESOR mm.', 'ABERTURA mm.', 'CONTINUIDAD m.', 
-            'ESPACIAMIENTO m.', 'DIP', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS'
+            'ESPACIAMIENTO m.', 'DIP', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS'
         ]
         structural_mandatory_clean = [clean_col_name(c) for c in structural_mandatory_cols]
 
@@ -742,13 +811,8 @@ def validate_bulk_excel(file_path, output_json_path):
             if not is_parent_row and clean_col_name(col_key) not in structural_mandatory_clean:
                 continue
 
-            v = sanitize_value(row_dict.get(col_key), str)
-            col_key_norm = "".join(col_key.split()).replace(".", "").upper()
-            es_columna_rating_vacio = any(
-                x in col_key_norm for x in ["RQD", "EFECTOSDEVOLADURA", "CONTROLESTRUCTURAL", "ESPACIAMIENTOVALOR"]
-            )
-            if es_columna_rating_vacio and v in ["0", "0.0"]:
-                v = None
+            is_dip_col = clean_col_name(col_key) in ['DIP', 'DIPTALUD']
+            v = sanitize_value(row_dict.get(col_key), str, allow_negative=is_dip_col)
                 
             if v is None: 
                 registrar_error(col_key, None, "ERR_CAMPO_OBLIGATORIO_VACIO", col_key=col_key)
@@ -766,6 +830,74 @@ def validate_bulk_excel(file_path, output_json_path):
                     break
 
         if debe_validar_global:
+            # Validación cruzada basada en las coordenadas espaciales de la celda
+            ef = sanitize_value(get_row_val(row_dict, 'ESTE_FROM'), float)
+            nf = sanitize_value(get_row_val(row_dict, 'NORTE_FROM'), float)
+            cf = sanitize_value(get_row_val(row_dict, 'COTA_FROM'), float)
+            et = sanitize_value(get_row_val(row_dict, 'ESTE_TO'), float)
+            nt = sanitize_value(get_row_val(row_dict, 'NORTE_TO'), float)
+            ct = sanitize_value(get_row_val(row_dict, 'COTA_TO'), float)
+            
+            coords_valid = all(val is not None for val in [ef, nf, cf, et, nt, ct]) and not (ef == 0 and nf == 0 and cf == 0)
+            
+            largo_calc = None
+            if coords_valid:
+                dx = et - ef
+                dy = nt - nf
+                dz = ct - cf
+                largo_calc = math.sqrt(dx*dx + dy*dy + dz*dz)
+                
+            largo_val = largo_calc if (largo_calc is not None and largo_calc > 0) else resolved_dist_celda
+            
+            # Validaciones de fórmulas comentadas a petición
+            # if coords_valid and largo_val and largo_val > 0:
+            #     dx = et - ef
+            #     dy = nt - nf
+            #     dz = ct - cf
+            #     
+            #     sin_val = abs(dz) / largo_val
+            #     if sin_val > 1.0:
+            #         sin_val = 1.0
+            #     expected_dip = abs(math.asin(sin_val) * (180.0 / math.pi))
+            #     
+            #     expected_az = (math.atan2(dx, dy) * (180.0 / math.pi)) % 360.0
+            #     if expected_az < 0:
+            #         expected_az += 360.0
+            #         
+            #     expected_dipdir = (expected_az + 90.0) % 360.0
+            #     
+            #     # Validar DIP (inclinación de celda)
+            #     entered_dip = sanitize_value(get_row_val(row_dict, 'DIP'), float, allow_negative=True)
+            #     if entered_dip is not None:
+            #         if abs(abs(entered_dip) - expected_dip) > 2.0:
+            #             registrar_error("DIP", entered_dip, "WRN_DIP_DISCREPANCIA_COORD", actual=entered_dip, expected=round(expected_dip, 2))
+            #             
+            #     # Validar AZ_HOLE
+            #     entered_az = sanitize_value(get_row_val(row_dict, 'AZ_HOLE'), float)
+            #     if entered_az is not None:
+            #         diff_az = abs(entered_az - expected_az) % 360.0
+            #         if diff_az > 180.0:
+            #             diff_az = 360.0 - diff_az
+            #         if diff_az > 2.0:
+            #             registrar_error("AZ_HOLE", entered_az, "WRN_AZ_HOLE_DISCREPANCIA", actual=entered_az, expected=round(expected_az, 2))
+            #             
+            #     # Validar DIP_DIR_TALUD
+            #     entered_dipdir = sanitize_value(get_row_val(row_dict, 'DIP_DIR_TALUD'), float)
+            #     if entered_dipdir is not None:
+            #         diff_dd = abs(entered_dipdir - expected_dipdir) % 360.0
+            #         if diff_dd > 180.0:
+            #             diff_dd = 360.0 - diff_dd
+            #         if diff_dd > 2.0:
+            #             registrar_error("DIP_DIR_TALUD", entered_dipdir, "WRN_DIP_DIR_TALUD_DISCREPANCIA", actual=entered_dipdir, expected=round(expected_dipdir, 2))
+            
+            # Comparar DIP_TALUD de fila hija contra el valor de la fila maestra (parent_properties) con 2° de tolerancia
+            if not is_parent_row:
+                parent_dip_talud = props.get("dip_talud")
+                entered_dip_talud = sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float, allow_negative=True)
+                if entered_dip_talud is not None and parent_dip_talud is not None:
+                    if abs(abs(entered_dip_talud) - abs(parent_dip_talud)) > 2.0:
+                        registrar_error("DIP_TALUD", entered_dip_talud, "WRN_DIP_TALUD_DISCREPANCIA", actual=entered_dip_talud, expected=parent_dip_talud)
+
             validate_geotechnical_header(row_dict, registrar_error)
             validate_geomechanical_properties(row_dict, registrar_error)
             validate_lithology_correlation(row_dict, registrar_error)

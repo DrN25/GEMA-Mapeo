@@ -79,7 +79,8 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
     const getInputValue = (rowId: any, key: string, stateVal: any): string => {
         const mapKey = `${rowId}-${key}`;
         if (localValues[mapKey] !== undefined) return localValues[mapKey];
-        if (stateVal === undefined || stateVal === null || stateVal === -1) return '';
+        const isNegativeAllowed = key === 'dip' || key === 'dip_talud' || key === 'dip_hw' || key === 'dipdir_talud';
+        if (stateVal === undefined || stateVal === null || (stateVal === -1 && !isNegativeAllowed)) return '';
         return String(stateVal);
     };
 
@@ -103,20 +104,22 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
     };
 
     const handleNumberLimit = (value: string, precision: number): string => {
+        const isNegative = value.startsWith('-');
         const cleaned = value.replace(/[^0-9.]/g, '');
         const parts = cleaned.split('.');
-        if (parts.length > 2) return cleaned.slice(0, -1);
+        if (parts.length > 2) return (isNegative ? '-' : '') + cleaned.slice(0, -1);
 
         const integerPart = parts[0];
         let decimalPart = parts[1];
 
         if (precision === 0) {
-            return integerPart;
+            return (isNegative ? '-' : '') + integerPart;
         }
         if (decimalPart !== undefined && decimalPart.length > precision) {
             decimalPart = decimalPart.slice(0, precision);
         }
-        return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+        const result = decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+        return (isNegative && (integerPart || decimalPart) ? '-' : (isNegative && value === '-' ? '-' : '')) + result;
     };
 
     const handleInputBlur = (rowId: any, col: ColumnConfig, rawVal: string) => {

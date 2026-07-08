@@ -224,6 +224,28 @@ CATEGORIES_REGISTRY = {
         "ADVERTENCIA"
     ),
     
+    # RMR y Consistencia Geométrica de Dips y Coordenadas
+    "CAT_RMR_CERO": RuleCategory(
+        "CAT_RMR_CERO",
+        "El valor de RMR '76 / '89 no puede ser 0.",
+        "ALERTA"
+    ),
+    "CAT_DIP_TALUD_DISCREPANCIA": RuleCategory(
+        "CAT_DIP_TALUD_DISCREPANCIA",
+        "Discrepancia en inclinación del talud con respecto al valor esperado.",
+        "ADVERTENCIA"
+    ),
+    "CAT_DIP_DISCREPANCIA_COORD": RuleCategory(
+        "CAT_DIP_DISCREPANCIA_COORD",
+        "Discrepancia en inclinación (Dip) del taladro/celda con respecto a las coordenadas.",
+        "ADVERTENCIA"
+    ),
+    "CAT_AZ_HOLE_DISCREPANCIA": RuleCategory(
+        "CAT_AZ_HOLE_DISCREPANCIA",
+        "Discrepancia en azimuth/dirección con respecto a las coordenadas.",
+        "ADVERTENCIA"
+    ),
+
     # Vacíos
     "CAT_CAMPO_OBLIGATORIO_VACIO": RuleCategory(
         "CAT_CAMPO_OBLIGATORIO_VACIO", 
@@ -575,7 +597,7 @@ RULES_REGISTRY = {
         "ERR_DIP_ESTRUC_RANGO",
         "CAT_DIP_ESTRUC_RANGO",
         ["DIP"],
-        "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados. Valor ingresado: {value}°."
+        "Valor de inclinación (Dip) fuera de rango permitido [0, 90] grados. Valor ingresado: {value}°."
     ),
 
 
@@ -627,5 +649,45 @@ RULES_REGISTRY = {
         "CAT_CAMPO_OBLIGATORIO_VACIO",
         [],
         "Campo obligatorio se encuentra vacío. Columna: '{col_key}'."
+    ),
+
+    # RMR CERO
+    "ERR_RMR_76_CERO": ErrorRule(
+        "ERR_RMR_76_CERO",
+        "CAT_RMR_CERO",
+        ["RMR  '76"],
+        "Inconsistencia crítica: El RMR calculado RMR '76 es de 0.0 (no puede ser cero)."
+    ),
+    "ERR_RMR_89_CERO": ErrorRule(
+        "ERR_RMR_89_CERO",
+        "CAT_RMR_CERO",
+        ["RMR '89"],
+        "Inconsistencia crítica: El RMR calculado RMR '89 es de 0.0 (no puede ser cero)."
+    ),
+
+    # GEOMETRIC CONSISTENCY WARNINGS (Gravedad ADVERTENCIA, tolerancia de hasta 2 grados)
+    "WRN_DIP_TALUD_DISCREPANCIA": ErrorRule(
+        "WRN_DIP_TALUD_DISCREPANCIA",
+        "CAT_DIP_TALUD_DISCREPANCIA",
+        ["DIP_TALUD"],
+        "Discrepancia en inclinación del talud: El geotécnico colocó {actual}°, pero el valor esperado de la celda es {expected}° (Excede la tolerancia de 2°)."
+    ),
+    "WRN_DIP_DISCREPANCIA_COORD": ErrorRule(
+        "WRN_DIP_DISCREPANCIA_COORD",
+        "CAT_DIP_DISCREPANCIA_COORD",
+        ["DIP"],
+        "Discrepancia en inclinación (Dip) de celda: El valor ingresado es {actual}°, pero el calculado por coordenadas es {expected}° (Excede la tolerancia de 2°)."
+    ),
+    "WRN_AZ_HOLE_DISCREPANCIA": ErrorRule(
+        "WRN_AZ_HOLE_DISCREPANCIA",
+        "CAT_AZ_HOLE_DISCREPANCIA",
+        ["AZ_HOLE"],
+        "Discrepancia en azimuth (AZ_HOLE) de celda: El valor ingresado es {actual}°, pero el calculado por coordenadas es {expected}° (Excede la tolerancia de 2°)."
+    ),
+    "WRN_DIP_DIR_TALUD_DISCREPANCIA": ErrorRule(
+        "WRN_DIP_DIR_TALUD_DISCREPANCIA",
+        "CAT_AZ_HOLE_DISCREPANCIA",
+        ["DIP_DIR_TALUD"],
+        "Discrepancia en dirección del talud (DIP_DIR_TALUD): El valor ingresado es {actual}°, pero el esperado (AZ_HOLE + 90) % 360 es {expected}° (Excede la tolerancia de 2°)."
     )
 }

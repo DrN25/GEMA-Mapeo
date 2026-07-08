@@ -11,9 +11,10 @@ interface VentanaFormProps {
 }
 
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
+  const isNegative = value.startsWith('-');
   const cleaned = value.replace(/[^0-9.]/g, '');
   const parts = cleaned.split('.');
-  if (parts.length > 2) return cleaned.slice(0, -1);
+  if (parts.length > 2) return (isNegative ? '-' : '') + cleaned.slice(0, -1);
 
   let integerPart = parts[0];
   let decimalPart = parts[1];
@@ -25,7 +26,8 @@ const handleNumberInputLimit = (value: string, intDigits: number, decDigits: num
     decimalPart = decimalPart.slice(0, decDigits);
   }
 
-  return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+  const result = decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
+  return (isNegative && (integerPart || decimalPart) ? '-' : (isNegative && value === '-' ? '-' : '')) + result;
 };
 
 // Sanitizador global de entrada decimal para unificar de coma a punto en tiempo real
@@ -395,7 +397,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">Dip Talud°</label>
                 <input
                   type="text"
-                  placeholder="0-90"
+                  placeholder="-90 a 90"
                   value={getInputValue('dip_talud', header.dip_talud)}
                   onChange={(e) => {
                     const limited = sanitizeDecimalInput(e.target.value, 2, 2);
@@ -403,7 +405,7 @@ export default function VentanaForm({
                   }}
                   onBlur={(e) => {
                     const num = parseFloat(e.target.value);
-                    handleChange('dip_talud', isNaN(num) ? 0 : Math.min(90, Math.max(0, num)));
+                    handleChange('dip_talud', isNaN(num) ? 0 : Math.min(90, Math.max(-90, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />

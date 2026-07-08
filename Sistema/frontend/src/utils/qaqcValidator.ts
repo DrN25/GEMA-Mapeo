@@ -104,11 +104,11 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     }
 
     // Dip & Dip Direction bounds
-    if (dip < 0 || dip > 90) {
+    if (dip < -90 || dip > 90) {
       alerts.push({
         fieldId: `joint-dip-${index}`,
         type: "ERROR",
-        message: `Fila ${rowNum}: El buzamiento (Dip: ${dip}°) debe estar en el rango de 0° a 90°.`
+        message: `Fila ${rowNum}: El buzamiento (Dip: ${dip}°) debe estar en el rango de -90° a 90°.`
       });
     }
     if (dip_dir < 0 || dip_dir > 360) {
