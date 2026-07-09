@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
-    Loader2, Info, RefreshCw, Trash2, X
+    Loader2, RefreshCw, Trash2, X
 } from 'lucide-react';
 import BulkImportWizard from './BulkImportWizard';
 
@@ -12,6 +12,7 @@ import KpiMetrics from './components/KpiMetrics';
 import ConsolidatedDeviations from './components/ConsolidatedDeviations';
 import DistributionBreakdown from './components/DistributionBreakdown';
 import AnomaliesViewer from './components/AnomaliesViewer';
+import ComparativoModal from './components/ComparativoModal';
 
 interface BulkAuditorProps {
     apiBase: string;
@@ -33,6 +34,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
     const [excelReady, setExcelReady] = useState<boolean>(false);
     const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
+    const [isCompareOpen, setIsCompareOpen] = useState<boolean>(false);
 
     // Historial e indicadores KPI
     const [history, setHistory] = useState<AuditHistoryItem[]>([]);
@@ -294,6 +296,16 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         localStorage.removeItem('geomec_bulk_auditor_processing_id');
     };
 
+    const clearAllFilters = () => {
+        setFilterTipo('');
+        setFilterCelda('');
+        setFilterCampania('');
+        setFilterGeotecnico('');
+        setFilterSearch('');
+        setSelectedYears([]);
+        setSelectedObservation(null);
+    };
+
     const handleSelectPastAudit = (auditId: string) => {
         setSelectedAuditId(auditId);
         clearAllFilters();
@@ -336,11 +348,19 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 onConfirm={handleWizardConfirm}
             />
 
+            <ComparativoModal
+                isOpen={isCompareOpen}
+                onClose={() => setIsCompareOpen(false)}
+                history={history}
+                apiBase={apiBase}
+            />
+
             {status !== 'uploading' && (
                 <AuditHistory
                     history={history}
                     selectedAuditId={selectedAuditId}
                     onSelectAudit={handleSelectPastAudit}
+                    onOpenCompare={() => setIsCompareOpen(true)}
                 />
             )}
 

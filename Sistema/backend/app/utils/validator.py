@@ -655,7 +655,8 @@ def validate_bulk_excel(file_path, output_json_path):
     filas_por_campana, filas_por_geotecnico = {}, {}
     vacios_por_campana, vacios_por_geotecnico = {}, {}
     
-    current_parent, daughter_counter = None, 0
+    seen_parents = set()
+    daughter_counters = {}
     parent_properties = {}
 
     for idx, row_dict in enumerate(records):
@@ -685,10 +686,11 @@ def validate_bulk_excel(file_path, output_json_path):
         ) or "N/A"
         dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
-        if celda_padre != current_parent:
-            current_parent = celda_padre
-            daughter_counter = 1
+        is_parent_row = False
+        if celda_padre not in seen_parents:
+            seen_parents.add(celda_padre)
             is_parent_row = True
+            daughter_counters[celda_padre] = 1
             parent_properties[celda_padre] = {
                 "camp": camp,
                 "geo": geo,
@@ -697,8 +699,7 @@ def validate_bulk_excel(file_path, output_json_path):
                 "dip_talud": sanitize_value(get_row_val(row_dict, 'DIP_TALUD'), float, allow_negative=True)
             }
         else:
-            daughter_counter += 1
-            is_parent_row = False
+            daughter_counters[celda_padre] += 1
 
         props = parent_properties.get(celda_padre, {})
         resolved_camp = props.get("camp") or camp
@@ -722,7 +723,7 @@ def validate_bulk_excel(file_path, output_json_path):
                 "campania": str(resolved_camp) if resolved_camp else "N/A"
             }
 
-        celda_hija = f"{celda_padre}-{daughter_counter}"
+        celda_hija = f"{celda_padre}-{daughter_counters[celda_padre]}"
         resumen_celdas[celda_padre]["total_hijas"] += 1
         row_has_errors = False
 
@@ -798,7 +799,7 @@ def validate_bulk_excel(file_path, output_json_path):
         structural_mandatory_cols = [
             'TIPO', 'TIPO DE ESTRUCT', 'TIPO DE ESTRUCTURA', 'JRC', 'RUGOSIDAD DE ESTRUCTURAS', 
             'FORMA DE ESTRUCTURA', 'ALTERACION', 'ESPESOR mm.', 'ABERTURA mm.', 'CONTINUIDAD m.', 
-            'ESPACIAMIENTO m.', 'DIP', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS'
+            'ESPACIAMIENTO m.', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS'
         ]
         structural_mandatory_clean = [clean_col_name(c) for c in structural_mandatory_cols]
 

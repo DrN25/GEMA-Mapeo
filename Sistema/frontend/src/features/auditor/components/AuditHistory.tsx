@@ -14,19 +14,31 @@ interface AuditHistoryProps {
     history: AuditHistoryItem[];
     selectedAuditId: string;
     onSelectAudit: (auditId: string) => void;
+    onOpenCompare: () => void;
 }
 
 export default function AuditHistory({
     history,
     selectedAuditId,
     onSelectAudit,
+    onOpenCompare,
 }: AuditHistoryProps) {
     return (
         <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-4 shadow-xl select-none">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                <Folder size={14} className="text-cyan-400" />
-                <span>Historial de Importaciones Logueadas y Revisadas</span>
-            </h3>
+            <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Folder size={14} className="text-cyan-400" />
+                    <span>Historial de Importaciones Logueadas y Revisadas</span>
+                </h3>
+                {history.length >= 1 && (
+                    <button
+                        onClick={onOpenCompare}
+                        className="bg-cyan-500/10 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm flex items-center gap-1.5"
+                    >
+                        <span>Comparar Reportes (A vs B)</span>
+                    </button>
+                )}
+            </div>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                 {history.length === 0 ? (
                     <span className="text-xs text-slate-500 italic px-2">No hay registros de auditorías anteriores.</span>

@@ -201,9 +201,9 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
     discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
     discs_correctas = total_filas - len(row_errors)
     
-    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
+    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
+    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
     
     observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
     top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
@@ -218,8 +218,11 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
         top_stations_por_año[c][obs_key][celda] += 1
         
         camp_stats[c]["filas"].add(i["fila_excel"])
+        camp_stats[c]["celdas"].add(i.get("celda_padre", "N/A"))
         geo_stats[g := i.get("geotecnico", "N/A")]["filas"].add(i["fila_excel"])
+        geo_stats[g]["celdas"].add(i.get("celda_padre", "N/A"))
         sector_stats[s := i.get("sector_geotecnico", "N/A")]["filas"].add(i["fila_excel"])
+        sector_stats[s]["celdas"].add(i.get("celda_padre", "N/A"))
         
         tipo = i.get("tipo_incidencia")
         if tipo == "VACIO":
@@ -256,7 +259,10 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
         rows_count = len(stats["filas"])
         total_fields_group = rows_count * MANDATORY_COLS_COUNT
         distribucion_campania.append({
-            "campania": c, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+            "campania": c, "discontinuidades": rows_count,
+            "celdas_afectadas": len(stats["celdas"]),
+            "estructuras_afectadas": rows_count,
+            "vacios_cant": stats["vacios"],
             "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
             "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
             "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
@@ -413,7 +419,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     # Tabla: Distribución por Campaña
     ws_dash.cell(row=9, column=2, value="DESEMPEÑO DE CONTROL POR CAMPAÑA").font = font_section
-    headers_camp = ["Campaña", "Estructuras", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
+    headers_camp = ["Campaña", "Estructuras", "Celdas Afectadas", "Estructuras Afectadas", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
     for idx, col in enumerate(headers_camp, start=2):
         cell = ws_dash.cell(row=10, column=idx, value=col)
         cell.font = font_header
@@ -429,19 +435,25 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         ws_dash.cell(row=r_camp, column=3, value=safe_int(row.get("discontinuidades"))).number_format = '#,##0'
         ws_dash.cell(row=r_camp, column=3).alignment = alignment_right
         
-        ws_dash.cell(row=r_camp, column=4, value=safe_int(row.get("alertas_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=4, value=safe_int(row.get("celdas_afectadas"))).number_format = '#,##0'
         ws_dash.cell(row=r_camp, column=4).alignment = alignment_right
         
-        ws_dash.cell(row=r_camp, column=5, value=safe_float(row.get("alertas_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=r_camp, column=5, value=safe_int(row.get("estructuras_afectadas"))).number_format = '#,##0'
         ws_dash.cell(row=r_camp, column=5).alignment = alignment_right
         
-        ws_dash.cell(row=r_camp, column=6, value=safe_int(row.get("vacios_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=6, value=safe_int(row.get("alertas_cant"))).number_format = '#,##0'
         ws_dash.cell(row=r_camp, column=6).alignment = alignment_right
         
-        ws_dash.cell(row=r_camp, column=7, value=safe_float(row.get("vacios_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=r_camp, column=7, value=safe_float(row.get("alertas_pct")) / 100.0).number_format = '0.00%'
         ws_dash.cell(row=r_camp, column=7).alignment = alignment_right
         
-        for col_idx in range(2, 8):
+        ws_dash.cell(row=r_camp, column=8, value=safe_int(row.get("vacios_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=8).alignment = alignment_right
+        
+        ws_dash.cell(row=r_camp, column=9, value=safe_float(row.get("vacios_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=r_camp, column=9).alignment = alignment_right
+        
+        for col_idx in range(2, 10):
             ws_dash.cell(row=r_camp, column=col_idx).border = border_thin
             if r_camp % 2 == 0:
                 ws_dash.cell(row=r_camp, column=col_idx).fill = fill_zebra
@@ -1025,7 +1037,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     return wb
 
-def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
+def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: str = None):
     t_start = time.time()
     print(f"\n======================================================================")
     print(f"[*] [AUDITORÍA {audit_id}] INICIANDO PIPELINE DE PROCESAMIENTO ASÍNCRONO")
@@ -1052,7 +1064,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str):
         with open(raw_json_out, "r", encoding="utf-8") as f:
             diag = json.load(f)
             
-        diag["nombre_archivo"] = os.path.basename(file_path)
+        diag["nombre_archivo"] = original_filename or os.path.basename(file_path)
         compact = aggregate_audit_metrics(diag)
         compact["audit_id"] = audit_id
         
@@ -1121,7 +1133,7 @@ async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFil
     file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id)
+    background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id, file.filename)
     return {"status": "procesando", "audit_id": audit_id, "filename": file.filename}
 
 @router.get("/geomecanica/auditorias")
