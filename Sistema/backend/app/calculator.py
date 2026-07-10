@@ -73,7 +73,7 @@ def get_spacing_rating(espac):
         r76 = 10
     elif espac < 1.0:
         r76 = 20
-    elif espac <= 3.0:
+    elif espac < 3.0:
         r76 = 25
     else:
         r76 = 30

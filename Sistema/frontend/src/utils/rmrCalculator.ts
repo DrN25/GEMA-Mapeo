@@ -174,17 +174,17 @@ export function getRqdRating89(rqd: number): number {
 
 export function getSpacingRating76(spacingM: number): number {
   if (spacingM < 0.05) return 5;
-  if (spacingM <= 0.3) return 10;
-  if (spacingM <= 1.0) return 20;
-  if (spacingM <= 3.0) return 25;
+  if (spacingM < 0.3) return 10;
+  if (spacingM < 1.0) return 20;
+  if (spacingM < 3.0) return 25;
   return 30;
 }
 
 export function getSpacingRating89(spacingM: number): number {
   if (spacingM < 0.06) return 5;
-  if (spacingM <= 0.2) return 8;
-  if (spacingM <= 0.6) return 10;
-  if (spacingM <= 2.0) return 15;
+  if (spacingM < 0.2) return 8;
+  if (spacingM < 0.6) return 10;
+  if (spacingM < 2.0) return 15;
   return 20;
 }
 

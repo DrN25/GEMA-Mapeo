@@ -97,7 +97,53 @@ def _build_key_map(incs: list) -> dict:
             m[k] = i
     return m
 
-def _compare_audits(diag_a, compact_a, diag_b, compact_b) -> dict:
+def _load_values_from_excel(excel_path, keys_to_query):
+    values_map = {}
+    celda_counts = {}
+    if not keys_to_query or not excel_path or not os.path.exists(excel_path):
+        return values_map, celda_counts
+    try:
+        import pandas as pd
+        import numpy as np
+        from app.utils.validator import clean_and_rename_columns, sanitize_value
+        
+        try:
+            import python_calamine
+            df = pd.read_excel(excel_path, engine='calamine')
+        except ImportError:
+            df = pd.read_excel(excel_path, engine='openpyxl')
+            
+        df = clean_and_rename_columns(df)
+        if 'CELDA_PADRE' not in df.columns:
+            return values_map, celda_counts
+            
+        df['CELDA_PADRE'] = df['CELDA_PADRE'].replace([-1, -1.0, '-1', '-1.0'], np.nan)
+        df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
+        
+        c_padres = df['CELDA_PADRE'].tolist()
+        
+        from collections import defaultdict
+        celda_to_indices = defaultdict(list)
+        for idx, val in enumerate(c_padres):
+            cp = sanitize_value(val, str)
+            if cp:
+                celda_to_indices[cp].append(idx)
+                
+        celda_counts = {cp: len(indices) for cp, indices in celda_to_indices.items()}
+                
+        for celda_p, n_th, columna in keys_to_query:
+            indices = celda_to_indices.get(celda_p)
+            if indices and len(indices) >= n_th:
+                row_idx = indices[n_th - 1]
+                if columna in df.columns:
+                    val = df.at[row_idx, columna]
+                    if pd.notna(val) and val is not None:
+                        values_map[(celda_p, n_th, columna)] = val
+    except Exception as e:
+        print(f"Error loading Excel for comparison values ({excel_path}): {e}")
+    return values_map, celda_counts
+
+def _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=None, excel_path_b=None) -> dict:
     inc_a = diag_a.get("incidencias", [])
     inc_b = diag_b.get("incidencias", [])
 
@@ -128,6 +174,38 @@ def _compare_audits(diag_a, compact_a, diag_b, compact_b) -> dict:
     new_keys      = keys_b - keys_a
     resolved_keys = keys_a - keys_b
     persistent    = keys_a & keys_b
+
+    # Construir conjuntos de consulta para la carga optimizada de Excel
+    keys_to_query_b = set()
+    for k in resolved_keys:
+        rec_a = map_a.get(k)
+        if rec_a:
+            celda_p = rec_a.get("celda_padre", "")
+            celda_h = rec_a.get("celda_hija", "")
+            columna = rec_a.get("columna", "")
+            n_th = 1
+            if celda_h and "-" in celda_h:
+                parts = celda_h.split("-")
+                if len(parts) >= 2 and parts[-1].isdigit():
+                    n_th = int(parts[-1])
+            keys_to_query_b.add((celda_p, n_th, columna))
+            
+    keys_to_query_a = set()
+    for k in new_keys:
+        rec_b = map_b.get(k)
+        if rec_b:
+            celda_p = rec_b.get("celda_padre", "")
+            celda_h = rec_b.get("celda_hija", "")
+            columna = rec_b.get("columna", "")
+            n_th = 1
+            if celda_h and "-" in celda_h:
+                parts = celda_h.split("-")
+                if len(parts) >= 2 and parts[-1].isdigit():
+                    n_th = int(parts[-1])
+            keys_to_query_a.add((celda_p, n_th, columna))
+
+    values_map_a, celda_counts_a = _load_values_from_excel(excel_path_a, keys_to_query_a)
+    values_map_b, celda_counts_b = _load_values_from_excel(excel_path_b, keys_to_query_b)
 
     fam1_a = compact_a.get("familia1", {})
     fam2_a = compact_a.get("familia2", {})
@@ -263,6 +341,10 @@ def _compare_audits(diag_a, compact_a, diag_b, compact_b) -> dict:
         "totales": {"nuevas": len(new_keys), "resueltas": len(resolved_keys), "persistentes": len(persistent)},
         "inc_a_filtered": inc_a_filtered,
         "inc_b_filtered": inc_b_filtered,
+        "values_map_a": values_map_a,
+        "values_map_b": values_map_b,
+        "celda_counts_a": celda_counts_a,
+        "celda_counts_b": celda_counts_b,
     }
 
 # ─── Helpers de escritura Excel ──────────────────────────────────────────────
@@ -356,6 +438,10 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
     
     inc_a_filtered = datos.get("inc_a_filtered", [])
     inc_b_filtered = datos.get("inc_b_filtered", [])
+    values_map_a = datos.get("values_map_a", {})
+    values_map_b = datos.get("values_map_b", {})
+    celda_counts_a = datos.get("celda_counts_a", {})
+    celda_counts_b = datos.get("celda_counts_b", {})
 
     wb = openpyxl.Workbook()
 
@@ -755,7 +841,31 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
                 fila_a = rec_a.get("fila_excel", "")
                 fila_b = "—"
                 val_antiguo = rec_a.get("valor_actual", "—")
+                
+                # Intentar obtener el valor corregido real de Excel B
                 val_nuevo = "CORREGIDO / OK"
+                
+                celda_p = rec_a.get("celda_padre", "")
+                celda_h = rec_a.get("celda_hija", "")
+                columna = rec_a.get("columna", "")
+                
+                n_th = 1
+                if celda_h and "-" in celda_h:
+                    parts = celda_h.split("-")
+                    if len(parts) >= 2 and parts[-1].isdigit():
+                        n_th = int(parts[-1])
+                        
+                # Si el número de estructura es mayor que las existentes en B, es que la fila fue eliminada
+                if celda_counts_b and (celda_p not in celda_counts_b or n_th > celda_counts_b[celda_p]):
+                    val_nuevo = "FILA ELIMINADA / OK"
+                elif values_map_b:
+                    raw_val_b = values_map_b.get((celda_p, n_th, columna))
+                    if raw_val_b is not None:
+                        from app.utils.validator import format_raw_value_for_report
+                        formatted_b = format_raw_value_for_report(raw_val_b)
+                        if formatted_b is not None:
+                            val_nuevo = formatted_b
+                            
                 resolved_camp = rec_a.get("campania", "")
                 resolved_sector = rec_a.get("sector_geotecnico", "")
                 celda_h = rec_a.get("celda_hija", "")
@@ -764,7 +874,31 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
                 fill_row = s["fill_new"]
                 fila_a = "—"
                 fila_b = rec_b.get("fila_excel", "")
+                
+                # Intentar obtener el valor antiguo correcto real de Excel A
                 val_antiguo = "—"
+                
+                celda_p = rec_b.get("celda_padre", "")
+                celda_h = rec_b.get("celda_hija", "")
+                columna = rec_b.get("columna", "")
+                
+                n_th = 1
+                if celda_h and "-" in celda_h:
+                    parts = celda_h.split("-")
+                    if len(parts) >= 2 and parts[-1].isdigit():
+                        n_th = int(parts[-1])
+                        
+                # Si el número de estructura es mayor que las existentes en A, es que la fila es nueva/creada
+                if celda_counts_a and (celda_p not in celda_counts_a or n_th > celda_counts_a[celda_p]):
+                    val_antiguo = "FILA CREADA (Nueva)"
+                elif values_map_a:
+                    raw_val_a = values_map_a.get((celda_p, n_th, columna))
+                    if raw_val_a is not None:
+                        from app.utils.validator import format_raw_value_for_report
+                        formatted_a = format_raw_value_for_report(raw_val_a)
+                        if formatted_a is not None:
+                            val_antiguo = formatted_a
+                            
                 val_nuevo = rec_b.get("valor_actual", "—")
                 resolved_camp = rec_b.get("campania", "")
                 resolved_sector = rec_b.get("sector_geotecnico", "")
@@ -884,7 +1018,9 @@ def reporte_comparativo_historial(audit_id_a: str, audit_id_b: str):
         raise HTTPException(status_code=400, detail="Los dos audit_id no pueden ser iguales.")
     diag_a, compact_a = _load_audit_files(audit_id_a)
     diag_b, compact_b = _load_audit_files(audit_id_b)
-    datos = _compare_audits(diag_a, compact_a, diag_b, compact_b)
+    excel_path_a = os.path.join(uploads_dir, "history", f"{audit_id_a}.xlsx")
+    excel_path_b = os.path.join(uploads_dir, "history", f"{audit_id_b}.xlsx")
+    datos = _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=excel_path_a, excel_path_b=excel_path_b)
     wb    = generar_excel_comparativo_core(datos)
     fname = f"comparativo_{audit_id_a}_vs_{audit_id_b}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _stream_wb(wb, fname)
@@ -923,7 +1059,7 @@ async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: U
         compact_b = aggregate_audit_metrics(diag_b)
         compact_b["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        datos = _compare_audits(diag_a, compact_a, diag_b, compact_b)
+        datos = _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=path_a, excel_path_b=path_b)
         wb    = generar_excel_comparativo_core(datos)
         return _stream_wb(wb, f"comparativo_{ts}.xlsx")
     finally:
