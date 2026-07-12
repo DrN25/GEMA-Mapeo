@@ -17,7 +17,8 @@ try:
         for col_def in [
             "ALTER TABLE ventana ADD turno VARCHAR(50) NULL",
             "ALTER TABLE ventanas_final ADD turno VARCHAR(50) NULL",
-            "ALTER TABLE ventanas_final ADD campania INT NULL"
+            "ALTER TABLE ventanas_final ADD campania INT NULL",
+            "ALTER TABLE ensayo_plt_irregular ADD tipo_ensayo VARCHAR(50) NULL"
         ]:
             try:
                 conn.execute(text(col_def))

@@ -149,35 +149,307 @@ export interface LithologyClassificationItem {
 
 // Catálogo litológico enriquecido con los factores K de tus tablas
 export const LITHOLOGY_CLASSIFICATION: LithologyClassificationItem[] = [
+  // INTRUSIVOS (lito1=MZB, MBF1, MBF2, MZM, MZH, MZD, MZQ, AN)
   { grupo: "INTRUSIVOS", unidad: "MZB", litologia: "MZB", codigo: "MZB_EQ", k: 8.29 },
   { grupo: "INTRUSIVOS", unidad: "MZB", litologia: "MZB", codigo: "MZB_P", k: 8.53 },
+  { grupo: "INTRUSIVOS", unidad: "MZB", litologia: "MZB", codigo: "NR", k: 9.31 },
+
   { grupo: "INTRUSIVOS", unidad: "MBF1", litologia: "MBF", codigo: "MBF1", k: 9.20 },
+  { grupo: "INTRUSIVOS", unidad: "MBF1", litologia: "MBF", codigo: "NR", k: 9.31 },
+
   { grupo: "INTRUSIVOS", unidad: "MBF2", litologia: "MBF", codigo: "MBF2", k: 10.73 },
   { grupo: "INTRUSIVOS", unidad: "MBF2", litologia: "MBF", codigo: "MBF_P", k: 9.31 },
+  { grupo: "INTRUSIVOS", unidad: "MBF2", litologia: "MBF", codigo: "NR", k: 9.31 },
+
   { grupo: "INTRUSIVOS", unidad: "MZM", litologia: "MZM", codigo: "MZM_F", k: 9.31 },
   { grupo: "INTRUSIVOS", unidad: "MZM", litologia: "MZM", codigo: "MZM_M", k: 8.61 },
+  { grupo: "INTRUSIVOS", unidad: "MZM", litologia: "MZM", codigo: "NR", k: 9.31 },
+
   { grupo: "INTRUSIVOS", unidad: "MZH", litologia: "MZH", codigo: "MZH_1", k: 11.62 },
   { grupo: "INTRUSIVOS", unidad: "MZH", litologia: "MZH", codigo: "MZH_2", k: 9.31 },
+  { grupo: "INTRUSIVOS", unidad: "MZH", litologia: "MZH", codigo: "NR", k: 9.31 },
+
   { grupo: "INTRUSIVOS", unidad: "MZD", litologia: "MZD", codigo: "MZD", k: 7.60 },
   { grupo: "INTRUSIVOS", unidad: "MZQ", litologia: "MZQ", codigo: "MZQ", k: 12.29 },
-  { grupo: "INTRUSIVOS", unidad: "AN", litologia: "LAM", codigo: "LAM", k: 9.31 },
+  { grupo: "INTRUSIVOS", unidad: "AN", litologia: "AN", codigo: "LAM", k: 9.31 },
+
+  // SEDIMENTARIOS (lito1=LMT, SHL, SND, OVD)
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT", k: 14.84 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_M", k: 14.74 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_MG", k: 14.25 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_S", k: 14.84 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_C", k: 16.83 },
   { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "LMT_U", k: 14.84 },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "LMT", codigo: "NR", k: 14.84 },
+
   { grupo: "SEDIMENTARIOS", unidad: "SHL", litologia: "HFL", codigo: "SHL_MA", k: 14.84 },
-  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "Varios", k: 11.15 },
-  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "Varios", k: 12.63 },
-  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MSK", codigo: "Varios", k: 12.63 },
-  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "Varios", k: 12.63 },
-  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBC", codigo: "Varios", k: 11.78 },
-  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "Varios", k: 13.34 },
-  { grupo: "METAMORFICAS", unidad: "SHL", litologia: "HFL", codigo: "-", k: 12.63 },
-  { grupo: "METAMORFICAS", unidad: "SND", litologia: "QZT", codigo: "-", k: 12.63 },
+  { grupo: "SEDIMENTARIOS", unidad: "SHL", litologia: "HFL", codigo: "-", k: 12.63 },
+  { grupo: "SEDIMENTARIOS", unidad: "SND", litologia: "QZT", codigo: "-", k: 12.63 },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "OVD", codigo: "OVD", k: 14.84 },
+  { grupo: "SEDIMENTARIOS", unidad: "LMT", litologia: "OVD", codigo: "-", k: 14.84 },
+
+  // BRECHAS (lito1=TBX, HBX, MBX / varios)
   { grupo: "BRECHAS", unidad: "TBX", litologia: "TBX", codigo: "TBX", k: 13.72 },
   { grupo: "BRECHAS", unidad: "HBX", litologia: "HBX", codigo: "HBX", k: 11.41 },
   { grupo: "BRECHAS", unidad: "MBX / varios", litologia: "MBX", codigo: "MBX", k: 11.41 },
-  { grupo: "ENDOSKARN", unidad: "MZM", litologia: "EPG", codigo: "-", k: 9.87 },
-  { grupo: "ENDOSKARN", unidad: "MZM", litologia: "EGT", codigo: "-", k: 9.87 }
+
+  // ENDOSKARN (lito1=Intrusivo)
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EPG", codigo: "MZB_EQ", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EPG", codigo: "MZM_M", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EPG", codigo: "MZD", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EPG", codigo: "-", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EGT", codigo: "MZM_M", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EGT", codigo: "MZB_EQ", k: 9.87 },
+  { grupo: "ENDOSKARN", unidad: "Intrusivo", litologia: "EGT", codigo: "-", k: 9.87 },
+
+  // METAMORFICAS (lito1=LMT)
+  // GSK
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "LMT_M", k: 11.15 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "LMT_C", k: 11.15 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "LMT_S", k: 11.15 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "LMT_U", k: 11.15 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "LMT_MG", k: 11.15 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "GSK", codigo: "Varios", k: 11.15 },
+  // PSK
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "LMT_MG", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "LMT_C", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "LMT_S", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "LMT_U", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "LMT_M", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "PSK", codigo: "Varios", k: 12.63 },
+  // MSK
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MSK", codigo: "LMT_MG", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MSK", codigo: "LMT_S", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MSK", codigo: "Varios", k: 12.63 },
+  // ESK
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "LMT_M", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "LMT_MG", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "LMT_C", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "LMT_S", k: 12.63 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "ESK", codigo: "Varios", k: 12.63 },
+  // MBC
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBC", codigo: "LMT_M", k: 11.78 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBC", codigo: "LMT_MG", k: 11.78 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBC", codigo: "LMT_S", k: 11.78 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBC", codigo: "Varios", k: 11.78 },
+  // MBL
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "LMT_MG", k: 13.34 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "LMT_S", k: 13.34 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "LMT_M", k: 13.34 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "LMT_C", k: 13.34 },
+  { grupo: "METAMORFICAS", unidad: "LMT", litologia: "MBL", codigo: "Varios", k: 13.34 }
+];
+
+export interface ResolvedKResult {
+  k: number;
+  lito1: string;
+  lito2: string;
+  lito3: string;
+  clase: string;
+}
+
+const EQUIVALENCIAS_MIGRACION: Record<string, { lito1: string, lito2: string, lito3: string, k: number }> = {
+  TBX: { lito1: "TBX", lito2: "TBX", lito3: "TBX", k: 13.72 },
+  LMT_C: { lito1: "LMT", lito2: "LMT", lito3: "LMT_C", k: 16.83 },
+  SKARN: { lito1: "LMT", lito2: "GSK", lito3: "Varios", k: 11.15 },
+  LMT_M: { lito1: "LMT", lito2: "LMT", lito3: "LMT_M", k: 14.74 },
+  LMT_S2: { lito1: "LMT", lito2: "LMT", lito3: "LMT_S", k: 14.84 },
+  LMT_S3: { lito1: "LMT", lito2: "LMT", lito3: "LMT_S", k: 14.84 },
+  LMT_S4: { lito1: "LMT", lito2: "LMT", lito3: "LMT_S", k: 14.30 },
+  LMT_MG: { lito1: "LMT", lito2: "LMT", lito3: "LMT_MG", k: 14.25 },
+  MBC: { lito1: "LMT", lito2: "MBC", lito3: "Varios", k: 11.78 },
+  MZQ: { lito1: "MZQ", lito2: "MZQ", lito3: "MZQ", k: 12.29 },
+  MZB_P: { lito1: "MZB", lito2: "MZB", lito3: "MZB_P", k: 8.53 }
+};
+
+export function resolveLithologyCascade(
+  l1: string,
+  l2: string | null | undefined,
+  l3: string | null | undefined,
+  model2022?: string | null,
+  fallbackLito1?: string
+): ResolvedKResult {
+  const cleanL1 = String(l1 || "").trim().toUpperCase();
+  const cleanL2 = String(l2 || "").trim().toUpperCase();
+  let cleanL3 = String(l3 || "").trim().toUpperCase();
+  if (!cleanL3 || cleanL3 === "-") cleanL3 = "NR";
+
+  // 1. PRIORIDAD 1: Flujo Histórico/Transición si la columna del Modelo 2022 tiene datos
+  const m2022 = String(model2022 || "").trim().toUpperCase();
+  if (m2022) {
+    if (m2022 === "ENDO") {
+      const targetL2 = (cleanL1 === "EPG" || cleanL2 === "EPG") ? "EPG" : "EGT";
+      return { k: 9.87, lito1: "Intrusivo", lito2: targetL2, lito3: "-", clase: "ENDOSKARN" };
+    }
+    const equiv = EQUIVALENCIAS_MIGRACION[m2022];
+    if (equiv) {
+      const exactMatch = LITHOLOGY_CLASSIFICATION.find(item => item.unidad.toUpperCase() === equiv.lito1.toUpperCase() && item.litologia.toUpperCase() === equiv.lito2.toUpperCase() && item.codigo.toUpperCase() === equiv.lito3.toUpperCase());
+      return {
+        k: equiv.k,
+        lito1: equiv.lito1,
+        lito2: equiv.lito2,
+        lito3: equiv.lito3,
+        clase: exactMatch ? exactMatch.grupo : "SEDIMENTARIOS"
+      };
+    } else {
+      // Regla de Paso Directo (Pass-Through)
+      const lookupK = lookupPltKOnly(m2022, "NR") || 10.0;
+      const exactMatch = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === m2022 && item.codigo.toUpperCase() === "NR");
+      return {
+        k: lookupK,
+        lito1: cleanL1 || fallbackLito1 || "LMT",
+        lito2: m2022,
+        lito3: "NR",
+        clase: exactMatch ? exactMatch.grupo : "SEDIMENTARIOS"
+      };
+    }
+  }
+
+  // 2. PRIORIDAD 2: Flujo de Datos Nuevos (Moderno 2023+ / Web)
+  const finalL2 = cleanL2;
+  const finalL3 = cleanL3;
+
+  const foundK = lookupPltKOnly(finalL2, finalL3);
+  const exactMatch = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === finalL3)
+    || LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === "VARIOS")
+    || LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === "NR");
+
+  return {
+    k: foundK !== null ? foundK : 10.0,
+    lito1: l1,
+    lito2: l2 || "",
+    lito3: l3 || "",
+    clase: exactMatch ? exactMatch.grupo : "INTRUSIVOS"
+  };
+}
+
+export function lookupPltKOnly(lito2: string, lito3: string): number | null {
+  const l2 = String(lito2 || "").trim().toUpperCase();
+  const l3 = String(lito3 || "").trim().toUpperCase();
+
+  // Exacto
+  const exact = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === l2 && item.codigo.toUpperCase() === l3);
+  if (exact) return exact.k;
+
+  // Varios
+  const varios = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === l2 && item.codigo.toUpperCase() === "VARIOS");
+  if (varios) return varios.k;
+
+  // NR
+  const nr = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === l2 && item.codigo.toUpperCase() === "NR");
+  if (nr) return nr.k;
+
+  return null;
+}
+
+export interface LitoColoresItem {
+  lito1: string;
+  lito2: string;
+  lito3: string;
+  k: number;
+}
+
+export interface LitoValidacionItem {
+  grupo: string;
+  lito2: string;
+  lito3: string;
+  validacion: string;
+  k: number;
+}
+
+export const LITO_COLORES_DATA: LitoColoresItem[] = [
+  { lito1: "MZB", lito2: "MZB", lito3: "MZB_EQ", k: 8.29 },
+  { lito1: "MZB", lito2: "MZB", lito3: "MZB_P", k: 8.53 },
+  { lito1: "MBF1", lito2: "MBF", lito3: "MBF1", k: 9.20 },
+  { lito1: "MBF2", lito2: "MBF", lito3: "MBF2", k: 10.73 },
+  { lito1: "MBF2", lito2: "MBF", lito3: "MBF_P", k: 9.31 },
+  { lito1: "MZM", lito2: "MZM", lito3: "MZM_F", k: 9.31 },
+  { lito1: "MZM", lito2: "MZM", lito3: "MZM_M", k: 8.61 },
+  { lito1: "MZH", lito2: "MZH", lito3: "MZH_1", k: 11.62 },
+  { lito1: "MZH", lito2: "MZH", lito3: "MZH_2", k: 9.31 },
+  { lito1: "MZD", lito2: "MZD", lito3: "MZD", k: 7.60 },
+  { lito1: "MZQ", lito2: "MZQ", lito3: "MZQ", k: 12.29 },
+  { lito1: "AN", lito2: "AN", lito3: "LAM", k: 9.31 },
+  { lito1: "LMT", lito2: "LMT", lito3: "LMT_M", k: 14.74 },
+  { lito1: "LMT", lito2: "LMT", lito3: "LMT_Mg", k: 14.25 },
+  { lito1: "LMT", lito2: "LMT", lito3: "LMT_S", k: 14.84 },
+  { lito1: "LMT", lito2: "LMT", lito3: "LMT_C", k: 16.83 },
+  { lito1: "LMT", lito2: "LMT", lito3: "LMT_U", k: 14.84 },
+  { lito1: "SHL", lito2: "HFL", lito3: "SHL_MA", k: 14.84 },
+  { lito1: "LMT", lito2: "GSK", lito3: "Varios", k: 11.15 },
+  { lito1: "LMT", lito2: "PSK", lito3: "Varios", k: 12.63 },
+  { lito1: "LMT", lito2: "MSK", lito3: "Varios", k: 12.63 },
+  { lito1: "LMT", lito2: "ESK", lito3: "Varios", k: 12.63 },
+  { lito1: "LMT", lito2: "MBC", lito3: "Varios", k: 11.78 },
+  { lito1: "LMT", lito2: "MBL", lito3: "Varios", k: 13.34 },
+  { lito1: "SHL", lito2: "HFL", lito3: "-", k: 12.63 },
+  { lito1: "SND", lito2: "QZT", lito3: "-", k: 12.63 },
+  { lito1: "TBX", lito2: "TBX", lito3: "TBX", k: 13.72 },
+  { lito1: "HBX", lito2: "HBX", lito3: "HBX", k: 11.41 },
+  { lito1: "MBX / varios", lito2: "MBX", lito3: "MBX", k: 11.41 },
+  { lito1: "Intrusivo", lito2: "EPG", lito3: "-", k: 9.87 },
+  { lito1: "Intrusivo", lito2: "EGT", lito3: "-", k: 9.87 }
+];
+
+export const LITO_VALIDACION_DATA: LitoValidacionItem[] = [
+  { grupo: "INTRUSIVOS", lito2: "MZB", lito3: "MZB_EQ", validacion: "MZB/MZB_EQ", k: 8.29 },
+  { grupo: "INTRUSIVOS", lito2: "MZB", lito3: "MZB_P", validacion: "MZB/MZB_P", k: 8.53 },
+  { grupo: "INTRUSIVOS", lito2: "MBF", lito3: "MBF1", validacion: "MBF/MBF1", k: 9.20 },
+  { grupo: "INTRUSIVOS", lito2: "MBF", lito3: "MBF2", validacion: "MBF/MBF2", k: 10.73 },
+  { grupo: "INTRUSIVOS", lito2: "MBF", lito3: "MBF_P", validacion: "MBF/MBF_P", k: 9.31 },
+  { grupo: "INTRUSIVOS", lito2: "MZM", lito3: "MZM_F", validacion: "MZM/MZM_F", k: 9.31 },
+  { grupo: "INTRUSIVOS", lito2: "MZM", lito3: "MZM_M", validacion: "MZM/MZM_M", k: 8.61 },
+  { grupo: "INTRUSIVOS", lito2: "MZH", lito3: "MZH_1", validacion: "MZH/MZH_1", k: 11.62 },
+  { grupo: "INTRUSIVOS", lito2: "MZH", lito3: "MZH_2", validacion: "MZH/MZH_2", k: 9.31 },
+  { grupo: "INTRUSIVOS", lito2: "MZD", lito3: "MZD", validacion: "MZD/MZD", k: 7.60 },
+  { grupo: "INTRUSIVOS", lito2: "MZQ", lito3: "MZQ", validacion: "MZQ/MZQ", k: 12.29 },
+  { grupo: "INTRUSIVOS", lito2: "MBF", lito3: "NR", validacion: "MBF/NR", k: 9.31 },
+  { grupo: "INTRUSIVOS", lito2: "MZM", lito3: "NR", validacion: "MZM/NR", k: 9.31 },
+  { grupo: "INTRUSIVOS", lito2: "MZB", lito3: "NR", validacion: "MZB/NR", k: 9.31 },
+  { grupo: "INTRUSIVOS", lito2: "MZH", lito3: "NR", validacion: "MZH/NR", k: 9.31 },
+  { grupo: "ENDOSKARN", lito2: "EGT", lito3: "MZM_M", validacion: "EGT/MZM_M", k: 9.87 },
+  { grupo: "ENDOSKARN", lito2: "EGT", lito3: "MZB_EQ", validacion: "EGT/MZB_EQ", k: 9.87 },
+  { grupo: "ENDOSKARN", lito2: "EGT", lito3: "-", validacion: "EGT/-", k: 9.87 },
+  { grupo: "ENDOSKARN", lito2: "EPG", lito3: "MZB_EQ", validacion: "EPG/MZB_EQ", k: 9.87 },
+  { grupo: "ENDOSKARN", lito2: "EPG", lito3: "MZM_M", validacion: "EPG/MZM_M", k: 9.87 },
+  { grupo: "ENDOSKARN", lito2: "EPG", lito3: "MZD", validacion: "EPG/MZD", k: 9.87 },
+  { grupo: "ENDOSKARN", lito2: "EPG", lito3: "-", validacion: "EPG/-", k: 9.87 },
+  { grupo: "BRECHAS", lito2: "TBX", lito3: "TBX", validacion: "TBX/TBX", k: 13.72 },
+  { grupo: "BRECHAS", lito2: "BX", lito3: "TBX", validacion: "BX/TBX", k: 13.72 },
+  { grupo: "BRECHAS", lito2: "HBX", lito3: "HBX", validacion: "HBX/HBX", k: 11.41 },
+  { grupo: "BRECHAS", lito2: "MBX", lito3: "MBX", validacion: "MBX/MBX", k: 11.41 },
+  { grupo: "SEDIMENTARIAS", lito2: "LMT", lito3: "LMT", validacion: "LMT/LMT", k: 14.84 },
+  { grupo: "SEDIMENTARIAS", lito2: "LMT", lito3: "NR", validacion: "LMT/NR", k: 14.84 },
+  { grupo: "SEDIMENTARIAS", lito2: "LMT", lito3: "LMT_M", validacion: "LMT/LMT_M", k: 14.74 },
+  { grupo: "SEDIMENTARIAS", lito2: "LMT", lito3: "LMT_MG", validacion: "LMT/LMT_MG", k: 14.25 },
+  { grupo: "SEDIMENTARIAS", lito2: "LMT", lito3: "LMT_S", validacion: "LMT/LMT_S", k: 14.84 },
+  { grupo: "SEDIMENTARIAS", lito2: "LMT", lito3: "LMT_C", validacion: "LMT/LMT_C", k: 16.83 },
+  { grupo: "SEDIMENTARIAS", lito2: "HFL", lito3: "SHL_MA", validacion: "HFL/SHL_MA", k: 14.84 },
+  { grupo: "SEDIMENTARIAS", lito2: "OVD", lito3: "OVD", validacion: "OVD/OVD", k: 14.84 },
+  { grupo: "SEDIMENTARIAS", lito2: "OVD", lito3: "-", validacion: "OVD/-", k: 14.84 },
+  { grupo: "METAMORFICAS", lito2: "GSK", lito3: "LMT_M", validacion: "GSK/LMT_M", k: 11.15 },
+  { grupo: "METAMORFICAS", lito2: "GSK", lito3: "LMT_C", validacion: "GSK/LMT_C", k: 11.15 },
+  { grupo: "METAMORFICAS", lito2: "GSK", lito3: "LMT_S", validacion: "GSK/LMT_S", k: 11.15 },
+  { grupo: "METAMORFICAS", lito2: "GSK", lito3: "LMT_U", validacion: "GSK/LMT_U", k: 11.15 },
+  { grupo: "METAMORFICAS", lito2: "GSK", lito3: "Varios", validacion: "GSK/Varios", k: 11.15 },
+  { grupo: "METAMORFICAS", lito2: "PSK", lito3: "LMT_MG", validacion: "PSK/LMT_MG", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "PSK", lito3: "LMT_C", validacion: "PSK/LMT_C", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "PSK", lito3: "LMT_S", validacion: "PSK/LMT_S", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "PSK", lito3: "LMT_U", validacion: "PSK/LMT_U", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "MSK", lito3: "LMT_MG", validacion: "MSK/LMT_MG", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "MSK", lito3: "LMT_S", validacion: "MSK/LMT_S", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "ESK", lito3: "LMT_M", validacion: "ESK/LMT_M", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "ESK", lito3: "LMT_MG", validacion: "ESK/LMT_MG", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "ESK", lito3: "LMT_C", validacion: "ESK/LMT_C", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "ESK", lito3: "LMT_S", validacion: "ESK/LMT_S", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "ESK", lito3: "Varios", validacion: "ESK/Varios", k: 12.63 },
+  { grupo: "METAMORFICAS", lito2: "MBC", lito3: "LMT_M", validacion: "MBC/LMT_M", k: 11.78 },
+  { grupo: "METAMORFICAS", lito2: "MBC", lito3: "LMT_MG", validacion: "MBC/LMT_MG", k: 11.78 },
+  { grupo: "METAMORFICAS", lito2: "MBC", lito3: "LMT_S", validacion: "MBC/LMT_S", k: 11.78 },
+  { grupo: "METAMORFICAS", lito2: "MBC", lito3: "Varios", validacion: "MBC/Varios", k: 11.78 },
+  { grupo: "METAMORFICAS", lito2: "MBL", lito3: "LMT_MG", validacion: "MBL/LMT_MG", k: 13.34 },
+  { grupo: "METAMORFICAS", lito2: "MBL", lito3: "LMT_S", validacion: "MBL/LMT_S", k: 13.34 },
+  { grupo: "METAMORFICAS", lito2: "MBL", lito3: "LMT_M", validacion: "MBL/LMT_M", k: 13.34 },
+  { grupo: "METAMORFICAS", lito2: "MBL", lito3: "LMT_C", validacion: "MBL/LMT_C", k: 13.34 },
+  { grupo: "METAMORFICAS", lito2: "MBL", lito3: "Varios", validacion: "MBL/Varios", k: 13.34 }
 ];

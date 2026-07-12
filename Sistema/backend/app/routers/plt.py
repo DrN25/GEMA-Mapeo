@@ -51,6 +51,7 @@ def save_ensayos_plt(data: List[schemas.EnsayoPLTSaveSchema], db: Session = Depe
             row.direccion_rotura = d.direccion_rotura
             row.tipo_fractura = d.tipo_fractura
             row.factor_conversion_k = d.factor_conversion_k
+            row.tipo_ensayo = d.tipo_ensayo
             row.observaciones = d.observaciones
         else:
             row = models.EnsayoPLTIrregular(
@@ -61,7 +62,7 @@ def save_ensayos_plt(data: List[schemas.EnsayoPLTSaveSchema], db: Session = Depe
                 tipo_litologico=d.tipo_litologico, este=d.este, norte=d.norte, elevacion=d.elevacion,
                 espesor_d=d.espesor_d, longitud_l=d.longitud_l, ancho_w1=d.ancho_w1, ancho_w2=d.ancho_w2,
                 fuerza_p=d.fuerza_p, direccion_rotura=d.direccion_rotura, tipo_fractura=d.tipo_fractura,
-                factor_conversion_k=d.factor_conversion_k, observaciones=d.observaciones
+                factor_conversion_k=d.factor_conversion_k, tipo_ensayo=d.tipo_ensayo, observaciones=d.observaciones
             )
             db.add(row)
             

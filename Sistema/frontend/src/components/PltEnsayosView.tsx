@@ -59,6 +59,8 @@ export default function PltEnsayosView({
   const [editCell, setEditCell] = useState<{ id: number; key: string } | null>(null);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
 
+  const visibleCols = useMemo(() => COLS.filter(c => !c.hidden), []);
+
   const createEmptyRow = (customId?: number, prefillCelda?: string) => {
     return {
       id: customId || Date.now(),
@@ -67,6 +69,7 @@ export default function PltEnsayosView({
       sector_geotecnico: "",
       ejecutado_por: "",
       zona_mapeo: "",
+      tipo_ensayo: "i",
       nivel: 3960.00,
       celda_mapeo: prefillCelda || (filterActiveCell && activeWindowCelda ? activeWindowCelda : ""),
       muestra: "",
@@ -222,7 +225,7 @@ export default function PltEnsayosView({
 
   const qaqcDetails = useMemo(() => {
     return computedRows.map(r => {
-      const required = ["campana", "fecha_ensayo", "ejecutado_por", "zona_mapeo", "nivel", "celda_mapeo", "muestra", "codigo_muestra", "litologia_1"];
+      const required = ["campana", "fecha_ensayo", "ejecutado_por", "tipo_ensayo", "zona_mapeo", "nivel", "celda_mapeo", "muestra", "codigo_muestra", "litologia_1"];
       const camposOk = required.every(k => r[k] !== null && r[k] !== undefined && r[k] !== "");
       const longitudOk = r.muestra_valida_longitud !== null ? (r.muestra_valida_longitud === "SÍ") : null;
       const anchoOk = r.muestra_valida_ancho !== null ? (r.muestra_valida_ancho === "SÍ") : null;
@@ -414,7 +417,7 @@ export default function PltEnsayosView({
           <thead>
             <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
               <th className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-b border-navy-800 w-12 min-w-[48px]">#</th>
-              {COLS.map(c => (
+              {visibleCols.map(c => (
                 <th
                   key={c.key}
                   style={{ width: c.width, minWidth: c.width }}
@@ -439,7 +442,7 @@ export default function PltEnsayosView({
                     {idx + 1}
                   </td>
 
-                  {COLS.map(c => {
+                  {visibleCols.map(c => {
                     const val = row[c.key];
                     const isCellLocked = (c.key === "celda_mapeo" && filterActiveCell) || c.computed;
 
@@ -451,11 +454,28 @@ export default function PltEnsayosView({
                       >
                         {isCellLocked ? (
                           (() => {
+                            const isValidaCol = c.key === "muestra_valida_longitud" || c.key === "muestra_valida_ancho";
+                            const displayVal = isValidaCol ? (
+                              val === "SÍ" ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 select-none">
+                                  ✓ SÍ
+                                </span>
+                              ) : val === "NO" ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-500/10 border border-rose-500/20 text-rose-400 select-none">
+                                  ✗ NO
+                                </span>
+                              ) : (
+                                <span className="text-navy-700/60 font-semibold select-none">—</span>
+                              )
+                            ) : (
+                              formatCellValue(val, c) || (
+                                <span className="text-navy-700/60 font-semibold select-none">—</span>
+                              )
+                            );
+
                             const renderedCell = (
                               <div className={getCellClassName(c, val)}>
-                                {formatCellValue(val, c) || (
-                                  <span className="text-navy-700/60 font-semibold select-none">—</span>
-                                )}
+                                {displayVal}
                               </div>
                             );
 
@@ -499,11 +519,13 @@ export default function PltEnsayosView({
 
                               return (
                                 <select
-                                  value={val ?? ""}
+                                  value={val ?? (c.key === "tipo_ensayo" ? "i" : "")}
                                   onChange={(e) => handleCommitSelect(row.id, c.key, e.target.value)}
                                   className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs font-semibold py-2 px-1 focus:ring-1 focus:ring-violet-500/50"
                                 >
-                                  <option value="" className="bg-navy-950 text-slate-500">—</option>
+                                  {c.key !== "tipo_ensayo" && (
+                                    <option value="" className="bg-navy-950 text-slate-500">—</option>
+                                  )}
                                   {options.map((o: string) => (
                                     <option key={o} value={o} className="bg-navy-950 text-slate-100">{o}</option>
                                   ))}
@@ -568,7 +590,7 @@ export default function PltEnsayosView({
 
             {computedRows.length === 0 && (
               <tr>
-                <td colSpan={COLS.length + 2} className="py-16 text-center text-slate-500 italic bg-navy-950 border-b border-navy-800 text-xs font-semibold select-none">
+                <td colSpan={visibleCols.length + 2} className="py-16 text-center text-slate-500 italic bg-navy-950 border-b border-navy-800 text-xs font-semibold select-none">
                   No se registran ensayos PLT para esta vista. Haz clic en "Nueva Fila" para crear uno.
                 </td>
               </tr>

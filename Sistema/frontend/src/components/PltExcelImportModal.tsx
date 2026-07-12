@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { X, FileSpreadsheet, Upload, AlertTriangle, Check, ArrowRight, Filter } from 'lucide-react';
-import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
+import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../utils/catalogData';
 import {
     PLT_COLUMN_DEFS as EXPECTED_FIELDS,
     getPltConstraints,
@@ -170,30 +170,17 @@ export default function PltExcelImportModal({
     };
 
     const resolveImportedLithology = (rowObj: any) => {
-        const code = String(rowObj.litologia_3 || "").trim().toUpperCase();
-        const l1 = String(rowObj.litologia_1 || "").trim().toUpperCase();
-        const l2 = String(rowObj.litologia_2 || "").trim().toUpperCase();
+        const cleanL1 = String(rowObj.litologia_1 || "").trim().toUpperCase();
+        const cleanL2 = String(rowObj.litologia_2 || "").trim().toUpperCase();
+        const cleanL3 = String(rowObj.litologia_3 || "").trim().toUpperCase();
+        const cleanM2022 = String(rowObj.model2022 || "").trim().toUpperCase();
 
-        let match = null;
-        if (code) {
-            match = LITHOLOGY_CLASSIFICATION.find(item => item.codigo.toUpperCase() === code);
-        }
-        if (!match && l1 && l2) {
-            match = LITHOLOGY_CLASSIFICATION.find(item => item.unidad.toUpperCase() === l1 && item.litologia.toUpperCase() === l2);
-        }
-        if (!match && l1) {
-            match = LITHOLOGY_CLASSIFICATION.find(item => item.unidad.toUpperCase() === l1);
-        }
-
-        if (match) {
-            rowObj.litologia_1 = match.unidad;
-            rowObj.litologia_2 = match.litologia;
-            rowObj.litologia_3 = match.codigo;
-            rowObj.tipo_litologico = match.grupo;
-            rowObj.factor_conversion_k = match.k;
-        } else {
-            rowObj.tipo_litologico = normalizeTipoLitologico(rowObj.tipo_litologico);
-        }
+        const res = resolveLithologyCascade(cleanL1, cleanL2, cleanL3, cleanM2022 || null);
+        rowObj.litologia_1 = res.lito1;
+        rowObj.litologia_2 = res.lito2;
+        rowObj.litologia_3 = res.lito3;
+        rowObj.tipo_litologico = res.clase;
+        rowObj.factor_conversion_k = res.k;
     };
 
     const runGrouping = (grid: any[][], headerRowIndex: number, currentMappings: Record<string, number>) => {
@@ -231,6 +218,7 @@ export default function PltExcelImportModal({
                 fecha_ensayo: parseDateStr(getVal(row, 'fecha_ensayo')),
                 sector_geotecnico: getStr(row, 'sector_geotecnico'),
                 ejecutado_por: getStr(row, 'ejecutado_por'),
+                tipo_ensayo: getStr(row, 'tipo_ensayo', 'i') || 'i',
                 zona_mapeo: getStr(row, 'zona_mapeo'),
                 nivel: Math.round(nivelVal * 100) / 100,
                 celda_mapeo: celdaMapeo,
@@ -239,6 +227,7 @@ export default function PltExcelImportModal({
                 litologia_1: getStr(row, 'litologia_1'),
                 litologia_2: getStr(row, 'litologia_2'),
                 litologia_3: getStr(row, 'litologia_3'),
+                model2022: getStr(row, 'model2022'),
                 tipo_litologico: getStr(row, 'tipo_litologico', 'INTRUSIVOS'),
                 este: getVal(row, 'este') !== null && getVal(row, 'este') !== "" ? Math.round(Math.abs(getNum(row, 'este')) * 10000) / 10000 : null,
                 norte: getVal(row, 'norte') !== null && getVal(row, 'norte') !== "" ? Math.round(Math.abs(getNum(row, 'norte')) * 1000) / 1000 : null,

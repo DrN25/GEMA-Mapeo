@@ -195,6 +195,7 @@ class EnsayoPLTIrregular(Base):
     direccion_rotura = Column(String(50), nullable=True)
     tipo_fractura = Column(String(50), nullable=True)
     factor_conversion_k = Column(Float, nullable=True)
+    tipo_ensayo = Column(String(50), nullable=True, default="i")
     observaciones = Column(String(1000), nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow, nullable=False)
     modificado_en = Column(DateTime, nullable=True, onupdate=datetime.utcnow)

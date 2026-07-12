@@ -115,6 +115,7 @@ class EnsayoPLTSaveSchema(BaseModel):
     direccion_rotura: Optional[str] = None
     tipo_fractura: Optional[str] = None
     factor_conversion_k: Optional[float] = None
+    tipo_ensayo: Optional[str] = "i"
     observaciones: Optional[str] = None
 
     class Config:

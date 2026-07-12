@@ -4,7 +4,8 @@ import {
     ALTERACION_CATALOG,
     FORMA_CATALOG,
     RUGOSIDAD_CATALOG,
-    LITHOLOGY_CLASSIFICATION
+    LITHOLOGY_CLASSIFICATION,
+    resolveLithologyCascade
 } from '../utils/catalogData';
 
 // 1. DICCIONARIO MAESTRO DE ETIQUETAS (SSOT ABSOLUTO)
@@ -97,7 +98,8 @@ export const COLUMN_LABELS: Record<string, string> = {
     fecha_ensayo: "Fecha de ensayo",
     sector_geotecnico: "Sector Geotécnico",
     ejecutado_por: "Ejecutado por",
-    zona_mapeo: "Zona de muestreo",
+    zona_mapeo: "ZONA",
+    tipo_ensayo: "Tipo de Ensayo",
     nivel: "Nivel",
     celda_mapeo: "Celda de mapeo",
     muestra: "Muestra",
@@ -293,18 +295,18 @@ export const ISRM_TABLE = [
 export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
     { key: "campana", label: COLUMN_LABELS.campana, type: "int", width: 80, group: 1, required: true, synonyms: ["campana", "campaña", "campana "] },
     { key: "fecha_ensayo", label: COLUMN_LABELS.fecha_ensayo, type: "date", width: 120, group: 1, required: true, synonyms: ["fecha de ensayo", "fechaensayo", "fecha_ensayo", "fecha"] },
-    { key: "sector_geotecnico", label: COLUMN_LABELS.sector_geotecnico, type: "text", width: 110, group: 1, synonyms: ["sector geotécnico", "sectorgeotecnico", "sector_geotecnico", "sector", "sectorgeot"] },
     { key: "ejecutado_por", label: COLUMN_LABELS.ejecutado_por, type: "text", width: 110, group: 1, required: true, synonyms: ["ejecutado por", "ejecutadopor", "ejecución de ensayo", "ejecucion de ensayo", "ejecutado"] },
+    { key: "tipo_ensayo", label: COLUMN_LABELS.tipo_ensayo, type: "select", width: 100, group: 1, required: true, options: ["i"], synonyms: ["tipo_ensayo", "tipo de ensayo", "tipo ensayo", "tipo"] },
 
-    { key: "zona_mapeo", label: COLUMN_LABELS.zona_mapeo, type: "text", width: 130, group: 2, required: true, synonyms: ["zona de muestreo", "zonademuestreo", "zona", "zona_mapeo", "zonamapeo", "identificación de muestra", "identificacion de muestra"] },
     { key: "nivel", label: COLUMN_LABELS.nivel, type: "decimal", width: 80, group: 2, required: true, synonyms: ["nivel"] },
     { key: "celda_mapeo", label: COLUMN_LABELS.celda_mapeo, type: "text", width: 110, group: 2, required: true, synonyms: ["celda de mapeo", "celdamapeo", "celda_mapeo", "celda"] },
     { key: "muestra", label: COLUMN_LABELS.muestra, type: "text", width: 80, group: 2, required: true, synonyms: ["muestra"] },
     { key: "codigo_muestra", label: COLUMN_LABELS.codigo_muestra, type: "text", width: 110, group: 2, computed: true },
     { key: "litologia_1", label: COLUMN_LABELS.litologia_1, type: "lito1", width: 90, group: 2, required: true, synonyms: ["litologia 1", "litología 1", "litologia_1", "lito1"] },
     { key: "litologia_2", label: COLUMN_LABELS.litologia_2, type: "lito2", width: 90, group: 2, synonyms: ["litologia 2", "litología 2", "litologia_2", "lito2"] },
-    { key: "litologia_3", label: COLUMN_LABELS.litologia_3, type: "lito3", width: 90, group: 2, synonyms: ["litologia 3", "litología 3", "litologia_3", "lito3", "litho 3 - modelo2022", "litho 3"] },
-    { key: "tipo_litologico", label: COLUMN_LABELS.tipo_litologico, type: "select", width: 130, group: 2, required: true, options: CAT_TIPO_LITOLOGICO, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litólico", "tipo litológico"] },
+    { key: "litologia_3", label: COLUMN_LABELS.litologia_3, type: "lito3", width: 90, group: 2, synonyms: ["litologia 3", "litología 3", "litologia_3", "lito3"] },
+    { key: "model2022", label: "Model2022", type: "text", width: 100, group: 2, hidden: true, synonyms: ["model2022", "modelo 2022", "modelo2022", "litho 3 - modelo2022"] },
+    { key: "tipo_litologico", label: COLUMN_LABELS.tipo_litologico, type: "text", width: 130, group: 2, required: true, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litólico", "tipo litológico"] },
 
     { key: "este", label: COLUMN_LABELS.este, type: "decimal", width: 100, group: 3, synonyms: ["este", "este (m)", "east", "este(m)"] },
     { key: "norte", label: COLUMN_LABELS.norte, type: "decimal", width: 110, group: 3, synonyms: ["norte", "norte (m)", "north", "norte(m)"] },
@@ -330,9 +332,11 @@ export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
     { key: "factor_conversion_k", label: COLUMN_LABELS.factor_conversion_k, type: "decimal", width: 80, group: 7, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
     { key: "ucs", label: COLUMN_LABELS.ucs, type: "decimal", width: 80, group: 7, computed: true },
     { key: "resistencia_isrm", label: COLUMN_LABELS.resistencia_isrm, type: "text", width: 90, group: 7, computed: true },
-    { key: "denominacion_isrm", label: COLUMN_LABELS.denominacion_isrm, type: "text", width: 220, group: 7, computed: true },
+    { key: "denominacion_isrm", label: COLUMN_LABELS.denominacion_isrm, type: "text", width: 220, group: 7, computed: true, hidden: true },
 
     { key: "observaciones", label: COLUMN_LABELS.observaciones, type: "text", width: 180, group: 8, synonyms: ["observaciones"] },
+    { key: "sector_geotecnico", label: COLUMN_LABELS.sector_geotecnico, type: "text", width: 110, group: 8, synonyms: ["sector geotécnico", "sectorgeotecnico", "sector_geotecnico", "sector", "sectorgeot"] },
+    { key: "zona_mapeo", label: COLUMN_LABELS.zona_mapeo, type: "text", width: 130, group: 8, required: true, synonyms: ["zona de muestreo", "zonademuestreo", "zona", "zona_mapeo", "zonamapeo", "identificación de muestra", "identificacion de muestra", "zona_mapeo ", "zona "] },
 ];
 
 export const GROUP_META: Record<number, { label: string; bg: string }> = {
@@ -385,14 +389,22 @@ export function applyPltFormulas(row: any) {
 
     r.muestra_valida_longitud = (L !== null && D !== null) ? (L >= D ? "SÍ" : "NO") : null;
     r.muestra_valida_ancho = (D !== null && W !== null) ? (D > 0.3 * W && D < W ? "SÍ" : "NO") : null;
-    r.diametro_equivalente = (D !== null && W !== null) ? Math.round(Math.sqrt(4 * D * W / Math.PI) * 100) / 100 : null;
-    r.f = (r.diametro_equivalente !== null) ? Math.round(Math.pow((r.diametro_equivalente * 10) / 50, 0.45) * 10000) / 10000 : null;
+    r.diametro_equivalente = (D !== null && W !== null) ? Math.round(Math.sqrt(4 * D * W / Math.PI) * 1000000) / 1000000 : null;
+    r.f = (r.diametro_equivalente !== null) ? Math.round(Math.pow((r.diametro_equivalente * 10) / 50, 0.45) * 1000000) / 1000000 : null;
 
     const P = num(r.fuerza_p);
     r.is_mpa = (P !== null && r.diametro_equivalente !== null && r.diametro_equivalente > 0)
-        ? Math.round((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2) * 10000) / 10000
+        ? Math.round((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2) * 1000000) / 1000000
         : null;
-    r.is_50 = (r.is_mpa !== null && r.f !== null) ? Math.round(r.is_mpa * r.f * 10000) / 10000 : null;
+
+    // Conforme a temp.md: SI (Muestra válida - ancho == "SI") ENTONCES (F * Is) SINO NULL
+    r.is_50 = (r.muestra_valida_ancho === "SÍ" && r.is_mpa !== null && r.f !== null)
+        ? Math.round(r.is_mpa * r.f * 1000000) / 1000000
+        : null;
+
+    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, null);
+    r.factor_conversion_k = res.k;
+    r.tipo_litologico = res.clase;
 
     const K = num(r.factor_conversion_k);
     r.ucs = (r.is_50 !== null && K !== null) ? Math.round(r.is_50 * K * 100) / 100 : null;
@@ -410,9 +422,6 @@ export function applyLitoCascade(key: string, val: any, row: any) {
     if (key === "litologia_1") {
         r.litologia_2 = "";
         r.litologia_3 = "";
-        r.factor_conversion_k = null;
-        r.tipo_litologico = "";
-
         if (val) {
             const matches = LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === val);
             if (matches.length > 0) {
@@ -423,21 +432,12 @@ export function applyLitoCascade(key: string, val: any, row: any) {
                     const uniqueL3 = Array.from(new Set(matchesL2.map(m => m.codigo)));
                     if (uniqueL3.length === 1) {
                         r.litologia_3 = uniqueL3[0];
-                        r.factor_conversion_k = matchesL2[0].k;
                     }
-                }
-                const uniqueGroups = Array.from(new Set(matches.map(m => m.grupo)));
-                if (uniqueGroups.length === 1) {
-                    r.tipo_litologico = uniqueGroups[0];
                 }
             }
         }
-    }
-
-    else if (key === "litologia_2") {
+    } else if (key === "litologia_2") {
         r.litologia_3 = "";
-        r.factor_conversion_k = null;
-
         if (val) {
             const matches = LITHOLOGY_CLASSIFICATION.filter(
                 item => item.unidad === r.litologia_1 && item.litologia === val
@@ -446,33 +446,14 @@ export function applyLitoCascade(key: string, val: any, row: any) {
                 const uniqueL3 = Array.from(new Set(matches.map(m => m.codigo)));
                 if (uniqueL3.length === 1) {
                     r.litologia_3 = uniqueL3[0];
-                    r.factor_conversion_k = matches[0].k;
-                }
-                const uniqueGroups = Array.from(new Set(matches.map(m => m.grupo)));
-                if (uniqueGroups.length === 1) {
-                    r.tipo_litologico = uniqueGroups[0];
                 }
             }
         }
     }
 
-    else if (key === "litologia_3") {
-        if (val) {
-            const match = LITHOLOGY_CLASSIFICATION.find(
-                item => item.unidad === r.litologia_1 && item.litologia === r.litologia_2 && item.codigo === val
-            ) || LITHOLOGY_CLASSIFICATION.find(item => item.codigo === val);
-
-            if (match) {
-                r.litologia_1 = match.unidad;
-                r.litologia_2 = match.litologia;
-                r.litologia_3 = match.codigo;
-                r.tipo_litologico = match.grupo;
-                r.factor_conversion_k = match.k;
-            }
-        } else {
-            r.factor_conversion_k = null;
-        }
-    }
+    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, null);
+    r.factor_conversion_k = res.k;
+    r.tipo_litologico = res.clase;
 
     return r;
 }

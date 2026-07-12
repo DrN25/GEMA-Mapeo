@@ -10,7 +10,9 @@ import {
   ALTERACION_CATALOG,
   FORMA_CATALOG,
   RUGOSIDAD_CATALOG,
-  LITHOLOGY_CLASSIFICATION
+  LITHOLOGY_CLASSIFICATION,
+  LITO_COLORES_DATA,
+  LITO_VALIDACION_DATA
 } from '../utils/catalogData';
 
 // --- DATASETS OFICIALES UNIFICADOS Y REVISADOS CON LLAVES ALINEADAS ---
@@ -64,6 +66,46 @@ const ESPACIAMIENTO_DATA_LIST = [
   { r89_range: "600 - 2000 mm", r89_rating: 15, r76_range: "1000 - 3000 mm", r76_rating: 25 },
   { r89_range: "> 2000 mm", r89_rating: 20, r76_range: "> 3000 mm", r76_rating: 30 }
 ];
+
+const getGroupBadge = (grupo: string) => {
+  const g = String(grupo).toUpperCase();
+  if (g.includes("INTRUSIVO")) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-violet-500/10 border border-violet-500/30 text-violet-300">
+        INTRUSIVOS
+      </span>
+    );
+  }
+  if (g.includes("SEDIMENTARIA") || g.includes("SEDIMENTARIO")) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-500/10 border border-sky-500/30 text-sky-300">
+        SEDIMENTARIAS
+      </span>
+    );
+  }
+  if (g.includes("METAMORFICA") || g.includes("METAMORFICO")) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+        METAMÓRFICAS
+      </span>
+    );
+  }
+  if (g.includes("BRECHA")) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/10 border border-rose-500/30 text-rose-300">
+        BRECHAS
+      </span>
+    );
+  }
+  if (g.includes("ENDOSKARN")) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/10 border border-amber-500/30 text-amber-300">
+        ENDOSKARN
+      </span>
+    );
+  }
+  return <span className="text-slate-400 font-bold">{grupo}</span>;
+};
 
 export default function CatalogsView() {
   const [activeTab, setActiveTab] = useState<string>('litologia');
@@ -144,34 +186,88 @@ export default function CatalogsView() {
 
         {/* 1. LITOLOGÍAS */}
         {activeTab === 'litologia' && (
-          <div className="space-y-3">
-            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Layers size={14} className="text-orange-500" />
-              <span>Tabla de Correlación de Litologías y Factores K (PLT)</span>
-            </h3>
-            <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[50vh]">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-2.5 px-4">Clase / Grupo</th>
-                    <th className="py-2.5 px-4">Litología 1 (Lito 1)</th>
-                    <th className="py-2.5 px-4">Litología 2 (Lito 2)</th>
-                    <th className="py-2.5 px-4">Litología 3 (Lito 3)</th>
-                    <th className="py-2.5 px-4 text-center text-cyan-400">Factor K</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {LITHOLOGY_CLASSIFICATION.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-bold text-slate-400">{item.grupo}</td>
-                      <td className="py-2.5 px-4 text-slate-300 font-semibold">{item.unidad}</td>
-                      <td className="py-2.5 px-4 text-slate-300">{item.litologia}</td>
-                      <td className="py-2.5 px-4 text-slate-300">{item.codigo}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
+          <div className="space-y-6">
+            {/* TABLA 1 */}
+            <div className="space-y-3">
+              <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+                <Layers size={14} className="text-orange-500 animate-pulse" />
+                <span>Tabla de Correlación Litológica y Factores K (Esquema de Reporte)</span>
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
+                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-2.5 px-4">Clase / Grupo</th>
+                      <th className="py-2.5 px-4">Litología 1 (Lito 1)</th>
+                      <th className="py-2.5 px-4">Litología 2 (Lito 2)</th>
+                      <th className="py-2.5 px-4">Litología 3 (Lito 3)</th>
+                      <th className="py-2.5 px-4 text-center text-cyan-400">Factor K</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                    {LITO_COLORES_DATA.map((item, idx) => {
+                      const lito2Up = item.lito2.toUpperCase();
+                      let grupo = "INTRUSIVOS";
+                      if (["GSK", "PSK", "MSK", "ESK", "MBC", "MBL"].includes(lito2Up)) {
+                        grupo = "METAMORFICAS";
+                      } else {
+                        const l1 = item.lito1.toUpperCase();
+                        if (["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"].includes(l1)) {
+                          grupo = "INTRUSIVOS";
+                        } else if (["LMT", "SHL", "SND"].includes(l1)) {
+                          grupo = "SEDIMENTARIAS";
+                        } else if (l1 === "INTRUSIVO") {
+                          grupo = "ENDOSKARN";
+                        } else if (["TBX", "HBX", "MBX / VARIOS", "BX"].includes(l1)) {
+                          grupo = "BRECHAS";
+                        }
+                      }
+                      
+                      return (
+                        <tr key={idx} className="hover:bg-navy-900/20">
+                          <td className="py-2 px-4">{getGroupBadge(grupo)}</td>
+                          <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito1}</td>
+                          <td className="py-2 px-4 text-slate-300">{item.lito2}</td>
+                          <td className="py-2 px-4 text-slate-300">{item.lito3}</td>
+                          <td className="py-2 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* TABLA 2 */}
+            <div className="space-y-3">
+              <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+                <Layers size={14} className="text-violet-500 animate-pulse" />
+                <span>Tabla de Validación y Reglas de Escape del Factor K (Base de Datos)</span>
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
+                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-2.5 px-4">Unidad Geotécnica</th>
+                      <th className="py-2.5 px-4">Lito 2</th>
+                      <th className="py-2.5 px-4">Lito 3</th>
+                      <th className="py-2.5 px-4">Validación Lito</th>
+                      <th className="py-2.5 px-4 text-center text-cyan-400">Factor K (K)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                    {LITO_VALIDACION_DATA.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-navy-900/20">
+                        <td className="py-2 px-4">{getGroupBadge(item.grupo)}</td>
+                        <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito2}</td>
+                        <td className="py-2 px-4 text-slate-300">{item.lito3}</td>
+                        <td className="py-2 px-4 text-slate-400 font-mono text-[11px]">{item.validacion}</td>
+                        <td className="py-2 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
