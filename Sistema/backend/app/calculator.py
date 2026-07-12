@@ -37,9 +37,9 @@ def get_continuidad_rating(cont):
         return {"r89": 0, "r76": 0}
 
 def get_relleno_comb_code(tipo_code, espesor):
-    if not tipo_code or tipo_code == "-1":
+    if tipo_code is None or tipo_code == "":
         return None
-    r_type = RELLENO_TIPO.get(tipo_code)
+    r_type = RELLENO_TIPO.get(str(tipo_code).strip().lower())
     if not r_type:
         return None
     if r_type == 3:

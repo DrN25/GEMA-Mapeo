@@ -99,24 +99,14 @@ export interface RellenoItem {
 
 // Normalización estricta de claves en minúsculas para compatibilidad absoluta con Excel
 export const RELLENO_CATALOG: Record<string, RellenoItem> = {
-  ca: { name: "Calcita (ca)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  sand: { name: "Arena (sand)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  ch: { name: "Clorita (ch)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  cl: { name: "Arcilla (cl)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  gy: { name: "Yeso (gy)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  rxf: { name: "Roca triturada (rxf)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  fbx: { name: "Brecha de falla (fbx)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  gou: { name: "Panizo (gou)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  "-1": { name: "Sin relleno (-1)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
+  si: { name: "Sílice (si)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  sf: { name: "Sulfuros (sf)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  ep: { name: "Epidota (ep)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  ox: { name: "Óxidos (ox)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   g: { name: "Panizo (g)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  pat: { name: "Patinas (pat)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  sio: { name: "Silicatos (sio)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  si: { name: "Silicatos (si)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  qz: { name: "Cuarzo (qz)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  su: { name: "Sulfuros (su)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  sf: { name: "Sulfuros (sf)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  ox: { name: "Óxidos (ox)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  ep: { name: "Epidota (ep)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 2, rmr89_gt5: 2 },
-  cwf: { name: "Limpia, sin relleno (cwf)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 }
+  cl: { name: "Arcilla (cl)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ca: { name: "Calcita (ca)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 }
 };
 
 export const ALTERACION_CATALOG: Record<string, { name: string; r76: number; r89: number }> = {

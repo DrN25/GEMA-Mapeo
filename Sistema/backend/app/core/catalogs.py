@@ -54,7 +54,7 @@ RUGOSIDAD_RATING_CATALOG = {
 
 # 5. CONSTANTES DE RELLENO (Unificado de calculator.py)
 RELLENO_TIPO = {
-    "cwf": 3,
+    "-1": 3,
     "si": 1,
     "sf": 1,
     "ep": 1,
@@ -108,7 +108,7 @@ ESPACIAMIENTO_R76_CATALOG = [
 TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'F', 'JN', 'SZ', '-1']
     
 # 11. TABLA TIPO DE RELLENO ACTUALIZADA CON NOMBRES REALES DE EXCEL
-TIPO_RELLENO_CATALOG = ['ca', 'sand', 'ch', 'cl', 'gy', 'rxf', 'fbx', 'gou', 'g', 'pat', 'sio', 'si', 'qz', 'su', 'sf', 'ox', 'ep', 'c', '-1']
+TIPO_RELLENO_CATALOG = ['cwf', 'si', 'sf', 'ep', 'ox', 'g', 'cl', 'ca', '-1']
 
 # 12. TABLA PERFILES DE RUGOSIDAD TIPICOS (ISRM, 1989)
 RUGOSIDAD_CATALOG = [1, 2, 3, 4, 5, 6, 7, 8, 9]

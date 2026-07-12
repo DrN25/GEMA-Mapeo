@@ -139,10 +139,10 @@ export function getAberturaRating(val: number | undefined | null): { r76: number
 }
 
 export function getFillingRatingSingle(rellenoCode: string | undefined | null, thicknessMm: number | undefined | null): { r76: number | null; r89: number | null } {
-  if (!rellenoCode || rellenoCode === '-1') return { r76: null, r89: null };
+  if (!rellenoCode) return { r76: null, r89: null };
 
   const cleanCode = String(rellenoCode).trim().toLowerCase();
-  const item = RELLENO_CATALOG[cleanCode] || RELLENO_CATALOG['cwf'];
+  const item = RELLENO_CATALOG[cleanCode] || RELLENO_CATALOG['-1'];
 
   if (item.clase === 3 || thicknessMm === 0 || thicknessMm === undefined || thicknessMm === null || thicknessMm === -1) {
     return { r76: item.rmr76, r89: item.rmr89 };
@@ -245,8 +245,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     const alt76 = altItem ? altItem.r76 : null;
     const alt89 = altItem ? altItem.r89 : null;
 
-    const hasR1 = j.relleno1 && j.relleno1 !== '-1';
-    const hasR2 = j.relleno2 && j.relleno2 !== '-1';
+    const hasR1 = !!j.relleno1;
+    const hasR2 = !!j.relleno2;
 
     const rel1_ratings = hasR1 ? getFillingRatingSingle(j.relleno1, j.espesor) : null;
     const rel2_ratings = hasR2 ? getFillingRatingSingle(j.relleno2, j.espesor) : null;

@@ -57,6 +57,22 @@ cd ..
 echo OK: Dependencias instaladas y listas.
 echo.
 
+:: Restaurar .env si existiera un respaldo (por apagado sucio de compartir_proyecto)
+if exist frontend\.env.backup (
+    echo Restaurando archivo .env de respaldo local...
+    copy /y frontend\.env.backup frontend\.env >nul
+    del /f /q frontend\.env.backup >nul
+) else (
+    if exist frontend\.env (
+        findstr /i "trycloudflare" frontend\.env >nul 2>nul
+        if %errorlevel% equ 0 (
+            echo Limpiando URL de tunel anterior en .env...
+            echo VITE_API_BASE=> frontend\.env
+            echo VITE_PROXY_TARGET=http://127.0.0.1:8001>> frontend\.env
+        )
+    )
+)
+
 :: 3. Liberar puertos 5174 y 8001 si estuvieran en uso
 echo [3/3] Liberando puertos 5174 y 8001 e iniciando servidores...
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do taskkill /f /pid %%a >nul 2>&1

@@ -350,13 +350,13 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
                 registrar_error("TIPO", tipo_junta, "ERR_TIPO_ESTRUCTURA_INVALIDO", value=tipo_junta, allowed_types=TIPO_ESTRUCTURA_CATALOG)
 
     # 2. Rellenos de junta (Opcionales)
-    rel1 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 1"), str)
+    rel1 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 1"), str, allow_negative=True)
     if rel1 is not None:
         rel1_clean = rel1.strip().lower()
         if rel1_clean not in TIPO_RELLENO_CATALOG:
             registrar_error("TIPO DE  RELLENO 1", rel1, "ERR_RELLENO_1_INVALIDO", value=rel1, allowed_fill_types=TIPO_RELLENO_CATALOG)
         
-    rel2 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 2"), str)
+    rel2 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 2"), str, allow_negative=True)
     if rel2 is not None:
         rel2_clean = rel2.strip().lower()
         if rel2_clean not in TIPO_RELLENO_CATALOG:
