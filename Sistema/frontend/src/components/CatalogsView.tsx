@@ -26,13 +26,13 @@ const AGUA_DATA = [
 ];
 
 const RESISTENCIA_DATA = [
-  { codigo: "R6", rango: "> 250", r76: 15, r89: 15, denom: "Extremadamente resistente" },
-  { codigo: "R5", rango: "100 - 250", r76: 12, r89: 12, denom: "Muy resistente" },
-  { codigo: "R4", rango: "50 - 100", r76: 7, r89: 7, denom: "Resistente" },
-  { codigo: "R3", rango: "25 - 50", r76: 4, r89: 4, denom: "Moderadamente resistente" },
-  { codigo: "R2", rango: "5 - 25", r76: 2, r89: 2, denom: "Débil" },
-  { codigo: "R1", rango: "1 - 5", r76: 1, r89: 1, denom: "Muy débil" },
-  { codigo: "R0", rango: "< 1", r76: 0, r89: 0, denom: "Extremadamente débil" }
+  { codigo: "R6", rango: "> 250", r76: 15, r89: "12.0 - 15.0", denom: "Extremadamente resistente" },
+  { codigo: "R5", rango: "100 - 250", r76: 12, r89: "9.5 - 12.0", denom: "Muy resistente" },
+  { codigo: "R4", rango: "50 - 100", r76: 7, r89: "5.5 - 9.5", denom: "Resistente" },
+  { codigo: "R3", rango: "25 - 50", r76: 4, r89: "3.8 - 5.5", denom: "Moderadamente resistente" },
+  { codigo: "R2", rango: "5 - 25", r76: 2, r89: "1.5 - 3.8", denom: "Débil" },
+  { codigo: "R1", rango: "1 - 5", r76: 1, r89: "1.5", denom: "Muy débil" },
+  { codigo: "R0", rango: "< 1", r76: 0, r89: "0.0", denom: "Extremadamente débil" }
 ];
 
 const CONTROL_ESTRUCTURAL_DATA = [
@@ -52,11 +52,11 @@ const EFECTOS_VOLADURA_DATA = [
 ];
 
 const RQD_DATA_LIST = [
-  { rango: "< 25 %", r76: 3, r89: 3, calidad: "Muy Mala" },
-  { rango: "25 - 50 %", r76: 8, r89: 8, calidad: "Mala" },
-  { rango: "50 - 75 %", r76: 13, r89: 13, calidad: "Regular" },
-  { rango: "75 - 90 %", r76: 17, r89: 17, calidad: "Buena" },
-  { rango: "90 - 100 %", r76: 20, r89: 20, calidad: "Excelente" }
+  { rango: "< 25 %", r76: 3, r89: "3.0 - 5.8", calidad: "Muy Mala" },
+  { rango: "25 - 50 %", r76: 8, r89: "5.8 - 10.0", calidad: "Mala" },
+  { rango: "50 - 75 %", r76: 13, r89: "10.0 - 15.0", calidad: "Regular" },
+  { rango: "75 - 90 %", r76: 17, r89: "15.0 - 18.0", calidad: "Buena" },
+  { rango: "90 - 100 %", r76: 20, r89: "18.0 - 20.0", calidad: "Excelente" }
 ];
 
 const ESPACIAMIENTO_DATA_LIST = [

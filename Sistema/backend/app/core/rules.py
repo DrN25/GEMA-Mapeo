@@ -75,6 +75,11 @@ CATEGORIES_REGISTRY = {
         "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.", 
         "ALERTA"
     ),
+    "CAT_RQD_INCONGRUENTE": RuleCategory(
+        "CAT_RQD_INCONGRUENTE", 
+        "Rating de RQD '76 / '89 es incongruente con el porcentaje.", 
+        "ALERTA"
+    ),
     "CAT_ESPACIAMIENTO_PROMEDIO_CERO": RuleCategory(
         "CAT_ESPACIAMIENTO_PROMEDIO_CERO", 
         "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero).", 
@@ -343,13 +348,13 @@ RULES_REGISTRY = {
         "ERR_RESISTENCIA_76_INCONGRUENTE",
         "CAT_RESISTENCIA_INCONGRUENTE",
         ["RESISTENCIA ESTIMADA VALOR  '76", "DUREZA  '76"],
-        "Resistencia '76 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Se esperaba {expected} (Tolerancia ±0.5)."
+        "Resistencia '76 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Se esperaba {expected} (Tolerancia ±0.2)."
     ),
     "ERR_RESISTENCIA_89_INCONGRUENTE": ErrorRule(
         "ERR_RESISTENCIA_89_INCONGRUENTE",
         "CAT_RESISTENCIA_INCONGRUENTE",
         ["RESISTENCIA ESTIMADA VALOR '89", "DUREZA '89"],
-        "Resistencia '89 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Se esperaba {expected} (Tolerancia ±0.5)."
+        "Resistencia '89 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Rango de rating esperado: {expected} (Tolerancia ±0.2)."
     ),
     "WRN_RESISTENCIA_76_VALOR_ALEJADO": ErrorRule(
         "WRN_RESISTENCIA_76_VALOR_ALEJADO",
@@ -361,7 +366,7 @@ RULES_REGISTRY = {
         "WRN_RESISTENCIA_89_VALOR_ALEJADO",
         "CAT_RESISTENCIA_VALOR_ALEJADO",
         ["RESISTENCIA ESTIMADA VALOR '89"],
-        "Puntaje de resistencia '89 es un valor alejado no válido. Valor ingresado: {value}. Valores discretos estándar: [0, 1, 2, 4, 7, 12, 15]."
+        "El rating de Resistencia '89 ingresado ({value}) está fuera de los límites del catálogo. Rangos válidos: R0 (0.0), R1 (1.5) o R2-R6 (1.5 a 15.0)."
     ),
 
     # CONTROL ESTRUCTURAL
@@ -415,7 +420,7 @@ RULES_REGISTRY = {
         "WRN_RQD_VAL_89_VALOR_ALEJADO",
         "CAT_RQD_VAL_VALOR_ALEJADO",
         ["RQD - VALOR '89"],
-        "Puntaje de RQD '89 es un valor alejado no válido. Valor ingresado: {value}. Valores de catálogo esperados: [3, 8, 13, 17, 20]."
+        "Rating de RQD '89 fuera del límite real [3.0, 20.0]. Valor ingresado: {value}."
     ),
     "ERR_RQD_76_SUPERIOR_100": ErrorRule(
         "ERR_RQD_76_SUPERIOR_100",
@@ -428,6 +433,18 @@ RULES_REGISTRY = {
         "CAT_RQD_SUPERIOR_100",
         ["RQD '89"],
         "Porcentaje de RQD '89 no puede ser superior al 100%. Porcentaje actual: {value}%."
+    ),
+    "ERR_RQD_76_INCONGRUENTE": ErrorRule(
+        "ERR_RQD_76_INCONGRUENTE",
+        "CAT_RQD_INCONGRUENTE",
+        ["RQD - VALOR  '76", "RQD  '76"],
+        "Rating de RQD '76 es incongruente con el porcentaje. Valor ingresado: {value}, Porcentaje: {pct}%. Se esperaba {expected} (Tolerancia ±0.2)."
+    ),
+    "ERR_RQD_89_INCONGRUENTE": ErrorRule(
+        "ERR_RQD_89_INCONGRUENTE",
+        "CAT_RQD_INCONGRUENTE",
+        ["RQD - VALOR '89", "RQD '89"],
+        "Rating de RQD '89 es incongruente con el porcentaje. Valor ingresado: {value}, Porcentaje: {pct}%. Rango esperado: {expected} (Tolerancia ±0.2)."
     ),
 
     # ESPACIAMIENTO

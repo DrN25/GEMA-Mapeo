@@ -1,3 +1,4 @@
+import { calculateWindowGeomec } from './rmrCalculator';
 import type { JointRow, WindowHeader } from './rmrCalculator';
 
 export interface ValidationAlert {
@@ -224,6 +225,23 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
         });
       }
     }
+  }
+
+  // --- VALIDACIONES DE RMR NO NULO ---
+  const rmrResult = calculateWindowGeomec(header, joints);
+  if (rmrResult.rmr_76 === 0) {
+    alerts.push({
+      fieldId: "header-resistencia_ucs",
+      type: "ERROR",
+      message: "Inconsistencia crítica: El RMR calculado RMR '76 es de 0.0 (no puede ser cero)."
+    });
+  }
+  if (rmrResult.rmr_89 === 0) {
+    alerts.push({
+      fieldId: "header-resistencia_ucs",
+      type: "ERROR",
+      message: "Inconsistencia crítica: El RMR calculado RMR '89 es de 0.0 (no puede ser cero)."
+    });
   }
 
   return alerts;

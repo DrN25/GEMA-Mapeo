@@ -55,13 +55,17 @@ RUGOSIDAD_RATING_CATALOG = {
 # 5. CONSTANTES DE RELLENO (Unificado de calculator.py)
 RELLENO_TIPO = {
     "-1": 3,
+    "cwf": 3,
     "si": 1,
     "sf": 1,
     "ep": 1,
     "ox": 1,
+    "qz": 1,
     "g": 2,
     "cl": 2,
     "ca": 2,
+    "ys": 2,
+    "ch": 2,
 }
 
 RELLENO_VALORES = {
@@ -105,10 +109,10 @@ ESPACIAMIENTO_R76_CATALOG = [
 ]
 
 # 10. TABLA TIPO DE ESTRUCTURA
-TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'F', 'JN', 'SZ', '-1']
+TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'F', 'JN', 'SZ', 'DQ', '-1']
     
 # 11. TABLA TIPO DE RELLENO ACTUALIZADA CON NOMBRES REALES DE EXCEL
-TIPO_RELLENO_CATALOG = ['cwf', 'si', 'sf', 'ep', 'ox', 'g', 'cl', 'ca', '-1']
+TIPO_RELLENO_CATALOG = ['cwf', 'si', 'sf', 'ep', 'ox', 'qz', 'g', 'cl', 'ca', 'ys', 'ch', '-1']
 
 # 12. TABLA PERFILES DE RUGOSIDAD TIPICOS (ISRM, 1989)
 RUGOSIDAD_CATALOG = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -121,6 +125,7 @@ ALTERACION_CATALOG = ['f', 'd', 'm', 'a', 'c', 's', '-1']
 
 # 15. TABLA LITOLOGÍAS Y FACTOR K
 LITHOLOGY_CLASSIFICATION = [
+    # INTRUSIVOS
     {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_EQ", "k": 8.29},
     {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_P", "k": 8.53},
     {"grupo": "INTRUSIVOS", "lito1": "MBF1", "lito2": "MBF", "lito3": "MBF1", "k": 9.20},
@@ -132,24 +137,60 @@ LITHOLOGY_CLASSIFICATION = [
     {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "MZH_2", "k": 9.31},
     {"grupo": "INTRUSIVOS", "lito1": "MZD", "lito2": "MZD", "lito3": "MZD", "k": 7.60},
     {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "MZQ", "k": 12.29},
-    {"grupo": "INTRUSIVOS", "lito1": "AN", "lito2": "AN", "lito3": "LAM", "k": 9.31},
-    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_M", "k": 14.74},
-    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_Mg", "k": 14.25},
-    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_S", "k": 14.84},
-    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_C", "k": 16.83},
-    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_U", "k": 14.84},
-    {"grupo": "SEDIMENTARIOS", "lito1": "SHL", "lito2": "HFL", "lito3": "SHL_MA", "k": 14.84},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "Varios", "k": 11.15},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "Varios", "k": 12.63},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "Varios", "k": 12.63},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "Varios", "k": 12.63},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "Varios", "k": 11.78},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "Varios", "k": 13.34},
-    {"grupo": "METAMORFICAS", "lito1": "SHL", "lito2": "HFL", "lito3": "-", "k": 12.63},
-    {"grupo": "METAMORFICAS", "lito1": "SND", "lito2": "QZT", "lito3": "-", "k": 12.63},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF1", "lito2": "MBF", "lito3": "NR", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF2", "lito2": "MBF", "lito3": "NR", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM", "lito2": "MZM", "lito3": "NR", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "NR", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "NR", "k": 9.31},
+    # ENDOSKARN
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "MZM_M", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "MZB_EQ", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "-", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "MZB_EQ", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "MZM_M", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "MZD", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "-", "k": 9.87},
+    # BRECHAS
     {"grupo": "BRECHAS", "lito1": "TBX", "lito2": "TBX", "lito3": "TBX", "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "BX", "lito2": "TBX", "lito3": "TBX", "k": 13.72},
     {"grupo": "BRECHAS", "lito1": "HBX", "lito2": "HBX", "lito3": "HBX", "k": 11.41},
     {"grupo": "BRECHAS", "lito1": "MBX / varios", "lito2": "MBX", "lito3": "MBX", "k": 11.41},
-    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "-", "k": 9.87},
-    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "-", "k": 9.87}
+    # SEDIMENTARIAS
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "NR", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_M", "k": 14.74},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_MG", "k": 14.25},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_S", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_C", "k": 16.83},
+    {"grupo": "SEDIMENTARIOS", "lito1": "SHL", "lito2": "HFL", "lito3": "SHL_MA", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "OVD", "lito3": "OVD", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "OVD", "lito3": "-", "k": 14.84},
+    # METAMORFICAS
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_M", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_C", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_S", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_U", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "Varios", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_C", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_S", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_U", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_S", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_M", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_C", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_S", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_M", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_MG", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_S", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "Varios", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_MG", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_S", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_M", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_C", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "Varios", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "SHL", "lito2": "HFL", "lito3": "-", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "SND", "lito2": "QZT", "lito3": "-", "k": 12.63}
 ]

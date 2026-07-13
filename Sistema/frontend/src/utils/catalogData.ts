@@ -84,7 +84,8 @@ export const STRUCTURE_CATALOG: Record<string, string> = {
   BED: "Estratos (BED)",
   F: "Falla (F)",
   SZ: "Zona de Cizalla (SZ)",
-  CON: "Contacto (CON)"
+  CON: "Contacto (CON)",
+  DQ: "Dique (DQ)"
 };
 
 export interface RellenoItem {
@@ -100,13 +101,17 @@ export interface RellenoItem {
 // Normalización estricta de claves en minúsculas para compatibilidad absoluta con Excel
 export const RELLENO_CATALOG: Record<string, RellenoItem> = {
   "-1": { name: "Sin relleno (-1)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
+  cwf: { name: "Limpio sin relleno (cwf)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
   si: { name: "Sílice (si)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   sf: { name: "Sulfuros (sf)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   ep: { name: "Epidota (ep)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   ox: { name: "Óxidos (ox)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  qz: { name: "Cuarzo (qz)", clase: 2, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   g: { name: "Panizo (g)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
   cl: { name: "Arcilla (cl)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  ca: { name: "Calcita (ca)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 }
+  ca: { name: "Calcita (ca)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ys: { name: "Yeso (ys)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ch: { name: "Clorita (ch)", clase: 1, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 }
 };
 
 export const ALTERACION_CATALOG: Record<string, { name: string; r76: number; r89: number }> = {
@@ -326,17 +331,25 @@ export function resolveLithologyCascade(
 export function lookupPltKOnly(lito2: string, lito3: string): number | null {
   const l2 = String(lito2 || "").trim().toUpperCase();
   const l3 = String(lito3 || "").trim().toUpperCase();
+  const normL3 = (l3 === "-" || l3 === "NR" || !l3) ? "NR" : l3;
 
-  // Exacto
-  const exact = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === l2 && item.codigo.toUpperCase() === l3);
+  // Exacto (con normalización de - y NR)
+  const exact = LITHOLOGY_CLASSIFICATION.find(item => {
+    const itemL3 = item.codigo.toUpperCase();
+    const normItemL3 = (itemL3 === "-" || itemL3 === "NR" || !itemL3) ? "NR" : itemL3;
+    return item.litologia.toUpperCase() === l2 && normItemL3 === normL3;
+  });
   if (exact) return exact.k;
 
   // Varios
   const varios = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === l2 && item.codigo.toUpperCase() === "VARIOS");
   if (varios) return varios.k;
 
-  // NR
-  const nr = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === l2 && item.codigo.toUpperCase() === "NR");
+  // NR / - fallback
+  const nr = LITHOLOGY_CLASSIFICATION.find(item => {
+    const itemL3 = item.codigo.toUpperCase();
+    return item.litologia.toUpperCase() === l2 && (itemL3 === "NR" || itemL3 === "-" || !itemL3);
+  });
   if (nr) return nr.k;
 
   return null;

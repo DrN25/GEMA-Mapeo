@@ -113,6 +113,7 @@ def get_rqd_rating(rqd_pct):
         r89 = (-0.000006 * (rqd_pct ** 3)) + (0.0015 * (rqd_pct ** 2)) + (0.0806 * rqd_pct) + 3.0282
     else:
         r89 = 0
+        
     return {"r89": r89, "r76": r76}
 
 def acot(val: float) -> float:
