@@ -4,6 +4,7 @@ import json
 import math
 import time
 from datetime import datetime
+from collections import defaultdict
 import pandas as pd
 import numpy as np
 
@@ -15,6 +16,30 @@ from app.core.catalogs import (
     RUGOSIDAD_CATALOG, FORMA_ESTRUCTURA_CATALOG, ALTERACION_CATALOG,
     LITHOLOGY_CLASSIFICATION
 )
+from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
+
+# --- Constantes pre-computadas a nivel de módulo para máximo rendimiento ---
+_MAPEO_ESTRUCTURAL_COLS = {
+    "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP DIR_TALUD", "INTEMPERISMO",
+    "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", "DUREZA  '76",
+    "RESISTENCIA ESTIMADA VALOR  '76", "GSI VISUAL  '76", "CONTROL ESTRUCTURAL  '76",
+    "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", "RQD  '76",
+    "FRECUENCIA DE FRACTURAMIENTO x m.  '76", "TAMAÑO DE BLOQUES  x m3  '76",
+    "ESPACIAMIENTO PROMEDIO   '76", "ESPACIAMIENTO - VALOR    '76",
+    "CONDICIÓN DE DISCONTINUIDAD - VALOR     '76", "RMR '76", "( UCS )  (Mpa)", "is50 (Mpa)",
+    "CONDICION DE AGUA  '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89",
+    "RESISTENCIA ESTIMADA VALOR '89", "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89",
+    "EFECTOS DE VOLADURA '89", "RQD - VALOR '89", "RQD '89",
+    "FRECUENCIA DE FRACTURAMIENTO x m. '89", "TAMAÑO DE BLOQUES  x m3 '89",
+    "ESPACIAMIENTO PROMEDIO '89", "ESPACIAMIENTO - VALOR '89",
+    "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89", "FECHA", "COMENTARIO GEOTECNICO",
+    "Nivel", "Lito 1", "Lito 2", "Lito 3", "Unidad Litologica"
+}
+
+def _norm_col(c: str) -> str:
+    return "".join(c.upper().split()).replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
+
+_MAPEO_ESTRUCTURAL_NORM = frozenset(_norm_col(x) for x in _MAPEO_ESTRUCTURAL_COLS)
 
 def clean_and_rename_columns(df):
     cols = []
@@ -651,40 +676,6 @@ def validate_bulk_excel(file_path, output_json_path):
 
     records = df.to_dict(orient='records')
     
-    # Agrupar los índices de las filas por CELDA_PADRE para analizar el bloque completo de la estación
-    from collections import defaultdict
-    estacion_records = defaultdict(list)
-    for idx, row_dict in enumerate(records):
-        celda_padre = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
-        if celda_padre:
-            estacion_records[celda_padre].append((idx, row_dict))
-
-    # Determinar para cada estación y cada columna si cumple el patrón de "repetido por omisión"
-    station_col_status = defaultdict(dict)
-    for celda_padre, rows in estacion_records.items():
-        if not rows:
-            continue
-        # El primer registro es el padre
-        parent_idx, parent_row = rows[0]
-        daughter_rows = rows[1:]
-        
-        for col_key in df.columns:
-            if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2', 'CELDA_PADRE']:
-                continue
-                
-            parent_val = sanitize_value(parent_row.get(col_key), str)
-            parent_has_value = parent_val is not None
-            
-            all_daughters_empty = True
-            for d_idx, d_row in daughter_rows:
-                d_val = sanitize_value(d_row.get(col_key), str)
-                if d_val is not None:
-                    all_daughters_empty = False
-                    break
-                    
-            # Si el padre tiene valor, y todos los hijos de la columna están vacíos en el Excel, se asume patrón maestro
-            station_col_status[celda_padre][col_key] = parent_has_value and all_daughters_empty
-
     print(f"    [*] [QA/QC] Ejecutando validaciones QA/QC sobre {len(records)} registros individuales...")
     incidencias, resumen_celdas = [], {}
     total_filas = len(records)
@@ -725,14 +716,26 @@ def validate_bulk_excel(file_path, output_json_path):
         ) or "N/A"
         dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
-        # Detectar inicio de bloque / nueva fila padre de forma ultra robusta
+        # Detectar inicio de bloque / nueva fila padre
+        # Regla 1: El nombre de celda cambió → siempre es nueva fila padre
+        # Regla 2: Celda duplicada explícita en la segunda columna CELDA
+        # Regla 3: Mismo nombre de celda PERO distinta campaña → misma estación, año diferente
+        #   (Esta es la corrección al bug: antes usábamos geo/FECHA que disparaban en TODAS
+        #    las filas hija con esos campos, generando millones de falsos vacíos)
         celda_dup = get_row_val(row_dict, 'CELDA_DUPLICADA_IGNORE')
-        is_new_parent_row = (
-            (celda_padre != active_celda_padre) or
-            (celda_dup is not None and str(celda_dup).strip().upper() == celda_padre.upper()) or
-            (geo is not None and str(geo).strip() != "" and str(geo).strip().upper() != "NONE") or
-            (get_row_val(row_dict, 'FECHA') is not None and str(get_row_val(row_dict, 'FECHA')).strip() != "" and str(get_row_val(row_dict, 'FECHA')).strip().upper() != "NONE")
-        )
+        is_new_parent_row = False
+
+        if celda_padre != active_celda_padre:
+            # El nombre de celda cambió — claramente nueva estación
+            is_new_parent_row = True
+        elif celda_dup is not None and str(celda_dup).strip().upper() == celda_padre.upper():
+            # Segunda columna CELDA tiene el mismo nombre → bloque repetido explícito
+            is_new_parent_row = True
+        elif camp is not None and active_block_key is not None:
+            # Mismo nombre de celda — verificar si la CAMPAÑA cambió respecto al bloque activo
+            active_camp = parent_properties.get(active_block_key, {}).get("camp")
+            if active_camp is not None and str(camp) != str(active_camp):
+                is_new_parent_row = True
 
         if is_new_parent_row:
             active_celda_padre = celda_padre
@@ -784,7 +787,6 @@ def validate_bulk_excel(file_path, output_json_path):
 
         def registrar_error(col, val, rule_code, **msg_kwargs):
             nonlocal row_has_errors, total_vacios, total_advertencias, total_alertas
-            from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
             rule = RULES_REGISTRY.get(rule_code)
             if not rule:
                 raise ValueError(f"Código de regla desconocido: {rule_code}")
@@ -792,33 +794,13 @@ def validate_bulk_excel(file_path, output_json_path):
             tipo = cat.severity if cat else "ALERTA"
             msg = rule.format_message(**msg_kwargs)
             
-            # Clasificación de Tipo de Mapeo
+            # Clasificación de Tipo de Mapeo — usando constantes pre-computadas a nivel de módulo
             col_clean = str(col).strip()
-            mapeo_estructural_cols = {
-                "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP DIR_TALUD", "INTEMPERISMO",
-                "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", "DUREZA  '76",
-                "RESISTENCIA ESTIMADA VALOR  '76", "GSI VISUAL  '76", "CONTROL ESTRUCTURAL  '76",
-                "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", "RQD  '76",
-                "FRECUENCIA DE FRACTURAMIENTO x m.  '76", "TAMAÑO DE BLOQUES  x m3  '76",
-                "ESPACIAMIENTO PROMEDIO   '76", "ESPACIAMIENTO - VALOR    '76",
-                "CONDICIÓN DE DISCONTINUIDAD - VALOR     '76", "RMR '76", "( UCS )  (Mpa)", "is50 (Mpa)",
-                "CONDICION DE AGUA  '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89",
-                "RESISTENCIA ESTIMADA VALOR '89", "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89",
-                "EFECTOS DE VOLADURA '89", "RQD - VALOR '89", "RQD '89",
-                "FRECUENCIA DE FRACTURAMIENTO x m. '89", "TAMAÑO DE BLOQUES  x m3 '89",
-                "ESPACIAMIENTO PROMEDIO '89", "ESPACIAMIENTO - VALOR '89",
-                "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89", "FECHA", "COMENTARIO GEOTECNICO",
-                "Nivel", "Lito 1", "Lito 2", "Lito 3", "Unidad Litologica"
-            }
-            def norm_col(c):
-                return "".join(c.upper().split()).replace(".", "").replace("'", "").replace("\"", "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
-            
-            mapeo_estructural_norm = {norm_col(x) for x in mapeo_estructural_cols}
             is_estructural_specific = (col_clean == "DIP_ESTRUC") or (col_clean == "DIP" and rule_code.startswith("ERR_DIP_ESTRUC"))
             if is_estructural_specific:
                 tipo_mapeo = "Mapeo de Estructuras"
             else:
-                tipo_mapeo = "Mapeo de Celdas" if norm_col(col_clean) in mapeo_estructural_norm else "Mapeo de Estructuras"
+                tipo_mapeo = "Mapeo de Celdas" if _norm_col(col_clean) in _MAPEO_ESTRUCTURAL_NORM else "Mapeo de Estructuras"
             
             # Obtener el valor real e íntegro de la celda de la planilla original
             actual_col = col

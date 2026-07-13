@@ -664,82 +664,92 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         r_cat += 1
 
     # --- HOJA 3: DETALLE PLANO COMPLETO DE INCIDENCIAS ---
-    ws_detail = wb.create_sheet(title="📋 Detalle de Incidencias")
-    ws_detail.views.sheetView[0].showGridLines = True
-    
-    ws_detail.cell(row=2, column=2, value="DETALLE COMPLETO DE INCIDENCIAS").font = font_title
-    ws_detail.cell(row=3, column=2, value="Listado plano consolidado de todas las desviaciones y vacíos detectados. Muestra las variables geomecánicas precisas que intervinieron en la inconsistencia.").font = font_subtitle
-    
-    headers_detail = [
-        "Fila Excel", "Gravedad", "Estación Padre", "Estructura Hija", "Campaña", 
-        "Logger Geotécnico", "Sector Geotécnico", "Tipo de Mapeo", "Columna de Falla", 
-        "Valor Actual", "Mensaje de Inconsistencia Geomecánica"
-    ]
-    
-    ws_detail.append([]) 
-    ws_detail.append([None] + headers_detail) 
-    grid_heading_row = ws_detail.max_row
-    
-    for idx in range(2, 13):
-        cell = ws_detail.cell(row=grid_heading_row, column=idx)
-        cell.font = font_header
-        cell.fill = fill_primary
-        cell.alignment = alignment_center
-        cell.border = border_thin
-        
-    start_detail_row = ws_detail.max_row + 1
-    for inc_item in filtered:
-        row_data = [
-            None,
-            safe_int(inc_item.get("fila_excel")),
-            inc_item.get("tipo_incidencia", "ALERTA"),
-            inc_item.get("celda_padre"),
-            inc_item.get("celda_hija"),
-            inc_item.get("campania"),
-            inc_item.get("geotecnico"),
-            inc_item.get("sector_geotecnico"),
-            inc_item.get("tipo_mapeo", "Mapeo de Celdas"),
-            inc_item.get("columna"),
-            inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-            inc_item.get("mensaje")
+    chunk_size = 1000000
+    detail_chunks = [filtered[i:i + chunk_size] for i in range(0, len(filtered), chunk_size)]
+    if not detail_chunks:
+        detail_chunks = [[]]
+
+    for chunk_idx, chunk_data in enumerate(detail_chunks):
+        title = "📋 Detalle de Incidencias"
+        if len(detail_chunks) > 1:
+            title = f"📋 Detalle Incidencias ({chunk_idx + 1})"
+
+        ws_detail = wb.create_sheet(title=title)
+        ws_detail.views.sheetView[0].showGridLines = True
+
+        ws_detail.cell(row=2, column=2, value="DETALLE COMPLETO DE INCIDENCIAS").font = font_title
+        ws_detail.cell(row=3, column=2, value="Listado plano consolidado de todas las desviaciones y vacíos detectados.").font = font_subtitle
+
+        headers_detail = [
+            "Fila Excel", "Gravedad", "Estación Padre", "Estructura Hija", "Campaña", 
+            "Logger Geotécnico", "Sector Geotécnico", "Tipo de Mapeo", "Columna de Falla", 
+            "Valor Actual", "Mensaje de Inconsistencia Geomecánica"
         ]
-        ws_detail.append(row_data)
-        
-    end_detail_row = ws_detail.max_row
-    
-    for r_idx in range(start_detail_row, end_detail_row + 1):
-        if r_idx <= start_detail_row + 150:
-            ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=4).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=5).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=6).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=7).alignment = alignment_left
-            ws_detail.cell(row=r_idx, column=8).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=9).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=10).alignment = alignment_left
-            ws_detail.cell(row=r_idx, column=11).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=12).alignment = alignment_left
-            
-            if r_idx % 2 == 0:
-                for col_idx in range(2, 13):
-                    if col_idx != 3:
-                        ws_detail.cell(row=r_idx, column=col_idx).fill = fill_zebra
-        else:
-            ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
-            ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
-            
-        cell_sev = ws_detail.cell(row=r_idx, column=3)
-        sev = cell_sev.value
-        if sev == "ALERTA": cell_sev.fill = fill_accent_red
-        elif sev == "ADVERTENCIA": cell_sev.fill = fill_accent_orange
-        else: cell_sev.fill = fill_accent_yellow
-        cell_sev.font = font_bold
-        
-        for col_idx in range(2, 13):
-            ws_detail.cell(row=r_idx, column=col_idx).border = border_thin
-            
-    ws_detail.auto_filter.ref = f"B{grid_heading_row}:L{end_detail_row}"
+
+        ws_detail.append([]) 
+        ws_detail.append([None] + headers_detail) 
+        grid_heading_row = ws_detail.max_row
+
+        for idx in range(2, 13):
+            cell = ws_detail.cell(row=grid_heading_row, column=idx)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
+
+        start_detail_row = ws_detail.max_row + 1
+        for inc_item in chunk_data:
+            row_data = [
+                None,
+                safe_int(inc_item.get("fila_excel")),
+                inc_item.get("tipo_incidencia", "ALERTA"),
+                inc_item.get("celda_padre"),
+                inc_item.get("celda_hija"),
+                inc_item.get("campania"),
+                inc_item.get("geotecnico"),
+                inc_item.get("sector_geotecnico"),
+                inc_item.get("tipo_mapeo", "Mapeo de Celdas"),
+                inc_item.get("columna"),
+                inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
+                inc_item.get("mensaje")
+            ]
+            ws_detail.append(row_data)
+
+        end_detail_row = ws_detail.max_row
+
+        for r_idx in range(start_detail_row, end_detail_row + 1):
+            if r_idx <= start_detail_row + 150:
+                ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=4).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=5).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=6).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=7).alignment = alignment_left
+                ws_detail.cell(row=r_idx, column=8).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=9).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=10).alignment = alignment_left
+                ws_detail.cell(row=r_idx, column=11).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=12).alignment = alignment_left
+
+                if r_idx % 2 == 0:
+                    for col_idx in range(2, 13):
+                        if col_idx != 3:
+                            ws_detail.cell(row=r_idx, column=col_idx).fill = fill_zebra
+            else:
+                ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
+                ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
+
+            cell_sev = ws_detail.cell(row=r_idx, column=3)
+            sev = cell_sev.value
+            if sev == "ALERTA": cell_sev.fill = fill_accent_red
+            elif sev == "ADVERTENCIA": cell_sev.fill = fill_accent_orange
+            else: cell_sev.fill = fill_accent_yellow
+            cell_sev.font = font_bold
+
+            for col_idx in range(2, 13):
+                ws_detail.cell(row=r_idx, column=col_idx).border = border_thin
+
+        ws_detail.auto_filter.ref = f"B{grid_heading_row}:L{end_detail_row}"
 
     # --- HOJAS 4+: DETALLES INDIVIDUALES POR REGLA DE ERROR ---
     for orig_msg, mapping_data in active_sheets_mapping.items():
@@ -841,8 +851,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         table_a_start = jump_link_row + 2
         table_a_height = 2 + len(rule_stats)
         
+        max_allowed_err = 1000000
+        truncated_err = len(err_records) > max_allowed_err
+        err_records_to_write = err_records[:max_allowed_err]
+
         indiv_start = table_a_start + table_a_height + 2
-        indiv_height = 2 + len(err_records)
+        indiv_height = 2 + len(err_records_to_write) + (1 if truncated_err else 0)
         
         table_b_start = indiv_start + indiv_height + 2
 
@@ -914,7 +928,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             cell.border = border_thin
             
         start_data_row = indiv_start + 2
-        for idx, inc_item in enumerate(err_records):
+        for idx, inc_item in enumerate(err_records_to_write):
             curr_row = start_data_row + idx
             ws_err.cell(row=curr_row, column=2, value=safe_int(inc_item.get("fila_excel")))
             ws_err.cell(row=curr_row, column=3, value=inc_item.get("celda_padre"))
@@ -927,7 +941,11 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             ws_err.cell(row=curr_row, column=10, value=inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—")
             ws_err.cell(row=curr_row, column=11, value=inc_item.get("mensaje"))
             
-        end_data_row = start_data_row + len(err_records) - 1
+        if truncated_err:
+            curr_row = start_data_row + len(err_records_to_write)
+            ws_err.cell(row=curr_row, column=3, value="--- REPORTE TRUNCADO: SE SUPERÓ EL LÍMITE DE FILAS DE EXCEL (1,048,576) ---")
+
+        end_data_row = start_data_row + len(err_records_to_write) - 1 + (1 if truncated_err else 0)
         
         for r_idx in range(start_data_row, end_data_row + 1):
             if r_idx <= start_data_row + 150:
@@ -1079,9 +1097,14 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
         shutil.copyfile(compact_json_out, public_compact_tmp)
         safe_replace(public_compact_tmp, public_compact)
 
-        # Paso 4: Generar archivo Excel cacheado
+        # Paso 5: Generar archivo Excel cacheado
+        # IMPORTANTE: Extraemos las incidencias del dict principal y vaciamos la referencia en diag
+        # para que el GC pueda liberar el dict grande mientras openpyxl construye el workbook,
+        # evitando el MemoryError por tener dos copias gigantes en RAM simultáneamente.
         print(f"[*] [AUDITORÍA {audit_id}] Paso 5/5: Pre-generando reporte de Excel (.xlsx) en segundo plano...")
-        wb = generar_excel_reporte_core(diag, compact, list(diag.get("incidencias", [])))
+        incidencias_list = diag.pop("incidencias", [])
+        wb = generar_excel_reporte_core(diag, compact, incidencias_list)
+        del incidencias_list  # liberar RAM antes de guardar el .xlsx
         
         excel_tmp = excel_pregenerated_out + ".tmp"
         wb.save(excel_tmp)
