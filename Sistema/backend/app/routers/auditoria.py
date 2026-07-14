@@ -595,7 +595,13 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_cat.cell(row=2, column=2, value="REGISTRO MAESTRO DE REGLAS DE CONSISTENCIA").font = font_title
     ws_cat.cell(row=3, column=2, value="Catálogo completo de validación geomecánica ordenado por frecuencia. Use los hipervínculos para navegar.").font = font_subtitle
     
-    headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Casos Hallados (N)", "Enlace Directo"]
+    # Recopilar los años únicos de campaña presentes en todas las incidencias
+    all_campaigns = sorted(set(
+        str(inc.get("campania", "N/A")) for inc in filtered
+        if inc.get("campania") and str(inc.get("campania")) not in ["N/A", "None", ""]
+    ))
+
+    headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Total (N)"] + [f"Año {c}" for c in all_campaigns] + ["Enlace Directo"]
     for idx, col in enumerate(headers_cat, start=2):
         cell = ws_cat.cell(row=5, column=idx, value=col)
         cell.font = font_header
@@ -612,11 +618,16 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     for cat in CATEGORIES_REGISTRY.values():
         rule_msg = cat.name
         matches = incidencias_por_error[rule_msg]
+        # Calcular conteos por campaña
+        camp_counts = {}
+        for c in all_campaigns:
+            camp_counts[c] = sum(1 for m in matches if str(m.get("campania", "N/A")) == c)
         catalog_frequencies.append({
             "msg": rule_msg,
             "severity": cat.severity,
             "matches": matches,
-            "count": len(matches)
+            "count": len(matches),
+            "camp_counts": camp_counts
         })
         
     catalog_frequencies = sorted(catalog_frequencies, key=lambda x: x["count"], reverse=True)
@@ -645,23 +656,38 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         c_count.alignment = alignment_right
         c_count.number_format = '#,##0'
         c_count.border = border_thin
-        
-        c_link = ws_cat.cell(row=r_cat, column=6)
+
+        # Columnas por año de campaña
+        for y_offset, camp_key in enumerate(all_campaigns):
+            c_yr = ws_cat.cell(row=r_cat, column=6 + y_offset, value=rule["camp_counts"].get(camp_key, 0))
+            c_yr.font = font_regular
+            c_yr.alignment = alignment_right
+            c_yr.number_format = '#,##0'
+            c_yr.border = border_thin
+            if rule["camp_counts"].get(camp_key, 0) == 0:
+                c_yr.font = Font(name="Segoe UI", size=9, color="AAAAAA")
+
+        link_col = 6 + len(all_campaigns)
+        c_link = ws_cat.cell(row=r_cat, column=link_col)
         if rule["count"] > 0:
             tab_name = get_safe_sheet_name(rule["msg"], c_idx)
             active_sheets_mapping[rule["msg"]] = {"tab_name": tab_name, "records": rule["matches"]}
             
-            c_link.value = f'=HYPERLINK("#\'{tab_name}\'!B2", "🔍 Navegar a Registros")'
+            c_link.value = f'=HYPERLINK("#{chr(39)}{tab_name}{chr(39)}!B2", "🔍 Navegar a Registros")'
             c_link.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
             c_link.alignment = alignment_center
         else:
-            c_link.value = "Limpio / 0 Inidencias"
+            c_link.value = "Limpio / 0 Incidencias"
             c_link.font = Font(name="Segoe UI", size=9, italic=True, color="7F8C8D")
             c_link.alignment = alignment_center
             c_link.fill = fill_accent_green
             
         c_link.border = border_thin
         r_cat += 1
+
+    # AutoFilter para permitir filtrar por año directamente en Excel
+    last_col_letter = chr(ord('A') + (5 + len(all_campaigns)))  # B=col2, C=col3, ...
+    ws_cat.auto_filter.ref = f"B5:{last_col_letter}{r_cat - 1}"
 
     # --- HOJA 3: DETALLE PLANO COMPLETO DE INCIDENCIAS ---
     chunk_size = 1000000

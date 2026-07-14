@@ -717,19 +717,17 @@ def validate_bulk_excel(file_path, output_json_path):
         dist_celda = sanitize_value(get_row_val(row_dict, 'Dist.Celda'), float)
 
         # Detectar inicio de bloque / nueva fila padre
-        # Regla 1: El nombre de celda cambió → siempre es nueva fila padre
-        # Regla 2: Celda duplicada explícita en la segunda columna CELDA
+        # Regla 1: El nombre de celda (CELDA1) cambió → nueva estación
+        # Regla 2: Celda duplicada explícita en CELDA2 con mismo nombre → bloque repetido
         # Regla 3: Mismo nombre de celda PERO distinta campaña → misma estación, año diferente
-        #   (Esta es la corrección al bug: antes usábamos geo/FECHA que disparaban en TODAS
-        #    las filas hija con esos campos, generando millones de falsos vacíos)
         celda_dup = get_row_val(row_dict, 'CELDA_DUPLICADA_IGNORE')
         is_new_parent_row = False
 
         if celda_padre != active_celda_padre:
-            # El nombre de celda cambió — claramente nueva estación
+            # El nombre de celda cambió — nueva estación
             is_new_parent_row = True
         elif celda_dup is not None and str(celda_dup).strip().upper() == celda_padre.upper():
-            # Segunda columna CELDA tiene el mismo nombre → bloque repetido explícito
+            # CELDA2 tiene el mismo nombre que CELDA1 → bloque repetido explícito
             is_new_parent_row = True
         elif camp is not None and active_block_key is not None:
             # Mismo nombre de celda — verificar si la CAMPAÑA cambió respecto al bloque activo
@@ -740,6 +738,7 @@ def validate_bulk_excel(file_path, output_json_path):
         if is_new_parent_row:
             active_celda_padre = celda_padre
             active_block_key = f"{celda_padre}_row_{fila_excel}"
+
 
         is_parent_row = False
         if active_block_key not in seen_parents:
