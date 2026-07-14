@@ -157,10 +157,11 @@ export function getFillingRatingSingle(rellenoCode: string | undefined | null, t
 }
 
 export function getRqdRating76(rqd: number): number {
-  if (rqd < 25) return 3;
-  if (rqd < 50) return 8;
-  if (rqd < 75) return 13;
-  if (rqd < 90) return 17;
+  const rounded = Math.round(rqd);
+  if (rounded < 25) return 3;
+  if (rounded < 50) return 8;
+  if (rounded < 75) return 13;
+  if (rounded < 90) return 17;
   return 20;
 }
 
@@ -173,20 +174,23 @@ export function getRqdRating89(rqd: number): number {
 }
 
 export function getSpacingRating76(spacingM: number): number {
-  if (spacingM < 0.05) return 5;
-  if (spacingM < 0.3) return 10;
-  if (spacingM < 1.0) return 20;
-  if (spacingM < 3.0) return 25;
+  const rounded = Math.round(spacingM * 1000) / 1000;
+  if (rounded < 0.05) return 5;
+  if (rounded < 0.3) return 10;
+  if (rounded < 1.0) return 20;
+  if (rounded < 3.0) return 25;
   return 30;
 }
 
 export function getSpacingRating89(spacingM: number): number {
-  if (spacingM < 0.06) return 5;
-  if (spacingM < 0.2) return 8;
-  if (spacingM < 0.6) return 10;
-  if (spacingM < 2.0) return 15;
+  const rounded = Math.round(spacingM * 1000) / 1000;
+  if (rounded < 0.06) return 5;
+  if (rounded < 0.2) return 8;
+  if (rounded < 0.6) return 10;
+  if (rounded < 2.0) return 15;
   return 20;
 }
+
 
 export function getRockClass(rmr: number): string {
   if (rmr >= 81) return "Muy Buena";

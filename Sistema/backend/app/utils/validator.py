@@ -249,11 +249,11 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             code_upper = dureza_89.upper()
             if code_upper in r89_ranges:
                 min_v, max_v, range_str = r89_ranges[code_upper]
-                if not (min_v - 0.2 <= dureza_val_89 <= max_v + 0.2):
+                if not (min_v <= dureza_val_89 <= max_v):
                     registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=range_str)
             else:
                 registrar_error("DUREZA '89", dureza_89, "ERR_DUREZA_89_INVALIDA", value=dureza_89)
-        elif not (abs(dureza_val_89 - 0.0) <= 0.2 or 1.3 <= dureza_val_89 <= 15.2):
+        elif not (dureza_val_89 == 0.0 or 1.5 <= dureza_val_89 <= 15.0):
             registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "WRN_RESISTENCIA_89_VALOR_ALEJADO", value=dureza_val_89)
 
     # 4. Control Estructural [1, 5]
@@ -303,30 +303,32 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         
         # Validación de incongruencia RQD 76
         if rqd_76 is not None:
-            expected_76 = 3 if rqd_76 < 25 else (8 if rqd_76 < 50 else (13 if rqd_76 < 75 else (17 if rqd_76 < 90 else 20)))
+            rqd_76_int = int(round(rqd_76))
+            expected_76 = 3 if rqd_76_int < 25 else (8 if rqd_76_int < 50 else (13 if rqd_76_int < 75 else (17 if rqd_76_int < 90 else 20)))
             if abs(rqd_val_76 - expected_76) > 0.2:
                 registrar_error("RQD - VALOR  '76", rqd_val_76, "ERR_RQD_76_INCONGRUENTE", value=rqd_val_76, pct=rqd_76, expected=expected_76)
 
     rqd_val_89 = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
     if rqd_val_89 is not None:
         rqd_val_89 = round(rqd_val_89, 2)
-        if not (2.8 <= rqd_val_89 <= 20.2):
+        if not (3.0 <= rqd_val_89 <= 20.0):
             registrar_error("RQD - VALOR '89", rqd_val_89, "WRN_RQD_VAL_89_VALOR_ALEJADO", value=rqd_val_89)
             
         # Validación de incongruencia RQD 89
         if rqd_89 is not None:
-            if rqd_89 < 25:
+            rqd_89_int = int(round(rqd_89))
+            if rqd_89_int < 25:
                 min_r, max_r, range_str = 3.0, 5.8, "3.0 - 5.8 (< 25%)"
-            elif rqd_89 < 50:
+            elif rqd_89_int < 50:
                 min_r, max_r, range_str = 5.8, 10.0, "5.8 - 10.0 (25 - 50%)"
-            elif rqd_89 < 75:
+            elif rqd_89_int < 75:
                 min_r, max_r, range_str = 10.0, 15.0, "10.0 - 15.0 (50 - 75%)"
-            elif rqd_89 < 90:
+            elif rqd_89_int < 90:
                 min_r, max_r, range_str = 15.0, 18.0, "15.0 - 18.0 (75 - 90%)"
             else:
                 min_r, max_r, range_str = 18.0, 20.0, "18.0 - 20.0 (90 - 100%)"
                 
-            if not (min_r - 0.2 <= rqd_val_89 <= max_r + 0.2):
+            if not (min_r <= rqd_val_89 <= max_r):
                 registrar_error("RQD - VALOR '89", rqd_val_89, "ERR_RQD_89_INCONGRUENTE", value=rqd_val_89, pct=rqd_89, expected=range_str)
 
     # 8. Espaciamiento Promedio y Coherencia de Ratings
