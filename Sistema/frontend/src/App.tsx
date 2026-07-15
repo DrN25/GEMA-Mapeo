@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -103,6 +103,7 @@ export default function App() {
   const [captions, setCaptions] = useState<string[]>(['', '', '', '']);
 
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+  const [isPltCatalogModalOpen, setIsPltCatalogModalOpen] = useState<boolean>(false);
   const [isCommentsExpanded, setIsCommentsExpanded] = useState<boolean>(false);
 
   // 1. Initialize Dark Mode Theme
@@ -753,10 +754,19 @@ export default function App() {
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
                 className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95"
-                title="Ver Catálogos de Referencia Geomecánica"
+                title="Ver Catálogos de Referencia Geomecánica de Ventanas"
               >
                 <BookOpen size={14} className="text-sky-400" />
-                <span>Catálogos</span>
+                <span>Catálogo de Ventanas</span>
+              </button>
+
+              <button
+                onClick={() => setIsPltCatalogModalOpen(true)}
+                className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95"
+                title="Ver Catálogos de Referencia de Ensayos PLT"
+              >
+                <Activity size={14} className="text-cyan-400" />
+                <span>Catálogo de Ensayos PLT</span>
               </button>
 
               {activeWindow && (
@@ -1097,7 +1107,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
-                    Catálogos de Referencia Geomecánica
+                    Catálogo de Referencia de Ventanas (RMR)
                   </h3>
                   <p className="text-xs text-slate-400">Guía de parámetros y ratings para clasificaciones RMR (Bieniawski)</p>
                 </div>
@@ -1111,7 +1121,39 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 bg-navy-950/20">
-              <CatalogsView />
+              <CatalogsView mode="ventanas" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPltCatalogModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
+          <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
+            <div className="h-1.5 bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-500 w-full" />
+
+            <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-lg">
+                  <Activity size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
+                    Catálogo de Ensayos PLT y Litologías
+                  </h3>
+                  <p className="text-xs text-slate-400">Parámetros de resistencia de roca intacta y factores de correlación K</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPltCatalogModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-navy-800 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-navy-950/20">
+              <CatalogsView mode="plt" />
             </div>
           </div>
         </div>

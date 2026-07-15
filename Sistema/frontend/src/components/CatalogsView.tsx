@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Table, Layers, Compass, Flame, AlignLeft, Droplet,
   Shield, Zap, Sparkles, Sliders, Maximize2, MoveRight,
-  Database, GitBranch, ArrowRightLeft, Activity
+  Database, GitBranch, ArrowRightLeft
 } from 'lucide-react';
 import {
   STRUCTURE_CATALOG,
@@ -10,12 +10,11 @@ import {
   ALTERACION_CATALOG,
   FORMA_CATALOG,
   RUGOSIDAD_CATALOG,
-  LITHOLOGY_CLASSIFICATION,
   LITO_COLORES_DATA,
   LITO_VALIDACION_DATA
 } from '../utils/catalogData';
 
-// --- DATASETS OFICIALES UNIFICADOS Y REVISADOS CON LLAVES ALINEADAS ---
+// --- DATASETS OFICIALES UNIFICADOS Y REVISADOS CON COMPARADORES MATEMÁTICOS ---
 
 const AGUA_DATA = [
   { desc: "Completamente seco", codigo: "C", r76: 10, r89: 15 },
@@ -26,12 +25,12 @@ const AGUA_DATA = [
 ];
 
 const RESISTENCIA_DATA = [
-  { codigo: "R6", rango: "> 250", r76: 15, r89: "12.0 - 15.0", denom: "Extremadamente resistente" },
-  { codigo: "R5", rango: "100 - 250", r76: 12, r89: "9.5 - 12.0", denom: "Muy resistente" },
-  { codigo: "R4", rango: "50 - 100", r76: 7, r89: "5.5 - 9.5", denom: "Resistente" },
-  { codigo: "R3", rango: "25 - 50", r76: 4, r89: "3.8 - 5.5", denom: "Moderadamente resistente" },
-  { codigo: "R2", rango: "5 - 25", r76: 2, r89: "1.5 - 3.8", denom: "Débil" },
-  { codigo: "R1", rango: "1 - 5", r76: 1, r89: "1.5", denom: "Muy débil" },
+  { codigo: "R6", rango: "≥ 250", r76: 15, r89: "12.0 - 15.0", denom: "Extremadamente resistente" },
+  { codigo: "R5", rango: "≥ 100 y < 250", r76: 12, r89: "9.5 - 12.0", denom: "Muy resistente" },
+  { codigo: "R4", rango: "≥ 50 y < 100", r76: 7, r89: "5.5 - 9.5", denom: "Resistente" },
+  { codigo: "R3", rango: "≥ 25 y < 50", r76: 4, r89: "3.8 - 5.5", denom: "Moderadamente resistente" },
+  { codigo: "R2", rango: "≥ 5 y < 25", r76: 2, r89: "1.5 - 3.8", denom: "Débil" },
+  { codigo: "R1", rango: "≥ 1 y < 5", r76: 1, r89: "1.5", denom: "Muy débil" },
   { codigo: "R0", rango: "< 1", r76: 0, r89: "0.0", denom: "Extremadamente débil" }
 ];
 
@@ -53,18 +52,25 @@ const EFECTOS_VOLADURA_DATA = [
 
 const RQD_DATA_LIST = [
   { rango: "< 25 %", r76: 3, r89: "3.0 - 5.8", calidad: "Muy Mala" },
-  { rango: "25 - 50 %", r76: 8, r89: "5.8 - 10.0", calidad: "Mala" },
-  { rango: "50 - 75 %", r76: 13, r89: "10.0 - 15.0", calidad: "Regular" },
-  { rango: "75 - 90 %", r76: 17, r89: "15.0 - 18.0", calidad: "Buena" },
-  { rango: "90 - 100 %", r76: 20, r89: "18.0 - 20.0", calidad: "Excelente" }
+  { rango: "≥ 25 y < 50 %", r76: 8, r89: "5.8 - 10.0", calidad: "Mala" },
+  { rango: "≥ 50 y < 75 %", r76: 13, r89: "10.0 - 15.0", calidad: "Regular" },
+  { rango: "≥ 75 y < 90 %", r76: 17, r89: "15.0 - 18.0", calidad: "Buena" },
+  { rango: "≥ 90 y ≤ 100 %", r76: 20, r89: "18.0 - 20.0", calidad: "Excelente" }
 ];
 
 const ESPACIAMIENTO_DATA_LIST = [
   { r89_range: "< 60 mm", r89_rating: 5, r76_range: "< 50 mm", r76_rating: 5 },
-  { r89_range: "60 - 200 mm", r89_rating: 8, r76_range: "50 - 300 mm", r76_rating: 10 },
-  { r89_range: "200 - 600 mm", r89_rating: 10, r76_range: "300 - 1000 mm", r76_rating: 20 },
-  { r89_range: "600 - 2000 mm", r89_rating: 15, r76_range: "1000 - 3000 mm", r76_rating: 25 },
-  { r89_range: "> 2000 mm", r89_rating: 20, r76_range: "> 3000 mm", r76_rating: 30 }
+  { r89_range: "≥ 60 y < 200 mm", r89_rating: 8, r76_range: "≥ 50 y < 300 mm", r76_rating: 10 },
+  { r89_range: "≥ 200 y < 600 mm", r89_rating: 10, r76_range: "≥ 300 y < 1000 mm", r76_rating: 20 },
+  { r89_range: "≥ 600 y < 2000 mm", r89_rating: 15, r76_range: "≥ 1000 y < 3000 mm", r76_rating: 25 },
+  { r89_range: "≥ 2000 mm", r89_rating: 20, r76_range: "≥ 3000 mm", r76_rating: 30 }
+];
+
+const EXTREMOS_TERMINACION_DATA = [
+  { codigo: 0, terminacion: "No se ven", desc: "No se observan ambos extremos" },
+  { codigo: 1, terminacion: "Solo vemos uno", desc: "Solo se observa un extremo visible que termina en otra estructura en el banco" },
+  { codigo: 2, terminacion: "Se ven dos extremos visibles", desc: "Se observan dos extremos visibles que terminan en otra estructura en el banco" },
+  { codigo: 3, terminacion: "Termina entre estructuras", desc: "La estructura finaliza en el espacio comprendido entre dos estructuras cercanas." }
 ];
 
 const getGroupBadge = (grupo: string) => {
@@ -107,16 +113,31 @@ const getGroupBadge = (grupo: string) => {
   return <span className="text-slate-400 font-bold">{grupo}</span>;
 };
 
-export default function CatalogsView() {
+interface CatalogsViewProps {
+  mode?: 'ventanas' | 'plt';
+}
+
+export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
   const [activeTab, setActiveTab] = useState<string>('litologia');
 
-  const groups = [
+  const groups = mode === 'plt' ? [
+    {
+      title: 'Ensayos PLT & Litología',
+      items: [
+        { id: 'litologia', label: 'Litología y K', icon: Layers },
+        { id: 'plt_resistencia_isrm', label: 'Clasificación Resistencia ISRM', icon: Shield },
+        { id: 'plt_direccion_rotura', label: 'Dirección de Rotura', icon: Compass },
+        { id: 'plt_tipo_fractura', label: 'Tipo de Fractura', icon: AlignLeft },
+        { id: 'plt_valoracion_rmr', label: 'Valoración Resistencia RMR', icon: Table },
+        { id: 'extremos_terminacion', label: 'Extremos / Terminación', icon: Maximize2 }
+      ]
+    }
+  ] : [
     {
       title: 'Roca Intacta & Litología',
       items: [
         { id: 'litologia', label: 'Litología y K', icon: Layers },
-        { id: 'resistencia', label: 'Resistencia ISRM', icon: Shield },
-        { id: 'plt_irregulares', label: 'Ensayos PLT', icon: Activity }
+        { id: 'resistencia', label: 'Resistencia ISRM', icon: Shield }
       ]
     },
     {
@@ -184,7 +205,7 @@ export default function CatalogsView() {
       {/* Contenedor principal de visualización de tablas */}
       <div className="md:col-span-3 overflow-y-auto max-h-[70vh] pr-1 space-y-4 scrollbar-thin">
 
-        {/* 1. LITOLOGÍAS */}
+        {/* 1. LITOLOGÍAS (Solo en modo PLT) */}
         {activeTab === 'litologia' && (
           <div className="space-y-6">
             {/* TABLA 1 */}
@@ -492,6 +513,36 @@ export default function CatalogsView() {
           </div>
         )}
 
+        {/* EXTREMOS Y TERMINACIÓN */}
+        {activeTab === 'extremos_terminacion' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Maximize2 size={14} className="text-orange-500" />
+              <span>Extremos Visibles / Terminación de Estructuras</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 text-center w-20">Código</th>
+                    <th className="py-2.5 px-4">Extremos visible / Terminación</th>
+                    <th className="py-2.5 px-4">Descripción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {EXTREMOS_TERMINACION_DATA.map((item) => (
+                    <tr key={item.codigo} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 text-center text-orange-400 font-black">{item.codigo}</td>
+                      <td className="py-2.5 px-4 font-bold text-slate-200">{item.terminacion}</td>
+                      <td className="py-2.5 px-4 text-slate-350 leading-relaxed">{item.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ABERTURA */}
         {activeTab === 'abertura' && (
           <div className="space-y-3">
@@ -513,9 +564,9 @@ export default function CatalogsView() {
                   {[
                     { label: "Masiva", range: "0 mm", r89: 6, r76: 5 },
                     { label: "Entre Abierta", range: "< 0.1 mm", r89: 5, r76: 4 },
-                    { label: "Abierta", range: "0.1 - 1.0 mm", r89: 3, r76: 3 },
-                    { label: "Muy Abierta", range: "1.0 - 5.0 mm", r89: 1, r76: 1 },
-                    { label: "Extremadamente Abierta", range: "> 5.0 mm", r89: 0, r76: 0 }
+                    { label: "Abierta", range: "≥ 0.1 y < 1.0 mm", r89: 3, r76: 3 },
+                    { label: "Muy Abierta", range: "≥ 1.0 y < 5.0 mm", r89: 1, r76: 1 },
+                    { label: "Extremadamente Abierta", range: "≥ 5.0 mm", r89: 0, r76: 0 }
                   ].map((item, idx) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-bold">{item.label}</td>
@@ -549,10 +600,10 @@ export default function CatalogsView() {
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {[
                     { range: "< 1 m", r89: 6, r76: 5 },
-                    { range: "1 - 3 m", r89: 4, r76: 4 },
-                    { range: "3 - 10 m", r89: 2, r76: 3 },
-                    { range: "10 - 20 m", r89: 1, r76: 1 },
-                    { range: "> 20 m", r89: 0, r76: 0 }
+                    { range: "≥ 1 y < 3 m", r89: 4, r76: 4 },
+                    { range: "≥ 3 y < 10 m", r89: 2, r76: 3 },
+                    { range: "≥ 10 y < 20 m", r89: 1, r76: 1 },
+                    { range: "≥ 20 m", r89: 0, r76: 0 }
                   ].map((item, idx) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-bold font-mono">{item.range}</td>
@@ -742,187 +793,144 @@ export default function CatalogsView() {
           </div>
         )}
 
-        {/* ENSAYOS PLT IRREGULARES */}
-        {activeTab === 'plt_irregulares' && (
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
-            <div className="space-y-2">
-              <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
-                <Table size={12} className="text-cyan-400" />
-                <span>Clasificación de Resistencia ISRM (UCS)</span>
-              </h3>
-              <div className="overflow-x-auto rounded-lg border border-navy-900">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
-                      <th className="py-2 px-3">Código</th>
-                      <th className="py-2 px-3 text-center">UCS Mínimo (MPa)</th>
-                      <th className="py-2 px-3 text-center">UCS Máximo (MPa)</th>
-                      <th className="py-2 px-3">Denominación ISRM</th>
+        {/* TABS INDIVIDUALES DE PLT (Solo en modo PLT) */}
+        {activeTab === 'plt_resistencia_isrm' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Shield size={14} className="text-cyan-400" />
+              <span>Clasificación de Resistencia ISRM (UCS)</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
+                    <th className="py-2.5 px-4 w-24">Código</th>
+                    <th className="py-2.5 px-4 text-center">UCS Mínimo (MPa)</th>
+                    <th className="py-2.5 px-4 text-center">UCS Máximo (MPa)</th>
+                    <th className="py-2.5 px-4">Denominación ISRM</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
+                  {[
+                    { code: "R0", min: "0.25", max: "1.00", desc: "Extremadamente débil", color: "text-rose-400" },
+                    { code: "R1", min: "1.00", max: "5.00", desc: "Muy débil", color: "text-orange-400" },
+                    { code: "R2", min: "5.00", max: "25.00", desc: "Débil", color: "text-amber-400" },
+                    { code: "R3", min: "25.00", max: "50.00", desc: "Moderadamente resistente", color: "text-yellow-400" },
+                    { code: "R4", min: "50.00", max: "100.00", desc: "Resistente", color: "text-emerald-400" },
+                    { code: "R5", min: "100.00", max: "250.00", desc: "Muy resistente", color: "text-cyan-400" },
+                    { code: "R6", min: "250.00", max: "> 250.00", desc: "Extremadamente resistente", color: "text-indigo-400" }
+                  ].map((row, index) => (
+                    <tr key={index} className="hover:bg-navy-900/20">
+                      <td className={`py-2.5 px-4 font-black ${row.color}`}>{row.code}</td>
+                      <td className="py-2.5 px-4 text-center font-mono">{row.min}</td>
+                      <td className="py-2.5 px-4 text-center font-mono">{row.max}</td>
+                      <td className="py-2.5 px-4">{row.desc}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-900/30 text-slate-300">
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-rose-400">R0</td>
-                      <td className="py-2 px-3 text-center font-mono">0.25</td>
-                      <td className="py-2 px-3 text-center font-mono">1.00</td>
-                      <td className="py-2 px-3">Extremadamente débil</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-orange-400">R1</td>
-                      <td className="py-2 px-3 text-center font-mono">1.00</td>
-                      <td className="py-2 px-3 text-center font-mono">5.00</td>
-                      <td className="py-2 px-3">Muy débil</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-amber-400">R2</td>
-                      <td className="py-2 px-3 text-center font-mono">5.00</td>
-                      <td className="py-2 px-3 text-center font-mono">25.00</td>
-                      <td className="py-2 px-3">Débil</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-yellow-400">R3</td>
-                      <td className="py-2 px-3 text-center font-mono">25.00</td>
-                      <td className="py-2 px-3 text-center font-mono">50.00</td>
-                      <td className="py-2 px-3">Moderadamente resistente</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-emerald-400">R4</td>
-                      <td className="py-2 px-3 text-center font-mono">50.00</td>
-                      <td className="py-2 px-3 text-center font-mono">100.00</td>
-                      <td className="py-2 px-3">Resistente</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-cyan-400">R5</td>
-                      <td className="py-2 px-3 text-center font-mono">100.00</td>
-                      <td className="py-2 px-3 text-center font-mono">250.00</td>
-                      <td className="py-2 px-3">Muy resistente</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-bold text-indigo-400">R6</td>
-                      <td className="py-2 px-3 text-center font-mono">250.00</td>
-                      <td className="py-2 px-3 text-center font-mono">&gt; 250.00</td>
-                      <td className="py-2 px-3">Extremadamente resistente</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
-                  <Compass size={12} className="text-emerald-400" />
-                  <span>Dirección de Rotura (ISRM)</span>
-                </h3>
-                <div className="overflow-x-auto rounded-lg border border-navy-900">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
-                        <th className="py-2 px-3">Sigla</th>
-                        <th className="py-2 px-3">Descripción Geológica</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-navy-900/30 text-slate-300">
-                      <tr className="hover:bg-navy-900/20">
-                        <td className="py-2 px-3 font-bold text-emerald-400">Pa</td>
-                        <td className="py-2 px-3">Paralela a los planos de debilidad (estratificación, foliación)</td>
-                      </tr>
-                      <tr className="hover:bg-navy-900/20">
-                        <td className="py-2 px-3 font-bold text-emerald-400">Pe</td>
-                        <td className="py-2 px-3">Perpendicular a los planos de debilidad (estratificación, foliación)</td>
-                      </tr>
-                      <tr className="hover:bg-navy-900/20">
-                        <td className="py-2 px-3 font-bold text-emerald-400">NA</td>
-                        <td className="py-2 px-3">No aplica (rocas masivas sin planos de debilidad)</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
-                  <Flame size={12} className="text-indigo-400" />
-                  <span>Tipo de Fractura / Rotura</span>
-                </h3>
-                <div className="overflow-x-auto rounded-lg border border-navy-900">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
-                        <th className="py-2 px-3">Tipo</th>
-                        <th className="py-2 px-3">Criterio de Aceptación</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-navy-900/30 text-slate-300">
-                      <tr className="hover:bg-navy-900/20">
-                        <td className="py-2 px-3 font-bold text-indigo-400">M</td>
-                        <td className="py-2 px-3">Rotura por matriz. Si la muestra no se rompe se considera M.</td>
-                      </tr>
-                      <tr className="hover:bg-navy-900/20">
-                        <td className="py-2 px-3 font-bold text-indigo-400">E</td>
-                        <td className="py-2 px-3">Rotura por estructura preexistente.</td>
-                      </tr>
-                      <tr className="hover:bg-navy-900/20">
-                        <td className="py-2 px-3 font-bold text-indigo-400">C</td>
-                        <td className="py-2 px-3">Rotura combinada (por matriz y estructura en simultáneo).</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-850 pb-1.5 flex items-center gap-1.5">
-                <AlignLeft size={12} className="text-amber-400" />
-                <span>Valoración de Resistencia de la Roca Intacta (RMR)</span>
-              </h3>
-              <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[9px] border-b border-navy-850">
-                      <th className="py-2 px-3">Rango de Resistencia UCS (MPa)</th>
-                      <th className="py-2 px-3 text-center">Rating RMR'89</th>
-                      <th className="py-2 px-3 text-center">Rating RMR'76</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-900/30 text-slate-300">
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-semibold">&gt; 250 MPa</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">15</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">10</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-semibold">100 - 250 MPa</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">12</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">8</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-semibold">50 - 100 MPa</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">7</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">5</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-semibold">25 - 50 MPa</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">4</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">2</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-semibold">5 - 25 MPa</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">2</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">1</td>
-                    </tr>
-                    <tr className="hover:bg-navy-900/20">
-                      <td className="py-2 px-3 font-semibold">1 - 5 MPa</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">1</td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-400">0</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
+
+        {activeTab === 'plt_direccion_rotura' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Compass size={14} className="text-emerald-400" />
+              <span>Dirección de Rotura (ISRM)</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
+                    <th className="py-2.5 px-4 w-24">Sigla</th>
+                    <th className="py-2.5 px-4">Descripción Geológica</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
+                  {[
+                    { sigla: "Pa", desc: "Paralela a los planos de debilidad (estratificación, foliación)" },
+                    { sigla: "Pe", desc: "Perpendicular a los planos de debilidad (estratificación, foliación)" },
+                    { sigla: "NA", desc: "No aplica (rocas masivas sin planos de debilidad)" }
+                  ].map((row, index) => (
+                    <tr key={index} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-bold text-emerald-400">{row.sigla}</td>
+                      <td className="py-2.5 px-4 text-slate-200">{row.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'plt_tipo_fractura' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <AlignLeft size={14} className="text-indigo-400" />
+              <span>Tipo de Fractura / Rotura</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
+                    <th className="py-2.5 px-4 w-24">Tipo</th>
+                    <th className="py-2.5 px-4">Criterio de Aceptación</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
+                  {[
+                    { tipo: "M", desc: "Rotura por matriz. Si la muestra no se rompe se considera M." },
+                    { tipo: "E", desc: "Rotura por estructura preexistente." },
+                    { tipo: "C", desc: "Rotura combinada (por matriz y estructura en simultáneo)." }
+                  ].map((row, index) => (
+                    <tr key={index} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-bold text-indigo-400">{row.tipo}</td>
+                      <td className="py-2.5 px-4 text-slate-200">{row.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'plt_valoracion_rmr' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <AlignLeft size={14} className="text-amber-400" />
+              <span>Valoración de Resistencia de la Roca Intacta (RMR)</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
+                    <th className="py-2.5 px-4">Rango de Resistencia UCS (MPa)</th>
+                    <th className="py-2.5 px-4 text-center">Rating RMR'89</th>
+                    <th className="py-2.5 px-4 text-center">Rating RMR'76</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
+                  {[
+                    { ucs: "≥ 250 MPa", r89: 15, r76: 10 },
+                    { ucs: "100 - < 250 MPa", r89: 12, r76: 8 },
+                    { ucs: "50 - < 100 MPa", r89: 7, r76: 5 },
+                    { ucs: "25 - < 50 MPa", r89: 4, r76: 2 },
+                    { ucs: "5 - < 25 MPa", r89: 2, r76: 1 },
+                    { ucs: "1 - < 5 MPa", r89: 1, r76: 0 }
+                  ].map((row, index) => (
+                    <tr key={index} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-semibold text-slate-200">{row.ucs}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-emerald-400">{row.r89}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-emerald-400">{row.r76}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
