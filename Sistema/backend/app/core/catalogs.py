@@ -194,3 +194,306 @@ LITHOLOGY_CLASSIFICATION = [
     {"grupo": "METAMORFICAS", "lito1": "SHL", "lito2": "HFL", "lito3": "-", "k": 12.63},
     {"grupo": "METAMORFICAS", "lito1": "SND", "lito2": "QZT", "lito3": "-", "k": 12.63}
 ]
+
+# ==============================================================================
+# CATÁLOGOS DISPLAY — Fuente única de verdad expuesta vía REST API al frontend
+# Cualquier cambio en los datos se hace SOLO AQUÍ y se propaga automáticamente.
+# ==============================================================================
+
+# D1. RESISTENCIA ISRM con textos de rango y denominación
+RESISTENCIA_DISPLAY_CATALOG = [
+    {"codigo": "R6", "rango": "≥ 250",         "r76": 15, "r89": 15, "denom": "Extremadamente resistente"},
+    {"codigo": "R5", "rango": "≥ 100 y < 250", "r76": 12, "r89": 12, "denom": "Muy resistente"},
+    {"codigo": "R4", "rango": "≥ 50 y < 100",  "r76": 7,  "r89": 7,  "denom": "Resistente"},
+    {"codigo": "R3", "rango": "≥ 25 y < 50",   "r76": 4,  "r89": 4,  "denom": "Moderadamente resistente"},
+    {"codigo": "R2", "rango": "≥ 5 y < 25",    "r76": 2,  "r89": 2,  "denom": "Débil"},
+    {"codigo": "R1", "rango": "≥ 1 y < 5",     "r76": 1,  "r89": 1,  "denom": "Muy débil"},
+    {"codigo": "R0", "rango": "< 1",            "r76": 0,  "r89": 0,  "denom": "Extremadamente débil"},
+]
+
+# D2. RQD con texto de rango y calidad
+RQD_DISPLAY_CATALOG = [
+    {"rango": "< 25 %",         "r76": 3,  "r89_min": 3.0,  "r89_max": 5.8,  "calidad": "Muy Mala"},
+    {"rango": "≥ 25 y < 50 %",  "r76": 8,  "r89_min": 5.8,  "r89_max": 10.0, "calidad": "Mala"},
+    {"rango": "≥ 50 y < 75 %",  "r76": 13, "r89_min": 10.0, "r89_max": 15.0, "calidad": "Regular"},
+    {"rango": "≥ 75 y < 90 %",  "r76": 17, "r89_min": 15.0, "r89_max": 18.0, "calidad": "Buena"},
+    {"rango": "≥ 90 y ≤ 100 %", "r76": 20, "r89_min": 18.0, "r89_max": 20.0, "calidad": "Excelente"},
+]
+
+# D3. ESPACIAMIENTO con rangos en mm para R89 y R76 lado a lado
+ESPACIAMIENTO_DISPLAY_CATALOG = [
+    {"r89_range": "< 60 mm",           "r89_rating": 5,  "r76_range": "< 50 mm",            "r76_rating": 5},
+    {"r89_range": "≥ 60 y < 200 mm",   "r89_rating": 8,  "r76_range": "≥ 50 y < 300 mm",    "r76_rating": 10},
+    {"r89_range": "≥ 200 y < 600 mm",  "r89_rating": 10, "r76_range": "≥ 300 y < 1000 mm",  "r76_rating": 20},
+    {"r89_range": "≥ 600 y < 2000 mm", "r89_rating": 15, "r76_range": "≥ 1000 y < 3000 mm", "r76_rating": 25},
+    {"r89_range": "≥ 2000 mm",          "r89_rating": 20, "r76_range": "≥ 3000 mm",           "r76_rating": 30},
+]
+
+# D4. CONDICIÓN DE AGUA con código, descripción y ratings
+AGUA_DISPLAY_CATALOG = [
+    {"codigo": "C", "desc": "Completamente seco", "r76": 10, "r89": 15},
+    {"codigo": "H", "desc": "Húmedo",              "r76": 10, "r89": 10},
+    {"codigo": "M", "desc": "Mojado",              "r76": 7,  "r89": 7},
+    {"codigo": "E", "desc": "Goteando",            "r76": 4,  "r89": 4},
+    {"codigo": "F", "desc": "Fluyendo",            "r76": 0,  "r89": 0},
+]
+
+# D5. ALTERACIÓN con código, nombre y ratings
+ALTERACION_DISPLAY_CATALOG = [
+    {"codigo": "f", "nombre": "Fresca",                    "r76": 5, "r89": 6},
+    {"codigo": "d", "nombre": "Débilmente meteorizada",    "r76": 5, "r89": 5},
+    {"codigo": "m", "nombre": "Moderadamente meteorizada", "r76": 4, "r89": 3},
+    {"codigo": "a", "nombre": "Altamente meteorizada",     "r76": 3, "r89": 3},
+    {"codigo": "c", "nombre": "Completamente meteorizada", "r76": 2, "r89": 2},
+    {"codigo": "s", "nombre": "Suelo residual",            "r76": 1, "r89": 1},
+]
+
+# D6. RELLENO con nombre completo, tipo y ratings por espesor
+RELLENO_DISPLAY_CATALOG = [
+    {"codigo": "-1",  "nombre": "Sin relleno",        "tipo": "Sin relleno", "r76_lt5": 5, "r89_lt5": 6, "r76_gte5": 5, "r89_gte5": 6},
+    {"codigo": "cwf", "nombre": "Limpio sin relleno", "tipo": "Sin relleno", "r76_lt5": 5, "r89_lt5": 6, "r76_gte5": 5, "r89_gte5": 6},
+    {"codigo": "si",  "nombre": "Sílice",             "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "sf",  "nombre": "Sulfuros",           "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "ep",  "nombre": "Epidota",            "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "ox",  "nombre": "Óxidos",             "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "qz",  "nombre": "Cuarzo",             "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "g",   "nombre": "Panizo",             "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "cl",  "nombre": "Arcilla",            "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "ca",  "nombre": "Calcita",            "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "ys",  "nombre": "Yeso",               "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "ch",  "nombre": "Clorita",            "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+]
+
+# D7. RUGOSIDAD con descripción y ratings
+RUGOSIDAD_DISPLAY_CATALOG = [
+    {"clase": 1, "desc": "Muy rugosa (Escalón/Irreg)", "r76": 5, "r89": 6},
+    {"clase": 2, "desc": "Rugosa (Ondulada)",           "r76": 4, "r89": 5},
+    {"clase": 3, "desc": "Lig. Rugosa (Ondulada)",      "r76": 4, "r89": 5},
+    {"clase": 4, "desc": "Plana Rugosa",                "r76": 2, "r89": 3},
+    {"clase": 5, "desc": "Plana Lig. Rugosa",           "r76": 2, "r89": 3},
+    {"clase": 6, "desc": "Plana Lisa",                  "r76": 0, "r89": 1},
+    {"clase": 7, "desc": "Ondulada Pulida",             "r76": 0, "r89": 1},
+    {"clase": 8, "desc": "Plana Pulida / Espejo",       "r76": 0, "r89": 0},
+    {"clase": 9, "desc": "Cizallada / Arcillosa",       "r76": 0, "r89": 0},
+]
+
+# D8. FORMA DE ESTRUCTURA
+FORMA_DISPLAY_CATALOG = [
+    {"codigo": "P", "desc": "Plana"},
+    {"codigo": "C", "desc": "Curva"},
+    {"codigo": "O", "desc": "Ondulada"},
+    {"codigo": "E", "desc": "Escalonada"},
+    {"codigo": "I", "desc": "Irregular"},
+]
+
+# D9. TIPO DE ESTRUCTURA
+ESTRUCTURA_DISPLAY_CATALOG = [
+    {"codigo": "JN",  "nombre": "Junta (JS)"},
+    {"codigo": "BED", "nombre": "Estratos (BED)"},
+    {"codigo": "F",   "nombre": "Falla (F)"},
+    {"codigo": "SZ",  "nombre": "Zona de Cizalla (SZ)"},
+    {"codigo": "CON", "nombre": "Contacto (CON)"},
+    {"codigo": "DQ",  "nombre": "Dique (DQ)"},
+]
+
+# D10. EXTREMOS VISIBLES / TERMINACIÓN
+EXTREMOS_TERMINACION_DISPLAY_CATALOG = [
+    {"codigo": 0, "terminacion": "No se ven",                "desc": "No se observan ambos extremos"},
+    {"codigo": 1, "terminacion": "Solo vemos uno",           "desc": "Solo se observa un extremo visible que termina en otra estructura en el banco"},
+    {"codigo": 2, "terminacion": "Se ven dos extremos",      "desc": "Se observan dos extremos visibles que terminan en otra estructura en el banco"},
+    {"codigo": 3, "terminacion": "Termina entre estructuras","desc": "La estructura finaliza en el espacio comprendido entre dos estructuras cercanas."},
+]
+
+# D11. CONTROL ESTRUCTURAL
+CONTROL_ESTRUCTURAL_DISPLAY_CATALOG = [
+    {"val": 1, "clas": "Ninguno",    "desc": "No hay discontinuidades aparentes, o no hay discontinuidades que influyan la estabilidad del banco"},
+    {"val": 2, "clas": "Débil",      "desc": "Uno a tres conjuntos de estructuras que son discontinuas y/o tienen una orientación favorable"},
+    {"val": 3, "clas": "Moderado",   "desc": "Las discontinuidades forman inestabilidades pequeñas y discontinuas del banco"},
+    {"val": 4, "clas": "Fuerte",     "desc": "Las discontinuidades están bien desarrolladas y forman deslizamientos tipo cuña o plano"},
+    {"val": 5, "clas": "Muy Fuerte", "desc": "Las discontinuidades están bien desarrolladas y forman deslizamientos planos o cuñas de igual altura del banco"},
+]
+
+# D12. EFECTOS DE VOLADURA
+EFECTOS_VOLADURA_DISPLAY_CATALOG = [
+    {"val": 1, "clas": "Ninguno",    "desc": "No hay efectos visibles."},
+    {"val": 2, "clas": "Débil",      "desc": "Hay fracturamiento menor y sobrequiebre del área de la cresta. Pocas fracturas nuevas y abiertas."},
+    {"val": 3, "clas": "Moderado",   "desc": "Varias fracturas irregulares en la cara de banco. Las juntas y fracturas están abiertas < 10 mm."},
+    {"val": 5, "clas": "Fuerte",     "desc": "Varias fracturas abiertas hasta 20 mm. La cresta del banco está suelta y existe sobrequiebre."},
+    {"val": 6, "clas": "Muy Fuerte", "desc": "Muchas fracturas abiertas y concoidales. La cresta está fracturada intensamente. Diaclasas > 20mm."},
+]
+
+# D13. LITOLOGÍA TABLA 1 — Correlación Lito1/Lito2/Lito3/K (vista de reporte esquemático)
+LITO_COLORES_DISPLAY_CATALOG = [
+    {"lito1": "MZB",          "lito2": "MZB", "lito3": "MZB_EQ", "k": 8.29},
+    {"lito1": "MZB",          "lito2": "MZB", "lito3": "MZB_P",  "k": 8.53},
+    {"lito1": "MBF1",         "lito2": "MBF", "lito3": "MBF1",   "k": 9.20},
+    {"lito1": "MBF2",         "lito2": "MBF", "lito3": "MBF2",   "k": 10.73},
+    {"lito1": "MBF2",         "lito2": "MBF", "lito3": "MBF_P",  "k": 9.31},
+    {"lito1": "MZM",          "lito2": "MZM", "lito3": "MZM_F",  "k": 9.31},
+    {"lito1": "MZM",          "lito2": "MZM", "lito3": "MZM_M",  "k": 8.61},
+    {"lito1": "MZH",          "lito2": "MZH", "lito3": "MZH_1",  "k": 11.62},
+    {"lito1": "MZH",          "lito2": "MZH", "lito3": "MZH_2",  "k": 9.31},
+    {"lito1": "MZD",          "lito2": "MZD", "lito3": "MZD",    "k": 7.60},
+    {"lito1": "MZQ",          "lito2": "MZQ", "lito3": "MZQ",    "k": 12.29},
+    {"lito1": "AN",           "lito2": "AN",  "lito3": "LAM",    "k": 9.31},
+    {"lito1": "LMT",          "lito2": "LMT", "lito3": "LMT_M",  "k": 14.74},
+    {"lito1": "LMT",          "lito2": "LMT", "lito3": "LMT_Mg", "k": 14.25},
+    {"lito1": "LMT",          "lito2": "LMT", "lito3": "LMT_S",  "k": 14.84},
+    {"lito1": "LMT",          "lito2": "LMT", "lito3": "LMT_C",  "k": 16.83},
+    {"lito1": "LMT",          "lito2": "LMT", "lito3": "LMT_U",  "k": 14.84},
+    {"lito1": "SHL",          "lito2": "HFL", "lito3": "SHL_MA", "k": 14.84},
+    {"lito1": "LMT",          "lito2": "GSK", "lito3": "Varios", "k": 11.15},
+    {"lito1": "LMT",          "lito2": "PSK", "lito3": "Varios", "k": 12.63},
+    {"lito1": "LMT",          "lito2": "MSK", "lito3": "Varios", "k": 12.63},
+    {"lito1": "LMT",          "lito2": "ESK", "lito3": "Varios", "k": 12.63},
+    {"lito1": "LMT",          "lito2": "MBC", "lito3": "Varios", "k": 11.78},
+    {"lito1": "LMT",          "lito2": "MBL", "lito3": "Varios", "k": 13.34},
+    {"lito1": "SHL",          "lito2": "HFL", "lito3": "-",      "k": 12.63},
+    {"lito1": "SND",          "lito2": "QZT", "lito3": "-",      "k": 12.63},
+    {"lito1": "TBX",          "lito2": "TBX", "lito3": "TBX",    "k": 13.72},
+    {"lito1": "HBX",          "lito2": "HBX", "lito3": "HBX",    "k": 11.41},
+    {"lito1": "MBX / varios", "lito2": "MBX", "lito3": "MBX",   "k": 11.41},
+    {"lito1": "Intrusivo",    "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"lito1": "Intrusivo",    "lito2": "EGT", "lito3": "-",      "k": 9.87},
+]
+
+# D14. LITOLOGÍA TABLA 2 — Validación por pares Lito2/Lito3 (vista de base de datos/reglas de escape)
+LITO_VALIDACION_DISPLAY_CATALOG = [
+    {"grupo": "INTRUSIVOS",    "lito2": "MZB", "lito3": "MZB_EQ",  "validacion": "MZB/MZB_EQ",  "k": 8.29},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZB", "lito3": "MZB_P",   "validacion": "MZB/MZB_P",   "k": 8.53},
+    {"grupo": "INTRUSIVOS",    "lito2": "MBF", "lito3": "MBF1",    "validacion": "MBF/MBF1",    "k": 9.20},
+    {"grupo": "INTRUSIVOS",    "lito2": "MBF", "lito3": "MBF2",    "validacion": "MBF/MBF2",    "k": 10.73},
+    {"grupo": "INTRUSIVOS",    "lito2": "MBF", "lito3": "MBF_P",   "validacion": "MBF/MBF_P",   "k": 9.31},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZM", "lito3": "MZM_F",   "validacion": "MZM/MZM_F",   "k": 9.31},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZM", "lito3": "MZM_M",   "validacion": "MZM/MZM_M",   "k": 8.61},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZH", "lito3": "MZH_1",   "validacion": "MZH/MZH_1",   "k": 11.62},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZH", "lito3": "MZH_2",   "validacion": "MZH/MZH_2",   "k": 9.31},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZD", "lito3": "MZD",     "validacion": "MZD/MZD",     "k": 7.60},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZQ", "lito3": "MZQ",     "validacion": "MZQ/MZQ",     "k": 12.29},
+    {"grupo": "INTRUSIVOS",    "lito2": "MBF", "lito3": "NR",      "validacion": "MBF/NR",      "k": 9.31},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZM", "lito3": "NR",      "validacion": "MZM/NR",      "k": 9.31},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZB", "lito3": "NR",      "validacion": "MZB/NR",      "k": 9.31},
+    {"grupo": "INTRUSIVOS",    "lito2": "MZH", "lito3": "NR",      "validacion": "MZH/NR",      "k": 9.31},
+    {"grupo": "ENDOSKARN",     "lito2": "EGT", "lito3": "MZM_M",   "validacion": "EGT/MZM_M",   "k": 9.87},
+    {"grupo": "ENDOSKARN",     "lito2": "EGT", "lito3": "MZB_EQ",  "validacion": "EGT/MZB_EQ",  "k": 9.87},
+    {"grupo": "ENDOSKARN",     "lito2": "EGT", "lito3": "-",       "validacion": "EGT/-",       "k": 9.87},
+    {"grupo": "ENDOSKARN",     "lito2": "EPG", "lito3": "MZB_EQ",  "validacion": "EPG/MZB_EQ",  "k": 9.87},
+    {"grupo": "ENDOSKARN",     "lito2": "EPG", "lito3": "MZM_M",   "validacion": "EPG/MZM_M",   "k": 9.87},
+    {"grupo": "ENDOSKARN",     "lito2": "EPG", "lito3": "MZD",     "validacion": "EPG/MZD",     "k": 9.87},
+    {"grupo": "ENDOSKARN",     "lito2": "EPG", "lito3": "-",       "validacion": "EPG/-",       "k": 9.87},
+    {"grupo": "BRECHAS",       "lito2": "TBX", "lito3": "TBX",     "validacion": "TBX/TBX",     "k": 13.72},
+    {"grupo": "BRECHAS",       "lito2": "BX",  "lito3": "TBX",     "validacion": "BX/TBX",      "k": 13.72},
+    {"grupo": "BRECHAS",       "lito2": "HBX", "lito3": "HBX",     "validacion": "HBX/HBX",     "k": 11.41},
+    {"grupo": "BRECHAS",       "lito2": "MBX", "lito3": "MBX",     "validacion": "MBX/MBX",     "k": 11.41},
+    {"grupo": "SEDIMENTARIAS", "lito2": "LMT", "lito3": "LMT",     "validacion": "LMT/LMT",     "k": 14.84},
+    {"grupo": "SEDIMENTARIAS", "lito2": "LMT", "lito3": "NR",      "validacion": "LMT/NR",      "k": 14.84},
+    {"grupo": "SEDIMENTARIAS", "lito2": "LMT", "lito3": "LMT_M",   "validacion": "LMT/LMT_M",   "k": 14.74},
+    {"grupo": "SEDIMENTARIAS", "lito2": "LMT", "lito3": "LMT_MG",  "validacion": "LMT/LMT_MG",  "k": 14.25},
+    {"grupo": "SEDIMENTARIAS", "lito2": "LMT", "lito3": "LMT_S",   "validacion": "LMT/LMT_S",   "k": 14.84},
+    {"grupo": "SEDIMENTARIAS", "lito2": "LMT", "lito3": "LMT_C",   "validacion": "LMT/LMT_C",   "k": 16.83},
+    {"grupo": "SEDIMENTARIAS", "lito2": "HFL", "lito3": "SHL_MA",  "validacion": "HFL/SHL_MA",  "k": 14.84},
+    {"grupo": "SEDIMENTARIAS", "lito2": "OVD", "lito3": "OVD",     "validacion": "OVD/OVD",     "k": 14.84},
+    {"grupo": "SEDIMENTARIAS", "lito2": "OVD", "lito3": "-",       "validacion": "OVD/-",       "k": 14.84},
+    {"grupo": "METAMORFICAS",  "lito2": "GSK", "lito3": "LMT_M",   "validacion": "GSK/LMT_M",   "k": 11.15},
+    {"grupo": "METAMORFICAS",  "lito2": "GSK", "lito3": "LMT_C",   "validacion": "GSK/LMT_C",   "k": 11.15},
+    {"grupo": "METAMORFICAS",  "lito2": "GSK", "lito3": "LMT_S",   "validacion": "GSK/LMT_S",   "k": 11.15},
+    {"grupo": "METAMORFICAS",  "lito2": "GSK", "lito3": "LMT_U",   "validacion": "GSK/LMT_U",   "k": 11.15},
+    {"grupo": "METAMORFICAS",  "lito2": "GSK", "lito3": "Varios",  "validacion": "GSK/Varios",  "k": 11.15},
+    {"grupo": "METAMORFICAS",  "lito2": "PSK", "lito3": "LMT_MG",  "validacion": "PSK/LMT_MG",  "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "PSK", "lito3": "LMT_C",   "validacion": "PSK/LMT_C",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "PSK", "lito3": "LMT_S",   "validacion": "PSK/LMT_S",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "PSK", "lito3": "LMT_U",   "validacion": "PSK/LMT_U",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "MSK", "lito3": "LMT_MG",  "validacion": "MSK/LMT_MG",  "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "MSK", "lito3": "LMT_S",   "validacion": "MSK/LMT_S",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "ESK", "lito3": "LMT_M",   "validacion": "ESK/LMT_M",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "ESK", "lito3": "LMT_MG",  "validacion": "ESK/LMT_MG",  "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "ESK", "lito3": "LMT_C",   "validacion": "ESK/LMT_C",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "ESK", "lito3": "LMT_S",   "validacion": "ESK/LMT_S",   "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "ESK", "lito3": "Varios",  "validacion": "ESK/Varios",  "k": 12.63},
+    {"grupo": "METAMORFICAS",  "lito2": "MBC", "lito3": "LMT_M",   "validacion": "MBC/LMT_M",   "k": 11.78},
+    {"grupo": "METAMORFICAS",  "lito2": "MBC", "lito3": "LMT_MG",  "validacion": "MBC/LMT_MG",  "k": 11.78},
+    {"grupo": "METAMORFICAS",  "lito2": "MBC", "lito3": "LMT_S",   "validacion": "MBC/LMT_S",   "k": 11.78},
+    {"grupo": "METAMORFICAS",  "lito2": "MBC", "lito3": "Varios",  "validacion": "MBC/Varios",  "k": 11.78},
+    {"grupo": "METAMORFICAS",  "lito2": "MBL", "lito3": "LMT_MG",  "validacion": "MBL/LMT_MG",  "k": 13.34},
+    {"grupo": "METAMORFICAS",  "lito2": "MBL", "lito3": "LMT_S",   "validacion": "MBL/LMT_S",   "k": 13.34},
+    {"grupo": "METAMORFICAS",  "lito2": "MBL", "lito3": "LMT_M",   "validacion": "MBL/LMT_M",   "k": 13.34},
+    {"grupo": "METAMORFICAS",  "lito2": "MBL", "lito3": "LMT_C",   "validacion": "MBL/LMT_C",   "k": 13.34},
+    {"grupo": "METAMORFICAS",  "lito2": "MBL", "lito3": "Varios",  "validacion": "MBL/Varios",  "k": 13.34},
+]
+
+# D15. LITOLOGÍA FULL — Tabla completa con lito1/lito2/lito3/grupo/k
+# Usada por el frontend para resolveLithologyCascade (lookupPltKOnly)
+LITHOLOGY_FULL_CATALOG = [
+    # INTRUSIVOS
+    {"grupo": "INTRUSIVOS", "lito1": "MZB",  "lito2": "MZB", "lito3": "MZB_EQ", "k": 8.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB",  "lito2": "MZB", "lito3": "MZB_P",  "k": 8.53},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB",  "lito2": "MZB", "lito3": "NR",     "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF1", "lito2": "MBF", "lito3": "MBF1",   "k": 9.20},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF1", "lito2": "MBF", "lito3": "NR",     "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF2", "lito2": "MBF", "lito3": "MBF2",   "k": 10.73},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF2", "lito2": "MBF", "lito3": "MBF_P",  "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MBF2", "lito2": "MBF", "lito3": "NR",     "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM",  "lito2": "MZM", "lito3": "MZM_F",  "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM",  "lito2": "MZM", "lito3": "MZM_M",  "k": 8.61},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM",  "lito2": "MZM", "lito3": "NR",     "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH",  "lito2": "MZH", "lito3": "MZH_1",  "k": 11.62},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH",  "lito2": "MZH", "lito3": "MZH_2",  "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH",  "lito2": "MZH", "lito3": "NR",     "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZD",  "lito2": "MZD", "lito3": "MZD",    "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ",  "lito2": "MZQ", "lito3": "MZQ",    "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "AN",   "lito2": "AN",  "lito3": "LAM",    "k": 9.31},
+    # SEDIMENTARIOS
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT",    "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_M",  "k": 14.74},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_MG", "k": 14.25},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_S",  "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_C",  "k": 16.83},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_U",  "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "NR",     "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "SHL", "lito2": "HFL", "lito3": "SHL_MA", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "SHL", "lito2": "HFL", "lito3": "-",      "k": 12.63},
+    {"grupo": "SEDIMENTARIOS", "lito1": "SND", "lito2": "QZT", "lito3": "-",      "k": 12.63},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "OVD", "lito3": "OVD",    "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "OVD", "lito3": "-",      "k": 14.84},
+    # BRECHAS
+    {"grupo": "BRECHAS", "lito1": "TBX",          "lito2": "TBX", "lito3": "TBX", "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "MBX / varios", "lito2": "MBX", "lito3": "MBX", "k": 11.41},
+    # ENDOSKARN
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "MZB_EQ", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "MZM_M",  "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "MZD",    "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "MZM_M",  "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "MZB_EQ", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "Intrusivo", "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    # METAMORFICAS
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_M",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_C",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_S",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_U",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_MG", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "Varios", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_C",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_S",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_U",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_S",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_M",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_C",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_S",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_M",  "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_MG", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_S",  "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "Varios", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_MG", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_S",  "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_M",  "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_C",  "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "Varios", "k": 13.34},
+]

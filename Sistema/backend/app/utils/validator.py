@@ -627,8 +627,18 @@ def validate_bulk_excel(file_path, output_json_path):
     print(f"    [*] [QA/QC] Iniciando lectura de archivo: {os.path.basename(file_path)}")
     
     try: 
-        df = pd.read_excel(file_path, engine='openpyxl')
+        xls = pd.ExcelFile(file_path, engine='openpyxl')
+        sheet_names = xls.sheet_names
+        
+        # Validar si el archivo es un reporte del sistema ya procesado
+        is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
+        if is_report:
+            raise ValueError("El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
+            
+        df = pd.read_excel(xls, sheet_name=sheet_names[0])
         print(f"    [+] [QA/QC] Archivo cargado con éxito. Filas físicas leídas: {len(df)}")
+    except ValueError as ve:
+        raise ve
     except Exception as e:
         print(f"    [-] [QA/QC] Error crítico al leer el archivo Excel: {e}")
         raise ValueError(f"No se pudo leer el archivo Excel. Verifique que no esté corrupto. Detalle: {str(e)}")

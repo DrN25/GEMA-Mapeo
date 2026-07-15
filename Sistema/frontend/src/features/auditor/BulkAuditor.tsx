@@ -132,6 +132,14 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         try {
             const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
             const res = await fetch(`${apiBase}/api/geomecanica/resumen-ligero?audit_id=${auditId}&years=${yearParam}`);
+            if (res.status === 400 || res.status === 500) {
+                const data = await res.json();
+                setStatus('error');
+                setMessage(data.detail || 'Fallo de procesamiento en el servidor.');
+                setProcessingAuditId('');
+                stopProcessingPolling();
+                return;
+            }
             if (res.ok) {
                 if (res.status === 202) return;
                 const data = await res.json();

@@ -1,77 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table, Layers, Compass, Flame, AlignLeft, Droplet,
   Shield, Zap, Sparkles, Sliders, Maximize2, MoveRight,
   Database, GitBranch, ArrowRightLeft
 } from 'lucide-react';
-import {
-  STRUCTURE_CATALOG,
-  RELLENO_CATALOG,
-  ALTERACION_CATALOG,
-  FORMA_CATALOG,
-  RUGOSIDAD_CATALOG,
-  LITO_COLORES_DATA,
-  LITO_VALIDACION_DATA
-} from '../utils/catalogData';
-
-// --- DATASETS OFICIALES UNIFICADOS Y REVISADOS CON COMPARADORES MATEMÁTICOS ---
-
-const AGUA_DATA = [
-  { desc: "Completamente seco", codigo: "C", r76: 10, r89: 15 },
-  { desc: "Húmedo", codigo: "H", r76: 10, r89: 10 },
-  { desc: "Mojado", codigo: "M", r76: 7, r89: 7 },
-  { desc: "Goteando", codigo: "E", r76: 4, r89: 4 },
-  { desc: "Fluyendo", codigo: "F", r76: 0, r89: 0 }
-];
-
-const RESISTENCIA_DATA = [
-  { codigo: "R6", rango: "≥ 250", r76: 15, r89: "12.0 - 15.0", denom: "Extremadamente resistente" },
-  { codigo: "R5", rango: "≥ 100 y < 250", r76: 12, r89: "9.5 - 12.0", denom: "Muy resistente" },
-  { codigo: "R4", rango: "≥ 50 y < 100", r76: 7, r89: "5.5 - 9.5", denom: "Resistente" },
-  { codigo: "R3", rango: "≥ 25 y < 50", r76: 4, r89: "3.8 - 5.5", denom: "Moderadamente resistente" },
-  { codigo: "R2", rango: "≥ 5 y < 25", r76: 2, r89: "1.5 - 3.8", denom: "Débil" },
-  { codigo: "R1", rango: "≥ 1 y < 5", r76: 1, r89: "1.5", denom: "Muy débil" },
-  { codigo: "R0", rango: "< 1", r76: 0, r89: "0.0", denom: "Extremadamente débil" }
-];
-
-const CONTROL_ESTRUCTURAL_DATA = [
-  { val: 1, clas: "Ninguno", desc: "No hay discontinuidades aparentes, o no hay discontinuidades que influyan la estabilidad del banco" },
-  { val: 2, clas: "Debil", desc: "Uno a tres conjuntos de estructuras que son discontinuas y/o tienen una orientacion" },
-  { val: 3, clas: "Moderado", desc: "Las discontinuidades forman inestabilidades pequeñas y discontinuidades, del" },
-  { val: 4, clas: "Fuerte", desc: "Las discontinuidades estan bien desarrolladas y forman deslizamientos tipo" },
-  { val: 5, clas: "Muy Fuerte", desc: "Las discontinuidades estan bien desarrolladas y forman deslizamientos planos o cuñas de igual altura del banco. La cara del banco se sobrequiebra al angulo aparente del mecanismo de control." }
-];
-
-const EFECTOS_VOLADURA_DATA = [
-  { val: 1, clas: "Ninguno", desc: "No hay efectos visibles." },
-  { val: 2, clas: "Debil", desc: "Hay fracturamiento menor y sobrequiebre del area de la cresta por efecto de la voladura. Pocas fracturas nuevas y abiertas." },
-  { val: 3, clas: "Moderado", desc: "Varias fracturas irregulares en la cara de banco. Las juntas y fracturas estan abiertas < 10 mm." },
-  { val: 5, clas: "Fuerte", desc: "Varias fracturas abiertas. Las juntas y fracturas estan abiertas hasta 20 mm. La cresta del banco está suelta y existe sobrequiebre por efectos de la voladura." },
-  { val: 6, clas: "Muy Fuerte", desc: "Muchas fracturas abiertas y fracturas concoidales por efecto de la voladura. La cresta esta fracturada intensamente. Diaclasa y fracturas abiertas > 20mm." }
-];
-
-const RQD_DATA_LIST = [
-  { rango: "< 25 %", r76: 3, r89: "3.0 - 5.8", calidad: "Muy Mala" },
-  { rango: "≥ 25 y < 50 %", r76: 8, r89: "5.8 - 10.0", calidad: "Mala" },
-  { rango: "≥ 50 y < 75 %", r76: 13, r89: "10.0 - 15.0", calidad: "Regular" },
-  { rango: "≥ 75 y < 90 %", r76: 17, r89: "15.0 - 18.0", calidad: "Buena" },
-  { rango: "≥ 90 y ≤ 100 %", r76: 20, r89: "18.0 - 20.0", calidad: "Excelente" }
-];
-
-const ESPACIAMIENTO_DATA_LIST = [
-  { r89_range: "< 60 mm", r89_rating: 5, r76_range: "< 50 mm", r76_rating: 5 },
-  { r89_range: "≥ 60 y < 200 mm", r89_rating: 8, r76_range: "≥ 50 y < 300 mm", r76_rating: 10 },
-  { r89_range: "≥ 200 y < 600 mm", r89_rating: 10, r76_range: "≥ 300 y < 1000 mm", r76_rating: 20 },
-  { r89_range: "≥ 600 y < 2000 mm", r89_rating: 15, r76_range: "≥ 1000 y < 3000 mm", r76_rating: 25 },
-  { r89_range: "≥ 2000 mm", r89_rating: 20, r76_range: "≥ 3000 mm", r76_rating: 30 }
-];
-
-const EXTREMOS_TERMINACION_DATA = [
-  { codigo: 0, terminacion: "No se ven", desc: "No se observan ambos extremos" },
-  { codigo: 1, terminacion: "Solo vemos uno", desc: "Solo se observa un extremo visible que termina en otra estructura en el banco" },
-  { codigo: 2, terminacion: "Se ven dos extremos visibles", desc: "Se observan dos extremos visibles que terminan en otra estructura en el banco" },
-  { codigo: 3, terminacion: "Termina entre estructuras", desc: "La estructura finaliza en el espacio comprendido entre dos estructuras cercanas." }
-];
 
 const getGroupBadge = (grupo: string) => {
   const g = String(grupo).toUpperCase();
@@ -119,6 +51,32 @@ interface CatalogsViewProps {
 
 export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
   const [activeTab, setActiveTab] = useState<string>('litologia');
+  const [catalogs, setCatalogs] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    fetch('/api/catalogs/all')
+      .then(res => {
+        if (!res.ok) throw new Error("Server error");
+        return res.json();
+      })
+      .then(data => {
+        setCatalogs(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error loading catalogs in view:", err);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 gap-3 text-slate-400 min-h-[50vh]">
+        <div className="w-10 h-10 border-4 border-violet-500/20 border-t-violet-500 rounded-full animate-spin"></div>
+        <p className="text-xs font-semibold">Cargando catálogos geomecánicos SSOT...</p>
+      </div>
+    );
+  }
 
   const groups = mode === 'plt' ? [
     {
@@ -158,61 +116,53 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
         { id: 'relleno', label: 'Relleno / Espesor', icon: Database },
         { id: 'rugosidad', label: 'Rugosidad (1-9)', icon: Flame },
         { id: 'forma', label: 'Forma', icon: Compass },
-        { id: 'jrc', label: 'JRC', icon: Table }
-      ]
-    },
-    {
-      title: 'Efectos de Contorno',
-      items: [
-        { id: 'control', label: 'Control Estruc.', icon: Zap },
-        { id: 'voladura', label: 'Efectos Voladura', icon: Sparkles }
+        { id: 'jrc', label: 'JRC vs Rugosidad', icon: Table }
       ]
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 select-none text-left animate-fade-in h-[75vh]">
-      {/* Barra lateral de navegación categórica */}
-      <div className="md:col-span-1 border-r border-navy-850/80 pr-4 space-y-5 overflow-y-auto max-h-[70vh] scrollbar-thin">
-        {groups.map((group, gIdx) => (
-          <div key={gIdx} className="space-y-1.5">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2">
-              {group.title}
+    <div className="flex flex-col md:flex-row gap-6 p-4 md:p-6 bg-navy-950 min-h-screen text-slate-100">
+      {/* SIDE MENU */}
+      <div className="w-full md:w-64 shrink-0 space-y-4">
+        {groups.map((g, gIdx) => (
+          <div key={gIdx} className="space-y-1 bg-navy-900/30 p-3 rounded-xl border border-navy-900">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-2 mb-2">
+              {g.title}
             </h4>
-            <div className="flex flex-col gap-1">
-              {group.items.map((t) => {
-                const Icon = t.icon;
-                const isActive = activeTab === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveTab(t.id)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${isActive
-                      ? 'bg-orange-500 text-slate-950 font-black shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-                      : 'bg-transparent text-slate-400 hover:bg-navy-900/40 hover:text-white'
-                      }`}
-                  >
-                    <Icon size={13} className={isActive ? 'text-slate-950' : 'text-slate-500'} />
-                    <span>{t.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {g.items.map((item) => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all text-left ${
+                    active
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/10'
+                      : 'text-slate-400 hover:bg-navy-900/60 hover:text-slate-200'
+                  }`}
+                >
+                  <Icon size={14} className={active ? 'text-white' : 'text-slate-400'} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
         ))}
       </div>
 
-      {/* Contenedor principal de visualización de tablas */}
-      <div className="md:col-span-3 overflow-y-auto max-h-[70vh] pr-1 space-y-4 scrollbar-thin">
-
-        {/* 1. LITOLOGÍAS (Solo en modo PLT) */}
+      {/* CONTENT TAB */}
+      <div className="flex-1 bg-navy-900/10 p-5 rounded-2xl border border-navy-900/55 min-w-0">
+        
+        {/* 1. LITOLOGÍA Y K */}
         {activeTab === 'litologia' && (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-8">
             {/* TABLA 1 */}
             <div className="space-y-3">
               <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-                <Layers size={14} className="text-orange-500 animate-pulse" />
-                <span>Tabla de Correlación Litológica y Factores K (Esquema de Reporte)</span>
+                <Layers size={14} className="text-cyan-400 animate-pulse" />
+                <span>Factor de correlación para ensayos de carga puntual (SRK, 2023)</span>
               </h3>
               <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
                 <table className="w-full text-left text-xs border-collapse">
@@ -226,7 +176,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                    {LITO_COLORES_DATA.map((item, idx) => {
+                    {catalogs.litologia.tabla_colores.map((item: any, idx: number) => {
                       const lito2Up = item.lito2.toUpperCase();
                       let grupo = "INTRUSIVOS";
                       if (["GSK", "PSK", "MSK", "ESK", "MBC", "MBL"].includes(lito2Up)) {
@@ -263,7 +213,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
             <div className="space-y-3">
               <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
                 <Layers size={14} className="text-violet-500 animate-pulse" />
-                <span>Tabla de Validación y Reglas de Escape del Factor K (Base de Datos)</span>
+                <span>Factor de correlación para ensayos de carga puntual (Detallado)</span>
               </h3>
               <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
                 <table className="w-full text-left text-xs border-collapse">
@@ -277,7 +227,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                    {LITO_VALIDACION_DATA.map((item, idx) => (
+                    {catalogs.litologia.tabla_validacion.map((item: any, idx: number) => (
                       <tr key={idx} className="hover:bg-navy-900/20">
                         <td className="py-2 px-4">{getGroupBadge(item.grupo)}</td>
                         <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito2}</td>
@@ -311,7 +261,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {AGUA_DATA.map((item, idx) => (
+                  {catalogs.agua.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 capitalize">{item.desc}</td>
                       <td className="py-2.5 px-4 text-center font-black text-orange-400">{item.codigo}</td>
@@ -345,7 +295,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                    {RESISTENCIA_DATA.map((item, idx) => (
+                    {catalogs.resistencia.map((item: any, idx: number) => (
                       <tr key={idx} className="hover:bg-navy-900/20">
                         <td className="py-2.5 px-4 font-black text-orange-400">{item.codigo}</td>
                         <td className="py-2.5 px-4 font-mono">{item.rango}</td>
@@ -378,7 +328,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {CONTROL_ESTRUCTURAL_DATA.map((item, idx) => (
+                  {catalogs.control_estructural.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 text-center font-black text-orange-400">{item.val}</td>
                       <td className="py-2.5 px-4 font-extrabold">{item.clas}</td>
@@ -408,7 +358,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {EFECTOS_VOLADURA_DATA.map((item, idx) => (
+                  {catalogs.efectos_voladura.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 text-center font-black text-orange-400">{item.val}</td>
                       <td className="py-2.5 px-4 font-extrabold">{item.clas}</td>
@@ -439,11 +389,11 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {RQD_DATA_LIST.map((item, idx) => (
+                  {catalogs.rqd.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-mono font-bold">{item.rango}</td>
                       <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_max.toFixed(1)}</td>
                       <td className="py-2.5 px-4 text-slate-300">{item.calidad}</td>
                     </tr>
                   ))}
@@ -471,7 +421,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {ESPACIAMIENTO_DATA_LIST.map((item, idx) => (
+                  {catalogs.espaciamiento.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-mono">{item.r89_range}</td>
                       <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_rating}</td>
@@ -501,10 +451,10 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {Object.entries(STRUCTURE_CATALOG).map(([code, desc]) => (
-                    <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 text-orange-400 font-black">{code}</td>
-                      <td className="py-2.5 px-4">{desc}</td>
+                  {catalogs.estructura.map((item: any) => (
+                    <tr key={item.codigo} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 text-orange-400 font-black">{item.codigo}</td>
+                      <td className="py-2.5 px-4">{item.nombre}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -530,7 +480,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {EXTREMOS_TERMINACION_DATA.map((item) => (
+                  {catalogs.extremos_terminacion.map((item: any) => (
                     <tr key={item.codigo} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 text-center text-orange-400 font-black">{item.codigo}</td>
                       <td className="py-2.5 px-4 font-bold text-slate-200">{item.terminacion}</td>
@@ -642,20 +592,23 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {Object.entries(RELLENO_CATALOG).map(([code, item]) => (
-                    <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-3 font-bold text-orange-400">{code} - {item.name.replace(/\([^)]+\)/g, '')}</td>
-                      <td className="py-2.5 px-2 text-center text-[10px] text-slate-400 font-semibold">{item.tipo}</td>
-                      <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{item.clase === 3 ? item.rmr89 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{item.clase === 2 ? item.rmr89 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{item.clase === 2 ? item.rmr89_gt5 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{item.clase === 1 ? item.rmr89 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{item.clase === 1 ? item.rmr89_gt5 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-amber-300 font-mono">{item.clase === 3 ? item.rmr76 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-amber-300 font-mono">{item.clase === 2 ? item.rmr76 : '—'}</td>
-                      <td className="py-2.5 px-2 text-center text-amber-300 font-mono">{item.clase === 2 ? item.rmr76_gt5 : '—'}</td>
-                    </tr>
-                  ))}
+                  {catalogs.relleno.map((item: any) => {
+                    const claseVal = item.tipo === "Blando" ? 1 : (item.tipo === "Duro" ? 2 : 3);
+                    return (
+                      <tr key={item.codigo} className="hover:bg-navy-900/20">
+                        <td className="py-2.5 px-3 font-bold text-orange-400">{item.codigo} - {item.nombre}</td>
+                        <td className="py-2.5 px-2 text-center text-[10px] text-slate-400 font-semibold">{item.tipo}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{claseVal === 3 ? item.r89_lt5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{claseVal === 2 ? item.r89_lt5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{claseVal === 2 ? item.r89_gte5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{claseVal === 1 ? item.r89_lt5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-pink-300 font-mono">{claseVal === 1 ? item.r89_gte5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 font-mono">{claseVal === 3 ? item.r76_lt5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 font-mono">{claseVal === 2 ? item.r76_lt5 : '—'}</td>
+                        <td className="py-2.5 px-2 text-center text-amber-300 font-mono">{claseVal === 2 ? item.r76_gte5 : '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -680,9 +633,9 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {Object.entries(RUGOSIDAD_CATALOG).map(([numStr, item]) => (
-                    <tr key={numStr} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 text-center font-bold text-orange-400">{numStr}</td>
+                  {catalogs.rugosidad.map((item: any) => (
+                    <tr key={item.clase} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 text-center font-bold text-orange-400">{item.clase}</td>
                       <td className="py-2.5 px-4">{item.desc.replace(/^\d\s*—\s*/, '')}</td>
                       <td className="py-2.5 px-4 text-center text-pink-300 font-black">{item.r89}</td>
                       <td className="py-2.5 px-4 text-center text-amber-300 font-black">{item.r76}</td>
@@ -710,10 +663,10 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {Object.entries(FORMA_CATALOG).map(([code, desc]) => (
-                    <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 text-orange-400 font-black">{code}</td>
-                      <td className="py-2.5 px-4">{desc}</td>
+                  {catalogs.forma.map((item: any) => (
+                    <tr key={item.codigo} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 text-orange-400 font-black">{item.codigo}</td>
+                      <td className="py-2.5 px-4">{item.desc}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -740,10 +693,10 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {Object.entries(ALTERACION_CATALOG).map(([code, item]) => (
-                    <tr key={code} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-black text-orange-400">{code}</td>
-                      <td className="py-2.5 px-4">{item.name.replace(/^[a-z]\s*—\s*/i, '')}</td>
+                  {catalogs.alteracion.map((item: any) => (
+                    <tr key={item.codigo} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-black text-orange-400">{item.codigo}</td>
+                      <td className="py-2.5 px-4">{item.nombre}</td>
                       <td className="py-2.5 px-4 text-center text-pink-300 font-black">{item.r89}</td>
                       <td className="py-2.5 px-4 text-center text-amber-300 font-black">{item.r76}</td>
                     </tr>

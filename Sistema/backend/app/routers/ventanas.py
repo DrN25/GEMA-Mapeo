@@ -14,63 +14,30 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from app.database import get_db
 from app import models, schemas, calculator
+from app.core.catalogs import LITHOLOGY_CLASSIFICATION
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 uploads_dir = os.path.join(BASE_DIR, "uploads")
 
-LITHOLOGY_CLASSIFICATION_DB = [
-    {"grupo": "INTRUSIVOS", "unidad": "MZB", "litologia": "MZB", "codigo": "MZB_EQ"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZB", "litologia": "MZB", "codigo": "MZB_P"},
-    {"grupo": "INTRUSIVOS", "unidad": "MBF1", "litologia": "MBF", "codigo": "MBF1"},
-    {"grupo": "INTRUSIVOS", "unidad": "MBF2", "litologia": "MBF", "codigo": "MBF2"},
-    {"grupo": "INTRUSIVOS", "unidad": "MBF2", "litologia": "MBF", "codigo": "MBF_P"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZM", "litologia": "MZM", "codigo": "MZM_F"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZM", "litologia": "MZM", "codigo": "MZM_M"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZH", "litologia": "MZH", "codigo": "MZH_1"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZH", "litologia": "MZH", "codigo": "MZH_2"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZD", "litologia": "MZD", "codigo": "MZD"},
-    {"grupo": "INTRUSIVOS", "unidad": "MZQ", "litologia": "MZQ", "codigo": "MZQ"},
-    {"grupo": "INTRUSIVOS", "unidad": "AN", "litologia": "LAM", "codigo": "LAM"},
-    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_M"},
-    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_MG"},
-    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_S"},
-    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_C"},
-    {"grupo": "SEDIMENTARIOS", "unidad": "LMT", "litologia": "LMT", "codigo": "LMT_U"},
-    {"grupo": "SEDIMENTARIOS", "unidad": "SHL", "litologia": "HFL", "codigo": "SHL_MA"},
-    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "GSK", "codigo": "Varios"},
-    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "PSK", "codigo": "Varios"},
-    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "MSK", "codigo": "Varios"},
-    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "ESK", "codigo": "Varios"},
-    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "MBC", "codigo": "Varios"},
-    {"grupo": "METAMORFICAS", "unidad": "LMT", "litologia": "MBL", "codigo": "Varios"},
-    {"grupo": "METAMORFICAS", "unidad": "SHL", "litologia": "HFL", "codigo": "-"},
-    {"grupo": "METAMORFICAS", "unidad": "SND", "litologia": "QZT", "codigo": "-"},
-    {"grupo": "BRECHAS", "unidad": "TBX", "litologia": "TBX", "codigo": "TBX"},
-    {"grupo": "BRECHAS", "unidad": "HBX", "litologia": "HBX", "codigo": "HBX"},
-    {"grupo": "BRECHAS", "unidad": "MBX / varios", "litologia": "MBX", "codigo": "MBX"},
-    {"grupo": "ENDOSKARN", "unidad": "MZM", "litologia": "EPG", "codigo": "-"},
-    {"grupo": "ENDOSKARN", "unidad": "MZM", "litologia": "EGT", "codigo": "-"}
-]
-
 def resolve_lithology(lito3_code: str) -> dict:
     code_clean = str(lito3_code or "").strip().upper().replace(" ", "").replace("-", "")
     match = None
-    for item in LITHOLOGY_CLASSIFICATION_DB:
-        item_code = item["codigo"].upper().replace(" ", "").replace("-", "")
+    for item in LITHOLOGY_CLASSIFICATION:
+        item_code = item["lito3"].upper().replace(" ", "").replace("-", "")
         if item_code and item_code == code_clean:
             match = item
             break
     if not match:
-        for item in LITHOLOGY_CLASSIFICATION_DB:
-            if code_clean in item["codigo"].upper() or code_clean in item["litologia"].upper():
+        for item in LITHOLOGY_CLASSIFICATION:
+            if code_clean in item["lito3"].upper() or code_clean in item["lito2"].upper():
                 match = item
                 break
     if match:
         return {
-            "lito_1": match["unidad"],
-            "lito_2": match["litologia"],
-            "lito_3": match["codigo"],
+            "lito_1": match["lito1"],
+            "lito_2": match["lito2"],
+            "lito_3": match["lito3"],
             "unidad_litologica": match["grupo"]
         }
     return {"lito_1": lito3_code, "lito_2": "", "lito_3": lito3_code, "unidad_litologica": "INTRUSIVOS"}

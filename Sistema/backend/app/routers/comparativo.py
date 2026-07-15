@@ -22,67 +22,23 @@ from fastapi.responses import StreamingResponse
 from app.utils.validator import validate_bulk_excel
 from app.core.catalogs import MANDATORY_COLS_COUNT
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
-from app.routers.auditoria import get_incidence_category_name
+from app.core.audit_helpers import (
+    safe_int,
+    safe_float,
+    get_safe_sheet_name,
+    get_incidence_category_name,
+)
+from app.core.excel_styles import get_styles, write_kpi_card
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 uploads_dir = os.path.join(BASE_DIR, "uploads")
 
-# ─── Paleta de estilos ───────────────────────────────────────────────────────
-
-def _make_styles():
-    return {
-        "font_title":      Font(name="Segoe UI", size=16, bold=True,  color="1B365D"),
-        "font_subtitle":   Font(name="Segoe UI", size=10, italic=True, color="555555"),
-        "font_section":    Font(name="Segoe UI", size=11, bold=True,  color="1B365D"),
-        "font_header":     Font(name="Segoe UI", size=10, bold=True,  color="FFFFFF"),
-        "font_bold":       Font(name="Segoe UI", size=10, bold=True,  color="000000"),
-        "font_regular":    Font(name="Segoe UI", size=10,             color="000000"),
-        "font_kpi_lbl":    Font(name="Segoe UI", size=9,  bold=True,  color="555555"),
-        "font_kpi_blue":   Font(name="Segoe UI", size=18, bold=True,  color="1B365D"),
-        "font_kpi_green":  Font(name="Segoe UI", size=18, bold=True,  color="375623"),
-        "font_kpi_red":    Font(name="Segoe UI", size=18, bold=True,  color="C00000"),
-        "font_delta_green":Font(name="Segoe UI", size=10, bold=True,  color="375623"),
-        "font_delta_red":  Font(name="Segoe UI", size=10, bold=True,  color="C00000"),
-        "font_delta_gray": Font(name="Segoe UI", size=10,             color="555555"),
-        "font_link":       Font(name="Segoe UI", size=10, bold=True,  color="1B365D", underline="single"),
-        "fill_primary":    PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid"),
-        "fill_a":          PatternFill(start_color="2B4F8C", end_color="2B4F8C", fill_type="solid"),
-        "fill_b":          PatternFill(start_color="14532D", end_color="14532D", fill_type="solid"),
-        "fill_green":      PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"),
-        "fill_orange":     PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid"),
-        "fill_red":        PatternFill(start_color="F2DCDB", end_color="F2DCDB", fill_type="solid"),
-        "fill_yellow":     PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid"),
-        "fill_zebra":      PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid"),
-        "fill_kpi_gray":   PatternFill(start_color="F2F4F7", end_color="F2F4F7", fill_type="solid"),
-        "fill_new":        PatternFill(start_color="FDE8E8", end_color="FDE8E8", fill_type="solid"),
-        "fill_resolved":   PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid"),
-        "border_thin": Border(
-            left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
-            top=Side(style="thin", color="E2E8F0"),  bottom=Side(style="thin", color="E2E8F0")
-        ),
-        "border_kpi": Border(
-            left=Side(style="thin", color="B0C4DE"),  right=Side(style="thin", color="B0C4DE"),
-            top=Side(style="thin", color="B0C4DE"),   bottom=Side(style="thin", color="B0C4DE")
-        ),
-        "align_center": Alignment(horizontal="center", vertical="center", wrap_text=True),
-        "align_left":   Alignment(horizontal="left",   vertical="center", wrap_text=True),
-        "align_right":  Alignment(horizontal="right",  vertical="center"),
-    }
-
-def _safe_int(v, d=0):
-    try: return int(v)
-    except: return d
-
-def _safe_float(v, d=0.0):
-    try: return float(v)
-    except: return d
-
-def _get_safe_sheet_name(title, index):
-    clean_title = re.sub(r'[:\/?*\[\]\'"]', '', title).strip()
-    suffix = f" ({index})"
-    max_title_len = 31 - len(suffix)
-    return f"{clean_title[:max_title_len].strip()}{suffix}"
+# Map local legacy names to centralized implementations
+_safe_int = safe_int
+_safe_float = safe_float
+_get_safe_sheet_name = get_safe_sheet_name
+_make_styles = get_styles
 
 # ─── Lógica de comparación con intersección de campañas ───────────────────────
 

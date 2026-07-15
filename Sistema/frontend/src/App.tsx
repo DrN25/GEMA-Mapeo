@@ -17,6 +17,7 @@ import PltEnsayosView from './components/PltEnsayosView';
 
 // --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
+import { initCatalogs } from './utils/catalogData';
 
 import {
   calculateWindowGeomec,
@@ -97,6 +98,7 @@ export default function App() {
   // Real-time calculated results & alerts
   const [calculated, setCalculated] = useState<CalculatorResult | null>(null);
   const [alerts, setAlerts] = useState<ValidationAlert[]>([]);
+  const [catalogsLoaded, setCatalogsLoaded] = useState<boolean>(false);
 
   // Photos & Captions states
   const [photos, setPhotos] = useState<string[]>(['', '', '', '']);
@@ -138,10 +140,24 @@ export default function App() {
     };
   }, []);
 
-  // 2. Fetch window summaries and PLT trials on mount
+  // 2. Fetch catalogs first, then summaries and PLT trials on mount
   useEffect(() => {
-    fetchWindows();
-    fetchPltEnsayos();
+    fetch(`${API_BASE}/api/catalogs/all`)
+      .then(res => {
+        if (!res.ok) throw new Error("Server error");
+        return res.json();
+      })
+      .then(data => {
+        initCatalogs(data);
+        setCatalogsLoaded(true);
+        fetchWindows();
+        fetchPltEnsayos();
+      })
+      .catch(err => {
+        console.error("Error loading geomechanical catalogs:", err);
+        setSyncStatus('offline');
+        setSyncMessage('Error al conectar con el servidor de catálogos.');
+      });
   }, []);
 
   // 3. Keep RMR calculations and QA/QC validation updated in real-time
@@ -681,6 +697,15 @@ export default function App() {
       }
     }, 150);
   };
+
+  if (!catalogsLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-navy-950 text-slate-100 gap-4">
+        <div className="w-12 h-12 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"></div>
+        <p className="text-sm font-semibold tracking-wide text-slate-400">Cargando interfaz de ventanas geomecánicas...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-navy-950 text-slate-100 font-sans">

@@ -24,376 +24,50 @@ uploads_dir = os.path.join(BASE_DIR, "uploads")
 
 # --- SISTEMA CENTRALIZADO (SSOT) DE REGLAS DE VALIDACIÓN GEOMECÁNICA ---
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
-
-def get_incidence_category_name(i: dict) -> str:
-    rule_code = i.get("rule_code")
-    rule = RULES_REGISTRY.get(rule_code) if rule_code else None
-    if rule:
-        cat = CATEGORIES_REGISTRY.get(rule.category_code)
-        if cat:
-            return cat.name
-    
-    # Fallback/Backward compatibility for legacy records
-    msg = i.get("mensaje", "")
-    msg_up = msg.upper()
-    for cat_code, cat_obj in CATEGORIES_REGISTRY.items():
-        if cat_obj.name.upper() in msg_up:
-            return cat_obj.name
-            
-    # Substring heuristics for legacy messages
-    if "VACÍO" in msg_up or "VACIO" in msg_up or "CAMPO OBLIGATORIO" in msg_up:
-        return "Campo obligatorio se encuentra vacío."
-    if "ÁNGULO DEL TALUD" in msg_up or "ANGULO DEL TALUD" in msg_up or "DIP_TALUD" in msg_up:
-        return "Ángulo del talud fuera del rango [-90, 90] grados."
-    if "AGUA" in msg_up:
-        if "CÓDIGO" in msg_up or "CODIGO" in msg_up or "NO ADMITIDO" in msg_up:
-            return "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F."
-        if "EXCEDE" in msg_up or "LÍMITES REALES" in msg_up or "LIMITES REALES" in msg_up:
-            return "Valor de agua '76 / '89 excede los límites reales de la escala."
-        if "INCONGRUENTE" in msg_up or "RATING" in msg_up:
-            return "Rating de agua '76 / '89 es incongruente con el código."
-        if "MEDIO NO EXACTO" in msg_up:
-            return "El valor de agua '76 / '89 es un valor medio no exacto."
-    if "DUREZA" in msg_up and "ADMITIDA" in msg_up:
-        return "Dureza '76 / '89 no admitida. Debe ser R0 a R6."
-    if "RESISTENCIA" in msg_up:
-        if "INCONGRUENTE" in msg_up:
-            return "Resistencia '76 / '89 es incongruente con la dureza."
-        if "LÍMITE REAL" in msg_up or "LIMITE REAL" in msg_up or "EXCEDE" in msg_up or "LÍMITE" in msg_up or "FUERA DEL" in msg_up:
-            return "Rating de resistencia '76 / '89 fuera del límite real."
-        if "ALEJADO" in msg_up or "PUNTAJE DE RESISTENCIA" in msg_up:
-            return "Puntaje de resistencia '76 / '89 es un valor alejado no válido."
-    if "CONTROL ESTRUCTURAL" in msg_up:
-         return "Control estructural '76 / '89 fuera de límites permitidos [1, 5]."
-    if "EFECTO" in msg_up or "VOLADURA" in msg_up:
-        if "EXCEDE" in msg_up or "ESCALA" in msg_up:
-            return "Efecto de voladura '76 / '89 excede los límites de la escala."
-        if "MEDIO NO EXACTO" in msg_up:
-            return "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto."
-    if "RQD" in msg_up:
-        if "SUPERIOR AL 100%" in msg_up or "SUPERIOR" in msg_up:
-            return "Porcentaje de RQD '76 / '89 no puede ser superior al 100%."
-        if "ALEJADO" in msg_up or "PUNTAJE DE RQD" in msg_up:
-            return "Puntaje de RQD '76 / '89 es un valor alejado no válido."
-    if "ESPACIAMIENTO PROMEDIO" in msg_up:
-        if "ES DE 0.0 M" in msg_up or "CERO" in msg_up:
-            return "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero)."
-        if "POSITIVO" in msg_up or "NEGATIVO" in msg_up:
-            return "El espaciamiento promedio '76 / '89 debe ser positivo."
-    if "ESPACIAMIENTO" in msg_up:
-        if "RANGO" in msg_up or "FUERA DEL" in msg_up:
-            return "Valor de rating de espaciamiento '76 / '89 fuera de rango."
-        if "ALINEA" in msg_up:
-            return "Rating de espaciamiento '76 / '89 no se alinea con el promedio."
-        if "MEDIO NO EXACTO" in msg_up:
-            return "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto."
-    if "SUGERIDA A NORMALIZAR POR 'JN'" in msg_up or "NORMALIZAR POR 'JN'" in msg_up:
-        return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
-    if "TIPO DE ESTRUCTURA GEOLÓGICA NO PERMITIDA" in msg_up or "TIPO DE ESTRUCTURA GEOLOGICA NO PERMITIDA" in msg_up:
-        return "Tipo de estructura geológica no permitida."
-    if "RELLENO" in msg_up and "CATÁLOGO" in msg_up or "RELLENO" in msg_up and "CATALOGO" in msg_up:
-        return "Tipo de relleno no pertenece al catálogo."
-    if "JRC" in msg_up and "RANGO" in msg_up:
-        return "Valor JRC fuera de rango permitido [0, 20]."
-    if "RUGOSIDAD" in msg_up and "LÍMITES" in msg_up or "RUGOSIDAD" in msg_up and "LIMITES" in msg_up:
-        return "Clase de rugosidad de junta fuera de límites [1, 9]."
-    if "FORMA" in msg_up and "INVÁLIDA" in msg_up or "FORMA" in msg_up and "INVALIDA" in msg_up:
-        return "Forma de estructura inválida. Debe ser P, C, O, E o I."
-    if "ALTERACION" in msg_up or "ALTERACIÓN" in msg_up:
-        return "Código de alteración inválido."
-    if "ESPESOR" in msg_up and "SUPERIOR" in msg_up and "ABERTURA" in msg_up:
-        return "Espesor del relleno es superior a la abertura total."
-    if "ABERTURA DE LA FALLA" in msg_up or ("ABERTURA" in msg_up and "FALLA" in msg_up and "SUPERA" in msg_up):
-        return "La abertura de la falla supera la longitud de la celda."
-    if "UCS" in msg_up and "IS50" in msg_up:
-        if "DIVERGENTE" in msg_up:
-            return "UCS es divergente a Is50."
-        if "DIVERGENCIA" in msg_up or "IS50 * K" in msg_up or "UCS VS IS50 * K" in msg_up:
-            return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
-    if "COMBINACIÓN LITOLÓGICA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
-         return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
-    if "UNIDAD LITOLÓGICA" in msg_up or "UNIDAD LITOLOGICA" in msg_up:
-         return "Unidad litológica es incongruente con la litología."
-    if "INCLINACIÓN (DIP) FUERA" in msg_up or "INCLINACION (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
-        return "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados."
-    if "INCLINACIÓN (DIP DIRECTION) FUERA" in msg_up or "DIP DIR" in msg_up:
-        return "Valor de dirección de inclinación (Dip Direction) fuera de rango permitido [0, 360] grados."
-    if "NÚMERO DE ESTRUCTURAS" in msg_up or "NUMERO DE ESTRUCTURAS" in msg_up:
-        return "En número de estructuras solamente se permiten números enteros."
-    if "ESPESOR" in msg_up and "NEGATIVO" in msg_up:
-        return "El espesor del relleno no puede ser un valor negativo."
-    if "ABERTURA" in msg_up and "NEGATIVO" in msg_up:
-        return "La abertura total no puede ser un valor negativo."
-    if "PERSISTENCIA" in msg_up and "NEGATIVO" in msg_up or "CONTINUIDAD" in msg_up and "NEGATIVO" in msg_up:
-        return "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo."
-    if "ESPACIAMIENTO" in msg_up and "NEGATIVO" in msg_up:
-        return "El espaciamiento de discontinuidad no puede ser un valor negativo."
-        
-    return msg
-
-def safe_int(val, default=0):
-    if val is None: return default
-    try: return int(val)
-    except: return default
-
-def safe_float(val, default=0.0):
-    if val is None: return default
-    try: return float(val)
-    except: return default
-
-def get_safe_sheet_name(title, index):
-    clean_title = "".join(c for c in title if c not in r':\/?*[]\'"').strip()
-    suffix = f" ({index})"
-    max_title_len = 31 - len(suffix)
-    return f"{clean_title[:max_title_len].strip()}{suffix}"
-
-def safe_replace(src: str, dst: str, retries: int = 5, delay: float = 0.2):
-    for i in range(retries):
-        try:
-            os.replace(src, dst)
-            return
-        except (PermissionError, OSError) as e:
-            if i == retries - 1:
-                try:
-                    shutil.copyfile(src, dst)
-                    try: os.remove(src)
-                    except: pass
-                    return
-                except:
-                    raise e
-            time.sleep(delay)
-
-# --- FUNCIÓN DE AGREGACIÓN UNIFICADA ---
-def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
-    """
-    Centraliza el cálculo estadístico y cruzamiento de variables para evitar 
-    duplicación de código entre el pipeline asíncrono y los endpoints de API.
-    """
-    incidencias = diag.get("incidencias", [])
-    total_filas_original = diag.get("total_filas_procesadas", 0)
-    resumen_celdas_raw = diag.get("resumen_por_celda_padre", {})
-    
-    if years_filter and years_filter != "TODOS" and years_filter != "":
-        years_list = [y.strip() for y in years_filter.split(",") if y.strip()]
-        incidencias = [i for i in incidencias if str(i.get("campania")) in years_list]
-        resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if str(v.get("campania")) in years_list}
-        total_filas = len(incidencias)
-    else:
-        resumen_celdas = resumen_celdas_raw
-        total_filas = total_filas_original
-
-    num_celdas_padre = len(resumen_celdas)
-    promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
-    total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
-    
-    total_fields = total_filas * MANDATORY_COLS_COUNT
-    total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
-    total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
-    total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
-    
-    row_errors = defaultdict(set)
-    for i in incidencias:
-        row_errors[i["fila_excel"]].add(i["tipo_incidencia"])
-        
-    discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
-    discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
-    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
-    discs_correctas = total_filas - len(row_errors)
-    
-    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
-    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
-    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
-    
-    observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
-    top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
-    
-    for i in incidencias:
-        c = i.get("campania", "N/A")
-        obs_key = get_incidence_category_name(i)
-        celda = i.get("celda_padre", "N/A")
-        
-        observaciones_por_año[c][obs_key]["incidents"] += 1
-        observaciones_por_año[c][obs_key]["stations"].add(celda)
-        top_stations_por_año[c][obs_key][celda] += 1
-        
-        camp_stats[c]["filas"].add(i["fila_excel"])
-        camp_stats[c]["celdas"].add(i.get("celda_padre", "N/A"))
-        geo_stats[g := i.get("geotecnico", "N/A")]["filas"].add(i["fila_excel"])
-        geo_stats[g]["celdas"].add(i.get("celda_padre", "N/A"))
-        sector_stats[s := i.get("sector_geotecnico", "N/A")]["filas"].add(i["fila_excel"])
-        sector_stats[s]["celdas"].add(i.get("celda_padre", "N/A"))
-        
-        tipo = i.get("tipo_incidencia")
-        if tipo == "VACIO":
-            camp_stats[c]["vacios"] += 1
-            geo_stats[g]["vacios"] += 1
-            sector_stats[s]["vacios"] += 1
-        elif tipo == "ADVERTENCIA":
-            camp_stats[c]["advertencias"] += 1
-            geo_stats[g]["advertencias"] += 1
-            sector_stats[s]["advertencias"] += 1
-        elif tipo == "ALERTA":
-            camp_stats[c]["alertas"] += 1
-            geo_stats[g]["alertas"] += 1
-            sector_stats[s]["alertas"] += 1
-            
-    consolidado_tabla = {}
-    for year, types in observaciones_por_año.items():
-        consolidado_tabla[year] = {}
-        total_inc_año = sum(v["incidents"] for k, v in types.items())
-        severity = "LEVE" if total_inc_año < 100 else ("MODERADO" if total_inc_año < 1000 else "CRÍTICO")
-        consolidado_tabla[year]["severity"] = severity
-        consolidado_tabla[year]["total_incidents"] = total_inc_año
-        
-        for obs_key, stats in types.items():
-            worst = [{"celda": k, "count": v} for k, v in top_stations_por_año[year][obs_key].most_common(3)]
-            consolidado_tabla[year][obs_key] = {
-                "incidents": stats["incidents"],
-                "affected_stations": len(stats["stations"]),
-                "top_stations": worst
-            }
-            
-    distribucion_campania = []
-    for c, stats in camp_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * MANDATORY_COLS_COUNT
-        distribucion_campania.append({
-            "campania": c, "discontinuidades": rows_count,
-            "celdas_afectadas": len(stats["celdas"]),
-            "estructuras_afectadas": rows_count,
-            "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    distribucion_geotecnico = []
-    for g, stats in geo_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * MANDATORY_COLS_COUNT
-        distribucion_geotecnico.append({
-            "geotecnico": g, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    distribucion_sector = []
-    for s, stats in sector_stats.items():
-        rows_count = len(stats["filas"])
-        total_fields_group = rows_count * MANDATORY_COLS_COUNT
-        distribucion_sector.append({
-            "sector": s, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
-            "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
-            "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
-            "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
-        })
-        
-    msg_alertas = Counter(get_incidence_category_name(i) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(get_incidence_category_name(i) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
-    
-    top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
-    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
-    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
-    
-    sorted_worst = sorted(resumen_celdas.items(), key=lambda x: (x[1].get("alertas", 0), x[1].get("vacios", 0), x[1].get("advertencias", 0)), reverse=True)[:20]
-    worst_cells = [{"celda": k, **v} for k, v in sorted_worst]
-    col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
-    top_column_errors = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
-    
-    return {
-        "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "consolidado_observaciones": consolidado_tabla,
-        "resumen_por_celda_padre": resumen_celdas,
-        "status": "completado",
-        "familia1": {
-            "num_celdas_padre": num_celdas_padre,
-            "promedio_hijas": round(promedio_hijas, 2),
-            "total_discontinuidades": total_filas,
-            "total_metros": round(total_metros, 2)
-        },
-        "familia2": {
-            "total_fields": total_fields, 
-            "total_vacios": total_vacios, 
-            "total_advertencias": total_advertencias, 
-            "total_alertas": total_alertas, 
-            "total_correctos": total_correctos
-        },
-        "familia3": {
-            "total_discontinuidades": total_filas, 
-            "discontinuidades_alertas": discs_con_alerta, 
-            "discontinuidades_advertencias": discs_con_advertencia, 
-            "discontinuidades_vacios": discs_con_vacio, 
-            "discontinuidades_correctas": discs_correctas
-        },
-        "distribucion_campania": distribucion_campania,
-        "distribucion_sector": distribucion_sector,
-        "distribucion_geotecnico": distribucion_geotecnico,
-        "top_5_alertas": top_5_alertas,
-        "error_types_detailed": {"alertas": lista_alertas, "advertencias": lista_advertencias},
-        "worst_cells": worst_cells,
-        "top_column_errors": top_column_errors
-    }
+from app.core.audit_helpers import (
+    safe_int,
+    safe_float,
+    get_safe_sheet_name,
+    safe_replace,
+    get_incidence_category_name,
+    aggregate_audit_metrics,
+)
+from app.core.excel_styles import get_styles, write_kpi_card
 
 def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
-    font_title = Font(name="Segoe UI", size=16, bold=True, color="1B365D")
-    font_subtitle = Font(name="Segoe UI", size=10, italic=True, color="555555")
-    font_section = Font(name="Segoe UI", size=11, bold=True, color="1B365D")
-    font_header = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
-    font_bold = Font(name="Segoe UI", size=10, bold=True, color="000000")
-    font_regular = Font(name="Segoe UI", size=10, color="000000")
-    font_kpi_lbl = Font(name="Segoe UI", size=9, bold=True, color="555555")
+    s = get_styles()
+    font_title = s["font_title"]
+    font_subtitle = s["font_subtitle"]
+    font_section = s["font_section"]
+    font_header = s["font_header"]
+    font_bold = s["font_bold"]
+    font_regular = s["font_regular"]
+    font_kpi_lbl = s["font_kpi_lbl"]
     
-    font_kpi_val_blue = Font(name="Segoe UI", size=18, bold=True, color="1B365D")
-    font_kpi_val_green = Font(name="Segoe UI", size=18, bold=True, color="375623")
-    font_kpi_val_red = Font(name="Segoe UI", size=18, bold=True, color="C00000")
-    font_kpi_val_orange = Font(name="Segoe UI", size=18, bold=True, color="C65911")
+    font_kpi_val_blue = s["font_kpi_blue"]
+    font_kpi_val_green = s["font_kpi_green"]
+    font_kpi_val_red = s["font_kpi_red"]
+    font_kpi_val_orange = s["font_kpi_orange"]
 
-    fill_primary = PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid")
-    fill_accent_green = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-    fill_accent_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    fill_accent_orange = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-    fill_accent_red = PatternFill(start_color="F2DCDB", end_color="F2DCDB", fill_type="solid")
-    fill_zebra = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid")
-    fill_kpi_gray = PatternFill(start_color="F2F4F7", end_color="F2F4F7", fill_type="solid")
+    fill_primary = s["fill_primary"]
+    fill_accent_green = s["fill_green"]
+    fill_accent_yellow = s["fill_yellow"]
+    fill_accent_orange = s["fill_orange"]
+    fill_accent_red = s["fill_red"]
+    fill_zebra = s["fill_zebra"]
+    fill_kpi_gray = s["fill_kpi_gray"]
 
-    border_thin = Border(
-        left=Side(style='thin', color='E2E8F0'), 
-        right=Side(style='thin', color='E2E8F0'), 
-        top=Side(style='thin', color='E2E8F0'), 
-        bottom=Side(style='thin', color='E2E8F0')
-    )
-    border_kpi = Border(
-        left=Side(style='thin', color='B0C4DE'),
-        right=Side(style='thin', color='B0C4DE'),
-        top=Side(style='thin', color='B0C4DE'),
-        bottom=Side(style='thin', color='B0C4DE')
-    )
+    border_thin = s["border_thin"]
+    border_kpi = s["border_kpi"]
 
-    alignment_center = Alignment(horizontal="center", vertical="center")
-    alignment_left = Alignment(horizontal="left", vertical="center")
-    alignment_right = Alignment(horizontal="right", vertical="center")
+    alignment_center = s["align_center"]
+    alignment_left = s["align_left"]
+    alignment_right = s["align_right"]
 
     wb = openpyxl.Workbook()
     
     def write_kpi_card_opt(ws, start_row, start_col, label, value, bg_fill, val_font):
-        c1 = ws.cell(row=start_row, column=start_col, value=label)
-        c1.font = font_kpi_lbl
-        c1.alignment = alignment_center
-        
-        c2 = ws.cell(row=start_row+1, column=start_col, value=value)
-        c2.font = val_font
-        c2.alignment = alignment_center
-        
-        for r in range(start_row, start_row+2):
-            for c in range(start_col, start_col+2):
-                cell = ws.cell(row=r, column=c)
-                cell.fill = bg_fill
-                cell.border = border_kpi
-                
-        ws.merge_cells(start_row=start_row, start_column=start_col, end_row=start_row, end_column=start_col+1)
-        ws.merge_cells(start_row=start_row+1, start_column=start_col, end_row=start_row+1, end_column=start_col+1)
+        write_kpi_card(ws, start_row, start_col, label, value, bg_fill, val_font, s)
 
     # --- HOJA 1: DASHBOARD EJECUTIVO ---
     ws_dash = wb.active
@@ -1180,8 +854,37 @@ async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFil
     history_dir = os.path.join(uploads_dir, "history")
     os.makedirs(history_dir, exist_ok=True)
     file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
+    
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+        
+    # Validar de forma síncrona si es un reporte generado por el sistema
+    try:
+        import pandas as pd
+        xls = pd.ExcelFile(file_path, engine='openpyxl')
+        sheet_names = xls.sheet_names
+        is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
+        if is_report:
+            try:
+                os.remove(file_path)
+            except:
+                pass
+            raise HTTPException(
+                status_code=400,
+                detail="El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        try:
+            os.remove(file_path)
+        except:
+            pass
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo leer el archivo Excel. Verifique que no esté corrupto o posea un formato inválido. Detalle: {str(e)}"
+        )
+
     background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id, file.filename)
     return {"status": "procesando", "audit_id": audit_id, "filename": file.filename}
 
@@ -1216,6 +919,18 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
         compact_file = os.path.join(uploads_dir, "history", f"{audit_id}_compact.json")
         excel_file = os.path.join(uploads_dir, "history", f"{audit_id}.xlsx")
         
+        # Check first if the compact_file has error status
+        if os.path.exists(compact_file):
+            try:
+                with open(compact_file, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                if meta.get("status") == "error":
+                    raise HTTPException(status_code=400, detail=meta.get("error_message", "Error de procesamiento en segundo plano."))
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+
         if not os.path.exists(compact_file) or not os.path.exists(raw_file):
             if os.path.exists(excel_file):
                 return JSONResponse(
@@ -1236,6 +951,18 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
                     raw_file = os.path.join(history_dir, f"{latest_id}_diagnostico.json")
                     compact_file = os.path.join(history_dir, f"{latest_id}_compact.json")
             
+            # Check default compact_file for error
+            if os.path.exists(compact_file):
+                try:
+                    with open(compact_file, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                    if meta.get("status") == "error":
+                        raise HTTPException(status_code=400, detail=meta.get("error_message", "Error en segundo plano."))
+                except HTTPException:
+                    raise
+                except Exception:
+                    pass
+
             if not os.path.exists(raw_file) or not os.path.exists(compact_file):
                 return JSONResponse(
                     status_code=202, 
@@ -1246,9 +973,14 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
     if (not years or years == "TODOS" or years == "") and os.path.exists(compact_file):
         try:
             with open(compact_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                meta = json.load(f)
+            if meta.get("status") == "error":
+                raise HTTPException(status_code=400, detail=meta.get("error_message", "Error en segundo plano."))
+            return meta
+        except HTTPException:
+            raise
         except Exception:
-            pass # Si falla la lectura, se cae en el cálculo bajo demanda inferior
+            pass 
 
     # 3. BAJO DEMANDA / FILTRADO: Procesar dinámicamente si se especificaron años o falla la caché
     with open(raw_file, "r", encoding="utf-8") as f:
