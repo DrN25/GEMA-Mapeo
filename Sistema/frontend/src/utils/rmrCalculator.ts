@@ -157,12 +157,13 @@ export function getFillingRatingSingle(rellenoCode: string | undefined | null, t
   };
 }
 
+const EPSILON = 1e-9;
+
 export function getRqdRating76(rqd: number): number {
-  const rounded = Math.round(rqd);
-  if (rounded < 25) return 3;
-  if (rounded < 50) return 8;
-  if (rounded < 75) return 13;
-  if (rounded < 90) return 17;
+  if (rqd < 25 - EPSILON) return 3;
+  if (rqd < 50 - EPSILON) return 8;
+  if (rqd < 75 - EPSILON) return 13;
+  if (rqd < 90 - EPSILON) return 17;
   return 20;
 }
 
@@ -171,20 +172,18 @@ export function getRqdRating89(rqd: number): number {
 }
 
 export function getSpacingRating76(spacingM: number): number {
-  const rounded = Math.round(spacingM * 1000) / 1000;
-  if (rounded < 0.05) return 5;
-  if (rounded < 0.3) return 10;
-  if (rounded < 1.0) return 20;
-  if (rounded < 3.0) return 25;
+  if (spacingM < 0.05 - EPSILON) return 5;
+  if (spacingM < 0.3 - EPSILON) return 10;
+  if (spacingM < 1.0 - EPSILON) return 20;
+  if (spacingM < 3.0 - EPSILON) return 25;
   return 30;
 }
 
 export function getSpacingRating89(spacingM: number): number {
-  const rounded = Math.round(spacingM * 1000) / 1000;
-  if (rounded < 0.06) return 5;
-  if (rounded < 0.2) return 8;
-  if (rounded < 0.6) return 10;
-  if (rounded < 2.0) return 15;
+  if (spacingM < 0.06 - EPSILON) return 5;
+  if (spacingM < 0.2 - EPSILON) return 8;
+  if (spacingM < 0.6 - EPSILON) return 10;
+  if (spacingM < 2.0 - EPSILON) return 15;
   return 20;
 }
 

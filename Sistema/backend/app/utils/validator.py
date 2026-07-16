@@ -297,8 +297,7 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         
         # Validación de incongruencia RQD 76
         if rqd_76 is not None:
-            rqd_76_int = int(round(rqd_76))
-            expected_76 = 3 if rqd_76_int < 25 else (8 if rqd_76_int < 50 else (13 if rqd_76_int < 75 else (17 if rqd_76_int < 90 else 20)))
+            expected_76 = 3 if rqd_76 < 25 - 1e-9 else (8 if rqd_76 < 50 - 1e-9 else (13 if rqd_76 < 75 - 1e-9 else (17 if rqd_76 < 90 - 1e-9 else 20)))
             if abs(rqd_val_76 - expected_76) > 0.2:
                 registrar_error("RQD - VALOR  '76", rqd_val_76, "ERR_RQD_76_INCONGRUENTE", value=rqd_val_76, pct=rqd_76, expected=expected_76)
 
@@ -310,14 +309,13 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             
         # Validación de incongruencia RQD 89
         elif rqd_89 is not None:
-            rqd_89_int = int(round(rqd_89))
-            if rqd_89_int < 25:
+            if rqd_89 < 25 - 1e-9:
                 min_r, max_r, range_str = 3.0, 5.8, "3.0 - 5.8 (< 25%)"
-            elif rqd_89_int < 50:
+            elif rqd_89 < 50 - 1e-9:
                 min_r, max_r, range_str = 5.8, 10.0, "5.8 - 10.0 (25 - 50%)"
-            elif rqd_89_int < 75:
+            elif rqd_89 < 75 - 1e-9:
                 min_r, max_r, range_str = 10.0, 15.0, "10.0 - 15.0 (50 - 75%)"
-            elif rqd_89_int < 90:
+            elif rqd_89 < 90 - 1e-9:
                 min_r, max_r, range_str = 15.0, 18.0, "15.0 - 18.0 (75 - 90%)"
             else:
                 min_r, max_r, range_str = 18.0, 20.0, "18.0 - 20.0 (90 - 100%)"
@@ -345,10 +343,10 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             if val_int not in [5, 10, 20, 25, 30]:
                 registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO", value=val_int)
             elif espac_prom_76 is not None and espac_prom_76 > 0:
-                if espac_prom_76 < 0.05: expected = 5
-                elif espac_prom_76 < 0.3: expected = 10
-                elif espac_prom_76 < 1.0: expected = 20
-                elif espac_prom_76 < 3.0: expected = 25
+                if espac_prom_76 < 0.05 - 1e-9: expected = 5
+                elif espac_prom_76 < 0.3 - 1e-9: expected = 10
+                elif espac_prom_76 < 1.0 - 1e-9: expected = 20
+                elif espac_prom_76 < 3.0 - 1e-9: expected = 25
                 else: expected = 30
                 if val_int != expected:
                     registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO", value=val_int, promedio=espac_prom_76, expected=expected)
@@ -372,10 +370,10 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             if val_int not in [5, 8, 10, 15, 20]:
                 registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO", value=val_int)
             elif espac_prom_89 is not None and espac_prom_89 > 0:
-                if espac_prom_89 < 0.06: expected = 5
-                elif espac_prom_89 < 0.2: expected = 8
-                elif espac_prom_89 < 0.6: expected = 10
-                elif espac_prom_89 < 2.0: expected = 15
+                if espac_prom_89 < 0.06 - 1e-9: expected = 5
+                elif espac_prom_89 < 0.2 - 1e-9: expected = 8
+                elif espac_prom_89 < 0.6 - 1e-9: expected = 10
+                elif espac_prom_89 < 2.0 - 1e-9: expected = 15
                 else: expected = 20
                 if val_int != expected:
                     registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO", value=val_int, promedio=espac_prom_89, expected=expected)
