@@ -14,7 +14,7 @@ from app.core.catalogs import (
     EFECTOS_VOLADURA_CATALOG, RQD_RATINGS_CATALOG, ESPACIAMIENTO_R89_CATALOG,
     ESPACIAMIENTO_R76_CATALOG, TIPO_ESTRUCTURA_CATALOG, TIPO_RELLENO_CATALOG,
     RUGOSIDAD_CATALOG, FORMA_ESTRUCTURA_CATALOG, ALTERACION_CATALOG,
-    LITHOLOGY_CLASSIFICATION
+    LITHOLOGY_CLASSIFICATION, RESISTENCIA_DISPLAY_CATALOG, RQD_DISPLAY_CATALOG
 )
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
 
@@ -238,13 +238,8 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_LIMITE_EXCEDIDO", value=dureza_val_89)
         elif dureza_89 is not None:
             r89_ranges = {
-                "R6": (12.0, 15.0, "12.0 - 15.0 (>250 MPa)"),
-                "R5": (9.5, 12.0, "9.5 - 12.0 (100 - 250 MPa)"),
-                "R4": (5.5, 9.5, "5.5 - 9.5 (50 - 100 MPa)"),
-                "R3": (3.8, 5.5, "3.8 - 5.5 (25 - 50 MPa)"),
-                "R2": (1.5, 3.8, "1.5 - 3.8 (5 - 25 MPa)"),
-                "R1": (1.5, 1.5, "1.5 (1 - 5 MPa)"),
-                "R0": (0.0, 0.0, "0 (<1 MPa)")
+                item["codigo"]: (item["r89_min"], item["r89_max"], f"{item['r89_min']:.2f} - {item['r89_max']:.2f} ({item['rango']} MPa)")
+                for item in RESISTENCIA_DISPLAY_CATALOG
             }
             code_upper = dureza_89.upper()
             if code_upper in r89_ranges:
@@ -318,15 +313,19 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         if rqd_89 is not None:
             rqd_89_int = int(round(rqd_89))
             if rqd_89_int < 25:
-                min_r, max_r, range_str = 3.0, 5.8, "3.0 - 5.8 (< 25%)"
+                matched_rqd = RQD_DISPLAY_CATALOG[0]
             elif rqd_89_int < 50:
-                min_r, max_r, range_str = 5.8, 10.0, "5.8 - 10.0 (25 - 50%)"
+                matched_rqd = RQD_DISPLAY_CATALOG[1]
             elif rqd_89_int < 75:
-                min_r, max_r, range_str = 10.0, 15.0, "10.0 - 15.0 (50 - 75%)"
+                matched_rqd = RQD_DISPLAY_CATALOG[2]
             elif rqd_89_int < 90:
-                min_r, max_r, range_str = 15.0, 18.0, "15.0 - 18.0 (75 - 90%)"
+                matched_rqd = RQD_DISPLAY_CATALOG[3]
             else:
-                min_r, max_r, range_str = 18.0, 20.0, "18.0 - 20.0 (90 - 100%)"
+                matched_rqd = RQD_DISPLAY_CATALOG[4]
+                
+            min_r = matched_rqd["r89_min"]
+            max_r = matched_rqd["r89_max"]
+            range_str = f"{min_r:.2f} - {max_r:.2f} ({matched_rqd['rango']})"
                 
             if not (min_r <= rqd_val_89 <= max_r):
                 registrar_error("RQD - VALOR '89", rqd_val_89, "ERR_RQD_89_INCONGRUENTE", value=rqd_val_89, pct=rqd_89, expected=range_str)
@@ -517,35 +516,49 @@ def validate_lithology_correlation(row_dict, registrar_error):
     if not l1_clean and not l2_clean and (not l3_clean or l3_clean == "-"):
         return
 
-    l3_search = l3_clean
-    if not l3_search or l3_search == "-":
-        l3_search = "NR"
-        
     group_input_norm = normalize_geological_group(u_lito) if u_lito else ""
+
+    # Determinar si es Metamórfica o Endoskarn mediante roca en Lito 1 (desplazado) o Lito 2 (estándar)
+    metamorficas_endoskarn_rocks = {"GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT"}
+    is_shifted = l1_clean in metamorficas_endoskarn_rocks
     
-    # --- BÚSQUEDA ROBUSTA DE LITOLOGÍA USANDO LA CASCADA DE PLT IRREGULARES ---
+    if is_shifted:
+        # Orden desplazado (ej. Lito1=MBL, Lito2=LMT_MG)
+        eff_l2 = l1_clean
+        eff_l3 = l2_clean
+    else:
+        # Orden estándar (ej. Lito2=GSK, Lito3=LMT_M)
+        eff_l2 = l2_clean
+        eff_l3 = l3_clean
+        if "/" in eff_l3:
+            eff_l3 = eff_l3.split("/")[-1].strip()
+
+    eff_l3_search = "NR" if (not eff_l3 or eff_l3 == "-") else eff_l3
+
+    # --- BÚSQUEDA DE LITOLOGÍA ---
     matched_row = None
     
     # Caso especial: Endoskarn
-    if group_input_norm == "ENDOSKARN" or l2_clean in ["EPG", "EGT"]:
+    if group_input_norm == "ENDOSKARN" or eff_l2 in ["EPG", "EGT"]:
         intrusivos_l1 = ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]
-        if l1_clean in intrusivos_l1 or not l1_clean:
-            matched_row = {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": l2_clean, "lito3": "-", "k": 9.87}
+        valid_endo_l1 = {"INTRUSIVO", "INTRUSIVOS", "ENDO", "ENDOSKARN"}
+        if is_shifted or l1_clean in valid_endo_l1 or l1_clean in intrusivos_l1 or not l1_clean:
+            matched_row = {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": eff_l2, "lito3": "-", "k": 9.87}
             
-    if not matched_row and l2_clean:
+    if not matched_row and eff_l2:
         # 1. Buscar coincidencia exacta en lito2 y lito3
         for row in LITHOLOGY_CLASSIFICATION:
             row_l3 = row["lito3"].upper()
             norm_row_l3 = "NR" if row_l3 in ["-", "NR", ""] else row_l3
-            norm_search_l3 = "NR" if l3_search in ["-", "NR", ""] else l3_search
-            if row["lito2"].upper() == l2_clean and norm_row_l3 == norm_search_l3:
+            norm_search_l3 = "NR" if eff_l3_search in ["-", "NR", ""] else eff_l3_search
+            if row["lito2"].upper() == eff_l2 and norm_row_l3 == norm_search_l3:
                 matched_row = row
                 break
                 
         # 2. Si no hay coincidencia exacta, buscar con "VARIOS"
         if not matched_row:
             for row in LITHOLOGY_CLASSIFICATION:
-                if row["lito2"].upper() == l2_clean and row["lito3"].upper() == "VARIOS":
+                if row["lito2"].upper() == eff_l2 and row["lito3"].upper() == "VARIOS":
                     matched_row = row
                     break
                     
@@ -553,18 +566,26 @@ def validate_lithology_correlation(row_dict, registrar_error):
         if not matched_row:
             for row in LITHOLOGY_CLASSIFICATION:
                 row_l3 = row["lito3"].upper()
-                if row["lito2"].upper() == l2_clean and row_l3 in ["NR", "-", ""]:
+                if row["lito2"].upper() == eff_l2 and row_l3 in ["NR", "-", ""]:
                     matched_row = row
                     break
 
     # --- VERIFICACIÓN RIGUROSA DE LA COMBINACIÓN ---
     is_valid_combination = False
     if matched_row is not None:
-        # Para que la combinación l1-l2-l3 sea válida, l1 debe pertenecer a la unidad lito1 del catálogo.
-        if l1_clean:
-            is_valid_combination = match_lito_column(matched_row["lito1"], l1_clean)
+        if is_shifted:
+            # En orden desplazado, Lito 1 (roca) y Lito 2 (subclase/alteración) deben calzar
+            is_valid_combination = (l1_clean == matched_row["lito2"].upper() and 
+                                    match_lito_column(matched_row["lito3"], l2_clean))
         else:
-            is_valid_combination = True
+            if l1_clean:
+                if matched_row["grupo"] == "ENDOSKARN":
+                    is_valid_combination = (l1_clean in {"INTRUSIVO", "INTRUSIVOS", "ENDO", "ENDOSKARN"} or 
+                                            l1_clean in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"])
+                else:
+                    is_valid_combination = match_lito_column(matched_row["lito1"], l1_clean)
+            else:
+                is_valid_combination = True
 
     # Emitir alertas litológicas correspondientes
     if not is_valid_combination:

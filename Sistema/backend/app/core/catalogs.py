@@ -202,22 +202,22 @@ LITHOLOGY_CLASSIFICATION = [
 
 # D1. RESISTENCIA ISRM con textos de rango y denominación
 RESISTENCIA_DISPLAY_CATALOG = [
-    {"codigo": "R6", "rango": "≥ 250",         "r76": 15, "r89": 15, "denom": "Extremadamente resistente"},
-    {"codigo": "R5", "rango": "≥ 100 y < 250", "r76": 12, "r89": 12, "denom": "Muy resistente"},
-    {"codigo": "R4", "rango": "≥ 50 y < 100",  "r76": 7,  "r89": 7,  "denom": "Resistente"},
-    {"codigo": "R3", "rango": "≥ 25 y < 50",   "r76": 4,  "r89": 4,  "denom": "Moderadamente resistente"},
-    {"codigo": "R2", "rango": "≥ 5 y < 25",    "r76": 2,  "r89": 2,  "denom": "Débil"},
-    {"codigo": "R1", "rango": "≥ 1 y < 5",     "r76": 1,  "r89": 1,  "denom": "Muy débil"},
-    {"codigo": "R0", "rango": "< 1",            "r76": 0,  "r89": 0,  "denom": "Extremadamente débil"},
+    {"codigo": "R6", "rango": "≥ 250",         "r76": 15, "r89": 15, "r89_min": 15.0, "r89_max": 15.0, "denom": "Extremadamente resistente"},
+    {"codigo": "R5", "rango": "≥ 100 y < 250", "r76": 12, "r89": 12, "r89_min": 10.75, "r89_max": 13.50, "denom": "Muy resistente"},
+    {"codigo": "R4", "rango": "≥ 50 y < 100",  "r76": 7,  "r89": 7,  "r89_min": 6.25, "r89_max": 8.25, "denom": "Resistente"},
+    {"codigo": "R3", "rango": "≥ 25 y < 50",   "r76": 4,  "r89": 4,  "r89_min": 3.72, "r89_max": 4.75, "denom": "Moderadamente resistente"},
+    {"codigo": "R2", "rango": "≥ 5 y < 25",    "r76": 2,  "r89": 2,  "r89_min": 1.76, "r89_max": 2.72, "denom": "Débil"},
+    {"codigo": "R1", "rango": "≥ 1 y < 5",     "r76": 1,  "r89": 1,  "r89_min": 1.05, "r89_max": 1.26, "denom": "Muy débil"},
+    {"codigo": "R0", "rango": "< 1",            "r76": 0,  "r89": 0,  "r89_min": 0.50, "r89_max": 0.55, "denom": "Extremadamente débil"},
 ]
 
 # D2. RQD con texto de rango y calidad
 RQD_DISPLAY_CATALOG = [
-    {"rango": "< 25 %",         "r76": 3,  "r89_min": 3.0,  "r89_max": 5.8,  "calidad": "Muy Mala"},
-    {"rango": "≥ 25 y < 50 %",  "r76": 8,  "r89_min": 5.8,  "r89_max": 10.0, "calidad": "Mala"},
-    {"rango": "≥ 50 y < 75 %",  "r76": 13, "r89_min": 10.0, "r89_max": 15.0, "calidad": "Regular"},
-    {"rango": "≥ 75 y < 90 %",  "r76": 17, "r89_min": 15.0, "r89_max": 18.0, "calidad": "Buena"},
-    {"rango": "≥ 90 y ≤ 100 %", "r76": 20, "r89_min": 18.0, "r89_max": 20.0, "calidad": "Excelente"},
+    {"rango": "< 25 %",         "r76": 3,  "r89_min": 3.00,  "r89_max": 4.38,  "calidad": "Muy Mala"},
+    {"rango": "≥ 25 y < 50 %",  "r76": 8,  "r89_min": 6.88,  "r89_max": 8.98,  "calidad": "Mala"},
+    {"rango": "≥ 50 y < 75 %",  "r76": 13, "r89_min": 11.48, "r89_max": 13.94, "calidad": "Regular"},
+    {"rango": "≥ 75 y < 90 %",  "r76": 17, "r89_min": 15.94, "r89_max": 17.49, "calidad": "Buena"},
+    {"rango": "≥ 90 y ≤ 100 %", "r76": 20, "r89_min": 18.99, "r89_max": 20.00, "calidad": "Excelente"},
 ]
 
 # D3. ESPACIAMIENTO con rangos en mm para R89 y R76 lado a lado

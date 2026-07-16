@@ -529,77 +529,181 @@ async def importar_excel_endpoint(file: UploadFile = File(...), db: Session = De
             imported_count += 1
     elif "BD" in wb.sheetnames:
         ws = wb["BD"]
+        
+        # Mapear cabeceras dinámicamente para prevenir bugs de columnas movidas o desplazadas
+        headers_list = []
+        cota_seen, celda_seen = 0, 0
+        for col_idx in range(1, ws.max_column + 1):
+            h_val = ws.cell(row=1, column=col_idx).value
+            h_str = str(h_val).strip() if h_val else ""
+            if h_str == 'COTA':
+                if cota_seen == 0:
+                    h_str = 'COTA_FROM'
+                    cota_seen += 1
+                else:
+                    h_str = 'COTA_TO'
+            elif h_str == 'CELDA':
+                if celda_seen == 0:
+                    h_str = 'CELDA_PADRE'
+                    celda_seen += 1
+                else:
+                    h_str = 'CELDA_DUPLICADA_IGNORE'
+            
+            h_clean = "".join(h_str.split()).upper().replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
+            headers_list.append((h_clean, col_idx))
+            
+        def get_col_idx(name_str, default_col):
+            name_clean = "".join(str(name_str).split()).upper().replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
+            for hc, idx in headers_list:
+                if hc == name_clean:
+                    return idx
+            return default_col
+
+        # Obtener índices correctos
+        idx_celda = get_col_idx("CELDA_PADRE", 2)
+        idx_este_from = get_col_idx("ESTE_FROM", 4)
+        idx_norte_from = get_col_idx("NORTE_FROM", 5)
+        idx_cota_from = get_col_idx("COTA_FROM", 6)
+        idx_este_to = get_col_idx("ESTE_TO", 7)
+        idx_norte_to = get_col_idx("NORTE_TO", 8)
+        idx_cota_to = get_col_idx("COTA_TO", 9)
+        idx_dist_celda = get_col_idx("DistCelda", 10)
+        idx_altura = get_col_idx("Altura", 11)
+        idx_dip_talud = get_col_idx("DIPTALUD", 14)
+        idx_intemp = get_col_idx("INTEMPERISMO", 16)
+        
+        idx_agua_code = get_col_idx("CONDICIONDEAGUA89", 35)
+        idx_res_code = get_col_idx("DUREZA89", 37)
+        idx_gsi_vis = get_col_idx("GSIVISUAL89", 39)
+        idx_ctrl = get_col_idx("CONTROLESTRUCTURAL89", 40)
+        idx_vol = get_col_idx("EFECTOSDEVOLADURA89", 41)
+        idx_ucs = get_col_idx("UCSMpa", 33)
+        idx_is50 = get_col_idx("is50Mpa", 34)
+        idx_fecha = get_col_idx("FECHA", 51)
+        idx_comentario = get_col_idx("COMENTARIO", 52)
+        idx_geot = get_col_idx("GEOTECNICO", 74)
+        idx_nivel = get_col_idx("Nivel", 75)
+        
+        idx_lito1 = get_col_idx("Lito1", 76)
+        idx_lito2 = get_col_idx("Lito2", 77)
+        idx_lito3 = get_col_idx("Lito3", 78)
+        idx_grupo = get_col_idx("UnidadLitologica", 79)
+        idx_sector = get_col_idx("SectorGeotecnicos", 80)
+        idx_campania = get_col_idx("Campaña", 81)
+
+        # Índices para discontinuidades
+        idx_disc_tipo = get_col_idx("TIPO", 59)
+        idx_disc_dip = get_col_idx("DIP", 60)
+        # DIP de discontinuidad debe estar a la derecha de la celda de mapeo (col 12)
+        for hc, idx in headers_list:
+            if hc == "DIP" and idx > 15:
+                idx_disc_dip = idx
+                break
+        idx_disc_dipdir = get_col_idx("DIPDIR", 61)
+        idx_disc_num = get_col_idx("NUMERODEESTRUCTURAS", 62)
+        idx_disc_aber = get_col_idx("ABERTURAmm", 63)
+        idx_disc_esp = get_col_idx("ESPESORmm", 64)
+        idx_disc_cont = get_col_idx("CONTINUIDADm", 65)
+        idx_disc_espac = get_col_idx("ESPACIAMIENTOm", 66)
+        idx_disc_extremos = get_col_idx("NUMERODEEXTREMOSVISIBLES", 67)
+        idx_disc_rell1 = get_col_idx("TIPODERELLENO1", 68)
+        idx_disc_rell2 = get_col_idx("TIPODERELLENO2", 69)
+        idx_disc_jrc = get_col_idx("JRC", 70)
+        idx_disc_rug = get_col_idx("RUGOSIDADDEESTRUCTURAS", 71)
+        idx_disc_forma = get_col_idx("FORMADEESTRUCTURA", 72)
+        idx_disc_alter = get_col_idx("ALTERACION", 73)
+        idx_disc_dist = get_col_idx("Distdeestr", 53)
+
         celda_groups = {}
         for r_idx in range(2, ws.max_row + 1):
-            celda_val = ws.cell(row=r_idx, column=3).value or ws.cell(row=r_idx, column=4).value
+            celda_val = ws.cell(row=r_idx, column=idx_celda).value
             if not celda_val or str(celda_val).strip() == "":
                 continue
             celda_code = str(celda_val).strip().upper()
             if celda_code not in celda_groups: celda_groups[celda_code] = []
             celda_groups[celda_code].append(r_idx)
+            
         for celda_code, rows_indices in celda_groups.items():
             f_row = rows_indices[0]
             def get_num(r, c):
                 val = ws.cell(row=r, column=c).value
-                if val is None:
-                    return 0.0
-                try:
-                    return float(val)
-                except:
-                    return 0.0
+                if val is None: return 0.0
+                try: return float(val)
+                except: return 0.0
             def get_str(r, c):
                 val = ws.cell(row=r, column=c).value
                 return str(val).strip() if val is not None else ""
-            este_from = round(get_num(f_row, 6), 4)
-            norte_from = round(get_num(f_row, 7), 3)
-            cota_from = round(get_num(f_row, 8), 2)
-            este_to = round(get_num(f_row, 10), 4)
-            norte_to = round(get_num(f_row, 11), 3)
-            cota_to = round(get_num(f_row, 12), 2)
-            dist_celda = int(round(get_num(f_row, 13)))
-            altura = round(get_num(f_row, 14), 1)
-            dip_talud = round(get_num(f_row, 20), 2)
-            intemp = get_str(f_row, 23)
-            agua_code = get_str(f_row, 43)
-            res_code = get_str(f_row, 45)
-            gsi_vis = int(get_num(f_row, 47))
-            ctrl = int(get_num(f_row, 48))
-            vol = int(get_num(f_row, 49))
-            ucs = get_num(f_row, 40)
-            is50 = get_num(f_row, 41)
-            fecha_val = ws.cell(row=f_row, column=59).value
+
+            este_from = round(get_num(f_row, idx_este_from), 4)
+            norte_from = round(get_num(f_row, idx_norte_from), 3)
+            cota_from = round(get_num(f_row, idx_cota_from), 2)
+            este_to = round(get_num(f_row, idx_este_to), 4)
+            norte_to = round(get_num(f_row, idx_norte_to), 3)
+            cota_to = round(get_num(f_row, idx_cota_to), 2)
+            dist_celda = int(round(get_num(f_row, idx_dist_celda)))
+            altura = round(get_num(f_row, idx_altura), 1)
+            dip_talud = round(get_num(f_row, idx_dip_talud), 2)
+            intemp = get_str(f_row, idx_intemp)
+            agua_code = get_str(f_row, idx_agua_code)
+            res_code = get_str(f_row, idx_res_code)
+            gsi_vis = int(get_num(f_row, idx_gsi_vis))
+            ctrl = int(get_num(f_row, idx_ctrl))
+            vol = int(get_num(f_row, idx_vol))
+            ucs = get_num(f_row, idx_ucs)
+            is50 = get_num(f_row, idx_is50)
+            fecha_val = ws.cell(row=f_row, column=idx_fecha).value
             fecha_mapeo = fecha_val.date() if isinstance(fecha_val, datetime) else date.today()
-            comentario = get_str(f_row, 61)
-            geot = get_str(f_row, 85)
-            nivel = round(get_num(f_row, 95), 2)
-            l1 = get_str(f_row, 89)
-            lito_details = resolve_lithology(l1)
+            comentario = get_str(f_row, idx_comentario)
+            geot = get_str(f_row, idx_geot)
+            nivel = round(get_num(f_row, idx_nivel), 2)
+            
+            l1_val = get_str(f_row, idx_lito1)
+            l2_val = get_str(f_row, idx_lito2)
+            l3_val = get_str(f_row, idx_lito3)
+            
+            # Resolver litología usando cascada
+            lito_details = resolve_lithology(l3_val or l2_val or l1_val)
+            if l1_val:
+                lito_details["lito_1"] = l1_val
+            if l2_val:
+                lito_details["lito_2"] = l2_val
+            if l3_val:
+                lito_details["lito_3"] = l3_val
+            
+            u_lito_val = get_str(f_row, idx_grupo)
+            if u_lito_val:
+                lito_details["unidad_litologica"] = u_lito_val
+
             discs = []
             for r_idx in rows_indices:
                 fam_val = ws.cell(row=r_idx, column=1).value or 1
-                raw_nstr = int(round(get_num(r_idx, 72)))
+                raw_nstr = int(round(get_num(r_idx, idx_disc_num)))
                 nstr = raw_nstr if raw_nstr > 0 else -1
                 discs.append(schemas.DiscontinuidadBase(
-                    familia_id=int(fam_val), distancia_m=int(round(get_num(r_idx, 63))),
-                    tipo_estructura=get_str(r_idx, 69) or "JN", dip=round(get_num(r_idx, 70), 2),
-                    dip_dir=round(get_num(r_idx, 71), 2), n_estructuras=nstr, abertura_mm=round(get_num(r_idx, 73), 1),
-                    espesor_mm=round(get_num(r_idx, 74), 1), continuidad_m=round(get_num(r_idx, 75), 2),
-                    espaciamiento_m=round(get_num(r_idx, 76), 2), n_extremos_visibles=min(2, max(0, int(get_num(r_idx, 77)))),
-                    terminacion=3, relleno_1_codigo=get_str(r_idx, 78), relleno_2_codigo=get_str(r_idx, 79),
-                    jrc=min(20, max(0, int(get_num(r_idx, 80)))), rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 81)))),
-                    forma_estructura=get_str(r_idx, 82), alteracion_codigo=get_str(r_idx, 83)
+                    familia_id=int(fam_val), distancia_m=int(round(get_num(r_idx, idx_disc_dist))),
+                    tipo_estructura=get_str(r_idx, idx_disc_tipo) or "JN", dip=round(get_num(r_idx, idx_disc_dip), 2),
+                    dip_dir=round(get_num(r_idx, idx_disc_dipdir), 2), n_estructuras=nstr, abertura_mm=round(get_num(r_idx, idx_disc_aber), 1),
+                    espesor_mm=round(get_num(r_idx, idx_disc_esp), 1), continuidad_m=round(get_num(r_idx, idx_disc_cont), 2),
+                    espaciamiento_m=round(get_num(r_idx, idx_disc_espac), 2), n_extremos_visibles=min(2, max(0, int(get_num(r_idx, idx_disc_extremos)))),
+                    terminacion=3, relleno_1_codigo=get_str(r_idx, idx_disc_rell1), relleno_2_codigo=get_str(r_idx, idx_disc_rell2),
+                    jrc=min(20, max(0, int(get_num(r_idx, idx_disc_jrc)))), rugosidad_codigo=min(9, max(0, int(get_num(r_idx, idx_disc_rug)))),
+                    forma_estructura=get_str(r_idx, idx_disc_forma), alteracion_codigo=get_str(r_idx, idx_disc_alter)
                 ))
+                
+            campania_val = int(get_num(f_row, idx_campania)) if get_num(f_row, idx_campania) > 0 else 2026
+            sector_val = get_str(f_row, idx_sector) or "E1"
+            
             ri_schema = schemas.VentanaRmrInputBase(
                 agua_codigo=agua_code or "C", resistencia_codigo=res_code or "R4", gsi_estructura="VB",
                 gsi_superficie="G", gsi_visual=gsi_vis or 50, control_estructural=ctrl or 4, efectos_voladura=vol or 3,
                 ucs_mpa=ucs or 74.0, is50_mpa=is50 or 5.0, comentario=comentario
             )
             ventana_schema = schemas.VentanaSaveSchema(
-                codigo=celda_code, fecha_mapeo=fecha_mapeo, mapeador=geot or "RD/RB", campania=2026,
-                este_ini=este_from, norte_ini=norte_from, cota_ini=cota_from, este_to=este_to, norte_to=norte_to, cota_to=cota_to,
+                codigo=celda_code, fecha_mapeo=fecha_mapeo, mapeador=geot or "RD/RB", campania=campania_val,
+                este_ini=este_from, norte_ini=norte_from, cota_ini=cota_from, este_fin=este_to, norte_fin=norte_to, cota_fin=cota_to,
                 largo_m=dist_celda, altura_m=altura, dip_talud=dip_talud, alteracion_codigo=intemp, intemperismo_codigo=intemp,
                 lito_1=lito_details["lito_1"], lito_2=lito_details["lito_2"], lito_3=lito_details["lito_3"], unidad_litologica=lito_details["unidad_litologica"],
-                sector="E1", fase=5, nivel=nivel, sector_geotecnico="E1", discontinuidades=discs, rmr_input=ri_schema
+                sector=sector_val, fase=5, nivel=nivel, sector_geotecnico=sector_val, discontinuidades=discs, rmr_input=ri_schema
             )
             save_ventana(ventana_schema, db)
             imported_count += 1

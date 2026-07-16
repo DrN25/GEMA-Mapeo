@@ -301,7 +301,9 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                         <td className="py-2.5 px-4 font-mono">{item.rango}</td>
                         <td className="py-2.5 px-4">{item.denom}</td>
                         <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                        <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89}</td>
+                        <td className="py-2.5 px-4 text-center font-bold text-pink-300">
+                          {item.r89_min !== undefined ? `${item.r89_min.toFixed(2)} - ${item.r89_max.toFixed(2)}` : item.r89}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -393,7 +395,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-mono font-bold">{item.rango}</td>
                       <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_max.toFixed(1)}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_min.toFixed(2)} - {item.r89_max.toFixed(2)}</td>
                       <td className="py-2.5 px-4 text-slate-300">{item.calidad}</td>
                     </tr>
                   ))}

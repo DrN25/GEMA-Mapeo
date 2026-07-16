@@ -70,20 +70,42 @@ export function resolveLithologyCascade(
     }
   }
 
-  const finalL2 = cleanL2;
-  const finalL3 = cleanL3;
+  // Detectar orden desplazado para Metamórficas o Endoskarn
+  const metamorficasEndoskarnRocks = new Set(["GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT"]);
+  const isShifted = metamorficasEndoskarnRocks.has(cleanL1);
+
+  let finalL2 = cleanL2;
+  let finalL3 = cleanL3;
+
+  if (isShifted) {
+    finalL2 = cleanL1;
+    finalL3 = cleanL2;
+  } else {
+    if (cleanL3.includes("/")) {
+      finalL3 = cleanL3.split("/").pop()?.trim() || cleanL3;
+    }
+  }
 
   const foundK = lookupPltKOnly(finalL2, finalL3);
-  const exactMatch = LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === finalL3)
-    || LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === "VARIOS")
-    || LITHOLOGY_CLASSIFICATION.find(item => item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === "NR");
+  
+  const exactMatch = LITHOLOGY_CLASSIFICATION.find(item => {
+    const itemL2 = item.litologia.toUpperCase();
+    const itemL3 = item.codigo.toUpperCase();
+    const normItemL3 = (itemL3 === "-" || itemL3 === "NR" || !itemL3) ? "NR" : itemL3;
+    const searchL3 = (finalL3 === "-" || finalL3 === "NR" || !finalL3) ? "NR" : finalL3;
+    return itemL2 === finalL2 && normItemL3 === searchL3;
+  }) || LITHOLOGY_CLASSIFICATION.find(item => {
+    return item.litologia.toUpperCase() === finalL2 && item.codigo.toUpperCase() === "VARIOS";
+  }) || LITHOLOGY_CLASSIFICATION.find(item => {
+    return item.litologia.toUpperCase() === finalL2 && (item.codigo.toUpperCase() === "NR" || item.codigo.toUpperCase() === "-");
+  });
 
   return {
     k: foundK !== null ? foundK : 10.0,
-    lito1: l1,
-    lito2: l2 || "",
-    lito3: l3 || "",
-    clase: exactMatch ? exactMatch.grupo : "INTRUSIVOS"
+    lito1: exactMatch?.grupo === "ENDOSKARN" ? "Intrusivo" : (isShifted ? (exactMatch ? exactMatch.unidad : "LMT") : l1),
+    lito2: isShifted ? cleanL1 : (l2 || ""),
+    lito3: isShifted ? cleanL2 : (l3 || ""),
+    clase: exactMatch ? exactMatch.grupo : (isShifted ? "METAMORFICAS" : "INTRUSIVOS")
   };
 }
 
