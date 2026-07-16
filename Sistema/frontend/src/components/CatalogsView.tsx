@@ -4,6 +4,14 @@ import {
   Shield, Zap, Sparkles, Sliders, Maximize2, MoveRight,
   Database, GitBranch, ArrowRightLeft
 } from 'lucide-react';
+import {
+  ratingDiscretoRqd,
+  ratingContinuoRqd,
+  ratingPromedioRqd,
+  ratingDiscretoResistencia,
+  ratingContinuoResistencia,
+  ratingPromedioResistencia
+} from '../utils/rmrInterpolation';
 
 const getGroupBadge = (grupo: string) => {
   const g = String(grupo).toUpperCase();
@@ -283,31 +291,36 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                 <Shield size={14} className="text-orange-500" />
                 <span>Resistencia de la Roca Intacta</span>
               </h3>
-              <div className="overflow-x-auto rounded-lg border border-navy-900">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-navy-950 border-b border-navy-900">
-                    <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="py-2.5 px-4">Resistencia</th>
-                      <th className="py-2.5 px-4">Rango MPa</th>
-                      <th className="py-2.5 px-4">Denominación ISRM</th>
-                      <th className="py-2.5 px-4 text-center text-amber-400">Rating 76</th>
-                      <th className="py-2.5 px-4 text-center text-pink-400">Rating 89</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                    {catalogs.resistencia.map((item: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-navy-900/20">
-                        <td className="py-2.5 px-4 font-black text-orange-400">{item.codigo}</td>
-                        <td className="py-2.5 px-4 font-mono">{item.rango}</td>
-                        <td className="py-2.5 px-4">{item.denom}</td>
-                        <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                        <td className="py-2.5 px-4 text-center font-bold text-pink-300">
-                          {item.r89_min !== undefined ? `${item.r89_min.toFixed(2)} - ${item.r89_max.toFixed(2)}` : item.r89}
-                        </td>
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-lg border border-navy-900">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-navy-950 border-b border-navy-900">
+                      <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="py-2.5 px-4">Resistencia</th>
+                        <th className="py-2.5 px-4">Rango MPa</th>
+                        <th className="py-2.5 px-4">Denominación ISRM</th>
+                        <th className="py-2.5 px-4 text-center text-amber-400">Rating 76</th>
+                        <th className="py-2.5 px-4 text-center text-pink-400">Rating 89</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                      {catalogs.resistencia.map((item: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-navy-900/20">
+                          <td className="py-2.5 px-4 font-black text-orange-400">{item.codigo}</td>
+                          <td className="py-2.5 px-4 font-mono">{item.rango}</td>
+                          <td className="py-2.5 px-4">{item.denom}</td>
+                          <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
+                          <td className="py-2.5 px-4 text-center font-bold text-pink-300">
+                            {item.r89_min !== undefined ? `${item.r89_min.toFixed(2)} - ${item.r89_max.toFixed(2)}` : item.r89}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="max-w-3xl">
+                  <ResistenciaRatingChart />
+                </div>
               </div>
             </div>
           </div>
@@ -380,27 +393,32 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
               <Sliders size={14} className="text-orange-500" />
               <span>RQD % (Ratings de Calidad)</span>
             </h3>
-            <div className="overflow-x-auto rounded-lg border border-navy-900">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-navy-950 border-b border-navy-900">
-                  <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-2.5 px-4">Rango (%)</th>
-                    <th className="py-2.5 px-4 text-center text-amber-400">Rating 76</th>
-                    <th className="py-2.5 px-4 text-center text-pink-400">Rating 89</th>
-                    <th className="py-2.5 px-4">Calidad</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                  {catalogs.rqd.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-mono font-bold">{item.rango}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_min.toFixed(2)} - {item.r89_max.toFixed(2)}</td>
-                      <td className="py-2.5 px-4 text-slate-300">{item.calidad}</td>
+            <div className="space-y-6">
+              <div className="overflow-x-auto rounded-lg border border-navy-900">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-navy-950 border-b border-navy-900">
+                    <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-2.5 px-4">Rango (%)</th>
+                      <th className="py-2.5 px-4 text-center text-amber-400">Rating 76</th>
+                      <th className="py-2.5 px-4 text-center text-pink-400">Rating 89</th>
+                      <th className="py-2.5 px-4">Calidad</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                    {catalogs.rqd.map((item: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-navy-900/20">
+                        <td className="py-2.5 px-4 font-mono font-bold">{item.rango}</td>
+                        <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
+                        <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_min.toFixed(2)} - {item.r89_max.toFixed(2)}</td>
+                        <td className="py-2.5 px-4 text-slate-300">{item.calidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="max-w-3xl">
+                <RqdRatingChart />
+              </div>
             </div>
           </div>
         )}
@@ -886,6 +904,494 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
           </div>
         )}
 
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// RATING PROMEDIO DE RQD (R2) - SVG CHART
+// =========================================================================
+function RqdRatingChart() {
+  const [hoveredVal, setHoveredVal] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0, rectWidth: 800 });
+
+  const width = 800;
+  const height = 500;
+  const paddingLeft = 70;
+  const paddingRight = 30;
+  const paddingTop = 30;
+  const paddingBottom = 70;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const discretePoints: string[] = [];
+  const continuousPoints: string[] = [];
+  const averagePoints: string[] = [];
+
+  for (let val = 0; val <= 100; val += 0.5) {
+    const cx = paddingLeft + (val / 100) * chartWidth;
+
+    const rd = ratingDiscretoRqd(val);
+    const rc = ratingContinuoRqd(val);
+    const rp = ratingPromedioRqd(val);
+
+    const cy_d = height - paddingBottom - (rd / 20) * chartHeight;
+    const cy_c = height - paddingBottom - (rc / 20) * chartHeight;
+    const cy_p = height - paddingBottom - (rp / 20) * chartHeight;
+
+    discretePoints.push(`${cx},${cy_d}`);
+    continuousPoints.push(`${cx},${cy_c}`);
+    averagePoints.push(`${cx},${cy_p}`);
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    
+    // Convert to SVG design coordinates (0 to 800)
+    const svgX = (clientX / rect.width) * width;
+    
+    let val = ((svgX - paddingLeft) / chartWidth) * 100;
+    val = Math.max(0, Math.min(100, val));
+    
+    setHoveredVal(val);
+    setMousePos({ x: clientX, y: clientY, rectWidth: rect.width });
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredVal(null);
+  };
+
+  const discretePath = `M ${discretePoints.join(' L ')}`;
+  const continuousPath = `M ${continuousPoints.join(' L ')}`;
+  const averagePath = `M ${averagePoints.join(' L ')}`;
+
+  const h_disc = hoveredVal !== null ? ratingDiscretoRqd(hoveredVal) : 0;
+  const h_cont = hoveredVal !== null ? ratingContinuoRqd(hoveredVal) : 0;
+  const h_avg = hoveredVal !== null ? ratingPromedioRqd(hoveredVal) : 0;
+
+  // Ticks y de 2 en 2 para RQD (0 a 20) para evitar colisiones a 12px
+  const yTicks = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
+  // Ticks x RQD
+  const xTicks = [0, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100];
+
+  // Tooltip positioning relative to SVG to avoid parent padding offset
+  const isRightHalf = mousePos.x > mousePos.rectWidth / 2;
+  const tooltipLeft = isRightHalf ? mousePos.x - 240 : mousePos.x + 20;
+  const tooltipTop = mousePos.y - 45;
+
+  return (
+    <div className="relative overflow-visible border border-navy-900 bg-navy-950/60 p-5 rounded-xl">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h4 className="text-sm font-bold text-slate-300">Curvas de Valoración RQD (R89)</h4>
+          <p className="text-xs text-slate-500">Mueve el cursor sobre la gráfica para ver los detalles exactos (X, Y)</p>
+        </div>
+        <div className="flex gap-4 text-xs font-semibold">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-yellow-500"></span> Discreto</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Continuo</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-pink-500"></span> Promedio</span>
+        </div>
+      </div>
+      
+      {/* direct wrapper that has the exact bounds of the SVG */}
+      <div className="relative overflow-visible">
+        <svg 
+          width="100%" 
+          height={height} 
+          viewBox={`0 0 ${width} ${height}`} 
+          className="overflow-visible select-none cursor-crosshair"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Grid lines & Y Labels (de 2 en 2, etiquetas a 12px) */}
+          {yTicks.map((rating) => {
+            const cy = height - paddingBottom - (rating / 20) * chartHeight;
+            const isMajor = rating % 10 === 0;
+            return (
+              <g key={rating}>
+                <line 
+                  x1={paddingLeft} 
+                  y1={cy} 
+                  x2={width - paddingRight} 
+                  y2={cy} 
+                  stroke={isMajor ? "#334155" : "#1e293b"} 
+                  strokeWidth={isMajor ? 1.0 : 0.6} 
+                  strokeDasharray={isMajor ? undefined : "2,2"} 
+                />
+                <text 
+                  x={paddingLeft - 10} 
+                  y={cy + 4} 
+                  fill={isMajor ? "#94a3b8" : "#475569"} 
+                  className="font-bold font-mono text-right" 
+                  style={{ fontSize: "12px" }}
+                  textAnchor="end"
+                >
+                  {rating}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Grid lines & X Labels (etiquetas a 12px) */}
+          {xTicks.map((pct) => {
+            const cx = paddingLeft + (pct / 100) * chartWidth;
+            const isMajor = [0, 25, 50, 75, 90, 100].includes(pct);
+            return (
+              <g key={pct}>
+                <line 
+                  x1={cx} 
+                  y1={paddingTop} 
+                  x2={cx} 
+                  y2={height - paddingBottom} 
+                  stroke={isMajor ? "#334155" : "#1e293b"} 
+                  strokeWidth={isMajor ? 1.0 : 0.6} 
+                  strokeDasharray={isMajor ? undefined : "3,3"} 
+                />
+                <text 
+                  x={cx} 
+                  y={height - paddingBottom + 18} 
+                  fill={isMajor ? "#94a3b8" : "#475569"} 
+                  className="font-bold font-mono" 
+                  style={{ fontSize: "12px" }}
+                  textAnchor="middle"
+                >
+                  {pct}%
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Axis lines */}
+          <line x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingRight} y2={height - paddingBottom} stroke="#475569" strokeWidth={1.5} />
+          <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} stroke="#475569" strokeWidth={1.5} />
+
+          {/* Axis Titles (min 12px) */}
+          <text 
+            transform="rotate(-90)" 
+            x={- (paddingTop + chartHeight / 2)} 
+            y={20} 
+            fill="#94a3b8" 
+            className="font-bold tracking-wider" 
+            style={{ fontSize: "12px" }}
+            textAnchor="middle"
+          >
+            Rating RMR'89 (Eje Y)
+          </text>
+          <text 
+            x={paddingLeft + chartWidth / 2} 
+            y={height - 20} 
+            fill="#94a3b8" 
+            className="font-bold tracking-wider" 
+            style={{ fontSize: "12px" }}
+            textAnchor="middle"
+          >
+            Porcentaje RQD (%) (Eje X)
+          </text>
+
+          {/* Paths */}
+          <path d={discretePath} fill="none" stroke="#eab308" strokeWidth={1.8} strokeDasharray="3,2" opacity={0.65} />
+          <path d={continuousPath} fill="none" stroke="#06b6d4" strokeWidth={1.8} opacity={0.65} />
+          <path d={averagePath} fill="none" stroke="#ec4899" strokeWidth={3.5} opacity={1.0} />
+
+          {/* Hover elements */}
+          {hoveredVal !== null && (
+            <>
+              <line 
+                x1={paddingLeft + (hoveredVal / 100) * chartWidth} 
+                y1={paddingTop} 
+                x2={paddingLeft + (hoveredVal / 100) * chartWidth} 
+                y2={height - paddingBottom} 
+                stroke="#ec4899" 
+                strokeWidth={1} 
+                strokeDasharray="2,2" 
+              />
+              <circle 
+                cx={paddingLeft + (hoveredVal / 100) * chartWidth} 
+                cy={height - paddingBottom - (h_avg / 20) * chartHeight} 
+                r={5} 
+                fill="#ec4899" 
+                stroke="#fff" 
+                strokeWidth={1.5} 
+              />
+            </>
+          )}
+        </svg>
+
+        {/* HTML Tooltip (absolutely positioned within the exact wrapper) */}
+        {hoveredVal !== null && (
+          <div 
+            className="absolute z-10 pointer-events-none bg-slate-900/95 border border-navy-800 text-xs rounded-lg p-3 shadow-xl space-y-1.5 w-56 text-slate-200"
+            style={{ 
+              left: `${tooltipLeft}px`, 
+              top: `${tooltipTop}px` 
+            }}
+          >
+            <div className="font-bold text-slate-300 border-b border-navy-850 pb-1 flex justify-between">
+              <span>RQD% (Eje X):</span>
+              <span className="text-pink-400 font-mono">{hoveredVal.toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between font-mono">
+              <span className="text-slate-400">Rating Discreto (Y):</span>
+              <span className="text-yellow-500">{h_disc.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-mono">
+              <span className="text-slate-400">Rating Continuo (Y):</span>
+              <span className="text-cyan-400">{h_cont.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold border-t border-navy-850 pt-1 text-pink-500 font-mono">
+              <span>Rating Promedio (Y):</span>
+              <span>{h_avg.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// RATING PROMEDIO DE RESISTENCIA (R1) - SVG CHART
+// =========================================================================
+function ResistenciaRatingChart() {
+  const [hoveredVal, setHoveredVal] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0, rectWidth: 800 });
+
+  const width = 800;
+  const height = 500;
+  const paddingLeft = 70;
+  const paddingRight = 30;
+  const paddingTop = 30;
+  const paddingBottom = 70;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const discretePoints: string[] = [];
+  const continuousPoints: string[] = [];
+  const averagePoints: string[] = [];
+
+  for (let val = 0; val <= 260; val += 1.0) {
+    const cx = paddingLeft + (val / 260) * chartWidth;
+
+    const rd = ratingDiscretoResistencia(val);
+    const rc = ratingContinuoResistencia(val);
+    const rp = ratingPromedioResistencia(val);
+
+    const cy_d = height - paddingBottom - (rd / 15) * chartHeight;
+    const cy_c = height - paddingBottom - (rc / 15) * chartHeight;
+    const cy_p = height - paddingBottom - (rp / 15) * chartHeight;
+
+    discretePoints.push(`${cx},${cy_d}`);
+    continuousPoints.push(`${cx},${cy_c}`);
+    averagePoints.push(`${cx},${cy_p}`);
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    
+    // Convert to SVG design coordinates (0 to 260)
+    const svgX = (clientX / rect.width) * width;
+    
+    let val = ((svgX - paddingLeft) / chartWidth) * 260;
+    val = Math.max(0, Math.min(260, val));
+    
+    setHoveredVal(val);
+    setMousePos({ x: clientX, y: clientY, rectWidth: rect.width });
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredVal(null);
+  };
+
+  const discretePath = `M ${discretePoints.join(' L ')}`;
+  const continuousPath = `M ${continuousPoints.join(' L ')}`;
+  const averagePath = `M ${averagePoints.join(' L ')}`;
+
+  const h_disc = hoveredVal !== null ? ratingDiscretoResistencia(hoveredVal) : 0;
+  const h_cont = hoveredVal !== null ? ratingContinuoResistencia(hoveredVal) : 0;
+  const h_avg = hoveredVal !== null ? ratingPromedioResistencia(hoveredVal) : 0;
+
+  // Ticks y de 2 en 2 para Resistencia (0 a 15)
+  const yTicks = [0, 2, 4, 6, 8, 10, 12, 14, 15];
+  // Ticks x UCS cada 25 mas el limite 260
+  const xTicks = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 260];
+
+  // Tooltip positioning relative to SVG to avoid parent padding offset
+  const isRightHalf = mousePos.x > mousePos.rectWidth / 2;
+  const tooltipLeft = isRightHalf ? mousePos.x - 240 : mousePos.x + 20;
+  const tooltipTop = mousePos.y - 45;
+
+  return (
+    <div className="relative overflow-visible border border-navy-900 bg-navy-950/60 p-5 rounded-xl">
+      <div className="flex justify-between items-center mb-3">
+        <div>
+          <h4 className="text-sm font-bold text-slate-300">Curvas de Valoración Resistencia UCS (R1 RMR89)</h4>
+          <p className="text-xs text-slate-500">Mueve el cursor sobre la gráfica para ver los detalles exactos (X, Y)</p>
+        </div>
+        <div className="flex gap-4 text-xs font-semibold">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-yellow-500"></span> Discreto</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Continuo</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-pink-500"></span> Promedio</span>
+        </div>
+      </div>
+      
+      {/* direct wrapper that has the exact bounds of the SVG */}
+      <div className="relative overflow-visible">
+        <svg 
+          width="100%" 
+          height={height} 
+          viewBox={`0 0 ${width} ${height}`} 
+          className="overflow-visible select-none cursor-crosshair"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Grid lines & Y Labels (de 2 en 2, etiquetas a 12px) */}
+          {yTicks.map((rating) => {
+            const cy = height - paddingBottom - (rating / 15) * chartHeight;
+            const isMajor = rating % 6 === 0 || rating === 15;
+            return (
+              <g key={rating}>
+                <line 
+                  x1={paddingLeft} 
+                  y1={cy} 
+                  x2={width - paddingRight} 
+                  y2={cy} 
+                  stroke={isMajor ? "#334155" : "#1e293b"} 
+                  strokeWidth={isMajor ? 1.0 : 0.6} 
+                  strokeDasharray={isMajor ? undefined : "2,2"} 
+                />
+                <text 
+                  x={paddingLeft - 10} 
+                  y={cy + 4} 
+                  fill={isMajor ? "#94a3b8" : "#475569"} 
+                  className="font-bold font-mono text-right" 
+                  style={{ fontSize: "12px" }}
+                  textAnchor="end"
+                >
+                  {rating}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Grid lines & X Labels (cada 25, etiquetas a 12px) */}
+          {xTicks.map((ucsVal) => {
+            const cx = paddingLeft + (ucsVal / 260) * chartWidth;
+            const isMajor = [0, 50, 100, 200, 250].includes(ucsVal);
+            return (
+              <g key={ucsVal}>
+                <line 
+                  x1={cx} 
+                  y1={paddingTop} 
+                  x2={cx} 
+                  y2={height - paddingBottom} 
+                  stroke={isMajor ? "#334155" : "#1e293b"} 
+                  strokeWidth={isMajor ? 1.0 : 0.6} 
+                  strokeDasharray={isMajor ? undefined : "3,3"} 
+                />
+                <text 
+                  x={cx} 
+                  y={height - paddingBottom + 18} 
+                  fill={isMajor ? "#94a3b8" : "#475569"} 
+                  className="font-bold font-mono" 
+                  style={{ fontSize: "12px" }}
+                  textAnchor="middle"
+                >
+                  {ucsVal}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Axis lines */}
+          <line x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingRight} y2={height - paddingBottom} stroke="#475569" strokeWidth={1.5} />
+          <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} stroke="#475569" strokeWidth={1.5} />
+
+          {/* Axis Titles (min 12px) */}
+          <text 
+            transform="rotate(-90)" 
+            x={- (paddingTop + chartHeight / 2)} 
+            y={20} 
+            fill="#94a3b8" 
+            className="font-bold tracking-wider" 
+            style={{ fontSize: "12px" }}
+            textAnchor="middle"
+          >
+            Rating RMR'89 (Eje Y)
+          </text>
+          <text 
+            x={paddingLeft + chartWidth / 2} 
+            y={height - 20} 
+            fill="#94a3b8" 
+            className="font-bold tracking-wider" 
+            style={{ fontSize: "12px" }}
+            textAnchor="middle"
+          >
+            Resistencia Compresión Uniaxial UCS (MPa) (Eje X)
+          </text>
+
+          {/* Paths */}
+          <path d={discretePath} fill="none" stroke="#eab308" strokeWidth={1.8} strokeDasharray="3,2" opacity={0.65} />
+          <path d={continuousPath} fill="none" stroke="#06b6d4" strokeWidth={1.8} opacity={0.65} />
+          <path d={averagePath} fill="none" stroke="#ec4899" strokeWidth={3.5} opacity={1.0} />
+
+          {/* Hover elements */}
+          {hoveredVal !== null && (
+            <>
+              <line 
+                x1={paddingLeft + (hoveredVal / 260) * chartWidth} 
+                y1={paddingTop} 
+                x2={paddingLeft + (hoveredVal / 260) * chartWidth} 
+                y2={height - paddingBottom} 
+                stroke="#ec4899" 
+                strokeWidth={1} 
+                strokeDasharray="2,2" 
+              />
+              <circle 
+                cx={paddingLeft + (hoveredVal / 260) * chartWidth} 
+                cy={height - paddingBottom - (h_avg / 15) * chartHeight} 
+                r={4.5} 
+                fill="#ec4899" 
+                stroke="#fff" 
+                strokeWidth={1.5} 
+              />
+            </>
+          )}
+        </svg>
+
+        {/* HTML Tooltip (absolutely positioned within the exact wrapper) */}
+        {hoveredVal !== null && (
+          <div 
+            className="absolute z-10 pointer-events-none bg-slate-900/95 border border-navy-800 text-xs rounded-lg p-3 shadow-xl space-y-1.5 w-56 text-slate-200"
+            style={{ 
+              left: `${tooltipLeft}px`, 
+              top: `${tooltipTop}px` 
+            }}
+          >
+            <div className="font-bold text-slate-300 border-b border-navy-850 pb-1 flex justify-between">
+              <span>UCS (Eje X):</span>
+              <span className="text-pink-400 font-mono">{hoveredVal.toFixed(1)} MPa</span>
+            </div>
+            <div className="flex justify-between font-mono">
+              <span className="text-slate-400">Rating Discreto (Y):</span>
+              <span className="text-yellow-500">{h_disc.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-mono">
+              <span className="text-slate-400">Rating Continuo (Y):</span>
+              <span className="text-cyan-400">{h_cont.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold border-t border-navy-850 pt-1 text-pink-500 font-mono">
+              <span>Rating Promedio (Y):</span>
+              <span>{h_avg.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

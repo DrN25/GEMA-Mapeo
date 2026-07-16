@@ -17,6 +17,7 @@ from app.core.catalogs import (
     LITHOLOGY_CLASSIFICATION, RESISTENCIA_DISPLAY_CATALOG, RQD_DISPLAY_CATALOG
 )
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
+from app.utils.interpolation import rating_promedio_rqd, rating_promedio_r1
 
 # --- Constantes pre-computadas a nivel de módulo para máximo rendimiento ---
 _MAPEO_ESTRUCTURAL_COLS = {
@@ -248,8 +249,6 @@ def validate_geomechanical_properties(row_dict, registrar_error):
                     registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=range_str)
             else:
                 registrar_error("DUREZA '89", dureza_89, "ERR_DUREZA_89_INVALIDA", value=dureza_89)
-        elif not (dureza_val_89 == 0.0 or 1.5 <= dureza_val_89 <= 15.0):
-            registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "WRN_RESISTENCIA_89_VALOR_ALEJADO", value=dureza_val_89)
 
     # 4. Control Estructural [1, 5]
     ctrl_76 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL  '76"), int)
@@ -310,22 +309,18 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             registrar_error("RQD - VALOR '89", rqd_val_89, "WRN_RQD_VAL_89_VALOR_ALEJADO", value=rqd_val_89)
             
         # Validación de incongruencia RQD 89
-        if rqd_89 is not None:
+        elif rqd_89 is not None:
             rqd_89_int = int(round(rqd_89))
             if rqd_89_int < 25:
-                matched_rqd = RQD_DISPLAY_CATALOG[0]
+                min_r, max_r, range_str = 3.0, 5.8, "3.0 - 5.8 (< 25%)"
             elif rqd_89_int < 50:
-                matched_rqd = RQD_DISPLAY_CATALOG[1]
+                min_r, max_r, range_str = 5.8, 10.0, "5.8 - 10.0 (25 - 50%)"
             elif rqd_89_int < 75:
-                matched_rqd = RQD_DISPLAY_CATALOG[2]
+                min_r, max_r, range_str = 10.0, 15.0, "10.0 - 15.0 (50 - 75%)"
             elif rqd_89_int < 90:
-                matched_rqd = RQD_DISPLAY_CATALOG[3]
+                min_r, max_r, range_str = 15.0, 18.0, "15.0 - 18.0 (75 - 90%)"
             else:
-                matched_rqd = RQD_DISPLAY_CATALOG[4]
-                
-            min_r = matched_rqd["r89_min"]
-            max_r = matched_rqd["r89_max"]
-            range_str = f"{min_r:.2f} - {max_r:.2f} ({matched_rqd['rango']})"
+                min_r, max_r, range_str = 18.0, 20.0, "18.0 - 20.0 (90 - 100%)"
                 
             if not (min_r <= rqd_val_89 <= max_r):
                 registrar_error("RQD - VALOR '89", rqd_val_89, "ERR_RQD_89_INCONGRUENTE", value=rqd_val_89, pct=rqd_89, expected=range_str)

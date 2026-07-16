@@ -227,10 +227,17 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
     },
     val_resist_r89: {
         title: `Rating Resistencia (R89)`,
-        equation: `Rating = Catálogo(${COLUMN_NAMES.resistencia_ucs})`,
-        description: "Determina el rating de resistencia geomecánica en base al catálogo estándar de resistencia estimada para RMR'89.",
-        inputs: [COLUMN_NAMES.resistencia_ucs],
-        calcExplanation: (params) => `Grado: "${params?.code || '—'}" ➔ Rating: ${params?.val ?? '—'}`
+        equation: `Rating = (Discreto(UCS) + Continuo(UCS)) / 2`,
+        description: "Determina el rating combinando la tabla discreta 4.1 de Bieniawski y la curva continua del Ábaco (interpolación PCHIP) en base al UCS en MPa.",
+        inputs: [COLUMN_NAMES.resistencia_ucs, COLUMN_NAMES.ucs_mpa],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { ucs, discreto, continuo, val } = params;
+            if (ucs !== undefined && ucs > 0) {
+                return `UCS: ${ucs.toFixed(1)} MPa ➔ (Discreto: ${discreto ?? '—'} + Continuo: ${continuo !== undefined ? continuo.toFixed(2) : '—'}) / 2 = ${val !== undefined ? val.toFixed(2) : '—'}`;
+            }
+            return `Grado: "${params?.code || '—'}" ➔ Rating: ${params?.val ?? '—'}`;
+        }
     },
     val_resist_r76: {
         title: `Rating Resistencia (R76)`,
@@ -248,10 +255,17 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
     },
     rqd_rating_r89: {
         title: `Rating RQD (R89)`,
-        equation: `Rating = -0.000006 * RQD^3 + 0.0015 * RQD^2 + 0.0806 * RQD + 3.0282`,
-        description: "Ajuste polinómico continuo de la curva Bieniawski para evitar saltos discretos artificiales en los umbrales de RQD.",
+        equation: `Rating = (Discreto(RQD) + Continuo(RQD)) / 2`,
+        description: "Determina el rating combinando la tabla discreta (Bieniawski) y la curva continua del Ábaco (interpolación CubicSpline).",
         inputs: [COLUMN_NAMES.rqd_est],
-        calcExplanation: (params) => `RQD: ${params?.rqd !== undefined ? `${params.rqd.toFixed(2)}%` : '—'} ➔ Rating: ${params?.val ?? '—'}`
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { rqd, discreto, continuo, val } = params;
+            if (rqd !== undefined) {
+                return `RQD: ${rqd.toFixed(2)}% ➔ (Discreto: ${discreto ?? '—'} + Continuo: ${continuo !== undefined ? continuo.toFixed(2) : '—'}) / 2 = ${val !== undefined ? val.toFixed(2) : '—'}`;
+            }
+            return `RQD: ${params?.rqd !== undefined ? `${params.rqd.toFixed(2)}%` : '—'} ➔ Rating: ${params?.val ?? '—'}`;
+        }
     },
     rqd_rating_r76: {
         title: `Rating RQD (R76)`,

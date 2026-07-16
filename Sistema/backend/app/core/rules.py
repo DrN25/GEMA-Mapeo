@@ -354,7 +354,7 @@ RULES_REGISTRY = {
         "ERR_RESISTENCIA_89_INCONGRUENTE",
         "CAT_RESISTENCIA_INCONGRUENTE",
         ["RESISTENCIA ESTIMADA VALOR '89", "DUREZA '89"],
-        "Resistencia '89 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Rango de rating esperado: {expected} (Tolerancia ±0.2)."
+        "Resistencia '89 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Rango de rating esperado: {expected}."
     ),
     "WRN_RESISTENCIA_76_VALOR_ALEJADO": ErrorRule(
         "WRN_RESISTENCIA_76_VALOR_ALEJADO",
@@ -444,7 +444,7 @@ RULES_REGISTRY = {
         "ERR_RQD_89_INCONGRUENTE",
         "CAT_RQD_INCONGRUENTE",
         ["RQD - VALOR '89", "RQD '89"],
-        "Rating de RQD '89 es incongruente con el porcentaje. Valor ingresado: {value}, Porcentaje: {pct}%. Rango esperado: {expected} (Tolerancia ±0.2)."
+        "Rating de RQD '89 es incongruente con el porcentaje. Valor ingresado: {value}, Porcentaje: {pct}%. Rango esperado: {expected}."
     ),
 
     # ESPACIAMIENTO

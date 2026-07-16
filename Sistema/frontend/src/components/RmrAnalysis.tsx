@@ -3,6 +3,12 @@ import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { Compass } from 'lucide-react';
 import { FormulaTooltipTrigger } from './FormulaTooltip';
 import { COLUMN_LABELS, ISRM_TABLE } from '../utils/geomecColumns';
+import {
+  ratingDiscretoRqd,
+  ratingContinuoRqd,
+  ratingDiscretoResistencia,
+  ratingContinuoResistencia
+} from '../utils/rmrInterpolation';
 
 interface RmrAnalysisProps {
   header: WindowHeader;
@@ -442,7 +448,18 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
-                <FormulaTooltipTrigger formulaId="val_resist_r89" params={{ code: header.resistencia_ucs, val: calculated.ucs_rating_89 }} position="bottom" enabled={showFormulas}>
+                <FormulaTooltipTrigger 
+                  formulaId="val_resist_r89" 
+                  params={{ 
+                    code: header.resistencia_ucs, 
+                    val: calculated.ucs_rating_89,
+                    ucs: header.ucs_mpa,
+                    discreto: header.ucs_mpa ? ratingDiscretoResistencia(header.ucs_mpa) : undefined,
+                    continuo: header.ucs_mpa ? ratingContinuoResistencia(header.ucs_mpa) : undefined
+                  }} 
+                  position="bottom" 
+                  enabled={showFormulas}
+                >
                   <span>{calculated.ucs_rating_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
@@ -452,7 +469,17 @@ export default function RmrAnalysis({
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl.toFixed(2)}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol.toFixed(2)}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
-                <FormulaTooltipTrigger formulaId="rqd_rating_r89" params={{ rqd: calculated.rqd_est, val: calculated.rqd_rating_89 }} position="bottom" enabled={showFormulas}>
+                <FormulaTooltipTrigger 
+                  formulaId="rqd_rating_r89" 
+                  params={{ 
+                    rqd: calculated.rqd_est, 
+                    val: calculated.rqd_rating_89,
+                    discreto: ratingDiscretoRqd(calculated.rqd_est),
+                    continuo: ratingContinuoRqd(calculated.rqd_est)
+                  }} 
+                  position="bottom" 
+                  enabled={showFormulas}
+                >
                   <span>{calculated.rqd_rating_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>

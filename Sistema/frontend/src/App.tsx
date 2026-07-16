@@ -1122,7 +1122,7 @@ export default function App() {
       />
       {isCatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
-          <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
+          <div className="glass-panel w-full max-w-6xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
             <div className="h-1.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-500 w-full" />
 
             <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
@@ -1154,7 +1154,7 @@ export default function App() {
 
       {isPltCatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
-          <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
+          <div className="glass-panel w-full max-w-6xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
             <div className="h-1.5 bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-500 w-full" />
 
             <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">

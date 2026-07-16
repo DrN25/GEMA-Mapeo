@@ -5,6 +5,7 @@ import {
   ALTERACION_CATALOG,
   RUGOSIDAD_CATALOG
 } from './catalogData';
+import { ratingPromedioRqd, ratingPromedioResistencia } from './rmrInterpolation';
 
 export interface JointRow {
   id: number;
@@ -166,11 +167,7 @@ export function getRqdRating76(rqd: number): number {
 }
 
 export function getRqdRating89(rqd: number): number {
-  if (rqd < 0) return 3;
-  if (rqd > 100) return 20;
-  const val = -0.000006 * Math.pow(rqd, 3) + 0.0015 * Math.pow(rqd, 2) + 0.0806 * rqd + 3.0282;
-  const rating = Math.round(val);
-  return Math.max(3, Math.min(20, rating));
+  return ratingPromedioRqd(rqd);
 }
 
 export function getSpacingRating76(spacingM: number): number {
@@ -401,7 +398,9 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   // RATING DE RESISTENCIA ESTIMADA (UCS) OBTENIDO EXCLUSIVAMENTE DEL INPUT DE CAMPO (ISRM GRADE R0-R6)
   const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
   const ucs_rating_76 = strengthItem.score;
-  const ucs_rating_89 = strengthItem.score;
+  const ucs_rating_89 = (header.ucs_mpa !== undefined && header.ucs_mpa !== null && header.ucs_mpa > 0)
+    ? ratingPromedioResistencia(header.ucs_mpa)
+    : strengthItem.score;
 
   const rmr_76 = ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
   const rmr_89 = ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;
