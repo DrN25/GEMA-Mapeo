@@ -17,7 +17,7 @@ from app.core.catalogs import (
     LITHOLOGY_CLASSIFICATION, RESISTENCIA_DISPLAY_CATALOG, RQD_DISPLAY_CATALOG
 )
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
-from app.utils.interpolation import rating_promedio_rqd, rating_promedio_r1
+from app.utils.interpolation import rating_promedio_rqd, rating_promedio_r1, rating_continuo_rqd, rating_continuo_r1
 
 # --- Constantes pre-computadas a nivel de módulo para máximo rendimiento ---
 _MAPEO_ESTRUCTURAL_COLS = {
@@ -170,7 +170,7 @@ def validate_geotechnical_header(row_dict, registrar_error):
         if not (-90.0 <= dip_talud <= 90.0):
             registrar_error("DIP_TALUD", dip_talud, "ERR_DIP_TALUD_RANGO", value=dip_talud)
 
-def validate_geomechanical_properties(row_dict, registrar_error):
+def validate_geomechanical_properties(row_dict, registrar_error, campania=None):
     # 1. Validación de Condición de Agua (Códigos)
     agua_76 = sanitize_value(get_row_val(row_dict, "CONDICION DE AGUA  '76."), str)
     if agua_76 is not None:
@@ -238,17 +238,25 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         if not (0 <= dureza_val_89 <= 15):
             registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_LIMITE_EXCEDIDO", value=dureza_val_89)
         elif dureza_89 is not None:
-            r89_ranges = {
-                item["codigo"]: (item["r89_min"], item["r89_max"], f"{item['r89_min']:.2f} - {item['r89_max']:.2f} ({item['rango']} MPa)")
-                for item in RESISTENCIA_DISPLAY_CATALOG
-            }
             code_upper = dureza_89.upper()
-            if code_upper in r89_ranges:
-                min_v, max_v, range_str = r89_ranges[code_upper]
-                if not (min_v <= dureza_val_89 <= max_v):
-                    registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=range_str)
+            if campania in [2021, 2022, 2023]:
+                ucs_val = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
+                if ucs_val is not None:
+                    expected_r = rating_continuo_r1(ucs_val)
+                    if abs(dureza_val_89 - expected_r) > 0.2:
+                        registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=f"{expected_r:.2f} (Ábaco UCS={ucs_val} MPa)")
+                else:
+                    if code_upper in RESISTENCIA_RATING_CATALOG:
+                        expected = RESISTENCIA_RATING_CATALOG[code_upper]["r89"]
+                        if abs(dureza_val_89 - expected) > 0.2:
+                            registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=f"{expected} (Discreto)")
             else:
-                registrar_error("DUREZA '89", dureza_89, "ERR_DUREZA_89_INVALIDA", value=dureza_89)
+                if code_upper in RESISTENCIA_RATING_CATALOG:
+                    expected = RESISTENCIA_RATING_CATALOG[code_upper]["r89"]
+                    if abs(dureza_val_89 - expected) > 0.2:
+                        registrar_error("RESISTENCIA ESTIMADA VALOR '89", dureza_val_89, "ERR_RESISTENCIA_89_INCONGRUENTE", value=dureza_val_89, dureza_val=dureza_89, expected=f"{expected} (Discreto)")
+                else:
+                    registrar_error("DUREZA '89", dureza_89, "ERR_DUREZA_89_INVALIDA", value=dureza_89)
 
     # 4. Control Estructural [1, 5]
     ctrl_76 = sanitize_value(get_row_val(row_dict, "CONTROL ESTRUCTURAL  '76"), int)
@@ -278,15 +286,13 @@ def validate_geomechanical_properties(row_dict, registrar_error):
     # 7. Porcentaje de RQD (Límite físico del 100%)
     rqd_76 = sanitize_value(get_row_val(row_dict, "RQD  '76"), float)
     if rqd_76 is not None:
-        rqd_76 = round(rqd_76, 2)
         if rqd_76 > 100.0:
-            registrar_error("RQD  '76", rqd_76, "ERR_RQD_76_SUPERIOR_100", value=rqd_76)
+            registrar_error("RQD  '76", rqd_76, "ERR_RQD_76_SUPERIOR_100", value=round(rqd_76, 2))
             
     rqd_89 = sanitize_value(get_row_val(row_dict, "RQD '89"), float)
     if rqd_89 is not None:
-        rqd_89 = round(rqd_89, 2)
         if rqd_89 > 100.0:
-            registrar_error("RQD '89", rqd_89, "ERR_RQD_89_SUPERIOR_100", value=rqd_89)
+            registrar_error("RQD '89", rqd_89, "ERR_RQD_89_SUPERIOR_100", value=round(rqd_89, 2))
 
     # 6. RQD Ratings por umbral discreto & comprobación de congruencia
     rqd_val_76 = sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float)
@@ -297,9 +303,10 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         
         # Validación de incongruencia RQD 76
         if rqd_76 is not None:
-            expected_76 = 3 if rqd_76 < 25 - 1e-9 else (8 if rqd_76 < 50 - 1e-9 else (13 if rqd_76 < 75 - 1e-9 else (17 if rqd_76 < 90 - 1e-9 else 20)))
+            rqd_76_int = int(round(rqd_76))
+            expected_76 = 3 if rqd_76_int < 25 else (8 if rqd_76_int < 50 else (13 if rqd_76_int < 75 else (17 if rqd_76_int < 90 else 20)))
             if abs(rqd_val_76 - expected_76) > 0.2:
-                registrar_error("RQD - VALOR  '76", rqd_val_76, "ERR_RQD_76_INCONGRUENTE", value=rqd_val_76, pct=rqd_76, expected=expected_76)
+                registrar_error("RQD - VALOR  '76", rqd_val_76, "ERR_RQD_76_INCONGRUENTE", value=rqd_val_76, pct=round(rqd_76, 2), expected=expected_76)
 
     rqd_val_89 = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
     if rqd_val_89 is not None:
@@ -307,28 +314,23 @@ def validate_geomechanical_properties(row_dict, registrar_error):
         if not (3.0 <= rqd_val_89 <= 20.0):
             registrar_error("RQD - VALOR '89", rqd_val_89, "WRN_RQD_VAL_89_VALOR_ALEJADO", value=rqd_val_89)
             
-        # Validación de incongruencia RQD 89
         elif rqd_89 is not None:
-            if rqd_89 < 25 - 1e-9:
-                min_r, max_r, range_str = 3.0, 5.8, "3.0 - 5.8 (< 25%)"
-            elif rqd_89 < 50 - 1e-9:
-                min_r, max_r, range_str = 5.8, 10.0, "5.8 - 10.0 (25 - 50%)"
-            elif rqd_89 < 75 - 1e-9:
-                min_r, max_r, range_str = 10.0, 15.0, "10.0 - 15.0 (50 - 75%)"
-            elif rqd_89 < 90 - 1e-9:
-                min_r, max_r, range_str = 15.0, 18.0, "15.0 - 18.0 (75 - 90%)"
+            if campania == 2021:
+                rqd_89_int = int(round(rqd_89))
+                expected_rqd = 3 if rqd_89_int < 25 else (8 if rqd_89_int < 50 else (13 if rqd_89_int < 75 else (17 if rqd_89_int < 90 else 20)))
+                if abs(rqd_val_89 - expected_rqd) > 0.2:
+                    registrar_error("RQD - VALOR '89", rqd_val_89, "ERR_RQD_89_INCONGRUENTE", value=rqd_val_89, pct=round(rqd_89, 2), expected=f"{expected_rqd} (Discreto)")
             else:
-                min_r, max_r, range_str = 18.0, 20.0, "18.0 - 20.0 (90 - 100%)"
-                
-            if not (min_r <= rqd_val_89 <= max_r):
-                registrar_error("RQD - VALOR '89", rqd_val_89, "ERR_RQD_89_INCONGRUENTE", value=rqd_val_89, pct=rqd_89, expected=range_str)
+                expected_rqd_r = rating_continuo_rqd(rqd_89)
+                if abs(rqd_val_89 - expected_rqd_r) > 0.2:
+                    registrar_error("RQD - VALOR '89", rqd_val_89, "ERR_RQD_89_INCONGRUENTE", value=rqd_val_89, pct=round(rqd_89, 2), expected=f"{expected_rqd_r:.2f} (Ábaco RQD)")
 
     # 8. Espaciamiento Promedio y Coherencia de Ratings
     espac_prom_76 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO PROMEDIO   '76"), float)
     espac_val_76 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR    '76"), float)
 
     if espac_prom_76 is not None:
-        espac_prom_76 = round(espac_prom_76, 2)
+        espac_prom_76 = round(espac_prom_76, 3)
         if espac_prom_76 < 0:
             registrar_error("ESPACIAMIENTO PROMEDIO   '76", espac_prom_76, "ERR_ESPACIAMIENTO_PROMEDIO_76_NEGATIVO", value=espac_prom_76)
         elif espac_prom_76 == 0:
@@ -343,19 +345,29 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             if val_int not in [5, 10, 20, 25, 30]:
                 registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO", value=val_int)
             elif espac_prom_76 is not None and espac_prom_76 > 0:
-                if espac_prom_76 < 0.05 - 1e-9: expected = 5
-                elif espac_prom_76 < 0.3 - 1e-9: expected = 10
-                elif espac_prom_76 < 1.0 - 1e-9: expected = 20
-                elif espac_prom_76 < 3.0 - 1e-9: expected = 25
-                else: expected = 30
-                if val_int != expected:
-                    registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO", value=val_int, promedio=espac_prom_76, expected=expected)
+                # Exacto
+                if espac_prom_76 < 0.05 - 1e-9: expected_ex = 5
+                elif espac_prom_76 < 0.3 - 1e-9: expected_ex = 10
+                elif espac_prom_76 < 1.0 - 1e-9: expected_ex = 20
+                elif espac_prom_76 < 3.0 - 1e-9: expected_ex = 25
+                else: expected_ex = 30
+                
+                # Redondeado a 2 decimales (formato visual en Excel)
+                espac_prom_76_rounded = round(espac_prom_76, 2)
+                if espac_prom_76_rounded < 0.05: expected_rd = 5
+                elif espac_prom_76_rounded < 0.3: expected_rd = 10
+                elif espac_prom_76_rounded < 1.0: expected_rd = 20
+                elif espac_prom_76_rounded < 3.0: expected_rd = 25
+                else: expected_rd = 30
+                
+                if val_int != expected_ex and val_int != expected_rd:
+                    registrar_error("ESPACIAMIENTO - VALOR    '76", espac_val_76, "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO", value=val_int, promedio=espac_prom_76, expected=expected_ex)
 
     espac_prom_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO PROMEDIO '89"), float)
     espac_val_89 = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO - VALOR '89"), float)
 
     if espac_prom_89 is not None:
-        espac_prom_89 = round(espac_prom_89, 2)
+        espac_prom_89 = round(espac_prom_89, 3)
         if espac_prom_89 < 0:
             registrar_error("ESPACIAMIENTO PROMEDIO '89", espac_prom_89, "ERR_ESPACIAMIENTO_PROMEDIO_89_NEGATIVO", value=espac_prom_89)
         elif espac_prom_89 == 0:
@@ -370,13 +382,23 @@ def validate_geomechanical_properties(row_dict, registrar_error):
             if val_int not in [5, 8, 10, 15, 20]:
                 registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO", value=val_int)
             elif espac_prom_89 is not None and espac_prom_89 > 0:
-                if espac_prom_89 < 0.06 - 1e-9: expected = 5
-                elif espac_prom_89 < 0.2 - 1e-9: expected = 8
-                elif espac_prom_89 < 0.6 - 1e-9: expected = 10
-                elif espac_prom_89 < 2.0 - 1e-9: expected = 15
-                else: expected = 20
-                if val_int != expected:
-                    registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO", value=val_int, promedio=espac_prom_89, expected=expected)
+                # Exacto
+                if espac_prom_89 < 0.06 - 1e-9: expected_ex = 5
+                elif espac_prom_89 < 0.2 - 1e-9: expected_ex = 8
+                elif espac_prom_89 < 0.6 - 1e-9: expected_ex = 10
+                elif espac_prom_89 < 2.0 - 1e-9: expected_ex = 15
+                else: expected_ex = 20
+                
+                # Redondeado a 2 decimales
+                espac_prom_89_rounded = round(espac_prom_89, 2)
+                if espac_prom_89_rounded < 0.06: expected_rd = 5
+                elif espac_prom_89_rounded < 0.2: expected_rd = 8
+                elif espac_prom_89_rounded < 0.6: expected_rd = 10
+                elif espac_prom_89_rounded < 2.0: expected_rd = 15
+                else: expected_rd = 20
+                
+                if val_int != expected_ex and val_int != expected_rd:
+                    registrar_error("ESPACIAMIENTO - VALOR '89", espac_val_89, "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO", value=val_int, promedio=espac_prom_89, expected=expected_ex)
 
     # 9. RMR no nulo
     rmr_76 = sanitize_value(get_row_val(row_dict, "RMR '76"), float)
@@ -962,7 +984,7 @@ def validate_bulk_excel(file_path, output_json_path):
                         registrar_error("DIP_TALUD", entered_dip_talud, "WRN_DIP_TALUD_DISCREPANCIA", actual=entered_dip_talud, expected=parent_dip_talud)
 
             validate_geotechnical_header(row_dict, registrar_error)
-            validate_geomechanical_properties(row_dict, registrar_error)
+            validate_geomechanical_properties(row_dict, registrar_error, resolved_camp)
             validate_lithology_correlation(row_dict, registrar_error)
             
         validate_structural_row(row_dict, resolved_dist_celda, registrar_error)

@@ -5,7 +5,7 @@ import {
   ALTERACION_CATALOG,
   RUGOSIDAD_CATALOG
 } from './catalogData';
-import { ratingPromedioRqd, ratingPromedioResistencia } from './rmrInterpolation';
+import { ratingDiscretoRqd, ratingContinuoRqd, ratingDiscretoResistencia, ratingContinuoResistencia } from './rmrInterpolation';
 
 export interface JointRow {
   id: number;
@@ -160,15 +160,19 @@ export function getFillingRatingSingle(rellenoCode: string | undefined | null, t
 const EPSILON = 1e-9;
 
 export function getRqdRating76(rqd: number): number {
-  if (rqd < 25 - EPSILON) return 3;
-  if (rqd < 50 - EPSILON) return 8;
-  if (rqd < 75 - EPSILON) return 13;
-  if (rqd < 90 - EPSILON) return 17;
+  const rounded = Math.round(rqd);
+  if (rounded < 25) return 3;
+  if (rounded < 50) return 8;
+  if (rounded < 75) return 13;
+  if (rounded < 90) return 17;
   return 20;
 }
 
-export function getRqdRating89(rqd: number): number {
-  return ratingPromedioRqd(rqd);
+export function getRqdRating89(rqd: number, campania?: number): number {
+  if (campania === 2021) {
+    return ratingDiscretoRqd(rqd);
+  }
+  return ratingContinuoRqd(rqd);
 }
 
 export function getSpacingRating76(spacingM: number): number {
@@ -346,7 +350,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const rqd_est = Math.max(0, Math.min(100, jv > 0 ? 115 - 3.3 * jv : 100));
 
   const rqd_rating_76 = getRqdRating76(rqd_est);
-  const rqd_rating_89 = getRqdRating89(rqd_est);
+  const rqd_rating_89 = getRqdRating89(rqd_est, header.campania);
 
   let totalStructures = 0;
   let spacingWeightedSum = 0;
@@ -397,9 +401,12 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   // RATING DE RESISTENCIA ESTIMADA (UCS) OBTENIDO EXCLUSIVAMENTE DEL INPUT DE CAMPO (ISRM GRADE R0-R6)
   const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
   const ucs_rating_76 = strengthItem.score;
-  const ucs_rating_89 = (header.ucs_mpa !== undefined && header.ucs_mpa !== null && header.ucs_mpa > 0)
-    ? ratingPromedioResistencia(header.ucs_mpa)
-    : strengthItem.score;
+  const isUcsMpaValid = header.ucs_mpa !== undefined && header.ucs_mpa !== null && header.ucs_mpa > 0;
+  const isCampAnaAbaco = header.campania === 2021 || header.campania === 2022 || header.campania === 2023;
+
+  const ucs_rating_89 = isCampAnaAbaco
+    ? (isUcsMpaValid ? ratingContinuoResistencia(header.ucs_mpa!) : strengthItem.score)
+    : (isUcsMpaValid ? ratingDiscretoResistencia(header.ucs_mpa!) : strengthItem.score);
 
   const rmr_76 = ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
   const rmr_89 = ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;

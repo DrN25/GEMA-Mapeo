@@ -17,6 +17,7 @@ import PltEnsayosView from './components/PltEnsayosView';
 
 // --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
+import CongruenceAuditor from './components/CongruenceAuditor/CongruenceAuditor';
 import { initCatalogs } from './utils/catalogData';
 
 import {
@@ -841,6 +842,10 @@ export default function App() {
 
           {currentView === 'auditoria_masiva' && (
             <BulkAuditor apiBase={RESOLVED_API_BASE} />
+          )}
+
+          {currentView === 'congruencia' && (
+            <CongruenceAuditor apiBase={RESOLVED_API_BASE} />
           )}
 
           {currentView === 'mapeo' && activeWindow && (

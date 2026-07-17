@@ -96,14 +96,17 @@ def get_rqd_rating(rqd_pct):
     if rqd_pct is None:
         return {"r89": 0, "r76": 0}
     
+    # Redondear directamente a entero para evaluación discreta (lógica Excel)
+    rqd_int = int(round(rqd_pct))
+    
     # R76 Lookup (Discrete)
-    if rqd_pct < 25 - 1e-9:
+    if rqd_int < 25:
         r76 = 3
-    elif rqd_pct < 50 - 1e-9:
+    elif rqd_int < 50:
         r76 = 8
-    elif rqd_pct < 75 - 1e-9:
+    elif rqd_int < 75:
         r76 = 13
-    elif rqd_pct < 90 - 1e-9:
+    elif rqd_int < 90:
         r76 = 17
     else:
         r76 = 20

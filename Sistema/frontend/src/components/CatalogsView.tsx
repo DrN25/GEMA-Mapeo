@@ -286,11 +286,34 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
         {/* 3. RESISTENCIA ISRM */}
         {activeTab === 'resistencia' && (
           <div className="space-y-5">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
                 <Shield size={14} className="text-orange-500" />
                 <span>Resistencia de la Roca Intacta</span>
               </h3>
+              
+              <div className="bg-navy-950/40 border border-violet-500/20 p-3.5 rounded-xl text-xs space-y-2 text-slate-350 max-w-3xl">
+                <span className="font-black text-[10px] uppercase text-violet-400 tracking-wider flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping"></span>
+                  Lógica Geomecánica Aplicada por Campaña
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <h5 className="font-semibold text-slate-200 text-xs">Resistencia '89:</h5>
+                    <ul className="list-disc pl-4 space-y-0.5 text-slate-400 text-[11px]">
+                      <li>Campañas 2021 a 2023: <strong className="text-cyan-400">Ábaco Continuo</strong> (Función PCHIP UCS)</li>
+                      <li>Campañas 2024 en adelante: <strong className="text-violet-400">Tabla Discreta Original</strong></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-slate-200 text-xs">Resistencia '76:</h5>
+                    <ul className="list-disc pl-4 space-y-0.5 text-slate-400 text-[11px]">
+                      <li>Todos los años: <strong className="text-slate-300">Tabla Discreta Original</strong> (ISRM R0-R6)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-6">
                 <div className="overflow-x-auto rounded-lg border border-navy-900">
                   <table className="w-full text-left text-xs border-collapse">
@@ -310,9 +333,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                           <td className="py-2.5 px-4 font-mono">{item.rango}</td>
                           <td className="py-2.5 px-4">{item.denom}</td>
                           <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                          <td className="py-2.5 px-4 text-center font-bold text-pink-300">
-                            {item.r89_min !== undefined ? `${item.r89_min.toFixed(2)} - ${item.r89_max.toFixed(2)}` : item.r89}
-                          </td>
+                          <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -388,11 +409,34 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
 
         {/* 6. RQD % */}
         {activeTab === 'rqd' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
               <Sliders size={14} className="text-orange-500" />
               <span>RQD % (Ratings de Calidad)</span>
             </h3>
+
+            <div className="bg-navy-950/40 border border-cyan-500/20 p-3.5 rounded-xl text-xs space-y-2 text-slate-350 max-w-3xl">
+              <span className="font-black text-[10px] uppercase text-cyan-400 tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                Lógica Geomecánica Aplicada por Campaña
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <h5 className="font-semibold text-slate-200 text-xs">RQD '89:</h5>
+                  <ul className="list-disc pl-4 space-y-0.5 text-slate-400 text-[11px]">
+                    <li>Campaña 2021: <strong className="text-violet-400">Tabla Discreta Original</strong></li>
+                    <li>Campañas 2022 en adelante: <strong className="text-cyan-400">Ábaco Continuo</strong> (Función CubicSpline)</li>
+                  </ul>
+                </div>
+                <div>
+                  <h5 className="font-semibold text-slate-200 text-xs">RQD '76:</h5>
+                  <ul className="list-disc pl-4 space-y-0.5 text-slate-400 text-[11px]">
+                    <li>Todos los años: <strong className="text-slate-300">Tabla Discreta Original</strong> (con redondeo a entero)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-6">
               <div className="overflow-x-auto rounded-lg border border-navy-900">
                 <table className="w-full text-left text-xs border-collapse">
@@ -409,7 +453,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                       <tr key={idx} className="hover:bg-navy-900/20">
                         <td className="py-2.5 px-4 font-mono font-bold">{item.rango}</td>
                         <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
-                        <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89_min.toFixed(2)} - {item.r89_max.toFixed(2)}</td>
+                        <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89}</td>
                         <td className="py-2.5 px-4 text-slate-300">{item.calidad}</td>
                       </tr>
                     ))}
@@ -926,24 +970,13 @@ function RqdRatingChart() {
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
-  const discretePoints: string[] = [];
   const continuousPoints: string[] = [];
-  const averagePoints: string[] = [];
 
   for (let val = 0; val <= 100; val += 0.5) {
     const cx = paddingLeft + (val / 100) * chartWidth;
-
-    const rd = ratingDiscretoRqd(val);
     const rc = ratingContinuoRqd(val);
-    const rp = ratingPromedioRqd(val);
-
-    const cy_d = height - paddingBottom - (rd / 20) * chartHeight;
     const cy_c = height - paddingBottom - (rc / 20) * chartHeight;
-    const cy_p = height - paddingBottom - (rp / 20) * chartHeight;
-
-    discretePoints.push(`${cx},${cy_d}`);
     continuousPoints.push(`${cx},${cy_c}`);
-    averagePoints.push(`${cx},${cy_p}`);
   }
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
@@ -965,13 +998,8 @@ function RqdRatingChart() {
     setHoveredVal(null);
   };
 
-  const discretePath = `M ${discretePoints.join(' L ')}`;
   const continuousPath = `M ${continuousPoints.join(' L ')}`;
-  const averagePath = `M ${averagePoints.join(' L ')}`;
-
-  const h_disc = hoveredVal !== null ? ratingDiscretoRqd(hoveredVal) : 0;
   const h_cont = hoveredVal !== null ? ratingContinuoRqd(hoveredVal) : 0;
-  const h_avg = hoveredVal !== null ? ratingPromedioRqd(hoveredVal) : 0;
 
   // Ticks y de 2 en 2 para RQD (0 a 20) para evitar colisiones a 12px
   const yTicks = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
@@ -991,9 +1019,7 @@ function RqdRatingChart() {
           <p className="text-xs text-slate-500">Mueve el cursor sobre la gráfica para ver los detalles exactos (X, Y)</p>
         </div>
         <div className="flex gap-4 text-xs font-semibold">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-yellow-500"></span> Discreto</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Continuo</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-pink-500"></span> Promedio</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Ábaco Continuo</span>
         </div>
       </div>
       
@@ -1093,9 +1119,7 @@ function RqdRatingChart() {
           </text>
 
           {/* Paths */}
-          <path d={discretePath} fill="none" stroke="#eab308" strokeWidth={1.8} strokeDasharray="3,2" opacity={0.65} />
-          <path d={continuousPath} fill="none" stroke="#06b6d4" strokeWidth={1.8} opacity={0.65} />
-          <path d={averagePath} fill="none" stroke="#ec4899" strokeWidth={3.5} opacity={1.0} />
+          <path d={continuousPath} fill="none" stroke="#06b6d4" strokeWidth={3.5} opacity={1.0} />
 
           {/* Hover elements */}
           {hoveredVal !== null && (
@@ -1105,15 +1129,15 @@ function RqdRatingChart() {
                 y1={paddingTop} 
                 x2={paddingLeft + (hoveredVal / 100) * chartWidth} 
                 y2={height - paddingBottom} 
-                stroke="#ec4899" 
+                stroke="#06b6d4" 
                 strokeWidth={1} 
                 strokeDasharray="2,2" 
               />
               <circle 
                 cx={paddingLeft + (hoveredVal / 100) * chartWidth} 
-                cy={height - paddingBottom - (h_avg / 20) * chartHeight} 
+                cy={height - paddingBottom - (h_cont / 20) * chartHeight} 
                 r={5} 
-                fill="#ec4899" 
+                fill="#06b6d4" 
                 stroke="#fff" 
                 strokeWidth={1.5} 
               />
@@ -1128,23 +1152,15 @@ function RqdRatingChart() {
             style={{ 
               left: `${tooltipLeft}px`, 
               top: `${tooltipTop}px` 
-            }}
+              }}
           >
             <div className="font-bold text-slate-300 border-b border-navy-850 pb-1 flex justify-between">
               <span>RQD% (Eje X):</span>
-              <span className="text-pink-400 font-mono">{hoveredVal.toFixed(1)}%</span>
+              <span className="text-cyan-400 font-mono">{hoveredVal.toFixed(1)}%</span>
             </div>
-            <div className="flex justify-between font-mono">
-              <span className="text-slate-400">Rating Discreto (Y):</span>
-              <span className="text-yellow-500">{h_disc.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-mono">
-              <span className="text-slate-400">Rating Continuo (Y):</span>
-              <span className="text-cyan-400">{h_cont.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold border-t border-navy-850 pt-1 text-pink-500 font-mono">
-              <span>Rating Promedio (Y):</span>
-              <span>{h_avg.toFixed(2)}</span>
+            <div className="flex justify-between font-bold border-t border-navy-850 pt-1 text-cyan-400 font-mono">
+              <span>Rating Continuo (Y):</span>
+              <span>{h_cont.toFixed(2)}</span>
             </div>
           </div>
         )}
@@ -1170,24 +1186,13 @@ function ResistenciaRatingChart() {
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
-  const discretePoints: string[] = [];
   const continuousPoints: string[] = [];
-  const averagePoints: string[] = [];
 
   for (let val = 0; val <= 260; val += 1.0) {
     const cx = paddingLeft + (val / 260) * chartWidth;
-
-    const rd = ratingDiscretoResistencia(val);
     const rc = ratingContinuoResistencia(val);
-    const rp = ratingPromedioResistencia(val);
-
-    const cy_d = height - paddingBottom - (rd / 15) * chartHeight;
     const cy_c = height - paddingBottom - (rc / 15) * chartHeight;
-    const cy_p = height - paddingBottom - (rp / 15) * chartHeight;
-
-    discretePoints.push(`${cx},${cy_d}`);
     continuousPoints.push(`${cx},${cy_c}`);
-    averagePoints.push(`${cx},${cy_p}`);
   }
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
@@ -1209,13 +1214,8 @@ function ResistenciaRatingChart() {
     setHoveredVal(null);
   };
 
-  const discretePath = `M ${discretePoints.join(' L ')}`;
   const continuousPath = `M ${continuousPoints.join(' L ')}`;
-  const averagePath = `M ${averagePoints.join(' L ')}`;
-
-  const h_disc = hoveredVal !== null ? ratingDiscretoResistencia(hoveredVal) : 0;
   const h_cont = hoveredVal !== null ? ratingContinuoResistencia(hoveredVal) : 0;
-  const h_avg = hoveredVal !== null ? ratingPromedioResistencia(hoveredVal) : 0;
 
   // Ticks y de 2 en 2 para Resistencia (0 a 15)
   const yTicks = [0, 2, 4, 6, 8, 10, 12, 14, 15];
@@ -1235,9 +1235,7 @@ function ResistenciaRatingChart() {
           <p className="text-xs text-slate-500">Mueve el cursor sobre la gráfica para ver los detalles exactos (X, Y)</p>
         </div>
         <div className="flex gap-4 text-xs font-semibold">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-yellow-500"></span> Discreto</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Continuo</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-pink-500"></span> Promedio</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Ábaco Continuo</span>
         </div>
       </div>
       
@@ -1337,9 +1335,7 @@ function ResistenciaRatingChart() {
           </text>
 
           {/* Paths */}
-          <path d={discretePath} fill="none" stroke="#eab308" strokeWidth={1.8} strokeDasharray="3,2" opacity={0.65} />
-          <path d={continuousPath} fill="none" stroke="#06b6d4" strokeWidth={1.8} opacity={0.65} />
-          <path d={averagePath} fill="none" stroke="#ec4899" strokeWidth={3.5} opacity={1.0} />
+          <path d={continuousPath} fill="none" stroke="#06b6d4" strokeWidth={3.5} opacity={1.0} />
 
           {/* Hover elements */}
           {hoveredVal !== null && (
@@ -1349,15 +1345,15 @@ function ResistenciaRatingChart() {
                 y1={paddingTop} 
                 x2={paddingLeft + (hoveredVal / 260) * chartWidth} 
                 y2={height - paddingBottom} 
-                stroke="#ec4899" 
+                stroke="#06b6d4" 
                 strokeWidth={1} 
                 strokeDasharray="2,2" 
               />
               <circle 
                 cx={paddingLeft + (hoveredVal / 260) * chartWidth} 
-                cy={height - paddingBottom - (h_avg / 15) * chartHeight} 
+                cy={height - paddingBottom - (h_cont / 15) * chartHeight} 
                 r={4.5} 
-                fill="#ec4899" 
+                fill="#06b6d4" 
                 stroke="#fff" 
                 strokeWidth={1.5} 
               />
@@ -1372,23 +1368,15 @@ function ResistenciaRatingChart() {
             style={{ 
               left: `${tooltipLeft}px`, 
               top: `${tooltipTop}px` 
-            }}
+              }}
           >
             <div className="font-bold text-slate-300 border-b border-navy-850 pb-1 flex justify-between">
               <span>UCS (Eje X):</span>
-              <span className="text-pink-400 font-mono">{hoveredVal.toFixed(1)} MPa</span>
+              <span className="text-cyan-400 font-mono">{hoveredVal.toFixed(1)} MPa</span>
             </div>
-            <div className="flex justify-between font-mono">
-              <span className="text-slate-400">Rating Discreto (Y):</span>
-              <span className="text-yellow-500">{h_disc.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-mono">
-              <span className="text-slate-400">Rating Continuo (Y):</span>
-              <span className="text-cyan-400">{h_cont.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold border-t border-navy-850 pt-1 text-pink-500 font-mono">
-              <span>Rating Promedio (Y):</span>
-              <span>{h_avg.toFixed(2)}</span>
+            <div className="flex justify-between font-bold border-t border-navy-850 pt-1 text-cyan-400 font-mono">
+              <span>Rating Continuo (Y):</span>
+              <span>{h_cont.toFixed(2)}</span>
             </div>
           </div>
         )}

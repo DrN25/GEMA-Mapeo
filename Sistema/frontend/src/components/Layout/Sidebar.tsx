@@ -22,7 +22,8 @@ export default function Sidebar({
     { id: 'mapeo', label: 'Mapeo por Ventana', icon: Map, category: 'REGISTRO DE CAMPO' },
     { id: 'grafico', label: 'Gráfico de Estructuras', icon: Share2, category: 'VISUALIZACIÓN' },
     { id: 'plt_ensayos', label: 'Ensayos PLT Irregulares', icon: TrendingUp, category: 'ENSAYOS' },
-    { id: 'auditoria_masiva', label: 'Carga para Revision', icon: FileSpreadsheet, category: 'REVISION GENERAL' }
+    { id: 'auditoria_masiva', label: 'Carga para Revision', icon: FileSpreadsheet, category: 'REVISION GENERAL' },
+    { id: 'congruencia', label: 'Auditoría de Congruencia', icon: FileSpreadsheet, category: 'REVISION GENERAL' }
   ];
 
   const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'VISUALIZACIÓN', 'ENSAYOS', 'REVISION GENERAL'];
