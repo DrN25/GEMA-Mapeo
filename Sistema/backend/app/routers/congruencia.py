@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import math
 import pandas as pd
 import numpy as np
@@ -71,21 +72,48 @@ def apply_auto_filter_and_styles(ws):
         last_col = get_column_letter(ws.max_column)
         ws.auto_filter.ref = f"A1:{last_col}{ws.max_row}"
 
-def get_resolved_campaign(row_dict):
-    camp = sanitize_value(get_row_val(row_dict, 'Campaña'), int)
-    if camp is not None:
-        return camp
-    
-    # Intenta resolver a partir de nombres alternativos de columna
-    for alt in ['Año', 'Ano', 'Campanha', 'CAMPANIA', 'AÑO', 'CAMPAÑA']:
-        val = sanitize_value(get_row_val(row_dict, alt), int)
+def natural_sort_key(s):
+    if s is None:
+        return []
+    s = str(s)
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+
+def get_row_val_robust(row_dict, possible_names):
+    """
+    Busca un valor en el diccionario de la fila de forma resiliente,
+    colapsando múltiples espacios, comillas y convirtiendo a mayúsculas.
+    """
+    if isinstance(possible_names, str):
+        possible_names = [possible_names]
+        
+    cleaned_row = {}
+    for k, v in row_dict.items():
+        k_str = str(k).strip().upper()
+        # Elimina comillas y colapsa espacios dobles o triples
+        k_clean = " ".join(k_str.replace("'", "").replace('"', '').split())
+        cleaned_row[k_clean] = v
+        
+    for name in possible_names:
+        name_str = str(name).strip().upper()
+        name_clean = " ".join(name_str.replace("'", "").replace('"', '').split())
+        if name_clean in cleaned_row:
+            return cleaned_row[name_clean]
+            
+    # Fallback al get_row_val original del validador
+    for name in possible_names:
+        val = get_row_val(row_dict, name)
         if val is not None:
             return val
+            
     return None
 
+def get_resolved_campaign(row_dict):
+    camp = sanitize_value(get_row_val_robust(row_dict, ['Campaña', 'Año', 'Ano', 'Campanha', 'CAMPANIA', 'AÑO', 'CAMPAÑA']), int)
+    return camp
+
 def evaluate_resistencia_76(row_dict):
-    dureza = sanitize_value(get_row_val(row_dict, "DUREZA  '76"), str)
-    dureza_val = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR  '76"), float)
+    dureza = sanitize_value(get_row_val_robust(row_dict, ["DUREZA '76", "DUREZA  '76", "DUREZA 76"]), str)
+    dureza_val = sanitize_value(get_row_val_robust(row_dict, ["RESISTENCIA ESTIMADA VALOR '76", "RESISTENCIA ESTIMADA VALOR  '76", "RESISTENCIA ESTIMADA VALOR 76"]), float)
     
     if dureza is None and dureza_val is None:
         return None
@@ -107,8 +135,8 @@ def evaluate_resistencia_76(row_dict):
     return False, None, "Código de dureza faltante"
 
 def evaluate_rqd_76(row_dict):
-    rqd_pct = sanitize_value(get_row_val(row_dict, "RQD  '76"), float)
-    rqd_val = sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float)
+    rqd_pct = sanitize_value(get_row_val_robust(row_dict, ["RQD '76", "RQD  '76", "RQD 76"]), float)
+    rqd_val = sanitize_value(get_row_val_robust(row_dict, ["RQD - VALOR '76", "RQD - VALOR  '76", "RQD VALOR 76"]), float)
     
     if rqd_pct is None and rqd_val is None:
         return None
@@ -127,9 +155,9 @@ def evaluate_rqd_76(row_dict):
     return False, None, "Porcentaje RQD faltante"
 
 def evaluate_resistencia_89(row_dict, camp):
-    dureza = sanitize_value(get_row_val(row_dict, "DUREZA '89"), str)
-    dureza_val = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR '89"), float)
-    ucs = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
+    dureza = sanitize_value(get_row_val_robust(row_dict, ["DUREZA '89", "DUREZA  '89", "DUREZA 89"]), str)
+    dureza_val = sanitize_value(get_row_val_robust(row_dict, ["RESISTENCIA ESTIMADA VALOR '89", "RESISTENCIA ESTIMADA VALOR  '89", "RESISTENCIA ESTIMADA VALOR 89"]), float)
+    ucs = sanitize_value(get_row_val_robust(row_dict, ["( UCS ) (Mpa)", "( UCS )  (Mpa)", "UCS (MPA)", "UCS"]), float)
     
     if dureza is None and dureza_val is None:
         return None
@@ -174,8 +202,8 @@ def evaluate_resistencia_89(row_dict, camp):
         return False, None, "Código de dureza faltante"
 
 def evaluate_rqd_89(row_dict, camp):
-    rqd_pct = sanitize_value(get_row_val(row_dict, "RQD '89"), float)
-    rqd_val = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
+    rqd_pct = sanitize_value(get_row_val_robust(row_dict, ["RQD '89", "RQD  '89", "RQD 89"]), float)
+    rqd_val = sanitize_value(get_row_val_robust(row_dict, ["RQD - VALOR '89", "RQD - VALOR  '89", "RQD VALOR 89"]), float)
     
     if rqd_pct is None and rqd_val is None:
         return None
@@ -215,9 +243,7 @@ async def auditar_congruencia(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
 
-    # Identificar celdas padre antes del renombrado y limpieza
-    # Si la columna CELDA contiene un valor válido, la marcamos como padre
-    raw_cols = [str(c).strip().upper() for c in df.columns]
+    # Encontrar la columna celda original antes de limpiar y ffill
     celda_col_name = None
     for col in df.columns:
         if str(col).strip().upper() in ['CELDA', 'CELDA_PADRE']:
@@ -228,7 +254,11 @@ async def auditar_congruencia(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="No se encontró la columna 'CELDA' o 'CELDA_PADRE' en el archivo Excel.")
 
     # Guardamos el indicador de fila padre original (donde no es nulo/vacío)
-    is_parent_series = df[celda_col_name].notna() & (df[celda_col_name].astype(str).str.strip() != '') & (df[celda_col_name].astype(str).str.strip() != '-1') & (df[celda_col_name].astype(str).str.strip() != '-1.0')
+    is_parent_series = (
+        df[celda_col_name].notna() & 
+        (df[celda_col_name].astype(str).str.strip() != '') & 
+        (~df[celda_col_name].astype(str).str.strip().isin(['-1', '-1.0']))
+    )
 
     # Limpiar columnas
     df = clean_and_rename_columns(df)
@@ -259,8 +289,8 @@ async def auditar_congruencia(file: UploadFile = File(...)):
     # Escribir Cabeceras
     ws_res_76.append(["Número de Fila", "ID", "Celda", "Campaña", "Dureza 76", "Resistencia Estimada Valor 76", "Correcto (Si/No)", "Valor Esperado"])
     ws_rqd_76.append(["Número de Fila", "ID", "Celda", "Campaña", "RQD 76", "RQD Valor 76", "Correcto (Si/No)", "Valor Esperado"])
-    ws_res_89.append(["Número de Fila", "ID", "Celda", "Campaña", "Dureza 89", "Resistencia Estimada Valor 89", "Correcto (Si/No)", "Valor Esperado"])
-    ws_rqd_89.append(["Número de Fila", "ID", "Celda", "Campaña", "RQD 89", "UCS (MPa)", "RQD Valor 89", "Correcto (Si/No)", "Valor Esperado"])
+    ws_res_89.append(["Número de Fila", "ID", "Celda", "Campaña", "Dureza 89", "UCS (MPa)", "Resistencia Estimada Valor 89", "Correcto (Si/No)", "Valor Esperado"])
+    ws_rqd_89.append(["Número de Fila", "ID", "Celda", "Campaña", "RQD 89", "RQD Valor 89", "Correcto (Si/No)", "Valor Esperado"])
 
     # Iterar sobre las filas padre únicamente
     for idx, row_dict in enumerate(records):
@@ -268,8 +298,8 @@ async def auditar_congruencia(file: UploadFile = File(...)):
         if not is_parent_series.iloc[idx]:
             continue
             
-        celda = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
-        id_val = sanitize_value(get_row_val(row_dict, 'ID'), str) or f"F{fila_excel}"
+        celda = sanitize_value(get_row_val_robust(row_dict, 'CELDA_PADRE'), str)
+        id_val = sanitize_value(get_row_val_robust(row_dict, 'ID'), str) or f"F{fila_excel}"
         camp = get_resolved_campaign(row_dict)
         camp_str = str(camp) if camp else "N/A"
         
@@ -278,9 +308,9 @@ async def auditar_congruencia(file: UploadFile = File(...)):
         if res_76_res is not None:
             correct, expected, msg = res_76_res
             val_esp = "" if correct else expected
-            corr_str = "Si" if correct else "No"
-            dureza_76 = sanitize_value(get_row_val(row_dict, "DUREZA  '76"), str) or ""
-            dureza_val_76 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR  '76"), float)
+            corr_str = "Si" if correct else f"No: {msg}"
+            dureza_76 = sanitize_value(get_row_val_robust(row_dict, ["DUREZA '76", "DUREZA  '76", "DUREZA 76"]), str) or ""
+            dureza_val_76 = sanitize_value(get_row_val_robust(row_dict, ["RESISTENCIA ESTIMADA VALOR '76", "RESISTENCIA ESTIMADA VALOR  '76", "RESISTENCIA ESTIMADA VALOR 76"]), float)
             dureza_val_76_str = f"{dureza_val_76:.1f}" if dureza_val_76 is not None else ""
             
             ws_res_76.append([fila_excel, id_val, celda, camp_str, dureza_76, dureza_val_76_str, corr_str, val_esp])
@@ -303,10 +333,10 @@ async def auditar_congruencia(file: UploadFile = File(...)):
         if rqd_76_res is not None:
             correct, expected, msg = rqd_76_res
             val_esp = "" if correct else expected
-            corr_str = "Si" if correct else "No"
-            rqd_76 = sanitize_value(get_row_val(row_dict, "RQD  '76"), float)
+            corr_str = "Si" if correct else f"No: {msg}"
+            rqd_76 = sanitize_value(get_row_val_robust(row_dict, ["RQD '76", "RQD  '76", "RQD 76"]), float)
             rqd_76_str = f"{rqd_76:.2f}" if rqd_76 is not None else ""
-            rqd_val_76 = sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float)
+            rqd_val_76 = sanitize_value(get_row_val_robust(row_dict, ["RQD - VALOR '76", "RQD - VALOR  '76", "RQD VALOR 76"]), float)
             rqd_val_76_str = f"{rqd_val_76:.1f}" if rqd_val_76 is not None else ""
             
             ws_rqd_76.append([fila_excel, id_val, celda, camp_str, rqd_76_str, rqd_val_76_str, corr_str, val_esp])
@@ -323,17 +353,19 @@ async def auditar_congruencia(file: UploadFile = File(...)):
             style_row_cell(ws_rqd_76.cell(row=r_idx, column=7), fill=fill_cell, font=font_cell, alignment=ALIGN_CENTER)
             style_row_cell(ws_rqd_76.cell(row=r_idx, column=8), font=FONT_MONO, alignment=ALIGN_RIGHT if isinstance(val_esp, (int, float)) else ALIGN_LEFT)
 
-        # 3. Evaluar Resistencia 89
+        # 3. Evaluar Resistencia 89 (Con columna UCS incorporada)
         res_89_res = evaluate_resistencia_89(row_dict, camp)
         if res_89_res is not None:
             correct, expected, msg = res_89_res
             val_esp = "" if correct else expected
-            corr_str = "Si" if correct else "No"
-            dureza_89 = sanitize_value(get_row_val(row_dict, "DUREZA '89"), str) or ""
-            dureza_val_89 = sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR '89"), float)
+            corr_str = "Si" if correct else f"No: {msg}"
+            dureza_89 = sanitize_value(get_row_val_robust(row_dict, ["DUREZA '89", "DUREZA  '89", "DUREZA 89"]), str) or ""
+            ucs = sanitize_value(get_row_val_robust(row_dict, ["( UCS ) (Mpa)", "( UCS )  (Mpa)", "UCS (MPA)", "UCS", "UCS_MPA"]), float)
+            ucs_str = f"{ucs:.2f}" if ucs is not None else ""
+            dureza_val_89 = sanitize_value(get_row_val_robust(row_dict, ["RESISTENCIA ESTIMADA VALOR '89", "RESISTENCIA ESTIMADA VALOR  '89", "RESISTENCIA ESTIMADA VALOR 89"]), float)
             dureza_val_89_str = f"{dureza_val_89:.2f}" if dureza_val_89 is not None else ""
             
-            ws_res_89.append([fila_excel, id_val, celda, camp_str, dureza_89, dureza_val_89_str, corr_str, val_esp])
+            ws_res_89.append([fila_excel, id_val, celda, camp_str, dureza_89, ucs_str, dureza_val_89_str, corr_str, val_esp])
             r_idx = ws_res_89.max_row
             fill_cell = FILL_GREEN if correct else FILL_RED
             font_cell = FONT_GREEN if correct else FONT_RED
@@ -343,24 +375,23 @@ async def auditar_congruencia(file: UploadFile = File(...)):
             style_row_cell(ws_res_89.cell(row=r_idx, column=3), alignment=ALIGN_LEFT)
             style_row_cell(ws_res_89.cell(row=r_idx, column=4), font=FONT_MONO, alignment=ALIGN_CENTER)
             style_row_cell(ws_res_89.cell(row=r_idx, column=5), alignment=ALIGN_CENTER)
-            style_row_cell(ws_res_89.cell(row=r_idx, column=6), font=FONT_MONO, alignment=ALIGN_RIGHT)
-            style_row_cell(ws_res_89.cell(row=r_idx, column=7), fill=fill_cell, font=font_cell, alignment=ALIGN_CENTER)
-            style_row_cell(ws_res_89.cell(row=r_idx, column=8), font=FONT_MONO, alignment=ALIGN_RIGHT if isinstance(val_esp, (int, float)) else ALIGN_LEFT)
+            style_row_cell(ws_res_89.cell(row=r_idx, column=6), font=FONT_MONO, alignment=ALIGN_RIGHT) # UCS (MPa)
+            style_row_cell(ws_res_89.cell(row=r_idx, column=7), font=FONT_MONO, alignment=ALIGN_RIGHT) # Resistencia Estimada Valor 89
+            style_row_cell(ws_res_89.cell(row=r_idx, column=8), fill=fill_cell, font=font_cell, alignment=ALIGN_CENTER) # Correcto
+            style_row_cell(ws_res_89.cell(row=r_idx, column=9), font=FONT_MONO, alignment=ALIGN_RIGHT if isinstance(val_esp, (int, float)) else ALIGN_LEFT)
 
-        # 4. Evaluar RQD 89
+        # 4. Evaluar RQD 89 (Con columna UCS removida)
         rqd_89_res = evaluate_rqd_89(row_dict, camp)
         if rqd_89_res is not None:
             correct, expected, msg = rqd_89_res
             val_esp = "" if correct else expected
-            corr_str = "Si" if correct else "No"
-            rqd_89 = sanitize_value(get_row_val(row_dict, "RQD '89"), float)
+            corr_str = "Si" if correct else f"No: {msg}"
+            rqd_89 = sanitize_value(get_row_val_robust(row_dict, ["RQD '89", "RQD  '89", "RQD 89"]), float)
             rqd_89_str = f"{rqd_89:.2f}" if rqd_89 is not None else ""
-            ucs = sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float)
-            ucs_str = f"{ucs:.2f}" if ucs is not None else ""
-            rqd_val_89 = sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
+            rqd_val_89 = sanitize_value(get_row_val_robust(row_dict, ["RQD - VALOR '89", "RQD - VALOR  '89", "RQD VALOR 89"]), float)
             rqd_val_89_str = f"{rqd_val_89:.2f}" if rqd_val_89 is not None else ""
             
-            ws_rqd_89.append([fila_excel, id_val, celda, camp_str, rqd_89_str, ucs_str, rqd_val_89_str, corr_str, val_esp])
+            ws_rqd_89.append([fila_excel, id_val, celda, camp_str, rqd_89_str, rqd_val_89_str, corr_str, val_esp])
             r_idx = ws_rqd_89.max_row
             fill_cell = FILL_GREEN if correct else FILL_RED
             font_cell = FONT_GREEN if correct else FONT_RED
@@ -369,11 +400,10 @@ async def auditar_congruencia(file: UploadFile = File(...)):
             style_row_cell(ws_rqd_89.cell(row=r_idx, column=2), font=FONT_MONO, alignment=ALIGN_CENTER)
             style_row_cell(ws_rqd_89.cell(row=r_idx, column=3), alignment=ALIGN_LEFT)
             style_row_cell(ws_rqd_89.cell(row=r_idx, column=4), font=FONT_MONO, alignment=ALIGN_CENTER)
-            style_row_cell(ws_rqd_89.cell(row=r_idx, column=5), font=FONT_MONO, alignment=ALIGN_RIGHT)
-            style_row_cell(ws_rqd_89.cell(row=r_idx, column=6), font=FONT_MONO, alignment=ALIGN_RIGHT)
-            style_row_cell(ws_rqd_89.cell(row=r_idx, column=7), font=FONT_MONO, alignment=ALIGN_RIGHT)
-            style_row_cell(ws_rqd_89.cell(row=r_idx, column=8), fill=fill_cell, font=font_cell, alignment=ALIGN_CENTER)
-            style_row_cell(ws_rqd_89.cell(row=r_idx, column=9), font=FONT_MONO, alignment=ALIGN_RIGHT if isinstance(val_esp, (int, float)) else ALIGN_LEFT)
+            style_row_cell(ws_rqd_89.cell(row=r_idx, column=5), font=FONT_MONO, alignment=ALIGN_RIGHT) # RQD 89
+            style_row_cell(ws_rqd_89.cell(row=r_idx, column=6), font=FONT_MONO, alignment=ALIGN_RIGHT) # RQD Valor 89
+            style_row_cell(ws_rqd_89.cell(row=r_idx, column=7), fill=fill_cell, font=font_cell, alignment=ALIGN_CENTER) # Correcto
+            style_row_cell(ws_rqd_89.cell(row=r_idx, column=8), font=FONT_MONO, alignment=ALIGN_RIGHT if isinstance(val_esp, (int, float)) else ALIGN_LEFT)
 
     # Aplicar filtros y autoajuste de columnas
     apply_auto_filter_and_styles(ws_res_76)
@@ -393,7 +423,7 @@ async def auditar_congruencia(file: UploadFile = File(...)):
 def _get_parent_cells_map(contents) -> dict:
     df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
     
-    # Encontrar columna celda
+    # Encontrar la columna celda original antes de limpiar y ffill para evitar que se distorsione el indicador
     celda_col_name = None
     for col in df.columns:
         if str(col).strip().upper() in ['CELDA', 'CELDA_PADRE']:
@@ -402,9 +432,13 @@ def _get_parent_cells_map(contents) -> dict:
     if not celda_col_name:
         raise ValueError("No se encontró la columna 'CELDA' o 'CELDA_PADRE' en el archivo Excel.")
         
-    is_parent_series = df[celda_col_name].notna() & (df[celda_col_name].astype(str).str.strip() != '') & (df[celda_col_name].astype(str).str.strip() != '-1')
+    is_parent_series = (
+        df[celda_col_name].notna() & 
+        (df[celda_col_name].astype(str).str.strip() != '') & 
+        (~df[celda_col_name].astype(str).str.strip().isin(['-1', '-1.0']))
+    )
     
-    # Normalizar columnas
+    # Limpiar columnas
     df = clean_and_rename_columns(df)
     
     df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
@@ -419,27 +453,31 @@ def _get_parent_cells_map(contents) -> dict:
         if not is_parent_series.iloc[idx]:
             continue
             
-        celda = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
+        celda = sanitize_value(get_row_val_robust(row_dict, 'CELDA_PADRE'), str)
         if not celda:
             continue
             
         camp = get_resolved_campaign(row_dict)
         key = (celda.strip().upper(), camp)
         
+        # Si ya agregamos esta celda-campaña, evitamos que las filas de discontinuidades (vacías) la pisen
+        if key in cells_map:
+            continue
+            
         cells_map[key] = {
             "fila": idx + 2,
-            "id": sanitize_value(get_row_val(row_dict, 'ID'), str) or f"F{idx+2}",
+            "id": sanitize_value(get_row_val_robust(row_dict, 'ID'), str) or f"F{idx+2}",
             "celda": celda,
             "campania": camp,
-            "dureza_76": sanitize_value(get_row_val(row_dict, "DUREZA  '76"), str) or "",
-            "resistencia_76": sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR  '76"), float),
-            "rqd_76": sanitize_value(get_row_val(row_dict, "RQD  '76"), float),
-            "rqd_valor_76": sanitize_value(get_row_val(row_dict, "RQD - VALOR  '76"), float),
-            "dureza_89": sanitize_value(get_row_val(row_dict, "DUREZA '89"), str) or "",
-            "resistencia_89": sanitize_value(get_row_val(row_dict, "RESISTENCIA ESTIMADA VALOR '89"), float),
-            "ucs": sanitize_value(get_row_val(row_dict, "( UCS )  (Mpa)"), float),
-            "rqd_89": sanitize_value(get_row_val(row_dict, "RQD '89"), float),
-            "rqd_valor_89": sanitize_value(get_row_val(row_dict, "RQD - VALOR '89"), float)
+            "dureza_76": sanitize_value(get_row_val_robust(row_dict, ["DUREZA '76", "DUREZA  '76", "DUREZA 76"]), str) or "",
+            "resistencia_76": sanitize_value(get_row_val_robust(row_dict, ["RESISTENCIA ESTIMADA VALOR '76", "RESISTENCIA ESTIMADA VALOR  '76", "RESISTENCIA ESTIMADA VALOR 76", "RESISTENCIA ESTIMADA '76", "RESISTENCIA ESTIMADA 76"]), float),
+            "rqd_76": sanitize_value(get_row_val_robust(row_dict, ["RQD '76", "RQD  '76", "RQD 76"]), float),
+            "rqd_valor_76": sanitize_value(get_row_val_robust(row_dict, ["RQD - VALOR '76", "RQD - VALOR  '76", "RQD VALOR 76", "RQD - VALOR 76", "RQD VALOR  '76"]), float),
+            "dureza_89": sanitize_value(get_row_val_robust(row_dict, ["DUREZA '89", "DUREZA  '89", "DUREZA 89"]), str) or "",
+            "resistencia_89": sanitize_value(get_row_val_robust(row_dict, ["RESISTENCIA ESTIMADA VALOR '89", "RESISTENCIA ESTIMADA VALOR  '89", "RESISTENCIA ESTIMADA VALOR 89", "RESISTENCIA ESTIMADA '89", "RESISTENCIA ESTIMADA 89"]), float),
+            "ucs": sanitize_value(get_row_val_robust(row_dict, ["( UCS ) (Mpa)", "( UCS )  (Mpa)", "UCS (MPA)", "UCS", "UCS_MPA"]), float),
+            "rqd_89": sanitize_value(get_row_val_robust(row_dict, ["RQD '89", "RQD  '89", "RQD 89"]), float),
+            "rqd_valor_89": sanitize_value(get_row_val_robust(row_dict, ["RQD - VALOR '89", "RQD - VALOR  '89", "RQD VALOR 89", "RQD - VALOR 89", "RQD VALOR  '89"]), float)
         }
     return cells_map
 
@@ -486,8 +524,8 @@ async def comparar_congruencia(antes: UploadFile = File(...), despues: UploadFil
     
     all_keys = set(map_antes.keys()) | set(map_despues.keys())
     
-    # Ordenar claves por celda y campaña
-    sorted_keys = sorted(list(all_keys), key=lambda x: (x[0], x[1] or 0))
+    # Ordenar claves usando ordenación natural por celda y luego por campaña
+    sorted_keys = sorted(list(all_keys), key=lambda x: (natural_sort_key(x[0]), x[1] or 0))
     
     def format_val(val):
         if val is None:
