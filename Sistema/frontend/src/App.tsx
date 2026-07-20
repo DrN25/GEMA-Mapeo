@@ -93,6 +93,7 @@ export default function App() {
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activeDateRange, setActiveDateRange] = useState<string>('hoy');
+  const [pendingImports, setPendingImports] = useState<string[]>([]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
@@ -916,6 +917,7 @@ export default function App() {
               totalFiltered={totalFiltered}
               totalPages={totalPages}
               loading={loading}
+              pendingImports={pendingImports}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
               onFilterChange={handleFilterChange}
@@ -1200,16 +1202,11 @@ export default function App() {
       <ExcelImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        onImport={(importedData) => {
-          const defaultAlt = importedData.header?.intemperia || 'd';
-          setActiveWindow({
-            ...importedData,
-            joints: normalizeJoints(importedData.joints || [], defaultAlt)
-          });
-          setSyncStatus('unsaved');
-          setSyncMessage('Datos cargados localmente desde Excel. Presione "Guardar Cambios" para sincronizar.');
-          setCurrentView('mapeo');
-          setSelectedRowIndex(0);
+        onImport={(cellCodes) => {
+          setPendingImports(prev => [...new Set([...prev, ...cellCodes])]);
+          fetchWindows();
+          setSyncStatus('synced');
+          setSyncMessage(`${cellCodes.length} celda(s) importadas correctamente.`);
         }}
       />
       {isCatalogModalOpen && (

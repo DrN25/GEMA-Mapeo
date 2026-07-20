@@ -219,7 +219,7 @@ class EstructuraGeologica(Base):
     estructura_id = Column("EstructuraID", Integer, Identity(always=True), primary_key=True)
     ventana_id = Column("VentanaID", Integer, ForeignKey("mapeo.VentanasMapeo.VentanaID", ondelete="CASCADE"), nullable=False)
     numero_estructura = Column("NumeroEstructura", Integer, nullable=False)
-    tipo_estructura_id = Column("TipoEstructuraID", Integer, ForeignKey("dbo.TiposEstructura.TipoEstructuraID"), nullable=False)
+    tipo_estructura_id = Column("TipoEstructuraID", Integer, ForeignKey("dbo.TiposEstructura.TipoEstructuraID"), nullable=True)
 
     dip = Column("Dip", Numeric(5, 2), nullable=False)
     dip_dir = Column("DipDir", Numeric(6, 2), nullable=False)

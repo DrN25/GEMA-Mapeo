@@ -35,6 +35,7 @@ interface DashboardProps {
   totalFiltered: number;
   totalPages: number;
   loading: boolean;
+  pendingImports: string[];
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onFilterChange: (filters: { dateRange?: string }) => void;
@@ -53,6 +54,7 @@ export default function Dashboard({
   totalFiltered,
   totalPages,
   loading,
+  pendingImports,
   onPageChange,
   onPageSizeChange,
   onFilterChange,
@@ -268,7 +270,14 @@ export default function Dashboard({
                   onClick={() => onSelectWindow(w.name)}
                   className="hover:bg-navy-900/20 cursor-pointer transition-colors h-11"
                 >
-                  <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">{w.name}</td>
+                  <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
+                    <div className="flex items-center gap-2">
+                      <span>{w.name}</span>
+                      {pendingImports.includes(w.name) && (
+                        <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">IMPORTADO</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-2.5 px-4 text-slate-400 text-[10px]">{w.fecha_mapeo}</td>
                   <td className="py-2.5 px-4 text-slate-400">{w.sector_geotecnico || '—'}</td>
                   <td className="py-2.5 px-4 text-center text-slate-300 font-bold">

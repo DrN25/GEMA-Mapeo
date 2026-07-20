@@ -36,8 +36,11 @@ uploads_dir = os.path.join(BASE_DIR, "uploads")
 
 class GEMACatalogResolver:
     """
-    Resuelve códigos string → IDs FK leyendo catálogos de GEMA.
-    Mantiene cache en sesión por request para evitar queries repetidas.
+    Resuelve codigos string -> IDs FK leyendo catalogos de GEMA.
+    Estrategia de 2 niveles:
+      Grupo A (Litologia, TipoEstructura, UnidadLitologica): NULL si no existe
+      Grupo B (Sector, Geotecnico): Crear en GEMA si no existe
+    Mantiene cache en sesion por request.
     """
     def __init__(self, db: Session):
         self.db = db
@@ -55,44 +58,64 @@ class GEMACatalogResolver:
         self._cache[cache_key] = m
         return m
 
+    # ==================== GRUPO A: NULL si no existe ====================
+
     def litologia_id(self, codigo: Optional[str]) -> Optional[int]:
-        if not codigo:
-            return None
+        if not codigo: return None
         m = self._load(models.Litologia, "litologia_id", "codigo", "litologias")
         return m.get(codigo.strip().upper())
 
-    def sector_id(self, codigo: Optional[str]) -> Optional[int]:
-        if not codigo:
-            return None
-        m = self._load(models.SectorGeotecnico, "sector_id", "codigo", "sectores")
-        return m.get(codigo.strip().upper())
+    def tipo_estructura_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo: return None
+        m = self._load(models.TipoEstructura, "tipo_estructura_id", "codigo", "tipos_estructura")
+        code_clean = codigo.strip().upper()
+        if code_clean == "J": code_clean = "JN"
+        return m.get(code_clean)
 
     def unidad_litologica_id(self, codigo: Optional[str]) -> Optional[int]:
-        if not codigo:
-            return None
+        if not codigo: return None
         m = self._load(models.UnidadLitologica, "unidad_id", "codigo", "unidades")
         return m.get(codigo.strip().upper())
 
-    def tipo_estructura_id(self, codigo: Optional[str]) -> Optional[int]:
-        if not codigo:
-            return None
-        m = self._load(models.TipoEstructura, "tipo_estructura_id", "codigo", "tipos_estructura")
-        code_clean = codigo.strip().upper()
-        if code_clean == "J":
-            code_clean = "JN"
-        return m.get(code_clean)
+    # ==================== GRUPO B: crear en GEMA si no existe ====================
+
+    def sector_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo: return None
+        m = self._load(models.SectorGeotecnico, "sector_id", "codigo", "sectores")
+        code_up = codigo.strip().upper()
+        if code_up in m:
+            return m[code_up]
+        # No existe -> crear
+        nuevo = models.SectorGeotecnico(
+            codigo=code_up, nombre=code_up,
+            proyecto="Ferrobamba", estado="Activo"
+        )
+        self.db.add(nuevo)
+        self.db.flush()
+        # Actualizar cache
+        m[code_up] = nuevo.sector_id
+        return nuevo.sector_id
 
     def geotecnico_id(self, codigo: Optional[str]) -> Optional[int]:
-        if not codigo:
-            return None
+        if not codigo: return None
         m = self._load(models.Geotecnico, "geotecnico_id", "nombre", "geotecnicos")
-        return m.get(codigo.strip().upper())
+        code_up = codigo.strip().upper()
+        if code_up in m:
+            return m[code_up]
+        # No existe -> crear
+        nuevo = models.Geotecnico(
+            nombre=code_up, estado="Activo"
+        )
+        self.db.add(nuevo)
+        self.db.flush()
+        m[code_up] = nuevo.geotecnico_id
+        return nuevo.geotecnico_id
+
+    # ==================== ADMIN: rechazar si no existe ====================
 
     def campania_id(self, value: int) -> bool:
-        if not value:
-            return False
-        exists = self.db.query(models.Campania).filter_by(campania_id=int(value)).first()
-        return exists is not None
+        if not value: return False
+        return self.db.query(models.Campania).filter_by(campania_id=int(value)).first() is not None
 
 
 # ============================================================================
@@ -263,7 +286,7 @@ def calculate_and_persist_subratings(db: Session, v: models.Ventana):
             "aber": float(e.abertura_mm) if e.abertura_mm is not None else None,
             "esp": float(e.espesor_mm) if e.espesor_mm is not None else None,
             "cont": float(e.continuidad_m) if e.continuidad_m is not None else None,
-            "espac": float(e.espaciamiento_m),
+            "espac": float(e.espaciamiento_m) if e.espaciamiento_m is not None else 0.5,
             "nstr": e.numero_estructuras,
             "rug": int(e.rugosidad_estructura) if e.rugosidad_estructura is not None else None,
             "alt": e.alteracion,
@@ -696,20 +719,405 @@ def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
 # IMPORTAR EXCEL — Bulk import desde formato BD/ventana compatible con GEMA
 # ============================================================================
 
-@router.post("/importar-excel")
-async def importar_excel_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)):
+@router.post("/importar-excel/preview")
+async def preview_import_excel(
+    file: UploadFile = File(...),
+    formato: Optional[str] = Query(None, pattern="^(ventana|bd|auto)?$"),
+    db: Session = Depends(get_db)
+):
+    """Parsea el Excel y devuelve lista de celdas detectadas SIN guardar en BD."""
     contents = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
     resolver = GEMACatalogResolver(db)
-    imported_count = 0
 
-    if "ventana" in wb.sheetnames:
-        ws = wb["ventana"]
+    # Detectar hoja
+    data_sheet = None
+    sheet_name = ""
+    if formato == "ventana":
+        for sn in wb.sheetnames:
+            if "ventana" in sn.lower():
+                data_sheet = wb[sn]
+                sheet_name = "ventana"
+                break
+        if not data_sheet:
+            raise HTTPException(status_code=400, detail="No se encontro hoja 'ventana' (formato forzado)")
+    elif formato == "bd":
+        data_sheet = wb[wb.sheetnames[0]]
+        sheet_name = "BD"
+    else:
+        if "ventana" in wb.sheetnames:
+            data_sheet = wb["ventana"]; sheet_name = "ventana"
+        elif "BD" in wb.sheetnames:
+            data_sheet = wb["BD"]; sheet_name = "BD"
+        else:
+            for sn in wb.sheetnames:
+                ws2 = wb[sn]
+                h1 = str(ws2.cell(row=1, column=1).value or "").strip()
+                h2 = str(ws2.cell(row=1, column=2).value or "").strip()
+                if h1 == "id" and h2.upper() == "CELDA":
+                    data_sheet = ws2; sheet_name = "BD"; break
+    if not data_sheet:
+        raise HTTPException(status_code=400, detail="No se encontro hoja de datos")
+    ws = data_sheet
+
+    celdas_detectadas = []
+
+    if sheet_name == "ventana":
         for start in range(3, ws.max_row, 30):
             celda_val = ws.cell(row=start + 1, column=1).value or ws.cell(row=start, column=51).value
             if not celda_val or not str(celda_val).strip():
                 continue
             codigo = str(celda_val).strip().upper()
+
+            def gn(r, c):
+                try: return float(ws.cell(row=r, column=c).value or 0.0)
+                except: return 0.0
+            def gs(r, c):
+                return str(ws.cell(row=r, column=c).value or "").strip()
+
+            est = round(gn(start + 2, 2), 4)
+            norte = round(gn(start + 2, 4), 3)
+            geo = gs(start + 5, 16)
+            n_disc = 0
+            for r_idx in range(start + 12, start + 25):
+                if ws.cell(row=r_idx, column=1).value is not None:
+                    n_disc += 1
+
+            celdas_detectadas.append({
+                "codigo": codigo, "este": est, "norte": norte,
+                "n_discontinuidades": n_disc, "mapeador": geo or None,
+                "fecha": str(ws.cell(row=start + 1, column=37).value or ""),
+            })
+
+    elif sheet_name == "BD":
+        col_map = {}
+        cota_seen = 0
+        celda_seen = 0
+        for ci in range(1, ws.max_column + 1):
+            h = ws.cell(row=1, column=ci).value
+            hs = str(h).strip() if h else ""
+            if hs == "COTA":
+                hs = "COTA_FROM" if cota_seen == 0 else "COTA_TO"
+                cota_seen += 1
+            elif hs == "CELDA":
+                hs = "CELDA_PADRE" if celda_seen == 0 else "CELDA_DUPLICADA_IGNORE"
+                celda_seen += 1
+            norm = "".join(hs.upper().split()).replace(".","").replace("'","").replace('"',"").replace("(","").replace(")","").replace("-","").replace("_","")
+            col_map[norm] = ci
+
+        def _c(name, default=1):
+            norm = "".join(str(name).upper().split()).replace(".","").replace("'","").replace('"',"").replace("(","").replace(")","").replace("-","").replace("_","")
+            return col_map.get(norm, default)
+
+        idx_celda = _c("CELDAPADRE", 2)
+        celda_groups = {}
+        for r_idx in range(2, ws.max_row + 1):
+            cv = ws.cell(row=r_idx, column=idx_celda).value
+            if cv and str(cv).strip():
+                code = str(cv).strip().upper()
+                celda_groups.setdefault(code, []).append(r_idx)
+
+        for code, rows_indices in celda_groups.items():
+            # Preview siempre muestra todas las celdas
+            f_row = rows_indices[0]
+            def gn(r, c):
+                try: return float(ws.cell(row=r, column=c).value or 0.0)
+                except: return 0.0
+            def gs(r, c):
+                return str(ws.cell(row=r, column=c).value or "").strip()
+
+            este = round(gn(f_row, _c("ESTEFROM", 4)), 4)
+            norte = round(gn(f_row, _c("NORTEFROM", 5)), 3)
+            geo = gs(f_row, _c("GEOTECNICO", 74))
+            fecha = str(ws.cell(row=f_row, column=_c("FECHA", 51)).value or "")
+
+            # Contar discontinuidades en el grupo
+            n_disc = len(rows_indices)
+
+            celdas_detectadas.append({
+                "codigo": code, "este": este, "norte": norte,
+                "n_discontinuidades": n_disc, "mapeador": geo or None,
+                "fecha": fecha[:10] if fecha else "",
+            })
+
+    return {
+        "total": len(celdas_detectadas),
+        "celdas": celdas_detectadas,
+    }
+
+
+@router.post("/importar-excel/parse")
+async def parse_import_excel(
+    file: UploadFile = File(...),
+    celdas: str = Query(..., description="Lista de celdas separadas por coma"),
+    formato: Optional[str] = Query(None, pattern="^(ventana|bd|auto)?$"),
+    db: Session = Depends(get_db)
+):
+    """Parsea el Excel y devuelve los datos completos de las celdas seleccionadas SIN guardar."""
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    resolver = GEMACatalogResolver(db)
+    celdas_set = set(c.strip().upper() for c in celdas.split(","))
+    resultado = []
+
+    # Detectar hoja (misma logica que preview)
+    data_sheet = None
+    sheet_name = ""
+    if formato == "ventana":
+        for sn in wb.sheetnames:
+            if "ventana" in sn.lower():
+                data_sheet = wb[sn]; sheet_name = "ventana"; break
+        if not data_sheet:
+            raise HTTPException(status_code=400, detail="No se encontro hoja 'ventana'")
+    elif formato == "bd":
+        data_sheet = wb[wb.sheetnames[0]]; sheet_name = "BD"
+    else:
+        if "ventana" in wb.sheetnames:
+            data_sheet = wb["ventana"]; sheet_name = "ventana"
+        elif "BD" in wb.sheetnames:
+            data_sheet = wb["BD"]; sheet_name = "BD"
+        else:
+            for sn in wb.sheetnames:
+                ws2 = wb[sn]
+                if str(ws2.cell(row=1, column=1).value or "").strip() == "id" and str(ws2.cell(row=1, column=2).value or "").strip().upper() == "CELDA":
+                    data_sheet = ws2; sheet_name = "BD"; break
+    if not data_sheet:
+        raise HTTPException(status_code=400, detail="No se encontro hoja de datos")
+    ws = data_sheet
+
+    if sheet_name == "ventana":
+        for start in range(3, ws.max_row, 30):
+            celda_val = ws.cell(row=start + 1, column=1).value or ws.cell(row=start, column=51).value
+            if not celda_val: continue
+            codigo = str(celda_val).strip().upper()
+            if codigo not in celdas_set: continue
+
+            def gn(r, c):
+                try: return float(ws.cell(row=r, column=c).value or 0.0)
+                except: return 0.0
+            def gs(r, c):
+                return str(ws.cell(row=r, column=c).value or "").strip()
+
+            discs = []
+            for r_idx in range(start + 12, start + 25):
+                if ws.cell(row=r_idx, column=1).value is None: continue
+                raw_nstr = int(round(gn(r_idx, 6))) if gn(r_idx, 6) else -1
+                discs.append(schemas.DiscontinuidadBase(
+                    familia_id=int(ws.cell(row=r_idx, column=1).value),
+                    distancia_m=round(gn(r_idx, 2)) if gn(r_idx, 2) else None,
+                    tipo_estructura=gs(r_idx, 3) or "JN",
+                    dip=round(gn(r_idx, 4), 2), dip_dir=round(gn(r_idx, 5), 2),
+                    n_estructuras=raw_nstr if raw_nstr > 0 else -1,
+                    abertura_mm=round(gn(r_idx, 7), 1) if gn(r_idx, 7) else None,
+                    espesor_mm=round(gn(r_idx, 8), 1) if gn(r_idx, 8) else None,
+                    continuidad_m=round(gn(r_idx, 9), 2) if gn(r_idx, 9) else None,
+                    espaciamiento_m=round(gn(r_idx, 10), 2),
+                    n_extremos_visibles=min(2, max(0, int(gn(r_idx, 11)))),
+                    terminacion=min(3, max(0, int(gn(r_idx, 12)))),
+                    relleno_1_codigo=gs(r_idx, 13), relleno_2_codigo=gs(r_idx, 14),
+                    jrc=min(20, max(0, int(gn(r_idx, 19)))),
+                    rugosidad_codigo=min(9, max(0, int(gn(r_idx, 20)))),
+                    forma_estructura=gs(r_idx, 21), alteracion_codigo=gs(r_idx, 22),
+                ))
+
+            resultado.append({
+                "codigo": codigo,
+                "data": {
+                    "codigo": codigo,
+                    "campania": 7,
+                    "sector_geotecnico": sect_geot or sector if (sect_geot := gs(start + 4, 21)) or (sector := gs(start + 1, 20)) else "PENDIENTE",
+                    "fecha_mapeo": str(ws.cell(row=start + 1, column=37).value or ""),
+                    "nivel": str(round(gn(start + 3, 21), 2)) if gn(start + 3, 21) else None,
+                    "este_ini": round(gn(start + 2, 2), 4),
+                    "norte_ini": round(gn(start + 2, 4), 3), "cota_ini": round(gn(start + 2, 6), 2),
+                    "este_fin": round(gn(start + 3, 2), 4),
+                    "norte_fin": round(gn(start + 3, 4), 3), "cota_fin": round(gn(start + 3, 6), 2),
+                    "distancia_celda": int(round(gn(start + 2, 11))),
+                    "altura": round(gn(start + 3, 11), 1),
+                    "dip_talud": round(gn(start + 2, 14), 2),
+                    "dipdir_talud": round(gn(start + 3, 14), 2) if gn(start + 3, 14) else None,
+                    "intemperismo": gs(start + 3, 16) or None,
+                    "mapeador": gs(start + 5, 16) or None,
+                    "discontinuidades": [d.model_dump() for d in discs],
+                    "rmr_input": {
+                        "agua_codigo": gs(start + 8, 36) or None,
+                        "resistencia_codigo": gs(start + 8, 38) or None,
+                        "gsi_visual": int(gn(start + 8, 42)) if gn(start + 8, 42) else None,
+                        "control_estructural": int(gn(start + 8, 43)) if gn(start + 8, 43) else None,
+                        "efectos_voladura": int(gn(start + 8, 44)) if gn(start + 8, 44) else None,
+                        "ucs_mpa": gn(start + 8, 53) if gn(start + 8, 53) else None,
+                        "is50_mpa": gn(start + 8, 54) if gn(start + 8, 54) else None,
+                        "comentario": gs(start + 18, 56) or None,
+                    }
+                }
+            })
+
+    elif sheet_name == "BD":
+        # Construir col_map (igual que preview)
+        col_map = {}
+        cota_seen = 0; celda_seen = 0
+        for ci in range(1, ws.max_column + 1):
+            h = ws.cell(row=1, column=ci).value
+            hs = str(h).strip() if h else ""
+            if hs == "COTA":
+                hs = "COTA_FROM" if cota_seen == 0 else "COTA_TO"; cota_seen += 1
+            elif hs == "CELDA":
+                hs = "CELDA_PADRE" if celda_seen == 0 else "CELDA_DUPLICADA_IGNORE"; celda_seen += 1
+            norm = "".join(hs.upper().split()).replace(".","").replace("'","").replace('"',"").replace("(","").replace(")","").replace("-","").replace("_","")
+            col_map[norm] = ci
+
+        def _c(name, default=1):
+            norm = "".join(str(name).upper().split()).replace(".","").replace("'","").replace('"',"").replace("(","").replace(")","").replace("-","").replace("_","")
+            return col_map.get(norm, default)
+
+        idx_celda = _c("CELDAPADRE", 2)
+        celda_groups = {}
+        for r_idx in range(2, ws.max_row + 1):
+            cv = ws.cell(row=r_idx, column=idx_celda).value
+            if cv and str(cv).strip():
+                code = str(cv).strip().upper()
+                celda_groups.setdefault(code, []).append(r_idx)
+
+        for code, rows_indices in celda_groups.items():
+            if code not in celdas_set: continue
+            f_row = rows_indices[0]
+            def gn(r, c):
+                try: return float(ws.cell(row=r, column=c).value or 0.0)
+                except: return 0.0
+            def gs(r, c):
+                return str(ws.cell(row=r, column=c).value or "").strip()
+
+            dip_col = _c("DIP", 60)
+            for hc, ci in col_map.items():
+                if hc == "DIP" and ci > 15: dip_col = ci; break
+
+            discs = []
+            for ri in rows_indices:
+                nstr = int(round(gn(ri, _c("NUMERODEESTRUCTURAS", 62)))) if gn(ri, _c("NUMERODEESTRUCTURAS", 62)) else -1
+                discs.append(schemas.DiscontinuidadBase(
+                    familia_id=int(ws.cell(row=ri, column=1).value or 1),
+                    distancia_m=round(gn(ri, _c("Distdeestr", 53))) if gn(ri, _c("Distdeestr", 53)) else None,
+                    tipo_estructura=gs(ri, _c("TIPO", 59)) or "JN",
+                    dip=round(gn(ri, dip_col), 2), dip_dir=round(gn(ri, _c("DIPDIR", 61)), 2),
+                    n_estructuras=nstr if nstr > 0 else -1,
+                    abertura_mm=round(gn(ri, _c("ABERTURAmm", 63)), 1) if gn(ri, _c("ABERTURAmm", 63)) else None,
+                    espesor_mm=round(gn(ri, _c("ESPESORmm", 64)), 1) if gn(ri, _c("ESPESORmm", 64)) else None,
+                    continuidad_m=round(gn(ri, _c("CONTINUIDADm", 65)), 2) if gn(ri, _c("CONTINUIDADm", 65)) else None,
+                    espaciamiento_m=round(gn(ri, _c("ESPACIAMIENTOm", 66)), 2),
+                    n_extremos_visibles=min(2, max(0, int(gn(ri, _c("NUMERODEEXTREMOSVISIBLES", 67))))),
+                    terminacion=3,
+                    relleno_1_codigo=gs(ri, _c("TIPODERELLENO1", 68)),
+                    relleno_2_codigo=gs(ri, _c("TIPODERELLENO2", 69)),
+                    jrc=min(20, max(0, int(gn(ri, _c("JRC", 70))))),
+                    rugosidad_codigo=min(9, max(0, int(gn(ri, _c("RUGOSIDADDEESTRUCTURAS", 71))))),
+                    forma_estructura=gs(ri, _c("FORMADEESTRUCTURA", 72)),
+                    alteracion_codigo=gs(ri, _c("ALTERACION", 73)),
+                ))
+
+            fecha_val = ws.cell(row=f_row, column=_c("FECHA", 51)).value
+            resultado.append({
+                "codigo": code,
+                "data": {
+                    "codigo": code,
+                    "campania": 7,
+                    "sector_geotecnico": gs(f_row, _c("SectorGeotecnicos", 80)) or "PENDIENTE",
+                    "fecha_mapeo": str(fecha_val)[:10] if fecha_val else None,
+                    "nivel": str(round(gn(f_row, _c("Nivel", 75)), 2)) if gn(f_row, _c("Nivel", 75)) else None,
+                    "este_ini": round(gn(f_row, _c("ESTEFROM", 4)), 4),
+                    "norte_ini": round(gn(f_row, _c("NORTEFROM", 5)), 3),
+                    "cota_ini": round(gn(f_row, _c("COTAFROM", 6)), 2),
+                    "este_fin": round(gn(f_row, _c("ESTETO", 7)), 4),
+                    "norte_fin": round(gn(f_row, _c("NORTETO", 8)), 3),
+                    "cota_fin": round(gn(f_row, _c("COTATO", 9)), 2),
+                    "distancia_celda": int(round(gn(f_row, _c("DistCelda", 10)))) if gn(f_row, _c("DistCelda", 10)) else None,
+                    "altura": round(gn(f_row, _c("Altura", 11)), 1) if gn(f_row, _c("Altura", 11)) else None,
+                    "dip_talud": round(gn(f_row, _c("DIPTALUD", 14)), 2),
+                    "intemperismo": gs(f_row, _c("INTEMPERISMO", 16)) or None,
+                    "mapeador": gs(f_row, _c("GEOTECNICO", 74)) or None,
+                    "lito_1": None, "lito_2": None, "lito_3": None, "unidad_litologica": None,
+                    "discontinuidades": [d.model_dump() for d in discs],
+                    "rmr_input": {
+                        "agua_codigo": gs(f_row, _c("CONDICIONDEAGUA89", 35)) or None,
+                        "resistencia_codigo": gs(f_row, _c("DUREZA89", 37)) or None,
+                        "gsi_visual": gn(f_row, _c("GSIVISUAL89", 39)) or None,
+                        "control_estructural": gn(f_row, _c("CONTROLESTRUCTURAL89", 40)) or None,
+                        "efectos_voladura": gn(f_row, _c("EFECTOSDEVOLADURA89", 41)) or None,
+                        "ucs_mpa": gn(f_row, _c("UCSMpa", 33)) or None,
+                        "is50_mpa": gn(f_row, _c("is50Mpa", 34)) or None,
+                        "comentario": gs(f_row, _c("COMENTARIO", 52)) or None,
+                    }
+                }
+            })
+
+    return {"total": len(resultado), "celdas": resultado}
+@router.post("/importar-excel")
+async def importar_excel_endpoint(
+    file: UploadFile = File(...),
+    formato: Optional[str] = Query(None, pattern="^(ventana|bd|auto)?$"),
+    celdas: Optional[str] = Query(None, description="Lista de celdas a importar separadas por coma (ej: A1,B1)"),
+    db: Session = Depends(get_db)
+):
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    resolver = GEMACatalogResolver(db)
+    imported_count = 0
+
+    # Detectar hoja de datos: probar "ventana", "BD", o cualquier hoja con cabeceras BD
+    data_sheet = None
+    sheet_name = ""
+    if formato == "ventana":
+        for sn in wb.sheetnames:
+            if "ventana" in sn.lower():
+                data_sheet = wb[sn]
+                sheet_name = "ventana"
+                break
+        if not data_sheet:
+            raise HTTPException(status_code=400, detail="No se encontro hoja 'ventana' en el archivo (formato forzado a Estaciones)")
+    elif formato == "bd":
+        for sn in wb.sheetnames:
+            if "bd" in sn.lower():
+                data_sheet = wb[sn]
+                sheet_name = "BD"
+                break
+        if not data_sheet:
+            # Si no hay hoja llamada BD, usar la primera hoja como BD
+            data_sheet = wb[wb.sheetnames[0]]
+            sheet_name = "BD"
+    else:
+        # Auto-deteccion
+        if "ventana" in wb.sheetnames:
+            data_sheet = wb["ventana"]
+            sheet_name = "ventana"
+        elif "BD" in wb.sheetnames:
+            data_sheet = wb["BD"]
+            sheet_name = "BD"
+        else:
+            for sn in wb.sheetnames:
+                ws = wb[sn]
+                h1 = str(ws.cell(row=1, column=1).value or "").strip()
+                h2 = str(ws.cell(row=1, column=2).value or "").strip()
+                h3 = str(ws.cell(row=1, column=3).value or "").strip()
+                if h1 == "id" and (h2.upper() == "CELDA" or h3.upper() == "CELDA"):
+                    data_sheet = ws
+                    sheet_name = "BD"
+                    break
+
+    if not data_sheet:
+        raise HTTPException(status_code=400, detail="No se encontro una hoja de datos valida (ventana, BD o formato tabular)")
+
+    ws = data_sheet
+
+    # Filtrar por celdas si se especifico
+    celdas_filter = set(c.strip().upper() for c in celdas.split(",")) if celdas else None
+
+    if sheet_name == "ventana":
+        for start in range(3, ws.max_row, 30):
+            celda_val = ws.cell(row=start + 1, column=1).value or ws.cell(row=start, column=51).value
+            if not celda_val or not str(celda_val).strip():
+                continue
+            codigo = str(celda_val).strip().upper()
+            if celdas_filter and codigo not in celdas_filter:
+                continue
             fecha_val = ws.cell(row=start + 1, column=37).value
             fecha_mapeo = fecha_val.date() if isinstance(fecha_val, datetime) else None
 
@@ -831,21 +1239,25 @@ async def importar_excel_endpoint(file: UploadFile = File(...), db: Session = De
             db.flush()
             imported_count += 1
 
-    elif "BD" in wb.sheetnames:
-        ws = wb["BD"]
+    elif sheet_name == "BD":
+        # ws ya esta asignado desde la deteccion de hojas
 
-        # Mapear cabeceras dinámicamente
+        # Mapear cabeceras dinamicamente
         def _norm_col(c):
             return "".join(str(c).upper().split()).replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
 
         col_map = {}
         cota_seen = 0
+        celda_seen = 0
         for ci in range(1, ws.max_column + 1):
             h = ws.cell(row=1, column=ci).value
             hs = str(h).strip() if h else ""
             if hs == "COTA":
                 hs = "COTA_FROM" if cota_seen == 0 else "COTA_TO"
                 cota_seen += 1
+            elif hs == "CELDA":
+                hs = "CELDA_PADRE" if celda_seen == 0 else "CELDA_DUPLICADA_IGNORE"
+                celda_seen += 1
             col_map[_norm_col(hs)] = ci
 
         def _c(name, default=1):
@@ -859,6 +1271,8 @@ async def importar_excel_endpoint(file: UploadFile = File(...), db: Session = De
                 celda_groups.setdefault(code, []).append(r_idx)
 
         for celda_code, rows_indices in celda_groups.items():
+            if celdas_filter and celda_code not in celdas_filter:
+                continue
             f_row = rows_indices[0]
 
             def gn(r, c):
@@ -994,7 +1408,7 @@ def _populate_ventana_from_schema(v: models.Ventana, data: schemas.VentanaSaveSc
     campania_id = data.campania if isinstance(data.campania, int) else 7
     v.campania_id = campania_id if resolver.campania_id(campania_id) else 7
     sector_id = resolver.sector_id(data.sector_geotecnico) if data.sector_geotecnico else None
-    v.sector_geotecnico_id = sector_id if sector_id else 20  # 20 = "PENDIENTE" en GEMA
+    v.sector_geotecnico_id = sector_id
     v.fecha_mapeo = data.fecha_mapeo
     v.nivel = data.nivel
     v.este_from = data.este_ini; v.norte_from = data.norte_ini; v.cota_from = data.cota_ini
@@ -1034,7 +1448,7 @@ def _populate_discontinuidades(db: Session, v: models.Ventana, discs: List[schem
     for idx, d in enumerate(discs, start=1):
         tipo_id = resolver.tipo_estructura_id(d.tipo)
         if not tipo_id:
-            tipo_id = 7137  # Fallback a JN (Junta) si no se encuentra el código
+            tipo_id = 7137  # fallback a JN (NOT NULL en GEMA)
         e = models.EstructuraGeologica(
             ventana_id=v.ventana_id,
             numero_estructura=idx,
@@ -1044,7 +1458,7 @@ def _populate_discontinuidades(db: Session, v: models.Ventana, discs: List[schem
             abertura_mm=float(d.aber) if d.aber is not None and d.aber != -1 else None,
             espesor_mm=float(d.esp) if d.esp is not None and d.esp != -1 else None,
             continuidad_m=float(d.cont) if d.cont is not None and d.cont != -1 else None,
-            espaciamiento_m=float(d.espac),
+            espaciamiento_m=float(d.espac) if d.espac is not None else 0.5,
             numero_estructuras=d.nstr if d.nstr is not None and d.nstr != -1 else None,
             numero_extremos_visibles=d.next if d.next is not None and d.next != -1 else None,
             terminacion=d.term if d.term is not None and d.term != -1 else None,
