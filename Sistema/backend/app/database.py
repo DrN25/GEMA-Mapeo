@@ -43,7 +43,7 @@ if DATABASE_URL:
 # 2. Si no hay DATABASE_URL o falló, intentar conexión por defecto con SQL Server (SQLEXPRESS)
 if not engine:
     db_server = os.environ.get("DB_SERVER", "localhost\\SQLEXPRESS")
-    db_name = os.environ.get("DB_NAME", "ventanas")
+    db_name = os.environ.get("DB_NAME", "GEMA")
     db_trusted = os.environ.get("DB_TRUSTED", "yes").lower() == "yes"
     db_user = os.environ.get("DB_USER", "")
     db_password = os.environ.get("DB_PASSWORD", "")
@@ -75,7 +75,7 @@ if not engine:
                 conn.execute(text("SELECT 1 WHERE :x = :y"), {"x": "test", "y": "test"})
                 from sqlalchemy import inspect
                 inspector = inspect(temp_engine)
-                inspector.has_table("ventana")
+                inspector.has_table("VentanasMapeo", schema="mapeo")
             
             engine = temp_engine
             DATABASE_URL = url

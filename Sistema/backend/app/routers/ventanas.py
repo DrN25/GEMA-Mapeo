@@ -1,16 +1,25 @@
-# backend/app/routers/ventanas.py
+"""
+routers/ventanas.py — Alineado a GEMA (SQL Server)
+
+Novedades vs versión anterior:
+- Sin sync_to_ventanas_final (tabla eliminada — schema GEMA no la tiene)
+- Lookup códigos string → IDs FK usando GEMA (cached en sesión por request)
+- Patrón Hybrid Cache Writable: backend recalcula sub-ratings, no confía en UI
+- IDs gestionados por IDENTITY de SQL Server (sin MAX(id)+1)
+- Foto upload mantenido; PLT eliminado (offline)
+"""
 import os
 import io
-import openpyxl
 import math
 import time
+import json
+import openpyxl
 from datetime import date, datetime
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from sqlalchemy import func, or_
 
 from app.database import get_db
 from app import models, schemas, calculator
@@ -20,356 +29,1035 @@ router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 uploads_dir = os.path.join(BASE_DIR, "uploads")
 
-def resolve_lithology(lito3_code: str) -> dict:
-    code_clean = str(lito3_code or "").strip().upper().replace(" ", "").replace("-", "")
-    match = None
-    for item in LITHOLOGY_CLASSIFICATION:
-        item_code = item["lito3"].upper().replace(" ", "").replace("-", "")
-        if item_code and item_code == code_clean:
-            match = item
-            break
-    if not match:
-        for item in LITHOLOGY_CLASSIFICATION:
-            if code_clean in item["lito3"].upper() or code_clean in item["lito2"].upper():
-                match = item
+
+# ============================================================================
+# HELPERS — Lookup códigos → IDs en GEMA (cache por request)
+# ============================================================================
+
+class GEMACatalogResolver:
+    """
+    Resuelve códigos string → IDs FK leyendo catálogos de GEMA.
+    Mantiene cache en sesión por request para evitar queries repetidas.
+    """
+    def __init__(self, db: Session):
+        self.db = db
+        self._cache: Dict[str, Dict[str, int]] = {}
+
+    def _load(self, model_cls, pk_attr: str, code_attr: str, cache_key: str) -> Dict[str, int]:
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+        rows = self.db.query(model_cls).all()
+        m = {}
+        for r in rows:
+            k = str(getattr(r, code_attr)).strip().upper()
+            v = getattr(r, pk_attr)
+            m[k] = v
+        self._cache[cache_key] = m
+        return m
+
+    def litologia_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo:
+            return None
+        m = self._load(models.Litologia, "litologia_id", "codigo", "litologias")
+        return m.get(codigo.strip().upper())
+
+    def sector_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo:
+            return None
+        m = self._load(models.SectorGeotecnico, "sector_id", "codigo", "sectores")
+        return m.get(codigo.strip().upper())
+
+    def unidad_litologica_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo:
+            return None
+        m = self._load(models.UnidadLitologica, "unidad_id", "codigo", "unidades")
+        return m.get(codigo.strip().upper())
+
+    def tipo_estructura_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo:
+            return None
+        m = self._load(models.TipoEstructura, "tipo_estructura_id", "codigo", "tipos_estructura")
+        code_clean = codigo.strip().upper()
+        if code_clean == "J":
+            code_clean = "JN"
+        return m.get(code_clean)
+
+    def geotecnico_id(self, codigo: Optional[str]) -> Optional[int]:
+        if not codigo:
+            return None
+        m = self._load(models.Geotecnico, "geotecnico_id", "nombre", "geotecnicos")
+        return m.get(codigo.strip().upper())
+
+    def campania_id(self, value: int) -> bool:
+        if not value:
+            return False
+        exists = self.db.query(models.Campania).filter_by(campania_id=int(value)).first()
+        return exists is not None
+
+
+# ============================================================================
+# HELPERS — Serialización ORM → API (IDs → códigos)
+# ============================================================================
+
+def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponseSchema:
+    resolver = GEMACatalogResolver(db)
+    tipos_map = {t.tipo_estructura_id: t.codigo for t in db.query(models.TipoEstructura).all()}
+
+    def _to_int(val):
+        if val is None:
+            return None
+        try:
+            return int(float(str(val)))
+        except (ValueError, TypeError):
+            return None
+
+    def _to_float(val):
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return None
+
+    def _reverse(model_cls, id_val, code_attr):
+        if not id_val:
+            return None
+        pk_col = None
+        for c in model_cls.__table__.columns:
+            if c.primary_key:
+                pk_col = c
                 break
-    if match:
-        return {
-            "lito_1": match["lito1"],
-            "lito_2": match["lito2"],
-            "lito_3": match["lito3"],
-            "unidad_litologica": match["grupo"]
-        }
-    return {"lito_1": lito3_code, "lito_2": "", "lito_3": lito3_code, "unidad_litologica": "INTRUSIVOS"}
+        if pk_col is None:
+            return None
+        obj = db.query(model_cls).filter(pk_col == id_val).first()
+        return getattr(obj, code_attr) if obj else None
 
-def sync_to_ventanas_final(db: Session, ventana_id: int):
-    v = db.query(models.Ventana).filter_by(ventana_id=ventana_id).first()
-    if not v:
-        return
-    rows_data = []
-    for d in v.discontinuidades:
-        rows_data.append({
-            "fam": d.familia_id,
-            "dist": float(d.distancia_m) if d.distancia_m is not None else None,
-            "tipo": d.tipo_estructura,
-            "dip": float(d.dip),
-            "dipdir": float(d.dip_dir),
-            "aber": float(d.abertura_mm) if d.abertura_mm is not None else None,
-            "esp": float(d.espesor_mm) if d.espesor_mm is not None else None,
-            "cont": float(d.continuidad_m) if d.continuidad_m is not None else None,
-            "espac": float(d.espaciamiento_m),
-            "nstr": float(d.n_estructuras) if d.n_estructuras is not None else None,
-            "next": d.n_extremos_visibles,
-            "term": d.terminacion,
-            "r1": d.relleno_1_codigo,
-            "r2": d.relleno_2_codigo,
-            "jrc": d.jrc,
-            "rug": d.rugosidad_codigo,
-            "forma": d.forma_estructura,
-            "alt": d.alteracion_codigo
-        })
-    rmr_data = {
-        "agua_codigo": v.rmr_input.agua_codigo if v.rmr_input else "C",
-        "resistencia_codigo": v.rmr_input.resistencia_codigo if v.rmr_input else "R4",
-        "gsi_estructura": v.rmr_input.gsi_estructura if v.rmr_input else "VB",
-        "gsi_superficie": v.rmr_input.gsi_superficie if v.rmr_input else "G",
-        "gsi_visual": v.rmr_input.gsi_visual if v.rmr_input else 50,
-        "control_estructural": v.rmr_input.control_estructural if v.rmr_input else 4,
-        "efectos_voladura": v.rmr_input.efectos_voladura if v.rmr_input else 3,
-        "ucs_mpa": float(v.rmr_input.ucs_mpa) if (v.rmr_input and v.rmr_input.ucs_mpa is not None) else 74.0,
-        "is50_mpa": float(v.rmr_input.is50_mpa) if (v.rmr_input and v.rmr_input.is50_mpa is not None) else 5.0,
-        "comentario": v.rmr_input.comentario if v.rmr_input else ""
-    }
-    largo_entero = int(round(float(v.largo_m))) if v.largo_m is not None else None
-    header_data = {
-        "este_ini": v.este_ini, "norte_ini": v.norte_ini, "cota_ini": v.cota_ini,
-        "este_fin": v.este_fin, "norte_fin": v.norte_fin, "cota_fin": v.cota_fin,
-        "largo_m": largo_entero
-    }
-    res = calculator.calculate_geomechanics(header_data, rows_data, rmr_data)
-    db.query(models.VentanasFinal).filter_by(celda=v.codigo).delete()
-    db.flush()
-    max_id = db.execute(text("SELECT MAX(id) FROM ventanas_final")).scalar()
-    next_id = (max_id or 0) + 1
-    for r_idx, r_calc in enumerate(res["rows"]):
-        row_norm = r_calc["row"]
-        final_nstr = int(row_norm["nstr"]) if (row_norm["nstr"] is not None and row_norm["nstr"] != -1) else None
-        final_row = models.VentanasFinal(
-            id=next_id, celda=v.codigo, este_from=float(v.este_ini), norte_from=float(v.norte_ini), cota_from=float(v.cota_ini),
-            este_to=float(v.este_fin), norte_to=float(v.norte_fin), cota_to=float(v.cota_fin), dist_celda=largo_entero,
-            altura=float(v.altura_m) if v.altura_m is not None else None,
-            dip=float(v.dip_hw) if v.dip_hw is not None else (r_calc["alfa"] * 180 / math.pi if r_calc["alfa"] else None),
-            az_hole=float(v.az_hw) if v.az_hw is not None else (r_calc["teta"] * 180 / math.pi if r_calc["teta"] else None),
-            dip_talud=float(v.dip_talud), dip_dir_talud=float(v.dipdir_talud) if v.dipdir_talud is not None else (float(v.dip_talud) + 90) % 360,
-            intemperismo=v.intemperismo_codigo, cond_agua_76=v.rmr_input.agua_codigo if v.rmr_input else "C",
-            cond_agua_valor_76=res["agua_r76"], dureza_76=v.rmr_input.resistencia_codigo if v.rmr_input else "R4",
-            resistencia_est_valor_76=res["resist_r76"], gsi_visual_76=v.rmr_input.gsi_visual if v.rmr_input else 50,
-            control_estructural_76=v.rmr_input.control_estructural if v.rmr_input else 4, efectos_voladura_76=v.rmr_input.efectos_voladura if v.rmr_input else 3,
-            rqd_valor_76=res["rqd_r76"], rqd_76=res["rqd_pct"], freq_fractura_m_76=res["jv"],
-            tam_bloques_m3_76=res["espac_prom"]**3 if res["espac_prom"] else None, espaciamiento_prom_76=res["espac_prom"],
-            espaciamiento_valor_76=res["spacing_r76"], cond_discontinuidad_valor_76=res["condisc_r76"], rmr_76=res["rmr_76"],
-            ucs_mpa=float(v.rmr_input.ucs_mpa) if v.rmr_input else None, is50_mpa=float(v.rmr_input.is50_mpa) if v.rmr_input else None,
-            cond_agua_89=v.rmr_input.agua_codigo if v.rmr_input else "C", cond_agua_valor_89=res["agua_r89"],
-            dureza_89=v.rmr_input.resistencia_codigo if v.rmr_input else "R4", resistencia_est_valor_89=res["resist_r89"],
-            gsi_visual_89=v.rmr_input.gsi_visual if v.rmr_input else 50, control_estructural_89=v.rmr_input.control_estructural if v.rmr_input else 4,
-            efecto_voladura_89=v.rmr_input.efectos_voladura if v.rmr_input else 3, rqd_valor_89=res["rqd_r89"], rqd_89=res["rqd_pct"],
-            freq_fractura_m_89=res["jv"], tam_bloques_m3_89=res["espac_prom"]**3 if res["espac_prom"] else None,
-            espaciamiento_prom_89=res["espac_prom"], espaciamiento_valor_89=res["spacing_r89"],
-            cond_discontinuidad_valor_89=res["condisc_r89"], rmr_89=res["rmr_89"],
-            fecha=datetime.combine(v.fecha_mapeo, datetime.min.time()) if v.fecha_mapeo else None, comentario=v.rmr_input.comentario if v.rmr_input else "",
-            dist_estructura=row_norm["dist"], angulo_estruct_teta=r_calc["teta"], angulo_estruct_alfa=r_calc["alfa"],
-            estruct_x=r_calc["wx"], struct_y=r_calc["wy"], struct_z=r_calc["wz"], tipo_estructura=row_norm["tipo"],
-            dip_estructura=row_norm["dip"], dip_dir_estructura=row_norm["dipdir"], num_estructuras=final_nstr,
-            abertura_mm=row_norm["aber"] if row_norm["aber"] is not None else 0.0, espesor_mm=row_norm["esp"] if row_norm["esp"] is not None else 0.0,
-            continuidad_m=row_norm["cont"] if row_norm["cont"] is not None else 0.0, espaciamiento_m=row_norm["espac"],
-            num_extremos_visibles=row_norm["next"], tipo_relleno_1=row_norm["r1"] if row_norm["r1"] else "cwf",
-            tipo_relleno_2=row_norm["r2"] if row_norm["r2"] else "-1", jrc=row_norm["jrc"], rugosidad_estructuras=row_norm["rug"] if row_norm["rug"] is not None else 1,
-            forma_estructura=row_norm["forma"] if row_norm["forma"] else "P", alteracion=row_norm["alt"] if row_norm["alt"] else "f",
-            geotecnico=v.mapeador, nivel=v.nivel, lito_1=v.lito_1, lito_2=v.lito_2, lito_3=v.lito_3, unidad_litologica=v.unidad_litologica,
-            sector_geotecnico=v.sector_geotecnico if v.sector_geotecnico else "E1", campania=v.campania if v.campania is not None else 2026, turno=v.turno
-        )
-        db.add(final_row)
-        next_id += 1
-    db.flush()
-
-@router.get("/ventanas", response_model=List[schemas.VentanaSummarySchema])
-def get_ventanas(db: Session = Depends(get_db)):
-    ventanas = db.query(models.Ventana).all()
-    res = []
-    for v in ventanas:
-        res.append(schemas.VentanaSummarySchema(
-            codigo=v.codigo, fecha_mapeo=v.fecha_mapeo, mapeador=v.mapeador,
-            lito_1=v.lito_1, discontinuidades_count=len(v.discontinuidades), creado_en=v.creado_en
+    discs = []
+    for e in v.discontinuidades:
+        tipo_codigo = tipos_map.get(e.tipo_estructura_id) if e.tipo_estructura_id else None
+        discs.append(schemas.DiscontinuidadResponse(
+            fam=e.familia_id,
+            dist=float(e.distancia_estructura) if e.distancia_estructura is not None else None,
+            tipo=tipo_codigo or "JN",
+            dip=float(e.dip),
+            dipdir=float(e.dip_dir),
+            aber=float(e.abertura_mm) if e.abertura_mm is not None else None,
+            esp=float(e.espesor_mm) if e.espesor_mm is not None else None,
+            cont=float(e.continuidad_m) if e.continuidad_m is not None else None,
+            espac=float(e.espaciamiento_m),
+            nstr=e.numero_estructuras,
+            next=e.numero_extremos_visibles,
+            term=e.terminacion,
+            r1=e.tipo_relleno_1,
+            r2=e.tipo_relleno_2,
+            jrc=float(e.jrc) if e.jrc is not None else None,
+            rug=int(e.rugosidad_estructura) if e.rugosidad_estructura is not None else None,
+            forma=e.forma_estructura,
+            alt=e.alteracion,
+            numero_estructura=e.numero_estructura,
+            altR76=_to_float(e.valor_alteracion_cd76),
+            relR76=_to_float(e.valor_relleno_cd76),
+            contR76=_to_float(e.continuidad_cd76),
+            abR76=_to_float(e.abertura_cd76),
+            rugR76=_to_float(e.rugosidad_cd76),
+            totalR76=_to_float(e.valor_condicion_cd76),
+            altR89=_to_float(e.valor_alteracion_cd89),
+            relR89=_to_float(e.valor_relleno_cd89),
+            contR89=_to_float(e.continuidad_cd89),
+            abR89=_to_float(e.abertura_cd89),
+            rugR89=_to_float(e.rugosidad_cd89),
+            totalR89=_to_float(e.valor_condicion_cd89),
+            teta=_to_float(e.teta),
+            alfa=_to_float(e.alfa),
+            x=_to_float(e.x),
+            y=_to_float(e.y),
+            z=_to_float(e.z),
         ))
-    return res
 
-@router.get("/ventanas/{codigo}", response_model=schemas.VentanaSaveSchema)
+    rmr_input = None
+    if v.condicion_agua_rmr76:
+        rmr_input = schemas.VentanaRmrInputBase(
+            agua_codigo=v.condicion_agua_rmr76,
+            resistencia_codigo=v.dureza_rmr76,
+            gsi_estructura=v.gsi_estructura,
+            gsi_superficie=v.gsi_superficie,
+            gsi_visual=_to_float(v.gsi_visual_rmr76),
+            control_estructural=_to_int(v.control_estructural_rmr76),
+            efectos_voladura=_to_int(v.efectos_voladura_rmr76),
+            ucs_mpa=_to_float(v.ucs_mpa),
+            is50_mpa=_to_float(v.is50_mpa),
+            comentario=v.comentarios,
+        )
+
+    try:
+        ix, iy, ic = float(v.este_from), float(v.norte_from), float(v.cota_from)
+        fx, fy, fc = float(v.este_to), float(v.norte_to), float(v.cota_to)
+        largo_m = math.sqrt((fx-ix)**2 + (fy-iy)**2 + (fc-ic)**2)
+    except Exception:
+        largo_m = float(v.distancia_celda) if v.distancia_celda is not None else None
+
+    return schemas.VentanaResponseSchema(
+        codigo=v.codigo_celda,
+        campania=v.campania_id,
+        sector_geotecnico=_reverse(models.SectorGeotecnico, v.sector_geotecnico_id, "codigo"),
+        fecha_mapeo=v.fecha_mapeo,
+        nivel=v.nivel,
+        este_ini=float(v.este_from), norte_ini=float(v.norte_from), cota_ini=float(v.cota_from),
+        este_fin=float(v.este_to), norte_fin=float(v.norte_to), cota_fin=float(v.cota_to),
+        distancia_celda=_to_float(v.distancia_celda),
+        altura=_to_float(v.altura),
+        dip=_to_float(v.dip),
+        azimut_hole=_to_float(v.azimut_hole),
+        dip_talud=float(v.dip_talud),
+        dipdir_talud=_to_float(v.dip_dir_talud),
+        lito_1=_reverse(models.Litologia, v.litologia1_id, "codigo"),
+        lito_2=_reverse(models.Litologia, v.litologia2_id, "codigo"),
+        lito_3=_reverse(models.Litologia, v.litologia3_id, "codigo"),
+        unidad_litologica=_reverse(models.UnidadLitologica, v.unidad_litologica_id, "codigo"),
+        intemperismo=v.grado_intemperismo,
+        altura_zona=v.altura_zona,
+        fase=v.fase,
+        turno=v.turno,
+        mapeador=_reverse(models.Geotecnico, v.geotecnico_id, "nombre"),
+        rmr_input=rmr_input,
+        agua_r76=_to_float(v.condicion_agua_valor_rmr76),
+        agua_r89=_to_float(v.condicion_agua_valor_rmr89),
+        resist_r76=_to_float(v.resistencia_estimada_valor_rmr76),
+        resist_r89=_to_float(v.resistencia_estimada_valor_rmr89),
+        rqd_r76=_to_float(v.rqd_valor_rmr76),
+        rqd_r89=_to_float(v.rqd_valor_rmr89),
+        rqd_pct=_to_float(v.rqd_rmr76),
+        jv=_to_float(v.frecuencia_fracturamiento_rmr76),
+        espac_prom=_to_float(v.espaciamiento_promedio_rmr76),
+        spacing_r76=_to_float(v.espaciamiento_valor_rmr76),
+        spacing_r89=_to_float(v.espaciamiento_valor_rmr89),
+        condisc_r76=_to_float(v.condicion_discontinuidad_valor_rmr76),
+        condisc_r89=_to_float(v.condicion_discontinuidad_valor_rmr89),
+        rmr_76=_to_float(v.rmr76_total),
+        rmr_89=_to_float(v.rmr89_total),
+        largo_m=largo_m,
+        discontinuidades=discs,
+    )
+
+
+def calculate_and_persist_subratings(db: Session, v: models.Ventana):
+    """Hybrid Cache Writable: recalcular sub-ratings en backend y persistir."""
+    header_data = {
+        "este_ini": float(v.este_from), "norte_ini": float(v.norte_from), "cota_ini": float(v.cota_from),
+        "este_fin": float(v.este_to), "norte_fin": float(v.norte_to), "cota_fin": float(v.cota_to),
+        "largo_m": float(v.distancia_celda) if v.distancia_celda is not None else None,
+    }
+    rows_data = []
+    for e in v.discontinuidades:
+        tipo_codigo = None
+        if e.tipo_estructura_id:
+            tipo_obj = db.query(models.TipoEstructura).filter_by(tipo_estructura_id=e.tipo_estructura_id).first()
+            if tipo_obj:
+                tipo_codigo = tipo_obj.codigo
+        rows_data.append({
+            "fam": e.familia_id,
+            "dist": float(e.distancia_estructura) if e.distancia_estructura is not None else None,
+            "tipo": tipo_codigo,
+            "dip": float(e.dip),
+            "dipdir": float(e.dip_dir),
+            "aber": float(e.abertura_mm) if e.abertura_mm is not None else None,
+            "esp": float(e.espesor_mm) if e.espesor_mm is not None else None,
+            "cont": float(e.continuidad_m) if e.continuidad_m is not None else None,
+            "espac": float(e.espaciamiento_m),
+            "nstr": e.numero_estructuras,
+            "rug": int(e.rugosidad_estructura) if e.rugosidad_estructura is not None else None,
+            "alt": e.alteracion,
+            "r1": e.tipo_relleno_1,
+            "r2": e.tipo_relleno_2,
+        })
+    rmr_input = {
+        "agua_codigo": v.condicion_agua_rmr76,
+        "resistencia_codigo": v.dureza_rmr76,
+    }
+
+    res = calculator.calculate_geomechanics(header_data, rows_data, rmr_input)
+
+    v.condicion_agua_valor_rmr76 = res["agua_r76"]
+    v.condicion_agua_valor_rmr89 = res["agua_r89"]
+    v.resistencia_estimada_valor_rmr76 = res["resist_r76"]
+    v.resistencia_estimada_valor_rmr89 = res["resist_r89"]
+    v.rqd_valor_rmr76 = res["rqd_r76"]
+    v.rqd_valor_rmr89 = res["rqd_r89"]
+    v.rqd_rmr76 = res["rqd_pct"]
+    v.rqd_rmr89 = res["rqd_pct"]
+    v.frecuencia_fracturamiento_rmr76 = res["jv"]
+    v.frecuencia_fracturamiento_rmr89 = res["jv"]
+    v.espaciamiento_promedio_rmr76 = res["espac_prom"]
+    v.espaciamiento_promedio_rmr89 = res["espac_prom"]
+    v.espaciamiento_valor_rmr76 = res["spacing_r76"]
+    v.espaciamiento_valor_rmr89 = res["spacing_r89"]
+    v.condicion_discontinuidad_valor_rmr76 = res["condisc_r76"]
+    v.condicion_discontinuidad_valor_rmr89 = res["condisc_r89"]
+    v.rmr76_total = res["rmr_76"]
+    v.rmr89_total = res["rmr_89"]
+    if res["espac_prom"]:
+        v.tamano_bloques_rmr76 = res["espac_prom"] ** 3
+        v.tamano_bloques_rmr89 = res["espac_prom"] ** 3
+    if v.distancia_celda is None and res["largo_m"]:
+        v.distancia_celda = res["largo_m"]
+
+    for r_calc, e in zip(res["rows"], v.discontinuidades):
+        e.valor_alteracion_cd76 = r_calc["alt_r76"]
+        e.valor_alteracion_cd89 = r_calc["alt_r89"]
+        e.valor_relleno_cd76 = r_calc["relleno_r76"]
+        e.valor_relleno_cd89 = r_calc["relleno_r89"]
+        e.continuidad_cd76 = r_calc["cont_r76"]
+        e.continuidad_cd89 = r_calc["cont_r89"]
+        e.abertura_cd76 = r_calc["aber_r76"]
+        e.abertura_cd89 = r_calc["aber_r89"]
+        e.rugosidad_cd76 = r_calc["rug_r76"]
+        e.rugosidad_cd89 = r_calc["rug_r89"]
+        e.valor_condicion_cd76 = r_calc["v76"]
+        e.valor_condicion_cd89 = r_calc["v89"]
+        e.teta = math.degrees(r_calc["teta"]) if r_calc["teta"] else None
+        e.alfa = math.degrees(r_calc["alfa"]) if r_calc["alfa"] else None
+        e.x = r_calc["wx"]
+        e.y = r_calc["wy"]
+        e.z = r_calc["wz"]
+    db.flush()
+
+
+# ============================================================================
+# ENDPOINTS — CRUD
+# ============================================================================
+
+@router.get("/ventanas", response_model=schemas.VentanasPaginatedResponse)
+def get_ventanas(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200, alias="page_size"),
+    order_by: str = Query("fecha_mapeo", pattern="^(fecha_mapeo|codigo_celda|rmr76_total|rmr89_total)$"),
+    order_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    fecha_desde: Optional[date] = Query(None),
+    fecha_hasta: Optional[date] = Query(None),
+    sector: Optional[str] = Query(None),
+    mapeador: Optional[str] = Query(None),
+    campania: Optional[int] = Query(None),
+    q: Optional[str] = Query(None, description="Buscar por código de celda"),
+    rmr_min: Optional[float] = Query(None, ge=0, le=100),
+    rmr_max: Optional[float] = Query(None, ge=0, le=100),
+    db: Session = Depends(get_db),
+):
+    # 1. Query base + joins para resolver códigos
+    query = db.query(models.Ventana)
+
+    # 2. Filtros
+    if fecha_desde:
+        query = query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
+    if sector:
+        query = query.join(models.SectorGeotecnico, models.Ventana.sector_geotecnico_id == models.SectorGeotecnico.sector_id)
+        query = query.filter(models.SectorGeotecnico.codigo.ilike(f"%{sector}%"))
+    if mapeador:
+        query = query.join(models.Geotecnico, models.Ventana.geotecnico_id == models.Geotecnico.geotecnico_id)
+        query = query.filter(models.Geotecnico.nombre.ilike(f"%{mapeador}%"))
+    if campania:
+        query = query.filter(models.Ventana.campania_id == campania)
+    if q:
+        query = query.filter(models.Ventana.codigo_celda.ilike(f"%{q}%"))
+    if rmr_min is not None:
+        query = query.filter(models.Ventana.rmr89_total >= rmr_min)
+    if rmr_max is not None:
+        query = query.filter(models.Ventana.rmr89_total <= rmr_max)
+
+    # 3. Total antes de paginar
+    total_filtered = query.count()
+
+    # 4. Ordenamiento
+    order_col = getattr(models.Ventana, order_by, models.Ventana.fecha_mapeo)
+    order_fn = getattr(order_col, order_dir, order_col.desc)
+    query = query.order_by(order_fn(), models.Ventana.ventana_id.desc())
+
+    # 5. Paginación
+    total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    total_global = db.query(func.count(models.Ventana.ventana_id)).scalar() or 0
+
+    # 6. KPIs del subconjunto filtrado
+    kpis_query = db.query(
+        func.count(models.Ventana.ventana_id),
+        func.coalesce(func.sum(models.Ventana.distancia_celda), 0),
+        func.avg(models.Ventana.rmr76_total),
+        func.avg(models.Ventana.rmr89_total),
+        func.min(models.Ventana.fecha_mapeo),
+        func.max(models.Ventana.fecha_mapeo),
+    )
+    if fecha_desde: kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
+    if fecha_hasta: kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
+    if sector:
+        kpis_query = kpis_query.join(models.SectorGeotecnico, models.Ventana.sector_geotecnico_id == models.SectorGeotecnico.sector_id)
+        kpis_query = kpis_query.filter(models.SectorGeotecnico.codigo.ilike(f"%{sector}%"))
+    if mapeador:
+        kpis_query = kpis_query.join(models.Geotecnico, models.Ventana.geotecnico_id == models.Geotecnico.geotecnico_id)
+        kpis_query = kpis_query.filter(models.Geotecnico.nombre.ilike(f"%{mapeador}%"))
+    if campania: kpis_query = kpis_query.filter(models.Ventana.campania_id == campania)
+    if q: kpis_query = kpis_query.filter(models.Ventana.codigo_celda.ilike(f"%{q}%"))
+    if rmr_min is not None: kpis_query = kpis_query.filter(models.Ventana.rmr89_total >= rmr_min)
+    if rmr_max is not None: kpis_query = kpis_query.filter(models.Ventana.rmr89_total <= rmr_max)
+
+    kpis_row = kpis_query.first()
+
+    # Último mapeador en el subconjunto (más reciente)
+    last_mapeador = None
+    if mapeador:
+        last_mapeador = mapeador
+    else:
+        last_v = db.query(models.Ventana).order_by(models.Ventana.fecha_mapeo.desc(), models.Ventana.ventana_id.desc()).first()
+        if last_v and last_v.geotecnico_id:
+            geo = db.query(models.Geotecnico).filter_by(geotecnico_id=last_v.geotecnico_id).first()
+            if geo:
+                last_mapeador = geo.nombre
+
+    kpis = schemas.VentanasKPISchema(
+        celdas_count=kpis_row[0] or 0,
+        total_global=total_global,
+        largo_total_m=round(float(kpis_row[1] or 0), 1),
+        rmr_76_promedio=round(float(kpis_row[2]), 1) if kpis_row[2] is not None else None,
+        rmr_89_promedio=round(float(kpis_row[3]), 1) if kpis_row[3] is not None else None,
+        mapeador_mas_reciente=last_mapeador,
+        fecha_min=kpis_row[4],
+        fecha_max=kpis_row[5],
+    )
+
+    # 7. Serializar items (información liviana, sin sub-ratings)
+    items_data = []
+    for v in items:
+        geologo = None
+        if v.geotecnico_id:
+            geo = db.query(models.Geotecnico).filter_by(geotecnico_id=v.geotecnico_id).first()
+            if geo:
+                geologo = geo.nombre
+        sector_code = None
+        if v.sector_geotecnico_id:
+            sec = db.query(models.SectorGeotecnico).filter_by(sector_id=v.sector_geotecnico_id).first()
+            if sec:
+                sector_code = sec.codigo
+        items_data.append(schemas.VentanaListItemSchema(
+            codigo=v.codigo_celda,
+            fecha_mapeo=v.fecha_mapeo,
+            sector_geotecnico=sector_code,
+            mapeador=geologo,
+            lito_1=(
+                db.query(models.Litologia).filter_by(litologia_id=v.litologia1_id).first().codigo
+                if v.litologia1_id else None
+            ),
+            largo_m=float(v.distancia_celda) if v.distancia_celda is not None else None,
+            altura_m=float(v.altura) if v.altura is not None else None,
+            nivel=v.nivel,
+            rmr_76=float(v.rmr76_total) if v.rmr76_total is not None else None,
+            rmr_89=float(v.rmr89_total) if v.rmr89_total is not None else None,
+            discontinuidades_count=len(v.discontinuidades),
+            creado_en=v.fecha_registro,
+        ))
+
+    return schemas.VentanasPaginatedResponse(
+        items=items_data,
+        total=total_global,
+        total_filtered=total_filtered,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        kpis=kpis,
+    )
+
+
+@router.get("/filtros/opciones")
+def get_filtros_opciones(db: Session = Depends(get_db)):
+    """Devuelve catálogos para popular los selects de filtros del Dashboard."""
+    sectores = db.query(models.SectorGeotecnico).order_by(models.SectorGeotecnico.codigo).all()
+    geotecnicos = db.query(models.Geotecnico).order_by(models.Geotecnico.nombre).all()
+    campanias = db.query(models.Campania).order_by(models.Campania.campania_id).all()
+    return {
+        "sectores": [{"codigo": s.codigo, "nombre": s.nombre} for s in sectores if s.estado == "Activo"],
+        "mapeadores": [{"codigo": g.nombre, "nombre": g.nombre} for g in geotecnicos if g.estado == "Activo"],
+        "campanias": [{"id": c.campania_id, "nombre": c.nombre} for c in campanias if c.estado == "Activa"],
+    }
+
+
+@router.get("/ventanas/{codigo}", response_model=schemas.VentanaResponseSchema)
 def get_ventana(codigo: str, db: Session = Depends(get_db)):
-    v = db.query(models.Ventana).filter_by(codigo=codigo.strip().upper()).first()
+    code_up = codigo.strip().upper()
+    v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if not v:
         raise HTTPException(status_code=404, detail="Ventana no encontrada")
-    discs = []
-    for d in v.discontinuidades:
-        discs.append(schemas.DiscontinuidadBase(
-            familia_id=d.familia_id, distancia_m=float(d.distancia_m) if d.distancia_m is not None else None,
-            tipo_estructura=d.tipo_estructura, dip=float(d.dip), dip_dir=float(d.dip_dir),
-            abertura_mm=float(d.abertura_mm) if d.abertura_mm is not None else None,
-            espesor_mm=float(d.espesor_mm) if d.espesor_mm is not None else None,
-            continuidad_m=float(d.continuidad_m) if d.continuidad_m is not None else None,
-            espaciamiento_m=float(d.espaciamiento_m), n_estructuras=float(d.n_estructuras) if d.n_estructuras is not None else -1.0,
-            n_extremos_visibles=d.n_extremos_visibles, terminacion=d.terminacion, relleno_1_codigo=d.relleno_1_codigo,
-            relleno_2_codigo=d.relleno_2_codigo, jrc=d.jrc, rugosidad_codigo=d.rugosidad_codigo,
-            forma_estructura=d.forma_estructura, alteracion_codigo=d.alteracion_codigo
-        ))
-    rmr = None
-    if v.rmr_input:
-        rmr = schemas.VentanaRmrInputBase(
-            agua_codigo=v.rmr_input.agua_codigo, resistencia_codigo=v.rmr_input.resistencia_codigo,
-            gsi_estructura=v.rmr_input.gsi_estructura, gsi_superficie=v.rmr_input.gsi_superficie,
-            gsi_visual=v.rmr_input.gsi_visual, control_estructural=v.rmr_input.control_estructural,
-            efectos_voladura=v.rmr_input.efectos_voladura,
-            ucs_mpa=float(v.rmr_input.ucs_mpa) if v.rmr_input.ucs_mpa is not None else None,
-            is50_mpa=float(v.rmr_input.is50_mpa) if v.rmr_input.is50_mpa is not None else None,
-            comentario=v.rmr_input.comentario
-        )
-    return schemas.VentanaSaveSchema(
-        codigo=v.codigo, fecha_mapeo=v.fecha_mapeo, mapeador=v.mapeador, campania=v.campania,
-        este_ini=float(v.este_ini), norte_ini=float(v.norte_ini), cota_ini=float(v.cota_ini),
-        este_fin=float(v.este_fin), norte_fin=float(v.norte_fin), cota_fin=float(v.cota_fin),
-        largo_m=int(round(float(v.largo_m))) if v.largo_m is not None else None,
-        altura_m=float(v.altura_m) if v.altura_m is not None else None, dip_talud=float(v.dip_talud),
-        dipdir_talud=float(v.dipdir_talud) if v.dipdir_talud is not None else None,
-        dip_hw=float(v.dip_hw) if v.dip_hw is not None else None, az_hw=float(v.az_hw) if v.az_hw is not None else None,
-        alteracion_codigo=v.alteracion_codigo, intemperismo_codigo=v.intemperismo_codigo,
-        lito_1=v.lito_1, lito_2=v.lito_2, lito_3=v.lito_3, unidad_litologica=v.unidad_litologica,
-        sector=v.sector, fase=v.fase, nivel=v.nivel, sector_geotecnico=v.sector_geotecnico,
-        turno=v.turno, discontinuidades=discs, rmr_input=rmr
-    )
+    return serialize_ventana(v, db)
+
 
 @router.post("/ventanas")
 def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db)):
     code_up = data.codigo.strip().upper()
-    v = db.query(models.Ventana).filter_by(codigo=code_up).first()
-    def clean_null_val(val):
-        return None if val in [-1, -1.0, "-1", ""] else val
+    resolver = GEMACatalogResolver(db)
 
+    sector_id = resolver.sector_id(data.sector_geotecnico)
+    if data.sector_geotecnico and sector_id is None:
+        raise HTTPException(status_code=400, detail=f"Sector '{data.sector_geotecnico}' no encontrado en GEMA")
+    if not resolver.campania_id(data.campania):
+        raise HTTPException(status_code=400, detail=f"Campaña ID {data.campania} no encontrada en GEMA")
+
+    lito1_id = resolver.litologia_id(data.lito_1)
+    lito2_id = resolver.litologia_id(data.lito_2)
+    lito3_id = resolver.litologia_id(data.lito_3)
+    unidad_id = resolver.unidad_litologica_id(data.unidad_litologica)
+    geotecnico_id = resolver.geotecnico_id(data.mapeador)
+
+    def clean(val):
+        if val in (-1, -1.0, "-1"):
+            return None
+        return val
+
+    v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if v:
+        v.campania_id = data.campania
+        v.sector_geotecnico_id = sector_id
         v.fecha_mapeo = data.fecha_mapeo
-        v.mapeador = data.mapeador
-        v.campania = data.campania
-        v.este_ini = data.este_ini
-        v.norte_ini = data.norte_ini
-        v.cota_ini = data.cota_ini
-        v.este_fin = data.este_fin
-        v.norte_fin = data.norte_fin
-        v.cota_fin = data.cota_fin
-        if "sqlite" in str(db.bind.url).lower():
-            v.largo_m = data.largo_m
-        v.altura_m = data.altura_m
-        v.dip_talud = data.dip_talud
-        v.dipdir_talud = data.dipdir_talud
-        v.dip_hw = data.dip_hw
-        v.az_hw = data.az_hw
-        v.alteracion_codigo = data.alteracion_codigo
-        v.intemperismo_codigo = data.intemperismo_codigo
-        v.lito_1 = data.lito_1
-        v.lito_2 = data.lito_2
-        v.lito_3 = data.lito_3
-        v.unidad_litologica = data.unidad_litologica
-        v.sector = data.sector
-        v.fase = data.fase
         v.nivel = data.nivel
-        v.sector_geotecnico = data.sector_geotecnico
-        v.turno = data.turno
-        db.query(models.Discontinuidad).filter_by(ventana_id=v.ventana_id).delete()
-        if v.rmr_input:
-            db.delete(v.rmr_input)
+        v.este_from = data.este_ini; v.norte_from = data.norte_ini; v.cota_from = data.cota_ini
+        v.este_to = data.este_fin; v.norte_to = data.norte_fin; v.cota_to = data.cota_fin
+        v.distancia_celda = data.distancia_celda
+        v.altura = data.altura
+        v.dip = data.dip; v.azimut_hole = data.azimut_hole
+        v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
+        v.litologia1_id = lito1_id; v.litologia2_id = lito2_id; v.litologia3_id = lito3_id
+        v.unidad_litologica_id = unidad_id
+        v.grado_intemperismo = data.intemperismo
+        v.altura_zona = data.altura_zona
+        v.fase = data.fase; v.turno = data.turno
+        v.geotecnico_id = geotecnico_id
+        for e in list(v.discontinuidades):
+            db.delete(e)
+        db.flush()
     else:
         v = models.Ventana(
-            codigo=code_up, fecha_mapeo=data.fecha_mapeo, mapeador=data.mapeador, campania=data.campania,
-            este_ini=data.este_ini, norte_ini=data.norte_ini, cota_ini=data.cota_ini,
-            este_fin=data.este_fin, norte_fin=data.norte_fin, cota_fin=data.cota_fin,
-            altura_m=data.altura_m, dip_talud=data.dip_talud, dipdir_talud=data.dipdir_talud,
-            dip_hw=data.dip_hw, az_hw=data.az_hw, alteracion_codigo=data.alteracion_codigo,
-            intemperismo_codigo=data.intemperismo_codigo, lito_1=data.lito_1, lito_2=data.lito_2,
-            lito_3=data.lito_3, unidad_litologica=data.unidad_litologica, sector=data.sector,
-            fase=data.fase, nivel=data.nivel, sector_geotecnico=data.sector_geotecnico, turno=data.turno
+            codigo_celda=code_up, campania_id=data.campania,
+            sector_geotecnico_id=sector_id,
+            fecha_mapeo=data.fecha_mapeo, nivel=data.nivel,
+            este_from=data.este_ini, norte_from=data.norte_ini, cota_from=data.cota_ini,
+            este_to=data.este_fin, norte_to=data.norte_fin, cota_to=data.cota_fin,
+            distancia_celda=data.distancia_celda, altura=data.altura,
+            dip=data.dip, azimut_hole=data.azimut_hole,
+            dip_talud=data.dip_talud, dip_dir_talud=data.dipdir_talud,
+            litologia1_id=lito1_id, litologia2_id=lito2_id, litologia3_id=lito3_id,
+            unidad_litologica_id=unidad_id,
+            grado_intemperismo=data.intemperismo,
+            altura_zona=data.altura_zona, fase=data.fase, turno=data.turno,
+            geotecnico_id=geotecnico_id,
         )
-        if "sqlite" in str(db.bind.url).lower():
-            v.largo_m = data.largo_m
         db.add(v)
         db.flush()
 
-    for idx, d in enumerate(data.discontinuidades):
-        disc = models.Discontinuidad(
-            ventana_id=v.ventana_id, familia_id=d.fam, orden_en_familia=idx + 1,
-            distancia_m=clean_null_val(d.dist), tipo_estructura=d.tipo,
-            dip=clean_null_val(d.dip), dip_dir=clean_null_val(d.dipdir),
-            abertura_mm=clean_null_val(d.aber), espesor_mm=clean_null_val(d.esp),
-            continuidad_m=clean_null_val(d.cont), espaciamiento_m=clean_null_val(d.espac),
-            n_estructuras=clean_null_val(d.nstr), n_extremos_visibles=clean_null_val(d.next),
-            terminacion=clean_null_val(d.term), relleno_1_codigo=d.r1 if d.r1 != "-1" else None,
-            relleno_2_codigo=d.r2 if d.r2 != "-1" else None, jrc=clean_null_val(d.jrc),
-            rugosidad_codigo=clean_null_val(d.rug), forma_estructura=d.forma if d.forma != "-1" else None,
-            alteracion_codigo=d.alt if d.alt != "-1" else None
+    if data.rmr_input:
+        v.condicion_agua_rmr76 = data.rmr_input.agua_codigo
+        v.condicion_agua_rmr89 = data.rmr_input.agua_codigo
+        v.dureza_rmr76 = data.rmr_input.resistencia_codigo
+        v.dureza_rmr89 = data.rmr_input.resistencia_codigo
+        v.gsi_visual_rmr76 = data.rmr_input.gsi_visual
+        v.gsi_visual_rmr89 = data.rmr_input.gsi_visual
+        v.control_estructural_rmr76 = str(data.rmr_input.control_estructural) if data.rmr_input.control_estructural is not None else None
+        v.control_estructural_rmr89 = str(data.rmr_input.control_estructural) if data.rmr_input.control_estructural is not None else None
+        v.efectos_voladura_rmr76 = str(data.rmr_input.efectos_voladura) if data.rmr_input.efectos_voladura is not None else None
+        v.efectos_voladura_rmr89 = str(data.rmr_input.efectos_voladura) if data.rmr_input.efectos_voladura is not None else None
+        v.gsi_superficie = data.rmr_input.gsi_superficie
+        v.gsi_estructura = data.rmr_input.gsi_estructura
+        v.ucs_mpa = data.rmr_input.ucs_mpa
+        v.is50_mpa = data.rmr_input.is50_mpa
+        v.comentarios = data.rmr_input.comentario
+
+    for idx, d in enumerate(data.discontinuidades, start=1):
+        tipo_id = resolver.tipo_estructura_id(d.tipo)
+        if d.tipo and tipo_id is None:
+            raise HTTPException(status_code=400, detail=f"Tipo estructura '{d.tipo}' no encontrado en GEMA")
+        e = models.EstructuraGeologica(
+            ventana_id=v.ventana_id,
+            numero_estructura=idx,
+            tipo_estructura_id=tipo_id,
+            dip=d.dip, dip_dir=d.dipdir,
+            distancia_estructura=clean(d.dist),
+            abertura_mm=clean(d.aber), espesor_mm=clean(d.esp),
+            continuidad_m=clean(d.cont), espaciamiento_m=clean(d.espac),
+            numero_estructuras=clean(d.nstr),
+            numero_extremos_visibles=clean(d.next),
+            terminacion=clean(d.term),
+            tipo_relleno_1=d.r1 if d.r1 and d.r1 != "-1" else None,
+            tipo_relleno_2=d.r2 if d.r2 and d.r2 != "-1" else None,
+            jrc=clean(d.jrc),
+            rugosidad_estructura=str(d.rug) if d.rug is not None else None,
+            forma_estructura=d.forma if d.forma and d.forma != "-1" else None,
+            alteracion=d.alt if d.alt and d.alt != "-1" else None,
+            familia_id=d.fam,
         )
-        db.add(disc)
+        db.add(e)
     db.flush()
 
-    if data.rmr_input:
-        ri = models.VentanaRmrInput(
-            ventana_id=v.ventana_id, agua_codigo=data.rmr_input.agua_codigo, resistencia_codigo=data.rmr_input.resistencia_codigo,
-            gsi_estructura=data.rmr_input.gsi_estructura, gsi_superficie=data.rmr_input.gsi_superficie,
-            gsi_visual=data.rmr_input.gsi_visual, control_estructural=data.rmr_input.control_estructural,
-            efectos_voladura=data.rmr_input.efectos_voladura, ucs_mpa=data.rmr_input.ucs_mpa,
-            is50_mpa=data.rmr_input.is50_mpa, comentario=data.rmr_input.comentario
-        )
-        db.add(ri)
-    db.flush()
-    sync_to_ventanas_final(db, v.ventana_id)
+    calculate_and_persist_subratings(db, v)
     db.commit()
-    return {"status": "success", "message": f"Ventana {code_up} guardada y sincronizada correctamente"}
+    return {"status": "success", "message": f"Ventana {code_up} guardada en GEMA", "ventana_id": v.ventana_id}
+
 
 @router.delete("/ventanas/{codigo}")
 def delete_ventana(codigo: str, db: Session = Depends(get_db)):
     code_up = codigo.strip().upper()
-    v = db.query(models.Ventana).filter_by(codigo=code_up).first()
+    v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if not v:
         raise HTTPException(status_code=404, detail="Ventana no encontrada")
     db.delete(v)
-    db.query(models.VentanasFinal).filter_by(celda=code_up).delete()
     db.commit()
-    return {"status": "success", "message": f"Ventana {code_up} eliminada correctamente"}
+    return {"status": "success", "message": f"Ventana {code_up} eliminada de GEMA"}
+
+
+# ============================================================================
+# EXPORTAR EXCEL
+# ============================================================================
 
 @router.get("/ventanas/{codigo}/exportar")
 def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
     code_up = codigo.strip().upper()
-    rows = db.query(models.VentanasFinal).filter_by(celda=code_up).order_by(models.VentanasFinal.id).all()
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"No se encontraron datos calculados para {code_up}.")
+    v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
+    if not v:
+        raise HTTPException(status_code=404, detail=f"Ventana {code_up} no encontrada")
+    data = serialize_ventana(v, db)
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Mapeo Ventana"
     headers = [
-        "id", "CELDA", "CELDA", "ESTE_FROM", "NORTE_FROM", "COTA", "ESTE_TO", "NORTE_TO", "COTA",
-        "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP_DIR_TALUD", "INTEMPERISMO",
-        "CONDICION DE AGUA '76", "CONDICION DE AGUA VALOR '76", "DUREZA '76", "RESISTENCIA ESTIMADA VALOR '76",
-        "GSI VISUAL '76", "CONTROL ESTRUCTURAL '76", "EFECTOS DE VOLADURA '76", "RQD - VALOR '76", "RQD '76",
-        "FRECUENCIA DE FRACTURAMIENTO x m '76", "TAMAÑO DE BLOQUES x m3 '76", "ESPACIAMIENTO PROMEDIO '76",
-        "ESPACIAMIENTO - VALOR '76", "CONDICION DE DISCONTINUIDAD - VALOR '76", "RMR '76", "( UCS ) (Mpa)", "is50 (Mpa)",
-        "CONDICION DE AGUA '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89", "RESISTENCIA ESTIMADA VALOR '89",
-        "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89", "EFECTOS DE VOLADURA '89", "RQD - VALOR '89", "RQD '89",
-        "FRECUENCIA DE FRACTURAMIENTO x m '89", "TAMAÑO DE BLOQUES x m3 '89", "ESPACIAMIENTO PROMEDIO '89",
-        "ESPACIAMIENTO - VALOR '89", "CONDICION DE DISCONTINUIDAD - VALOR '89", "RMR '89", "FECHA", "COMENTARIO",
-        "Dist. de estr.", "teta", "alfa", "x", "y", "z", "TIPO DE ESTRUCT", "DIP", "DIP DIR", "NUMERO DE ESTRUCTURAS",
-        "ABERTURA mm", "ESPESOR mm", "CONTINUIDAD m", "ESPACIAMIENTO m", "NUMERO DE EXTREMOS VISIBLES",
-        "TIPO DE RELLENO 1", "TIPO DE RELLENO 2", "JRC", "RUGOSIDAD", "FORMA DE ESTRUCTURA", "ALTERACION", "GEOTECNICO",
-        "Is50_Mpa", "LITO3_MODELO", "Sector", "Nivel"
+        "id", "CELDA", "Campaña", "Sector", "FECHA",
+        "ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO",
+        "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP_DIR_TALUD",
+        "INTEMPERISMO", "Lito1", "Lito2", "Lito3", "Unidad", "AlturaZona", "Fase", "Turno", "Mapeador",
+        "CONDICION_AGUA_76", "VALOR_AGUA_76", "DUREZA_76", "RESISTENCIA_VALOR_76",
+        "GSI_VISUAL_76", "CONTROL_ESTRUC_76", "EFECTOS_VOLADURA_76",
+        "RQD_VALOR_76", "RQD_76", "FREC_FRACT_76", "TAM_BLOQUES_76",
+        "ESPAC_PROM_76", "ESPAC_VALOR_76", "COND_DISC_VALOR_76", "RMR_76",
+        "DUREZA_89", "RESISTENCIA_VALOR_89", "GSI_VISUAL_89", "CONTROL_ESTRUC_89", "EFECTOS_VOL_89",
+        "RQD_VALOR_89", "RQD_89", "FREC_FRACT_89", "TAM_BLOQUES_89",
+        "ESPAC_PROM_89", "ESPAC_VALOR_89", "COND_DISC_VALOR_89", "RMR_89",
+        "UCS_MPa", "IS50_MPa", "COMENTARIO",
+        "TIPO", "DIP", "DIPDIR", "NumEstructura", "NumEstructuras",
+        "ABERTURA_mm", "ESPESOR_mm", "CONTINUIDAD_m", "ESPACIAMIENTO_m",
+        "EXTREMOS", "TERMINACION", "RELLENO1", "RELLENO2", "JRC", "RUGOSIDAD", "FORMA", "ALTERACION",
+        "altR76", "relR76", "contR76", "abR76", "rugR76", "totalR76",
+        "altR89", "relR89", "contR89", "abR89", "rugR89", "totalR89",
+        "teta", "alfa", "x", "y", "z",
     ]
     ws.append(headers)
-    for r in rows:
+    for d in data.discontinuidades:
         ws.append([
-            r.id, r.celda, r.celda, float(r.este_from), float(r.norte_from), float(r.cota_from),
-            float(r.este_to), float(r.norte_to), float(r.cota_to), r.dist_celda,
-            float(r.altura) if r.altura is not None else None, float(r.dip) if r.dip is not None else None,
-            float(r.az_hole) if r.az_hole is not None else None, float(r.dip_talud) if r.dip_talud is not None else None,
-            float(r.dip_dir_talud) if r.dip_dir_talud is not None else None, r.intemperismo,
-            r.cond_agua_76, r.cond_agua_valor_76, r.dureza_76, r.resistencia_est_valor_76,
-            r.gsi_visual_76, r.control_estructural_76, r.efectos_voladura_76, r.rqd_valor_76, r.rqd_76,
-            r.freq_fractura_m_76, r.tam_bloques_m3_76, r.espaciamiento_prom_76, r.espaciamiento_valor_76, r.cond_discontinuidad_valor_76, r.rmr_76,
-            r.ucs_mpa, r.is50_mpa, r.cond_agua_89, r.cond_agua_valor_89, r.dureza_89, r.resistencia_est_valor_89,
-            r.gsi_visual_89, r.control_estructural_89, r.efecto_voladura_89, r.rqd_valor_89, r.rqd_89,
-            r.freq_fractura_m_89, r.tam_bloques_m3_89, r.espaciamiento_prom_89, r.espaciamiento_valor_89, r.cond_discontinuidad_valor_89, r.rmr_89,
-            r.fecha.strftime("%Y-%m-%d") if r.fecha else "", r.comentario, r.dist_estructura, r.angulo_estruct_teta, r.angulo_estruct_alfa,
-            r.estruct_x, r.struct_y, r.struct_z, r.tipo_estructura, r.dip_estructura, r.dip_dir_estructura, r.num_estructuras,
-            r.abertura_mm, r.espesor_mm, r.continuidad_m, r.espaciamiento_m, r.num_extremos_visibles,
-            r.tipo_relleno_1, r.tipo_relleno_2, r.jrc, r.rugosidad_estructuras, r.forma_estructura, r.alteracion, r.geotecnico, r.is50_mpa, r.lito_3, r.sector_geotecnico, r.nivel
+            v.ventana_id, data.codigo, data.campania, data.sector_geotecnico,
+            data.fecha_mapeo.isoformat() if data.fecha_mapeo else "",
+            data.este_ini, data.norte_ini, data.cota_ini,
+            data.este_fin, data.norte_fin, data.cota_fin,
+            data.distancia_celda, data.altura, data.dip, data.azimut_hole,
+            data.dip_talud, data.dipdir_talud,
+            data.intemperismo, data.lito_1, data.lito_2, data.lito_3, data.unidad_litologica,
+            data.altura_zona, data.fase, data.turno, data.mapeador,
+            data.rmr_input.agua_codigo if data.rmr_input else None, data.agua_r76,
+            data.rmr_input.resistencia_codigo if data.rmr_input else None, data.resist_r76,
+            data.rmr_input.gsi_visual if data.rmr_input else None,
+            data.rmr_input.control_estructural if data.rmr_input else None,
+            data.rmr_input.efectos_voladura if data.rmr_input else None,
+            data.rqd_r76, data.rqd_pct, data.jv,
+            (data.espac_prom ** 3) if data.espac_prom else None,
+            data.espac_prom, data.spacing_r76, data.condisc_r76, data.rmr_76,
+            data.rmr_input.resistencia_codigo if data.rmr_input else None, data.resist_r89,
+            data.rmr_input.gsi_visual if data.rmr_input else None,
+            data.rmr_input.control_estructural if data.rmr_input else None,
+            data.rmr_input.efectos_voladura if data.rmr_input else None,
+            data.rqd_r89, data.rqd_pct, data.jv,
+            (data.espac_prom ** 3) if data.espac_prom else None,
+            data.espac_prom, data.spacing_r89, data.condisc_r89, data.rmr_89,
+            data.rmr_input.ucs_mpa if data.rmr_input else None,
+            data.rmr_input.is50_mpa if data.rmr_input else None,
+            data.rmr_input.comentario if data.rmr_input else None,
+            d.tipo, d.dip, d.dipdir, d.numero_estructura, d.nstr,
+            d.aber, d.esp, d.cont, d.espac,
+            d.next, d.term, d.r1, d.r2, d.jrc, d.rug, d.forma, d.alt,
+            d.altR76, d.relR76, d.contR76, d.abR76, d.rugR76, d.totalR76,
+            d.altR89, d.relR89, d.contR89, d.abR89, d.rugR89, d.totalR89,
+            d.teta, d.alfa, d.x, d.y, d.z,
         ])
-    fill_red = PatternFill(start_color="F2DCDB", end_color="F2DCDB", fill_type="solid")
-    fill_blue = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    fill_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    fill_peach = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-    fill_green = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-    fill_brown = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-    font_header = Font(name="Arial", size=9, bold=True, color="333333")
-    alignment_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    border_thin = Border(left=Side(style='thin', color='BFBFBF'), right=Side(style='thin', color='BFBFBF'), top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF'))
-    
-    for col_idx in range(1, len(headers) + 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.font = font_header
-        cell.alignment = alignment_center
-        cell.border = border_thin
-        if col_idx <= 9: cell.fill = fill_red
-        elif 10 <= col_idx <= 13: cell.fill = fill_blue
-        elif 14 <= col_idx <= 31: cell.fill = fill_yellow
-        elif 32 <= col_idx <= 33: cell.fill = fill_peach
-        elif 34 <= col_idx <= 48: cell.fill = fill_green
-        elif 51 <= col_idx <= 56: cell.fill = fill_brown
-        elif col_idx >= 57: cell.fill = fill_yellow
-
-    font_body = Font(name="Arial", size=9)
-    for col_idx in range(1, len(headers) + 1):
-        header_name = headers[col_idx - 1].upper()
-        for row_idx in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            cell.font = font_body
-            cell.border = border_thin
-            if isinstance(cell.value, (int, float)):
-                if "ESTE" in header_name or header_name == "X": cell.number_format = '0.0000'
-                elif "NORTE" in header_name or header_name == "Y": cell.number_format = '0.000'
-                elif "COTA" in header_name or header_name == "Z": cell.number_format = '0.00'
-                else: cell.number_format = '0.00'
-
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = openpyxl.utils.get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 3, 11)
 
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename=mapeo_ventana_{code_up}.xlsx"})
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=mapeo_ventana_{code_up}.xlsx"}
+    )
+
+
+# ============================================================================
+# IMPORTAR EXCEL — Bulk import desde formato BD/ventana compatible con GEMA
+# ============================================================================
+
+@router.post("/importar-excel")
+async def importar_excel_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    resolver = GEMACatalogResolver(db)
+    imported_count = 0
+
+    if "ventana" in wb.sheetnames:
+        ws = wb["ventana"]
+        for start in range(3, ws.max_row, 30):
+            celda_val = ws.cell(row=start + 1, column=1).value or ws.cell(row=start, column=51).value
+            if not celda_val or not str(celda_val).strip():
+                continue
+            codigo = str(celda_val).strip().upper()
+            fecha_val = ws.cell(row=start + 1, column=37).value
+            fecha_mapeo = fecha_val.date() if isinstance(fecha_val, datetime) else None
+
+            def gn(r, c):
+                try:
+                    return float(ws.cell(row=r, column=c).value or 0.0)
+                except:
+                    return 0.0
+
+            def gs(r, c):
+                return str(ws.cell(row=r, column=c).value or "").strip()
+
+            este_ini = round(gn(start + 2, 2), 4)
+            norte_ini = round(gn(start + 2, 4), 3)
+            cota_ini = round(gn(start + 2, 6), 2)
+            este_fin = round(gn(start + 3, 2), 4)
+            norte_fin = round(gn(start + 3, 4), 3)
+            cota_fin = round(gn(start + 3, 6), 2)
+            dist_celda = int(round(gn(start + 2, 11)))
+            altura = round(gn(start + 3, 11), 1)
+            dip_talud = round(gn(start + 2, 14), 2)
+            dipdir_talud = round(gn(start + 3, 14), 2) if gn(start + 3, 14) else None
+            dip_val = round(gn(start + 2, 12), 2) if gn(start + 2, 12) else None
+            az_hole = round(gn(start + 2, 13), 2) if gn(start + 2, 13) else None
+            lito_model = gs(start + 4, 16)
+            mapeador = gs(start + 5, 16)
+            sector = gs(start + 1, 20)
+            fase = int(gn(start + 2, 21)) if gn(start + 2, 21) else None
+            nivel = round(gn(start + 3, 21), 2) if gn(start + 3, 21) else None
+            sect_geot = gs(start + 4, 21)
+            intemp = gs(start + 3, 16)
+            agua_code = gs(start + 8, 36)
+            res_code = gs(start + 8, 38)
+            gsi_vis = int(gn(start + 8, 42)) if gn(start + 8, 42) else None
+            ctrl = int(gn(start + 8, 43)) if gn(start + 8, 43) else None
+            vol = int(gn(start + 8, 44)) if gn(start + 8, 44) else None
+            ucs = gn(start + 8, 53) if gn(start + 8, 53) else None
+            is50_v = gn(start + 8, 54) if gn(start + 8, 54) else None
+            comentario = gs(start + 18, 56)
+
+            # Resolver litología por cascada
+            lito1, lito2, lito3 = "", "", ""
+            unidad = ""
+            for row in LITHOLOGY_CLASSIFICATION:
+                if row["lito3"].upper() == lito_model.upper().replace(" ", "").replace("-", ""):
+                    lito1 = row["lito1"]
+                    lito2 = row["lito2"]
+                    lito3 = row["lito3"]
+                    unidad = row["grupo"]
+                    break
+
+            discs = []
+            for r_idx in range(start + 12, start + 25):
+                fam_val = ws.cell(row=r_idx, column=1).value
+                if fam_val is None or str(fam_val).strip() == "":
+                    continue
+                try:
+                    fam_id = int(fam_val)
+                except:
+                    continue
+                raw_nstr = int(round(gn(r_idx, 6))) if gn(r_idx, 6) else -1
+                discs.append(schemas.DiscontinuidadBase(
+                    familia_id=fam_id,
+                    distancia_m=int(round(gn(r_idx, 2))) if gn(r_idx, 2) else None,
+                    tipo_estructura=gs(r_idx, 3) or "JN",
+                    dip=round(gn(r_idx, 4), 2), dip_dir=round(gn(r_idx, 5), 2),
+                    n_estructuras=raw_nstr if raw_nstr > 0 else -1,
+                    abertura_mm=round(gn(r_idx, 7), 1) if gn(r_idx, 7) else None,
+                    espesor_mm=round(gn(r_idx, 8), 1) if gn(r_idx, 8) else None,
+                    continuidad_m=round(gn(r_idx, 9), 2) if gn(r_idx, 9) else None,
+                    espaciamiento_m=round(gn(r_idx, 10), 2),
+                    n_extremos_visibles=min(2, max(0, int(gn(r_idx, 11)))),
+                    terminacion=min(3, max(0, int(gn(r_idx, 12)))),
+                    relleno_1_codigo=gs(r_idx, 13), relleno_2_codigo=gs(r_idx, 14),
+                    jrc=min(20, max(0, int(gn(r_idx, 19)))),
+                    rugosidad_codigo=min(9, max(0, int(gn(r_idx, 20)))),
+                    forma_estructura=gs(r_idx, 21), alteracion_codigo=gs(r_idx, 22),
+                ))
+
+            ri = schemas.VentanaRmrInputBase(
+                agua_codigo=agua_code or None, resistencia_codigo=res_code or None,
+                gsi_estructura=gs(start + 8, 41) or None,
+                gsi_superficie=gs(start + 8, 40) or None,
+                gsi_visual=gsi_vis, control_estructural=ctrl,
+                efectos_voladura=vol, ucs_mpa=ucs, is50_mpa=is50_v,
+                comentario=comentario or None,
+            )
+
+            schema = schemas.VentanaSaveSchema(
+                codigo=codigo, fecha_mapeo=fecha_mapeo, mapeador=mapeador or None,
+                campania=7,  # Campaña 2026 por defecto en importación
+                sector_geotecnico=sect_geot or sector,
+                este_ini=este_ini, norte_ini=norte_ini, cota_ini=cota_ini,
+                este_fin=este_fin, norte_fin=norte_fin, cota_fin=cota_fin,
+                distancia_celda=dist_celda, altura=altura,
+                dip_talud=dip_talud, dipdir_talud=dipdir_talud,
+                dip=dip_val, azimut_hole=az_hole,
+                intemperismo=intemp or None, lito_1=lito1 or None,
+                lito_2=lito2 or None, lito_3=lito3 or lito_model or None,
+                unidad_litologica=unidad or None,
+                altura_zona=None, fase=fase, turno=None,
+                discontinuidades=discs, rmr_input=ri,
+            )
+            # Usar save_ventana para upsert con recálculo
+            code_up = schema.codigo.strip().upper()
+            v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
+            if v:
+                for e in list(v.discontinuidades):
+                    db.delete(e)
+            else:
+                v = models.Ventana()
+                db.add(v)
+
+            _populate_ventana_from_schema(v, schema, resolver)
+            db.flush()
+            _populate_discontinuidades(db, v, schema.discontinuidades, resolver)
+            db.flush()
+            calculate_and_persist_subratings(db, v)
+            db.flush()
+            imported_count += 1
+
+    elif "BD" in wb.sheetnames:
+        ws = wb["BD"]
+
+        # Mapear cabeceras dinámicamente
+        def _norm_col(c):
+            return "".join(str(c).upper().split()).replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
+
+        col_map = {}
+        cota_seen = 0
+        for ci in range(1, ws.max_column + 1):
+            h = ws.cell(row=1, column=ci).value
+            hs = str(h).strip() if h else ""
+            if hs == "COTA":
+                hs = "COTA_FROM" if cota_seen == 0 else "COTA_TO"
+                cota_seen += 1
+            col_map[_norm_col(hs)] = ci
+
+        def _c(name, default=1):
+            return col_map.get(_norm_col(name), default)
+
+        celda_groups = {}
+        for r_idx in range(2, ws.max_row + 1):
+            cv = ws.cell(row=r_idx, column=_c("CELDA_PADRE", 2)).value
+            if cv and str(cv).strip():
+                code = str(cv).strip().upper()
+                celda_groups.setdefault(code, []).append(r_idx)
+
+        for celda_code, rows_indices in celda_groups.items():
+            f_row = rows_indices[0]
+
+            def gn(r, c):
+                try:
+                    return float(ws.cell(row=r, column=c).value or 0.0)
+                except:
+                    return 0.0
+
+            def gs(r, c):
+                return str(ws.cell(row=r, column=c).value or "").strip()
+
+            # Resolver litología
+            l1 = gs(f_row, _c("Lito1", 76))
+            l2 = gs(f_row, _c("Lito2", 77))
+            l3 = gs(f_row, _c("Lito3", 78))
+            ug = gs(f_row, _c("UnidadLitologica", 79))
+            lito_det = {"lito_1": l1, "lito_2": l2, "lito_3": l3, "unidad_litologica": ug}
+            if l3:
+                for row in LITHOLOGY_CLASSIFICATION:
+                    if row["lito3"].upper().replace(" ", "").replace("-", "") == l3.upper().replace(" ", "").replace("-", ""):
+                        lito_det = {"lito_1": row["lito1"], "lito_2": row["lito2"], "lito_3": row["lito3"], "unidad_litologica": row["grupo"]}
+                        break
+
+            discs = []
+            for r_idx in rows_indices:
+                dip_col = _c("DIP", 60)
+                for hc, ci in col_map.items():
+                    if hc == "DIP" and ci > 15:
+                        dip_col = ci
+                        break
+                nstr = int(round(gn(r_idx, _c("NUMERODEESTRUCTURAS", 62)))) if gn(r_idx, _c("NUMERODEESTRUCTURAS", 62)) else -1
+                discs.append(schemas.DiscontinuidadBase(
+                    familia_id=int(ws.cell(row=r_idx, column=1).value or 1),
+                    distancia_m=round(gn(r_idx, _c("Distdeestr", 53))) if gn(r_idx, _c("Distdeestr", 53)) else None,
+                    tipo_estructura=gs(r_idx, _c("TIPO", 59)) or "JN",
+                    dip=round(gn(r_idx, dip_col), 2),
+                    dip_dir=round(gn(r_idx, _c("DIPDIR", 61)), 2),
+                    n_estructuras=nstr if nstr > 0 else -1,
+                    abertura_mm=round(gn(r_idx, _c("ABERTURAmm", 63)), 1) if gn(r_idx, _c("ABERTURAmm", 63)) else None,
+                    espesor_mm=round(gn(r_idx, _c("ESPESORmm", 64)), 1) if gn(r_idx, _c("ESPESORmm", 64)) else None,
+                    continuidad_m=round(gn(r_idx, _c("CONTINUIDADm", 65)), 2) if gn(r_idx, _c("CONTINUIDADm", 65)) else None,
+                    espaciamiento_m=round(gn(r_idx, _c("ESPACIAMIENTOm", 66)), 2),
+                    n_extremos_visibles=min(2, max(0, int(gn(r_idx, _c("NUMERODEEXTREMOSVISIBLES", 67))))),
+                    terminacion=3,  # Default para importación BD
+                    relleno_1_codigo=gs(r_idx, _c("TIPODERELLENO1", 68)),
+                    relleno_2_codigo=gs(r_idx, _c("TIPODERELLENO2", 69)),
+                    jrc=min(20, max(0, int(gn(r_idx, _c("JRC", 70))))),
+                    rugosidad_codigo=min(9, max(0, int(gn(r_idx, _c("RUGOSIDADDEESTRUCTURAS", 71))))),
+                    forma_estructura=gs(r_idx, _c("FORMADEESTRUCTURA", 72)),
+                    alteracion_codigo=gs(r_idx, _c("ALTERACION", 73)),
+                ))
+
+            fecha_val = ws.cell(row=f_row, column=_c("FECHA", 51)).value
+            fecha_mapeo = fecha_val.date() if isinstance(fecha_val, datetime) else None
+
+            ri = schemas.VentanaRmrInputBase(
+                agua_codigo=gs(f_row, _c("CONDICIONDEAGUA89", 35)) or None,
+                resistencia_codigo=gs(f_row, _c("DUREZA89", 37)) or None,
+                gsi_visual=gn(f_row, _c("GSIVISUAL89", 39)) or None,
+                control_estructural=gn(f_row, _c("CONTROLESTRUCTURAL89", 40)) or None,
+                efectos_voladura=gn(f_row, _c("EFECTOSDEVOLADURA89", 41)) or None,
+                ucs_mpa=gn(f_row, _c("UCSMpa", 33)) or None,
+                is50_mpa=gn(f_row, _c("is50Mpa", 34)) or None,
+                comentario=gs(f_row, _c("COMENTARIO", 52)) or None,
+            )
+
+            geo = gs(f_row, _c("GEOTECNICO", 74))
+            nivel = round(gn(f_row, _c("Nivel", 75)), 2) if gn(f_row, _c("Nivel", 75)) else None
+            # Campaña: buscar varias formas de escribir la columna
+            campania_idx = _c("CampañaID", 81)
+            if campania_idx == 81:
+                for alt_name in ["Campaña", "Campana", "Campa", "CampaniaID", "Campania"]:
+                    tmp = _c(alt_name, 0)
+                    if tmp:
+                        campania_idx = tmp
+                        break
+            campania_val = int(gn(f_row, campania_idx)) if gn(f_row, campania_idx) else None
+            if campania_val and resolver.campania_id(campania_val):
+                campania = campania_val
+            else:
+                campania = 7
+
+            schema = schemas.VentanaSaveSchema(
+                codigo=celda_code, fecha_mapeo=fecha_mapeo, mapeador=geo or None,
+                campania=campania, sector_geotecnico=gs(f_row, _c("SectorGeotecnicos", 80)) or "PENDIENTE",
+                este_ini=round(gn(f_row, _c("ESTE_FROM", 4)), 4),
+                norte_ini=round(gn(f_row, _c("NORTE_FROM", 5)), 3),
+                cota_ini=round(gn(f_row, _c("COTA_FROM", 6)), 2),
+                este_fin=round(gn(f_row, _c("ESTE_TO", 7)), 4),
+                norte_fin=round(gn(f_row, _c("NORTE_TO", 8)), 3),
+                cota_fin=round(gn(f_row, _c("COTA_TO", 9)), 2),
+                distancia_celda=int(round(gn(f_row, _c("DistCelda", 10)))) if gn(f_row, _c("DistCelda", 10)) else None,
+                altura=round(gn(f_row, _c("Altura", 11)), 1) if gn(f_row, _c("Altura", 11)) else None,
+                dip_talud=round(gn(f_row, _c("DIPTALUD", 14)), 2),
+                intemperismo=gs(f_row, _c("INTEMPERISMO", 16)) or None,
+                lito_1=lito_det["lito_1"] or None, lito_2=lito_det["lito_2"] or None,
+                lito_3=lito_det["lito_3"] or None, unidad_litologica=lito_det["unidad_litologica"] or None,
+                nivel=str(nivel) if nivel else None, fase=5, turno=None,
+                discontinuidades=discs, rmr_input=ri,
+            )
+
+            # Crear o actualizar ventana + rellenar campos ANTES del primer flush
+            code_up = schema.codigo.strip().upper()
+            v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
+            if v:
+                for e in list(v.discontinuidades):
+                    db.delete(e)
+            else:
+                v = models.Ventana()
+                db.add(v)
+
+            # Llenar todos los campos (incluye NOT NULLs) antes del flush
+            _populate_ventana_from_schema(v, schema, resolver)
+            db.flush()
+
+            _populate_discontinuidades(db, v, schema.discontinuidades, resolver)
+            db.flush()
+            calculate_and_persist_subratings(db, v)
+            db.flush()
+            imported_count += 1
+
+    db.commit()
+    return {"status": "success", "message": f"Importación completada. {imported_count} ventanas importadas."}
+
+
+# ============================================================================
+# HELPERS COMPARTIDOS — para save_ventana e importar_excel
+# ============================================================================
+
+def _populate_ventana_from_schema(v: models.Ventana, data: schemas.VentanaSaveSchema, resolver: GEMACatalogResolver):
+    """Llena los campos de una ventana ORM desde el schema."""
+    v.codigo_celda = data.codigo.strip().upper()
+    campania_id = data.campania if isinstance(data.campania, int) else 7
+    v.campania_id = campania_id if resolver.campania_id(campania_id) else 7
+    sector_id = resolver.sector_id(data.sector_geotecnico) if data.sector_geotecnico else None
+    v.sector_geotecnico_id = sector_id if sector_id else 20  # 20 = "PENDIENTE" en GEMA
+    v.fecha_mapeo = data.fecha_mapeo
+    v.nivel = data.nivel
+    v.este_from = data.este_ini; v.norte_from = data.norte_ini; v.cota_from = data.cota_ini
+    v.este_to = data.este_fin; v.norte_to = data.norte_fin; v.cota_to = data.cota_fin
+    v.distancia_celda = data.distancia_celda
+    v.altura = data.altura
+    v.dip = data.dip; v.azimut_hole = data.azimut_hole
+    v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
+    v.litologia1_id = resolver.litologia_id(data.lito_1) if data.lito_1 else None
+    v.litologia2_id = resolver.litologia_id(data.lito_2) if data.lito_2 else None
+    v.litologia3_id = resolver.litologia_id(data.lito_3) if data.lito_3 else None
+    v.unidad_litologica_id = resolver.unidad_litologica_id(data.unidad_litologica) if data.unidad_litologica else None
+    v.grado_intemperismo = data.intemperismo
+    v.altura_zona = data.altura_zona
+    v.fase = data.fase; v.turno = data.turno
+    v.geotecnico_id = resolver.geotecnico_id(data.mapeador) if data.mapeador else None
+    if data.rmr_input:
+        v.condicion_agua_rmr76 = data.rmr_input.agua_codigo
+        v.condicion_agua_rmr89 = data.rmr_input.agua_codigo
+        v.dureza_rmr76 = data.rmr_input.resistencia_codigo
+        v.dureza_rmr89 = data.rmr_input.resistencia_codigo
+        v.gsi_visual_rmr76 = data.rmr_input.gsi_visual
+        v.gsi_visual_rmr89 = data.rmr_input.gsi_visual
+        v.control_estructural_rmr76 = str(data.rmr_input.control_estructural) if data.rmr_input.control_estructural is not None else None
+        v.control_estructural_rmr89 = str(data.rmr_input.control_estructural) if data.rmr_input.control_estructural is not None else None
+        v.efectos_voladura_rmr76 = str(data.rmr_input.efectos_voladura) if data.rmr_input.efectos_voladura is not None else None
+        v.efectos_voladura_rmr89 = str(data.rmr_input.efectos_voladura) if data.rmr_input.efectos_voladura is not None else None
+        v.gsi_superficie = data.rmr_input.gsi_superficie
+        v.gsi_estructura = data.rmr_input.gsi_estructura
+        v.ucs_mpa = data.rmr_input.ucs_mpa
+        v.is50_mpa = data.rmr_input.is50_mpa
+        v.comentarios = data.rmr_input.comentario
+
+
+def _populate_discontinuidades(db: Session, v: models.Ventana, discs: List[schemas.DiscontinuidadBase], resolver: GEMACatalogResolver):
+    """Inserta discontinuidades en GEMA desde el schema."""
+    for idx, d in enumerate(discs, start=1):
+        tipo_id = resolver.tipo_estructura_id(d.tipo)
+        if not tipo_id:
+            tipo_id = 7137  # Fallback a JN (Junta) si no se encuentra el código
+        e = models.EstructuraGeologica(
+            ventana_id=v.ventana_id,
+            numero_estructura=idx,
+            tipo_estructura_id=tipo_id,
+            dip=float(d.dip), dip_dir=float(d.dipdir),
+            distancia_estructura=float(d.dist) if d.dist is not None and d.dist != -1 else None,
+            abertura_mm=float(d.aber) if d.aber is not None and d.aber != -1 else None,
+            espesor_mm=float(d.esp) if d.esp is not None and d.esp != -1 else None,
+            continuidad_m=float(d.cont) if d.cont is not None and d.cont != -1 else None,
+            espaciamiento_m=float(d.espac),
+            numero_estructuras=d.nstr if d.nstr is not None and d.nstr != -1 else None,
+            numero_extremos_visibles=d.next if d.next is not None and d.next != -1 else None,
+            terminacion=d.term if d.term is not None and d.term != -1 else None,
+            tipo_relleno_1=d.r1 if d.r1 and d.r1 != "-1" else None,
+            tipo_relleno_2=d.r2 if d.r2 and d.r2 != "-1" else None,
+            jrc=float(d.jrc) if d.jrc is not None and d.jrc != -1 else None,
+            rugosidad_estructura=str(d.rug) if d.rug is not None and d.rug != -1 else None,
+            forma_estructura=d.forma if d.forma and d.forma != "-1" else None,
+            alteracion=d.alt if d.alt and d.alt != "-1" else None,
+            familia_id=d.fam,
+        )
+        db.add(e)
+# ============================================================================
 
 @router.post("/ventanas/{codigo}/fotos")
 async def upload_foto(codigo: str, index: int, file: UploadFile = File(...)):
@@ -382,7 +1070,7 @@ async def upload_foto(codigo: str, index: int, file: UploadFile = File(...)):
     ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
     allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
     if ext not in allowed_exts:
-         raise HTTPException(status_code=400, detail="Formato no soportado.")
+        raise HTTPException(status_code=400, detail="Formato no soportado.")
     new_filename = f"{code_up}-VENTANA-{index + 1}.{ext}"
     for e in allowed_exts:
         old_path = os.path.join(dir_path, f"foto_{index}.{e}")
@@ -393,6 +1081,7 @@ async def upload_foto(codigo: str, index: int, file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(contents)
     return {"status": "success", "url": f"/api/uploads/{code_up}/{new_filename}"}
+
 
 @router.delete("/ventanas/{codigo}/fotos/{index}")
 def delete_foto(codigo: str, index: int):
@@ -406,6 +1095,7 @@ def delete_foto(codigo: str, index: int):
         if os.path.exists(old_path): os.remove(old_path)
     return {"status": "success"}
 
+
 @router.post("/ventanas/{codigo}/fotos/meta")
 def save_metadata(codigo: str, data: Dict[str, Any]):
     code_up = codigo.strip().upper()
@@ -415,6 +1105,7 @@ def save_metadata(codigo: str, data: Dict[str, Any]):
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     return {"status": "success"}
+
 
 @router.get("/ventanas/{codigo}/fotos")
 def get_fotos(codigo: str):
@@ -429,7 +1120,7 @@ def get_fotos(codigo: str):
                 with open(meta_path, 'r') as f:
                     meta = json.load(f)
                     captions = meta.get("captions", ["", "", "", ""])
-            except:
+            except Exception:
                 pass
         allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
         for i in range(4):
@@ -447,264 +1138,3 @@ def get_fotos(codigo: str):
                         photos[i] = f"/api/uploads/{code_up}/foto_{i}.{e}?t={int(time.time())}"
                         break
     return {"photos": photos, "captions": captions}
-
-@router.post("/importar-excel")
-async def importar_excel_endpoint(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    contents = await file.read()
-    wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
-    imported_count = 0
-    if "ventana" in wb.sheetnames:
-        ws = wb["ventana"]
-        for start in range(3, ws.max_row, 30):
-            celda_val = ws.cell(row=start+1, column=1).value or ws.cell(row=start, column=51).value
-            if not celda_val or not str(celda_val).strip():
-                continue
-            codigo = str(celda_val).strip().upper()
-            fecha_val = ws.cell(row=start+1, column=37).value
-            fecha_mapeo = fecha_val.date() if isinstance(fecha_val, datetime) else date.today()
-            def get_num(r, c):
-                try: return float(ws.cell(row=r, column=c).value or 0.0)
-                except: return 0.0
-            def get_str(r, c):
-                return str(ws.cell(row=r, column=c).value or "").strip()
-
-            este_ini = round(get_num(start+2, 2), 4)
-            norte_ini = round(get_num(start+2, 4), 3)
-            cota_ini = round(get_num(start+2, 6), 2)
-            este_fin = round(get_num(start+3, 2), 4)
-            norte_fin = round(get_num(start+3, 4), 3)
-            cota_fin = round(get_num(start+3, 6), 2)
-            largo = int(round(get_num(start+2, 11)))
-            altura = round(get_num(start+3, 11), 1)
-            dip_talud = round(get_num(start+2, 14), 2)
-            lito_model = get_str(start+4, 16)
-            mapeador = get_str(start+5, 16)
-            sector = get_str(start+1, 20)
-            fase = int(get_num(start+2, 21))
-            nivel = round(get_num(start+3, 21), 2)
-            sect_geot = get_str(start+4, 21)
-            intemp = get_str(start+3, 16)
-            agua_code = get_str(start+8, 36)
-            res_code = get_str(start+8, 38)
-            gsi_cond = get_str(start+8, 40)
-            gsi_est = get_str(start+8, 41)
-            gsi_vis = int(get_num(start+8, 42))
-            ctrl = int(get_num(start+8, 43))
-            vol = int(get_num(start+8, 44))
-            ucs = get_num(start+8, 53)
-            is50 = get_num(start+8, 54)
-            comentario = get_str(start+18, 56)
-            lito_details = resolve_lithology(lito_model)
-            discs = []
-            for r_idx in range(start+12, start+25):
-                fam_val = ws.cell(row=r_idx, column=1).value
-                if fam_val is None or str(fam_val).strip() == "": continue
-                try: fam_id = int(fam_val)
-                except: continue
-                raw_nstr = int(round(get_num(r_idx, 6)))
-                nstr = raw_nstr if raw_nstr > 0 else -1
-                discs.append(schemas.DiscontinuidadBase(
-                    familia_id=fam_id, distancia_m=int(round(get_num(r_idx, 2))),
-                    tipo_estructura=get_str(r_idx, 3) or "JN", dip=round(get_num(r_idx, 4), 2),
-                    dip_dir=round(get_num(r_idx, 5), 2), n_estructuras=nstr, abertura_mm=round(get_num(r_idx, 7), 1),
-                    espesor_mm=round(get_num(r_idx, 8), 1), continuidad_m=round(get_num(r_idx, 9), 2),
-                    espaciamiento_m=round(get_num(r_idx, 10), 2), n_extremos_visibles=min(2, max(0, int(get_num(r_idx, 11)))),
-                    terminacion=min(3, max(0, int(get_num(r_idx, 12)))), relleno_1_codigo=get_str(r_idx, 13),
-                    relleno_2_codigo=get_str(r_idx, 14), jrc=min(20, max(0, int(get_num(r_idx, 19)))),
-                    rugosidad_codigo=min(9, max(0, int(get_num(r_idx, 20)))), forma_estructura=get_str(r_idx, 21), alteracion_codigo=get_str(r_idx, 22)
-                ))
-            ri_schema = schemas.VentanaRmrInputBase(
-                agua_codigo=agua_code or "C", resistencia_codigo=res_code or "R4", gsi_estructura=gsi_est or "VB",
-                gsi_superficie=gsi_cond or "G", gsi_visual=gsi_vis or 50, control_estructural=ctrl or 4, efectos_voladura=vol or 3,
-                ucs_mpa=ucs or 74.0, is50_mpa=is50 or 5.0, comentario=comentario
-            )
-            ventana_schema = schemas.VentanaSaveSchema(
-                codigo=codigo, fecha_mapeo=fecha_mapeo, mapeador=mapeador or "RD/RB", campania=2026,
-                este_ini=este_ini, norte_ini=norte_ini, cota_ini=cota_ini, este_fin=este_fin, norte_fin=norte_fin, cota_fin=cota_fin,
-                largo_m=largo, altura_m=altura, dip_talud=dip_talud, alteracion_codigo=intemp, intemperismo_codigo=intemp,
-                lito_1=lito_details["lito_1"], lito_2=lito_details["lito_2"], lito_3=lito_details["lito_3"], unidad_litologica=lito_details["unidad_litologica"],
-                sector=sector, fase=fase, nivel=nivel, sector_geotecnico=sect_geot, discontinuidades=discs, rmr_input=ri_schema
-            )
-            save_ventana(ventana_schema, db)
-            imported_count += 1
-    elif "BD" in wb.sheetnames:
-        ws = wb["BD"]
-        
-        # Mapear cabeceras dinámicamente para prevenir bugs de columnas movidas o desplazadas
-        headers_list = []
-        cota_seen, celda_seen = 0, 0
-        for col_idx in range(1, ws.max_column + 1):
-            h_val = ws.cell(row=1, column=col_idx).value
-            h_str = str(h_val).strip() if h_val else ""
-            if h_str == 'COTA':
-                if cota_seen == 0:
-                    h_str = 'COTA_FROM'
-                    cota_seen += 1
-                else:
-                    h_str = 'COTA_TO'
-            elif h_str == 'CELDA':
-                if celda_seen == 0:
-                    h_str = 'CELDA_PADRE'
-                    celda_seen += 1
-                else:
-                    h_str = 'CELDA_DUPLICADA_IGNORE'
-            
-            h_clean = "".join(h_str.split()).upper().replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
-            headers_list.append((h_clean, col_idx))
-            
-        def get_col_idx(name_str, default_col):
-            name_clean = "".join(str(name_str).split()).upper().replace(".", "").replace("'", "").replace('"', "").replace("(", "").replace(")", "").replace("-", "").replace("_", "")
-            for hc, idx in headers_list:
-                if hc == name_clean:
-                    return idx
-            return default_col
-
-        # Obtener índices correctos
-        idx_celda = get_col_idx("CELDA_PADRE", 2)
-        idx_este_from = get_col_idx("ESTE_FROM", 4)
-        idx_norte_from = get_col_idx("NORTE_FROM", 5)
-        idx_cota_from = get_col_idx("COTA_FROM", 6)
-        idx_este_to = get_col_idx("ESTE_TO", 7)
-        idx_norte_to = get_col_idx("NORTE_TO", 8)
-        idx_cota_to = get_col_idx("COTA_TO", 9)
-        idx_dist_celda = get_col_idx("DistCelda", 10)
-        idx_altura = get_col_idx("Altura", 11)
-        idx_dip_talud = get_col_idx("DIPTALUD", 14)
-        idx_intemp = get_col_idx("INTEMPERISMO", 16)
-        
-        idx_agua_code = get_col_idx("CONDICIONDEAGUA89", 35)
-        idx_res_code = get_col_idx("DUREZA89", 37)
-        idx_gsi_vis = get_col_idx("GSIVISUAL89", 39)
-        idx_ctrl = get_col_idx("CONTROLESTRUCTURAL89", 40)
-        idx_vol = get_col_idx("EFECTOSDEVOLADURA89", 41)
-        idx_ucs = get_col_idx("UCSMpa", 33)
-        idx_is50 = get_col_idx("is50Mpa", 34)
-        idx_fecha = get_col_idx("FECHA", 51)
-        idx_comentario = get_col_idx("COMENTARIO", 52)
-        idx_geot = get_col_idx("GEOTECNICO", 74)
-        idx_nivel = get_col_idx("Nivel", 75)
-        
-        idx_lito1 = get_col_idx("Lito1", 76)
-        idx_lito2 = get_col_idx("Lito2", 77)
-        idx_lito3 = get_col_idx("Lito3", 78)
-        idx_grupo = get_col_idx("UnidadLitologica", 79)
-        idx_sector = get_col_idx("SectorGeotecnicos", 80)
-        idx_campania = get_col_idx("Campaña", 81)
-
-        # Índices para discontinuidades
-        idx_disc_tipo = get_col_idx("TIPO", 59)
-        idx_disc_dip = get_col_idx("DIP", 60)
-        # DIP de discontinuidad debe estar a la derecha de la celda de mapeo (col 12)
-        for hc, idx in headers_list:
-            if hc == "DIP" and idx > 15:
-                idx_disc_dip = idx
-                break
-        idx_disc_dipdir = get_col_idx("DIPDIR", 61)
-        idx_disc_num = get_col_idx("NUMERODEESTRUCTURAS", 62)
-        idx_disc_aber = get_col_idx("ABERTURAmm", 63)
-        idx_disc_esp = get_col_idx("ESPESORmm", 64)
-        idx_disc_cont = get_col_idx("CONTINUIDADm", 65)
-        idx_disc_espac = get_col_idx("ESPACIAMIENTOm", 66)
-        idx_disc_extremos = get_col_idx("NUMERODEEXTREMOSVISIBLES", 67)
-        idx_disc_rell1 = get_col_idx("TIPODERELLENO1", 68)
-        idx_disc_rell2 = get_col_idx("TIPODERELLENO2", 69)
-        idx_disc_jrc = get_col_idx("JRC", 70)
-        idx_disc_rug = get_col_idx("RUGOSIDADDEESTRUCTURAS", 71)
-        idx_disc_forma = get_col_idx("FORMADEESTRUCTURA", 72)
-        idx_disc_alter = get_col_idx("ALTERACION", 73)
-        idx_disc_dist = get_col_idx("Distdeestr", 53)
-
-        celda_groups = {}
-        for r_idx in range(2, ws.max_row + 1):
-            celda_val = ws.cell(row=r_idx, column=idx_celda).value
-            if not celda_val or str(celda_val).strip() == "":
-                continue
-            celda_code = str(celda_val).strip().upper()
-            if celda_code not in celda_groups: celda_groups[celda_code] = []
-            celda_groups[celda_code].append(r_idx)
-            
-        for celda_code, rows_indices in celda_groups.items():
-            f_row = rows_indices[0]
-            def get_num(r, c):
-                val = ws.cell(row=r, column=c).value
-                if val is None: return 0.0
-                try: return float(val)
-                except: return 0.0
-            def get_str(r, c):
-                val = ws.cell(row=r, column=c).value
-                return str(val).strip() if val is not None else ""
-
-            este_from = round(get_num(f_row, idx_este_from), 4)
-            norte_from = round(get_num(f_row, idx_norte_from), 3)
-            cota_from = round(get_num(f_row, idx_cota_from), 2)
-            este_to = round(get_num(f_row, idx_este_to), 4)
-            norte_to = round(get_num(f_row, idx_norte_to), 3)
-            cota_to = round(get_num(f_row, idx_cota_to), 2)
-            dist_celda = int(round(get_num(f_row, idx_dist_celda)))
-            altura = round(get_num(f_row, idx_altura), 1)
-            dip_talud = round(get_num(f_row, idx_dip_talud), 2)
-            intemp = get_str(f_row, idx_intemp)
-            agua_code = get_str(f_row, idx_agua_code)
-            res_code = get_str(f_row, idx_res_code)
-            gsi_vis = int(get_num(f_row, idx_gsi_vis))
-            ctrl = int(get_num(f_row, idx_ctrl))
-            vol = int(get_num(f_row, idx_vol))
-            ucs = get_num(f_row, idx_ucs)
-            is50 = get_num(f_row, idx_is50)
-            fecha_val = ws.cell(row=f_row, column=idx_fecha).value
-            fecha_mapeo = fecha_val.date() if isinstance(fecha_val, datetime) else date.today()
-            comentario = get_str(f_row, idx_comentario)
-            geot = get_str(f_row, idx_geot)
-            nivel = round(get_num(f_row, idx_nivel), 2)
-            
-            l1_val = get_str(f_row, idx_lito1)
-            l2_val = get_str(f_row, idx_lito2)
-            l3_val = get_str(f_row, idx_lito3)
-            
-            # Resolver litología usando cascada
-            lito_details = resolve_lithology(l3_val or l2_val or l1_val)
-            if l1_val:
-                lito_details["lito_1"] = l1_val
-            if l2_val:
-                lito_details["lito_2"] = l2_val
-            if l3_val:
-                lito_details["lito_3"] = l3_val
-            
-            u_lito_val = get_str(f_row, idx_grupo)
-            if u_lito_val:
-                lito_details["unidad_litologica"] = u_lito_val
-
-            discs = []
-            for r_idx in rows_indices:
-                fam_val = ws.cell(row=r_idx, column=1).value or 1
-                raw_nstr = int(round(get_num(r_idx, idx_disc_num)))
-                nstr = raw_nstr if raw_nstr > 0 else -1
-                discs.append(schemas.DiscontinuidadBase(
-                    familia_id=int(fam_val), distancia_m=int(round(get_num(r_idx, idx_disc_dist))),
-                    tipo_estructura=get_str(r_idx, idx_disc_tipo) or "JN", dip=round(get_num(r_idx, idx_disc_dip), 2),
-                    dip_dir=round(get_num(r_idx, idx_disc_dipdir), 2), n_estructuras=nstr, abertura_mm=round(get_num(r_idx, idx_disc_aber), 1),
-                    espesor_mm=round(get_num(r_idx, idx_disc_esp), 1), continuidad_m=round(get_num(r_idx, idx_disc_cont), 2),
-                    espaciamiento_m=round(get_num(r_idx, idx_disc_espac), 2), n_extremos_visibles=min(2, max(0, int(get_num(r_idx, idx_disc_extremos)))),
-                    terminacion=3, relleno_1_codigo=get_str(r_idx, idx_disc_rell1), relleno_2_codigo=get_str(r_idx, idx_disc_rell2),
-                    jrc=min(20, max(0, int(get_num(r_idx, idx_disc_jrc)))), rugosidad_codigo=min(9, max(0, int(get_num(r_idx, idx_disc_rug)))),
-                    forma_estructura=get_str(r_idx, idx_disc_forma), alteracion_codigo=get_str(r_idx, idx_disc_alter)
-                ))
-                
-            campania_val = int(get_num(f_row, idx_campania)) if get_num(f_row, idx_campania) > 0 else 2026
-            sector_val = get_str(f_row, idx_sector) or "E1"
-            
-            ri_schema = schemas.VentanaRmrInputBase(
-                agua_codigo=agua_code or "C", resistencia_codigo=res_code or "R4", gsi_estructura="VB",
-                gsi_superficie="G", gsi_visual=gsi_vis or 50, control_estructural=ctrl or 4, efectos_voladura=vol or 3,
-                ucs_mpa=ucs or 74.0, is50_mpa=is50 or 5.0, comentario=comentario
-            )
-            ventana_schema = schemas.VentanaSaveSchema(
-                codigo=celda_code, fecha_mapeo=fecha_mapeo, mapeador=geot or "RD/RB", campania=campania_val,
-                este_ini=este_from, norte_ini=norte_from, cota_ini=cota_from, este_fin=este_to, norte_fin=norte_to, cota_fin=cota_to,
-                largo_m=dist_celda, altura_m=altura, dip_talud=dip_talud, alteracion_codigo=intemp, intemperismo_codigo=intemp,
-                lito_1=lito_details["lito_1"], lito_2=lito_details["lito_2"], lito_3=lito_details["lito_3"], unidad_litologica=lito_details["unidad_litologica"],
-                sector=sector_val, fase=5, nivel=nivel, sector_geotecnico=sector_val, discontinuidades=discs, rmr_input=ri_schema
-            )
-            save_ventana(ventana_schema, db)
-            imported_count += 1
-    return {"status": "success", "message": f"Importación completada. {imported_count} ventanas importadas."}

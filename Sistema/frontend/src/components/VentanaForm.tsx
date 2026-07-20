@@ -3,6 +3,19 @@ import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
 import { AlignLeft, FileSpreadsheet } from 'lucide-react';
 
+// Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
+// Hardcodeado temporalmente; al migrar a la nueva BD se cargará dinámicamente desde /api/catalogos/campanas
+const CAMPANAS_HARDCODED = [
+  { id: 1, label: 'Campaña 2020' },
+  { id: 2, label: 'Campaña 2021' },
+  { id: 3, label: 'Campaña 2022' },
+  { id: 4, label: 'Campaña 2023' },
+  { id: 5, label: 'Campaña 2024' },
+  { id: 6, label: 'Campaña 2025' },
+  { id: 7, label: 'Campaña 2026' },
+  { id: 8, label: 'Campaña 2019' },
+];
+
 interface VentanaFormProps {
   header: WindowHeader;
   onChange: (updatedHeader: WindowHeader) => void;
@@ -264,7 +277,7 @@ export default function VentanaForm({
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between block w-full">
-                  <span>Largo (m)</span>
+                  <span>Dist. Celda (m)</span>
                   {calculatedLargo !== null && (
                     <span className="text-[10px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.1)] select-none">
                       AUTO
@@ -316,10 +329,10 @@ export default function VentanaForm({
                     className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
                   <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
-                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">Z</span>
+                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
                   <input
                     type="text"
-                    placeholder="Cota (Z)"
+                    placeholder="Cota (C)"
                     value={getInputValue('cota_from', header.cota_from)}
                     id="header-cota_from"
                     onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, 4, 2)}
@@ -360,10 +373,10 @@ export default function VentanaForm({
                     className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
                   <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
-                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">Z</span>
+                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
                   <input
                     type="text"
-                    placeholder="Cota (Z)"
+                    placeholder="Cota (C)"
                     value={getInputValue('cota_to', header.cota_to)}
                     id="header-cota_to"
                     onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, 4, 2)}
@@ -430,7 +443,7 @@ export default function VentanaForm({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">Dip Hw°</label>
+                <label className="text-xs font-bold text-slate-500 uppercase block">DIP°</label>
                 <input
                   type="text"
                   placeholder="-90-90"
@@ -448,7 +461,7 @@ export default function VentanaForm({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">Az Hw°</label>
+                <label className="text-xs font-bold text-slate-500 uppercase block">AZ_HOLE°</label>
                 <input
                   type="text"
                   placeholder="0-359"
@@ -582,7 +595,21 @@ export default function VentanaForm({
 
             {/* Divisor de Sección: Metadatos y Control de Campaña */}
             <div className="border-t border-navy-900/60 pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Campaña</label>
+                  <select
+                    value={header.campania !== undefined && header.campania !== null ? String(header.campania) : ''}
+                    onChange={(e) => handleChange('campania', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  >
+                    <option value="" className="bg-navy-950 text-slate-500">— Campaña —</option>
+                    {CAMPANAS_HARDCODED.map(c => (
+                      <option key={c.id} value={c.id} className="bg-navy-950 text-slate-100 text-xs">{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Fase</label>
                   <input

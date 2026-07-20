@@ -226,6 +226,7 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
+            maxLength={20}
             value={gsiCond}
             onChange={(e) => handleFieldChange('gsi_superficie', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
@@ -238,6 +239,7 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
+            maxLength={20}
             value={gsiEstruc}
             onChange={(e) => handleFieldChange('gsi_estructura', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"

@@ -61,7 +61,7 @@ export const COLUMN_LABELS: Record<string, string> = {
     val_agua_sub: "Valor Agua",
     val_agua_r89: "Valor Agua (R89)",
     val_agua_r76: "Valor Agua (R76)",
-    resistencia_ucs: "Resistencia Estimada",
+    resistencia_ucs: "Dureza",
     val_resist_sub: "Resistencia Estimada (Valor)",
     val_resist_r89: "Resistencia Estimada Valor (R89)",
     val_resist_r76: "Resistencia Estimada Valor (R76)",
@@ -233,7 +233,7 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
     { key: 'r1_76', label: COLUMN_LABELS.r1_sub_76, type: 'number', width: 80, isComputed: true, formulaId: 'rel_single_r76', getFormulaParams: (row) => ({ code: row.relleno1, thickness: row.espesor }) },
     { key: 'r2_76', label: COLUMN_LABELS.r2_sub_76, type: 'number', width: 80, isComputed: true, formulaId: 'rel_single_r76', getFormulaParams: (row) => ({ code: row.relleno2, thickness: row.espesor }) },
 
-    { key: 'jrc', label: COLUMN_LABELS.jrc, type: 'number', width: 80, precision: 0, range: [1, 20] },
+    { key: 'jrc', label: COLUMN_LABELS.jrc, type: 'number', width: 80, precision: 0, range: [0, 20] },
     { key: 'rugosidad', label: COLUMN_LABELS.rugosidad, type: 'number', width: 144, precision: 0, range: [1, 9] },
     {
         key: 'forma',

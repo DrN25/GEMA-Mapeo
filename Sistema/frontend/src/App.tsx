@@ -85,6 +85,15 @@ export default function App() {
   const [pltEnsayos, setPltEnsayos] = useState<any[]>([]);
   const [showFormulas, setShowFormulas] = useState<boolean>(true);
 
+  // Paginación y filtros del Dashboard
+  const [loading, setLoading] = useState<boolean>(false);
+  const [kpis, setKpis] = useState<any>(null);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [totalFiltered, setTotalFiltered] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [activeDateRange, setActiveDateRange] = useState<string>('hoy');
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   // UI & Theme
@@ -247,36 +256,78 @@ export default function App() {
     window.location.href = `${API_BASE}/api/ventanas/${celda}/exportar`;
   };
 
-  const fetchWindows = async () => {
+  const fetchWindows = async (p?: number, ps?: number, dr?: string, searchTerm?: string) => {
+    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/ventanas`);
+      const params = new URLSearchParams({
+        page: String(p || page),
+        page_size: String(ps || pageSize),
+        order_by: 'fecha_mapeo',
+        order_dir: 'desc',
+      });
+
+      // Calcular fecha_desde/fecha_hasta según dateRange
+      const drActive = dr || activeDateRange;
+      const now = new Date();
+      if (drActive === 'hoy') {
+        const today = now.toISOString().split('T')[0];
+        params.set('fecha_desde', today);
+        params.set('fecha_hasta', today);
+      } else if (drActive === 'ayer') {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        params.set('fecha_desde', yesterday.toISOString().split('T')[0]);
+        params.set('fecha_hasta', yesterday.toISOString().split('T')[0]);
+      } else if (drActive === 'semana') {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        params.set('fecha_desde', weekAgo.toISOString().split('T')[0]);
+        params.set('fecha_hasta', now.toISOString().split('T')[0]);
+      } else if (drActive === 'mes') {
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        params.set('fecha_desde', monthAgo.toISOString().split('T')[0]);
+        params.set('fecha_hasta', now.toISOString().split('T')[0]);
+      } else if (drActive === 'ano') {
+        params.set('fecha_desde', `${now.getFullYear()}-01-01`);
+        params.set('fecha_hasta', now.toISOString().split('T')[0]);
+      }
+
+      if (searchTerm) params.set('q', searchTerm);
+
+      const res = await fetch(`${API_BASE}/api/ventanas?${params}`);
       if (res.ok) {
         const data = await res.json();
-        const summaries: WindowSummary[] = data.map((v: any) => ({
+        const summaries: WindowSummary[] = data.items.map((v: any) => ({
           name: v.codigo,
-          proyecto: "Proyecto A",
-          geologo: v.mapeador || "N/A",
-          largo: v.largo_m !== null && v.largo_m !== undefined ? Math.round(v.largo_m) : 5,
-          altura: v.altura_m || 15.0,
-          fecha_registro: v.fecha_mapeo || new Date().toISOString().split('T')[0],
-          rmr_76: 60,
-          rmr_89: 65,
-          class_89: "Regular"
+          fecha_mapeo: v.fecha_mapeo || '',
+          sector_geotecnico: v.sector_geotecnico || '',
+          geologo: v.mapeador || 'N/A',
+          lito_1: v.lito_1 || '',
+          largo: v.largo_m !== null ? v.largo_m : 0,
+          altura: v.altura_m || 0,
+          nivel: v.nivel || '',
+          rmr_76: v.rmr_76 !== null ? v.rmr_76 : 0,
+          rmr_89: v.rmr_89 !== null ? v.rmr_89 : 0,
+          class_89: v.rmr_89 >= 81 ? 'MUY BUENA' : v.rmr_89 >= 61 ? 'BUENA' : v.rmr_89 >= 41 ? 'MALA' : 'MUY MALA',
         }));
         setWindows(summaries);
+        setKpis(data.kpis);
+        setTotalFiltered(data.total_filtered);
+        setTotalPages(data.total_pages);
+        setPage(data.page);
         setSyncStatus('synced');
-        setSyncMessage('Sincronizado con SQL Server.');
+        setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} páginas.`);
+        return data;
       } else {
         throw new Error();
       }
     } catch (e) {
       console.warn("Backend offline, loading from local cache.", e);
       setSyncStatus('offline');
-      setSyncMessage("Servidor backend desconectado. Operando en modo local temporal.");
-      const cached = localStorage.getItem('geolog_windows_summaries');
-      if (cached) {
-        setWindows(JSON.parse(cached));
-      }
+      setSyncMessage("Servidor backend desconectado.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -494,6 +545,27 @@ export default function App() {
     setCurrentView('dashboard');
   };
 
+  // Paginación y filtros del Dashboard
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchWindows(newPage, pageSize, activeDateRange);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+    fetchWindows(1, newSize, activeDateRange);
+  };
+
+  const handleFilterChange = (filters: { dateRange?: string }) => {
+    const newDr = filters.dateRange || activeDateRange;
+    if (newDr !== activeDateRange) {
+      setActiveDateRange(newDr);
+      setPage(1);
+      fetchWindows(1, pageSize, newDr);
+    }
+  };
+
   const handleDeleteFamily = (famId: number) => {
     if (!activeWindow) return;
 
@@ -639,11 +711,16 @@ export default function App() {
 
       const summary: WindowSummary = {
         name: activeWindow.header.celda,
-        proyecto: "Proyecto A",
+        fecha_mapeo: activeWindow.header.fecha || new Date().toISOString().split('T')[0],
+        sector_geotecnico: activeWindow.header.sect_geot || '',
         geologo: activeWindow.header.mapeador || "N/A",
+        lito_1: activeWindow.header.lito_1 || '',
         largo: calculated.largo,
         altura: activeWindow.header.altura,
-        fecha_registro: activeWindow.header.fecha || new Date().toISOString().split('T')[0],
+        nivel: activeWindow.header.nivel || '',
+        rmr_76: calculated.rmr_76,
+        rmr_89: calculated.rmr_89,
+        class_89: calculated.class_89,
         rmr_76: calculated.rmr_76,
         rmr_89: calculated.rmr_89,
         class_89: calculated.class_89
@@ -833,6 +910,16 @@ export default function App() {
           {currentView === 'dashboard' && (
             <Dashboard
               windows={windows}
+              kpis={kpis}
+              page={page}
+              pageSize={pageSize}
+              totalFiltered={totalFiltered}
+              totalPages={totalPages}
+              loading={loading}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              onFilterChange={handleFilterChange}
+              activeDateRange={activeDateRange}
               onSelectWindow={handleSelectWindow}
               onCreateWindow={handleCreateWindow}
               onDeleteWindow={handleDeleteWindow}
