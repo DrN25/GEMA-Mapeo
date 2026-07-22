@@ -44,10 +44,23 @@ const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): Jo
     tipo_estructura: (j.tipo_estructura && j.tipo_estructura.toUpperCase() === 'J') ? 'JN' : (j.tipo_estructura || 'JN'),
     alteracion: (j.alteracion && j.alteracion !== '-1') ? j.alteracion : defaultAlt
   }));
-
   const result: JointRow[] = [...mappedJoints];
-  const maxFam = Math.max(3, ...mappedJoints.map(j => j.familia));
-  for (let fam = 1; fam <= maxFam; fam++) {
+
+  // Si todas las estructuras tienen la misma familia (generalmente 1, porque NULL->1),
+  // redistribuirlas en 3 familias de 3 estructuras cada una
+  const allSameFam = result.length > 0 && result.every(j => j.familia === result[0].familia);
+  if (allSameFam && result.length >= 3) {
+    result.forEach((j, i) => {
+      j.familia = Math.floor(i / 3) + 1;
+    });
+  }
+
+  // Obtener familias existentes en los datos + asegurar 1-3
+  const fams = new Set(mappedJoints.map(j => j.familia));
+  for (let f = 1; f <= 3; f++) fams.add(f);
+  const sortedFams = [...fams].sort((a, b) => a - b);
+
+  for (const fam of sortedFams) {
     const count = result.filter(j => j.familia === fam).length;
     for (let i = count; i < 3; i++) {
       result.push({
@@ -92,7 +105,7 @@ export default function App() {
   const [pageSize, setPageSize] = useState<number>(20);
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [activeDateRange, setActiveDateRange] = useState<string>('hoy');
+  const [activeDateRange, setActiveDateRange] = useState<string>('todo');
   const [pendingImports, setPendingImports] = useState<string[]>([]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -383,19 +396,19 @@ export default function App() {
           altura: roundDec(v.altura_m, 1) || 15.0,
           dip_talud: roundDec(v.dip_talud, 2) || 64.0,
           dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
-          dip_hw: v.dip_hw !== null && v.dip_hw !== undefined ? roundDec(v.dip_hw, 2) : undefined,
-          az_hw: v.az_hw !== null && v.az_hw !== undefined ? roundDec(v.az_hw, 2) : undefined,
+          dip_hw: v.dip !== null && v.dip !== undefined ? roundDec(v.dip, 2) : undefined,
+          az_hw: v.azimut_hole !== null && v.azimut_hole !== undefined ? roundDec(v.azimut_hole, 2) : undefined,
           unidad_litologica: v.unidad_litologica || '',
           lito_1: v.lito_1 || '',
           lito_2: v.lito_2 || '',
           lito_3: v.lito_3 || '',
           mapeador: v.mapeador || 'AS-HM',
-          sector: v.sector || 'E1',
-          fase: String(v.fase || '5'),
-          nivel: String(roundDec(v.nivel, 2) || '3960'),
-          sect_geot: v.sector_geotecnico || 'E1',
-          intemperia: v.intemperismo_codigo || '',
-          alt_zona: v.alteracion_codigo || '',
+          sector: v.sector_geotecnico || '',
+          fase: String(v.fase || ''),
+          nivel: String(v.nivel || ''),
+          sect_geot: v.sector_geotecnico || '',
+          intemperia: v.intemperismo || '',
+          alt_zona: v.altura_zona || '',
           fecha: v.fecha_mapeo || new Date().toISOString().split('T')[0],
           condicion_agua: v.rmr_input?.agua_codigo || '',
           resistencia_ucs: v.rmr_input?.resistencia_codigo || '',

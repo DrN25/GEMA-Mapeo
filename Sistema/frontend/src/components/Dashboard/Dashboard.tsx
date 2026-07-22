@@ -67,6 +67,11 @@ export default function Dashboard({
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
 
+  // Filtrar ventanas por busqueda local
+  const filteredWindows = search.trim()
+    ? windows.filter(w => w.name.toLowerCase().includes(search.toLowerCase().trim()))
+    : windows;
+
   const formatDate = (d: Date) => {
     const day = d.getDate().toString().padStart(2, '0');
     const month = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
@@ -264,7 +269,7 @@ export default function Dashboard({
                   ))}
                 </tr>
               ))}
-              {!loading && windows.map(w => (
+              {!loading && filteredWindows.map(w => (
                 <tr
                   key={w.name}
                   onClick={() => onSelectWindow(w.name)}
@@ -326,7 +331,7 @@ export default function Dashboard({
                   </td>
                 </tr>
               ))}
-              {windows.length === 0 && (
+              {filteredWindows.length === 0 && (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-500 text-xs font-semibold">
                     No se encontraron celdas en este rango. {activeDateRange === 'hoy' ? 'Crea la primera del día.' : 'Prueba con otro filtro.'}

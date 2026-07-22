@@ -155,6 +155,11 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
         obj = db.query(model_cls).filter(pk_col == id_val).first()
         return getattr(obj, code_attr) if obj else None
 
+    def _reverse_sector(id_val):
+        """Reverse lookup de sector, retorna None si es PENDIENTE."""
+        code = _reverse(models.SectorGeotecnico, id_val, "codigo")
+        return None if code == "PENDIENTE" else code
+
     discs = []
     for e in v.discontinuidades:
         tipo_codigo = tipos_map.get(e.tipo_estructura_id) if e.tipo_estructura_id else None
@@ -925,7 +930,7 @@ async def parse_import_excel(
                 "data": {
                     "codigo": codigo,
                     "campania": 7,
-                    "sector_geotecnico": sect_geot or sector if (sect_geot := gs(start + 4, 21)) or (sector := gs(start + 1, 20)) else "PENDIENTE",
+                    "sector_geotecnico": sect_geot or sector if (sect_geot := gs(start + 4, 21)) or (sector := gs(start + 1, 20)) else None,
                     "fecha_mapeo": str(ws.cell(row=start + 1, column=37).value or ""),
                     "nivel": str(round(gn(start + 3, 21), 2)) if gn(start + 3, 21) else None,
                     "este_ini": round(gn(start + 2, 2), 4),
@@ -993,9 +998,10 @@ async def parse_import_excel(
 
             discs = []
             for ri in rows_indices:
+                disc_pos = ri - rows_indices[0]  # 0, 1, 2, 3... dentro del grupo
                 nstr = int(round(gn(ri, _c("NUMERODEESTRUCTURAS", 62)))) if gn(ri, _c("NUMERODEESTRUCTURAS", 62)) else -1
                 discs.append(schemas.DiscontinuidadBase(
-                    familia_id=int(ws.cell(row=ri, column=1).value or 1),
+                    familia_id=(disc_pos // 3) + 1,  # 0-2→F1, 3-5→F2, 6-8→F3
                     distancia_m=round(gn(ri, _c("Distdeestr", 53))) if gn(ri, _c("Distdeestr", 53)) else None,
                     tipo_estructura=gs(ri, _c("TIPO", 59)) or "JN",
                     dip=round(gn(ri, dip_col), 2), dip_dir=round(gn(ri, _c("DIPDIR", 61)), 2),
@@ -1020,7 +1026,7 @@ async def parse_import_excel(
                 "data": {
                     "codigo": code,
                     "campania": 7,
-                    "sector_geotecnico": gs(f_row, _c("SectorGeotecnicos", 80)) or "PENDIENTE",
+                    "sector_geotecnico": gs(f_row, _c("SectorGeotecnicos", 80)) or None,
                     "fecha_mapeo": str(fecha_val)[:10] if fecha_val else None,
                     "nivel": str(round(gn(f_row, _c("Nivel", 75)), 2)) if gn(f_row, _c("Nivel", 75)) else None,
                     "este_ini": round(gn(f_row, _c("ESTEFROM", 4)), 4),
@@ -1031,10 +1037,16 @@ async def parse_import_excel(
                     "cota_fin": round(gn(f_row, _c("COTATO", 9)), 2),
                     "distancia_celda": int(round(gn(f_row, _c("DistCelda", 10)))) if gn(f_row, _c("DistCelda", 10)) else None,
                     "altura": round(gn(f_row, _c("Altura", 11)), 1) if gn(f_row, _c("Altura", 11)) else None,
-                    "dip_talud": round(gn(f_row, _c("DIPTALUD", 14)), 2),
+                    "dip": round(gn(f_row, 12), 2) if gn(f_row, 12) else None,
+                    "azimut_hole": round(gn(f_row, 13), 2) if gn(f_row, 13) else None,
+                    "dip_talud": round(gn(f_row, 14), 2),
+                    "dipdir_talud": round(gn(f_row, 15), 2) if gn(f_row, 15) else None,
                     "intemperismo": gs(f_row, _c("INTEMPERISMO", 16)) or None,
                     "mapeador": gs(f_row, _c("GEOTECNICO", 74)) or None,
-                    "lito_1": None, "lito_2": None, "lito_3": None, "unidad_litologica": None,
+                    "lito_1": gs(f_row, _c("Lito1", 76)) or None,
+                    "lito_2": gs(f_row, _c("Lito2", 77)) or None,
+                    "lito_3": gs(f_row, _c("Lito3", 78)) or None,
+                    "unidad_litologica": gs(f_row, _c("UnidadLitologica", 79)) or None,
                     "discontinuidades": [d.model_dump() for d in discs],
                     "rmr_input": {
                         "agua_codigo": gs(f_row, _c("CONDICIONDEAGUA89", 35)) or None,
@@ -1298,6 +1310,7 @@ async def importar_excel_endpoint(
 
             discs = []
             for r_idx in rows_indices:
+                disc_pos = r_idx - rows_indices[0]
                 dip_col = _c("DIP", 60)
                 for hc, ci in col_map.items():
                     if hc == "DIP" and ci > 15:
@@ -1305,7 +1318,7 @@ async def importar_excel_endpoint(
                         break
                 nstr = int(round(gn(r_idx, _c("NUMERODEESTRUCTURAS", 62)))) if gn(r_idx, _c("NUMERODEESTRUCTURAS", 62)) else -1
                 discs.append(schemas.DiscontinuidadBase(
-                    familia_id=int(ws.cell(row=r_idx, column=1).value or 1),
+                    familia_id=(disc_pos // 3) + 1,
                     distancia_m=round(gn(r_idx, _c("Distdeestr", 53))) if gn(r_idx, _c("Distdeestr", 53)) else None,
                     tipo_estructura=gs(r_idx, _c("TIPO", 59)) or "JN",
                     dip=round(gn(r_idx, dip_col), 2),
@@ -1357,7 +1370,7 @@ async def importar_excel_endpoint(
 
             schema = schemas.VentanaSaveSchema(
                 codigo=celda_code, fecha_mapeo=fecha_mapeo, mapeador=geo or None,
-                campania=campania, sector_geotecnico=gs(f_row, _c("SectorGeotecnicos", 80)) or "PENDIENTE",
+                campania=campania, sector_geotecnico=gs(f_row, _c("SectorGeotecnicos", 80)) or None,
                 este_ini=round(gn(f_row, _c("ESTE_FROM", 4)), 4),
                 norte_ini=round(gn(f_row, _c("NORTE_FROM", 5)), 3),
                 cota_ini=round(gn(f_row, _c("COTA_FROM", 6)), 2),

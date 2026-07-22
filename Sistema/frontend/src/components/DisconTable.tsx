@@ -216,7 +216,7 @@ export default function DisconTable({
   };
 
   const getRowClassName = (_row: any, idx: number) => {
-    const famId = Math.floor(idx / 3) + 1;
+    const famId = _row?.familia || Math.floor(idx / 3) + 1;
     const borderClass = (idx + 1) % 3 === 0 ? "border-b-2 border-navy-700/80" : "border-b border-navy-900/25";
 
     const backgrounds: Record<number, string> = {
@@ -235,7 +235,7 @@ export default function DisconTable({
   };
 
   const renderRowIndex = (idx: number, _row: any) => {
-    const famId = Math.floor(idx / 3) + 1;
+    const famId = _row?.familia || Math.floor(idx / 3) + 1;
     const color = getFamilyColor(famId);
     return (
       <span

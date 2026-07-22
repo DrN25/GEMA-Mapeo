@@ -1,11 +1,30 @@
 export let LITHOLOGY_CLASSIFICATION: any[] = [];
 export let GROUNDWATER_CATALOG: Record<string, any> = {};
 export let STRENGTH_CATALOG: Record<string, any> = {};
-export let STRUCTURE_CATALOG: Record<string, string> = {};
-export let RELLENO_CATALOG: Record<string, any> = {};
-export let ALTERACION_CATALOG: Record<string, any> = {};
+export let STRUCTURE_CATALOG: Record<string, string> = {
+  JN: "Junta (JS)", BED: "Estratos (BED)", F: "Falla (F)",
+  SZ: "Zona de Cizalla (SZ)", CON: "Contacto (CON)", DQ: "Dique (DQ)"
+};
+export let RELLENO_CATALOG: Record<string, any> = {
+  cwf: { name: "Limpio sin relleno (cwf)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
+  si: { name: "Silice (si)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  ox: { name: "Oxidos (ox)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ca: { name: "Calcita (ca)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  g: { name: "Panizo (g)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  cl: { name: "Arcilla (cl)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+};
+export let ALTERACION_CATALOG: Record<string, any> = {
+  f: { name: "f — Fresca", r76: 5, r89: 6 },
+  d: { name: "d — Débilmente meteorizada", r76: 5, r89: 5 },
+  m: { name: "m — Moderadamente meteorizada", r76: 4, r89: 3 },
+  a: { name: "a — Altamente meteorizada", r76: 3, r89: 3 },
+  c: { name: "c — Completamente meteorizada", r76: 2, r89: 2 },
+  s: { name: "s — Suelo residual", r76: 1, r89: 1 },
+};
 export let RUGOSIDAD_CATALOG: Record<number, any> = {};
-export let FORMA_CATALOG: Record<string, string> = {};
+export let FORMA_CATALOG: Record<string, string> = {
+  P: "Plana (P)", C: "Curva (C)", O: "Ondulada (O)", E: "Escalonada (E)", I: "Irregular (I)"
+};
 
 export interface ResolvedKResult {
   k: number;

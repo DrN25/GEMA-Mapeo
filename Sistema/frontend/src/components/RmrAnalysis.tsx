@@ -388,12 +388,12 @@ export default function RmrAnalysis({
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiCond}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiEstruc}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual.toFixed(2)}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl.toFixed(2)}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol.toFixed(2)}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual?.toFixed(2) ?? '—'}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl?.toFixed(2) ?? '—'}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="rqd_rating_r76" params={{ rqd: calculated.rqd_est, val: calculated.rqd_rating_76 }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.rqd_rating_76.toFixed(2)}</span>
+                  <span>{calculated.rqd_rating_76?.toFixed(2) ?? '—'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
@@ -467,9 +467,9 @@ export default function RmrAnalysis({
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiCond}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiEstruc}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual.toFixed(2)}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl.toFixed(2)}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol.toFixed(2)}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual?.toFixed(2) ?? '—'}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl?.toFixed(2) ?? '—'}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
                 <FormulaTooltipTrigger 
                   formulaId="rqd_rating_r89" 
