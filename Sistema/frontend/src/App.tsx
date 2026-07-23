@@ -1235,6 +1235,7 @@ export default function App() {
       </div>
       <ExcelImportModal
         isOpen={isImportModalOpen}
+        apiBase={RESOLVED_API_BASE}
         onClose={() => setIsImportModalOpen(false)}
         onImport={(cellCodes) => {
           setPendingImports(prev => [...new Set([...prev, ...cellCodes])]);

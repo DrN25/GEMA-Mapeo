@@ -40,6 +40,7 @@ from app.routers.auditoria import router as auditoria_router
 from app.routers.comparativo import router as comparativo_router
 from app.routers.catalogs import router as catalogs_router
 from app.routers.congruencia import router as congruencia_router
+from app.routers.importador import router as importador_router
 
 app.include_router(ventanas_router, prefix="/api", tags=["Ventanas"])
 app.include_router(plt_router, prefix="/api", tags=["Ensayos PLT"])
@@ -47,6 +48,7 @@ app.include_router(auditoria_router, prefix="/api", tags=["Auditoría Geotécnic
 app.include_router(comparativo_router, prefix="/api", tags=["Comparación de Auditorías"])
 app.include_router(catalogs_router, prefix="/api", tags=["Catálogos"])
 app.include_router(congruencia_router, prefix="/api", tags=["Congruencia Geomecánica"])
+app.include_router(importador_router, prefix="/api", tags=["Importador de Excel"])
 
 @app.get("/")
 def read_root():
