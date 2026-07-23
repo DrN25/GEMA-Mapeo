@@ -394,12 +394,12 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 20;
   const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 25;
 
-  const waterItem = GROUNDWATER_CATALOG[header.condicion_agua] || GROUNDWATER_CATALOG['C'];
+  const waterItem = GROUNDWATER_CATALOG[header.condicion_agua] || { rmr76: 0, rmr89: 0 };
   const water_rating_76 = waterItem.rmr76;
   const water_rating_89 = waterItem.rmr89;
 
   // RATING DE RESISTENCIA ESTIMADA (UCS) OBTENIDO EXCLUSIVAMENTE DEL INPUT DE CAMPO (ISRM GRADE R0-R6)
-  const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || STRENGTH_CATALOG['R4'];
+  const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || { score: 0 };
   const ucs_rating_76 = strengthItem.score;
   const isUcsMpaValid = header.ucs_mpa !== undefined && header.ucs_mpa !== null && header.ucs_mpa > 0;
   const isCampAnaAbaco = header.campania === 2021 || header.campania === 2022 || header.campania === 2023;

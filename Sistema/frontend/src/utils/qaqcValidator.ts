@@ -163,11 +163,13 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     }
 
     // Relleno vs Espesor QA/QC Contradiction
-    if (relleno1 === 'cwf' && (!relleno2 || relleno2 === 'cwf') && esp !== -1 && esp > 0) {
+    const isSinRelleno1 = relleno1 === 'c' || relleno1 === 'cwf' || relleno1 === '-1';
+    const isSinRelleno2 = !relleno2 || relleno2 === 'c' || relleno2 === 'cwf' || relleno2 === '-1';
+    if (isSinRelleno1 && isSinRelleno2 && esp !== -1 && esp > 0) {
       alerts.push({
         fieldId: `joint-espesor-${index}`,
         type: "WARNING",
-        message: `Fila ${rowNum}: Se declaró junta limpia/sin relleno (cwf) pero el espesor de relleno figura con ${esp}mm.`
+        message: `Fila ${rowNum}: Se declaró junta limpia/sin relleno pero el espesor de relleno figura con ${esp}mm.`
       });
     }
 

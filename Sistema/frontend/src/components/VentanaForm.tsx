@@ -2,6 +2,7 @@ import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
 import { AlignLeft, FileSpreadsheet } from 'lucide-react';
+import MapeadorCombobox from './MapeadorCombobox';
 
 // Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
 // Hardcodeado temporalmente; al migrar a la nueva BD se cargará dinámicamente desde /api/catalogos/campanas
@@ -67,7 +68,7 @@ export default function VentanaForm({
 
   const getInputValue = (field: keyof WindowHeader, stateVal: any): string => {
     if (localValues[field as string] !== undefined) return localValues[field as string];
-    if (stateVal === undefined || stateVal === null) return '';
+    if (stateVal === undefined || stateVal === null || stateVal === 0) return '';
     return String(stateVal);
   };
 
@@ -98,16 +99,30 @@ export default function VentanaForm({
     }
   };
 
-  const uniqueLito1 = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.unidad))).sort();
-  const uniqueUnidades = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.grupo))).sort();
+  const uniqueLito1 = Array.from(new Set([
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.unidad),
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.litologia),
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.codigo),
+    ...(header.lito_1 ? [header.lito_1] : [])
+  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
 
-  const filteredLito2Options = header.lito_1
-    ? Array.from(new Set(LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.lito_1).map(item => item.litologia))).sort()
-    : Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.litologia))).sort();
+  const uniqueUnidades = Array.from(new Set([
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.grupo),
+    ...(header.unidad_litologica ? [header.unidad_litologica, header.unidad_litologica.toUpperCase()] : [])
+  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
 
-  const filteredLito3Options = header.lito_1 && header.lito_2
-    ? Array.from(new Set(LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === header.lito_1 && item.litologia === header.lito_2).map(item => item.codigo))).sort()
-    : Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(item => item.codigo))).sort();
+  const filteredLito2Options = Array.from(new Set([
+    ...LITHOLOGY_CLASSIFICATION.filter(item => !header.lito_1 || item.unidad === header.lito_1 || item.litologia === header.lito_1 || item.codigo === header.lito_1).map(item => item.litologia),
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.litologia),
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.codigo),
+    ...(header.lito_2 ? [header.lito_2] : [])
+  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
+
+  const filteredLito3Options = Array.from(new Set([
+    ...LITHOLOGY_CLASSIFICATION.filter(item => !header.lito_2 || item.litologia === header.lito_2 || item.codigo === header.lito_2).map(item => item.codigo),
+    ...LITHOLOGY_CLASSIFICATION.map(item => item.codigo),
+    ...(header.lito_3 ? [header.lito_3] : [])
+  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
 
   const handleLito1Change = (val: string) => {
     if (!val) {
@@ -646,15 +661,11 @@ export default function VentanaForm({
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Mapeador</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={header.mapeador || ''}
-                      onChange={(e) => handleChange('mapeador', e.target.value)}
-                      placeholder="Mapeador"
-                      className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
-                    />
-                  </div>
+                  <MapeadorCombobox
+                    value={header.mapeador || ''}
+                    onChange={(val) => handleChange('mapeador', val)}
+                    placeholder="Buscar o crear mapeador..."
+                  />
                 </div>
               </div>
             </div>

@@ -99,7 +99,6 @@ GeotecnicoID	NombreCompleto	Especialidad	Email	Telefono	Estado	FechaRegistro
 8950	DPH	NULL	NULL	NULL	Activo	2026-04-09 23:47:45.910
 8951	WTM	NULL	NULL	NULL	Activo	2026-04-09 23:47:45.933
 
-LitologiaID	CodigoLitologia	NombreLitologia	Descripcion	TipoRoca	FechaRegistro
 15388	MZQ	Monzonita cuarzosa	Descripción pendiente — verificar con geólogo	Ígneo	2026-05-27 06:35:49.917
 23138	LMT	Caliza	Limolita — roca sedimentaria de grano fino (limo)	Sedimentaria	2026-04-09 23:47:09.060
 23139	MBL	Mármol	Mármol con plagioclasa labradorita — metamorfismo de alto grado	Metamórfica	2026-04-09 23:47:09.060
@@ -160,6 +159,13 @@ LitologiaID	CodigoLitologia	NombreLitologia	Descripcion	TipoRoca	FechaRegistro
 23761	LMT_S4	Caliza sucia	NULL	Sedimentaria	2026-05-27 13:02:56.423
 23762	MB1	Mármol Brechado 1	NULL	Metamórfica	2026-05-27 13:02:56.423
 23763	MBF_1	Monzonita Biotítica Fina 1	NULL	Ígneo	2026-05-27 13:02:56.423
+23764	AN			No definido	2026-07-20 01:12:14.860
+23765	INTRUSIVO			Igneo	2026-07-20 01:12:15.000
+23766	LAM			Igneo	2026-07-20 01:12:15.103
+23767	LMT_U			Sedimentaria	2026-07-20 01:12:15.160
+23768	MBX / VARIOS			Brecha	2026-07-20 01:12:15.223
+23769	QZT			Metamorfica	2026-07-20 01:12:15.287
+23770	SND			Sedimentaria	2026-07-20 01:12:15.310
 
 UnidadLitologicaID	CodigoUnidad	NombreUnidad	Descripcion	TipoRoca	Estado	FechaRegistro
 1	Intrusivos	Rocas Intrusivas	NULL	Ígnea	Activo	2026-05-04 00:37:30.040

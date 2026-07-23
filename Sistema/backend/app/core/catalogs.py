@@ -55,6 +55,7 @@ RUGOSIDAD_RATING_CATALOG = {
 # 5. CONSTANTES DE RELLENO (Unificado de calculator.py)
 RELLENO_TIPO = {
     "-1": 3,
+    "c": 3,
     "cwf": 3,
     "si": 1,
     "sf": 1,
@@ -66,6 +67,7 @@ RELLENO_TIPO = {
     "ca": 2,
     "ys": 2,
     "ch": 2,
+    "sa": 2,
 }
 
 RELLENO_VALORES = {
@@ -112,7 +114,7 @@ ESPACIAMIENTO_R76_CATALOG = [
 TIPO_ESTRUCTURA_CATALOG = ['BED', 'CON', 'F', 'JN', 'SZ', 'DQ', '-1']
     
 # 11. TABLA TIPO DE RELLENO ACTUALIZADA CON NOMBRES REALES DE EXCEL
-TIPO_RELLENO_CATALOG = ['cwf', 'si', 'sf', 'ep', 'ox', 'qz', 'g', 'cl', 'ca', 'ys', 'ch', '-1']
+TIPO_RELLENO_CATALOG = ['c', 'cwf', 'si', 'sf', 'ep', 'ox', 'qz', 'g', 'cl', 'ca', 'ys', 'ch', 'sa', '-1']
 
 # 12. TABLA PERFILES DE RUGOSIDAD TIPICOS (ISRM, 1989)
 RUGOSIDAD_CATALOG = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -250,18 +252,19 @@ ALTERACION_DISPLAY_CATALOG = [
 
 # D6. RELLENO con nombre completo, tipo y ratings por espesor
 RELLENO_DISPLAY_CATALOG = [
-    {"codigo": "-1",  "nombre": "Sin relleno",        "tipo": "Sin relleno", "r76_lt5": 5, "r89_lt5": 6, "r76_gte5": 5, "r89_gte5": 6},
-    {"codigo": "cwf", "nombre": "Limpio sin relleno", "tipo": "Sin relleno", "r76_lt5": 5, "r89_lt5": 6, "r76_gte5": 5, "r89_gte5": 6},
-    {"codigo": "si",  "nombre": "Sílice",             "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
-    {"codigo": "sf",  "nombre": "Sulfuros",           "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
-    {"codigo": "ep",  "nombre": "Epidota",            "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
-    {"codigo": "ox",  "nombre": "Óxidos",             "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
-    {"codigo": "qz",  "nombre": "Cuarzo",             "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
-    {"codigo": "g",   "nombre": "Panizo",             "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
-    {"codigo": "cl",  "nombre": "Arcilla",            "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
-    {"codigo": "ca",  "nombre": "Calcita",            "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
-    {"codigo": "ys",  "nombre": "Yeso",               "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
-    {"codigo": "ch",  "nombre": "Clorita",            "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "-1",  "nombre": "Sin información",         "tipo": "Sin relleno", "r76_lt5": 5, "r89_lt5": 6, "r76_gte5": 5, "r89_gte5": 6},
+    {"codigo": "c",   "nombre": "Limpio sin relleno",      "tipo": "Sin relleno", "r76_lt5": 5, "r89_lt5": 6, "r76_gte5": 5, "r89_gte5": 6},
+    {"codigo": "si",  "nombre": "Sílice",                  "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "sf",  "nombre": "Sulfuros",                "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "ep",  "nombre": "Epidota",                 "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "ox",  "nombre": "Óxidos",                  "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "qz",  "nombre": "Cuarzo",                  "tipo": "Duro",        "r76_lt5": 4, "r89_lt5": 4, "r76_gte5": 3, "r89_gte5": 2},
+    {"codigo": "g",   "nombre": "Panizo (Roca Triturada)", "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "cl",  "nombre": "Arcilla",                 "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "ca",  "nombre": "Calcita",                 "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "ys",  "nombre": "Yeso",                    "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "ch",  "nombre": "Clorita",                 "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
+    {"codigo": "sa",  "nombre": "Arena",                   "tipo": "Blando",      "r76_lt5": 2, "r89_lt5": 2, "r76_gte5": 0, "r89_gte5": 0},
 ]
 
 # D7. RUGOSIDAD con descripción y ratings

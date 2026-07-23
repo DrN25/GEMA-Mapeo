@@ -36,6 +36,10 @@ interface DashboardProps {
   totalPages: number;
   loading: boolean;
   pendingImports: string[];
+  searchTerm: string;
+  isGlobalSearch: boolean;
+  onSearchSubmit: (term: string, isGlobal: boolean) => void;
+  onClearSearch: () => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onFilterChange: (filters: { dateRange?: string }) => void;
@@ -55,6 +59,10 @@ export default function Dashboard({
   totalPages,
   loading,
   pendingImports,
+  searchTerm,
+  isGlobalSearch,
+  onSearchSubmit,
+  onClearSearch,
   onPageChange,
   onPageSizeChange,
   onFilterChange,
@@ -64,13 +72,14 @@ export default function Dashboard({
   onDeleteWindow,
   onOpenImportModal
 }: DashboardProps) {
-  const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchTerm);
 
-  // Filtrar ventanas por busqueda local
-  const filteredWindows = search.trim()
-    ? windows.filter(w => w.name.toLowerCase().includes(search.toLowerCase().trim()))
-    : windows;
+  React.useEffect(() => {
+    setLocalSearch(searchTerm);
+  }, [searchTerm]);
+
+  const filteredWindows = windows;
 
   const formatDate = (d: Date) => {
     const day = d.getDate().toString().padStart(2, '0');
@@ -232,16 +241,79 @@ export default function Dashboard({
 
       {/* Search + Grid */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/15 shadow-xl space-y-4">
-        <div className="relative max-w-sm">
-          <Search size={14} className="absolute left-3 top-3.5 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Buscar celda por código..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') onFilterChange({ dateRange: activeDateRange }); }}
-            className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-2xl w-full">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-3.5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Escriba código de celda (ej. A1, TR13)..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onSearchSubmit(localSearch, isGlobalSearch);
+                  }
+                }}
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {localSearch && (
+                <button
+                  onClick={() => {
+                    setLocalSearch('');
+                    onClearSearch();
+                  }}
+                  className="absolute right-2.5 top-3 text-slate-500 hover:text-slate-200 transition-colors"
+                  title="Limpiar texto de búsqueda"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onSearchSubmit(localSearch, false)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+                title={`Buscar dentro del rango activo (${filterLabel})`}
+              >
+                <Search size={13} />
+                <span>Buscar en {filterLabel}</span>
+              </button>
+
+              <button
+                onClick={() => onSearchSubmit(localSearch, true)}
+                className={`border font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap ${
+                  isGlobalSearch && searchTerm.trim()
+                    ? 'bg-violet-500 border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]'
+                    : 'bg-navy-900 border-navy-700 text-slate-300 hover:text-white hover:border-navy-600'
+                }`}
+                title="Buscar en todo el historial completo de la base de datos (ignora filtro de fecha)"
+              >
+                <span>🌐 Buscar en todo</span>
+              </button>
+            </div>
+          </div>
+
+          {searchTerm.trim() && (
+            <div className="flex items-center justify-between gap-3 bg-violet-500/10 border border-violet-500/30 rounded-lg px-3.5 py-2 text-xs text-violet-300 animate-fade-in">
+              <div className="flex items-center gap-2 font-medium">
+                <span className="w-2 h-2 rounded-full bg-violet-400 animate-ping" />
+                <span>
+                  {isGlobalSearch ? '🌐 Todo el historial' : `📅 En ${filterLabel}`}: Buscando <strong className="text-white">"{searchTerm}"</strong> (Coincidencia exacta prioritario)
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setLocalSearch('');
+                  onClearSearch();
+                }}
+                className="text-[11px] font-bold text-violet-400 hover:text-violet-200 underline cursor-pointer ml-3 whitespace-nowrap"
+              >
+                Limpiar búsqueda
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-navy-900 bg-navy-950/30">

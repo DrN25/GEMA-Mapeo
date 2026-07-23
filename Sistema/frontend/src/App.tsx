@@ -39,21 +39,18 @@ const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
 const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): JointRow[] => {
-  const mappedJoints = (loadedJoints || []).map(j => ({
-    ...j,
-    tipo_estructura: (j.tipo_estructura && j.tipo_estructura.toUpperCase() === 'J') ? 'JN' : (j.tipo_estructura || 'JN'),
-    alteracion: (j.alteracion && j.alteracion !== '-1') ? j.alteracion : defaultAlt
-  }));
+  const mappedJoints = (loadedJoints || []).map((j, i) => {
+    const expectedFam = Math.ceil((i + 1) / 3.0);
+    const maxFamAllowed = Math.ceil((loadedJoints.length || 1) / 3.0);
+    const useFam = (j.familia && j.familia <= maxFamAllowed) ? j.familia : expectedFam;
+    return {
+      ...j,
+      familia: useFam,
+      tipo_estructura: (j.tipo_estructura && j.tipo_estructura.toUpperCase() === 'J') ? 'JN' : (j.tipo_estructura || 'JN'),
+      alteracion: (j.alteracion && j.alteracion !== '-1') ? j.alteracion : defaultAlt
+    };
+  });
   const result: JointRow[] = [...mappedJoints];
-
-  // Si todas las estructuras tienen la misma familia (generalmente 1, porque NULL->1),
-  // redistribuirlas en 3 familias de 3 estructuras cada una
-  const allSameFam = result.length > 0 && result.every(j => j.familia === result[0].familia);
-  if (allSameFam && result.length >= 3) {
-    result.forEach((j, i) => {
-      j.familia = Math.floor(i / 3) + 1;
-    });
-  }
 
   // Obtener familias existentes en los datos + asegurar 1-3
   const fams = new Set(mappedJoints.map(j => j.familia));
@@ -106,6 +103,8 @@ export default function App() {
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activeDateRange, setActiveDateRange] = useState<string>('todo');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isGlobalSearch, setIsGlobalSearch] = useState<boolean>(false);
   const [pendingImports, setPendingImports] = useState<string[]>([]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -394,7 +393,7 @@ export default function App() {
           norte_to: roundDec(v.norte_fin, 3),
           cota_to: roundDec(v.cota_fin, 2),
           altura: roundDec(v.altura_m, 1) || 15.0,
-          dip_talud: roundDec(v.dip_talud, 2) || 64.0,
+          dip_talud: roundDec(v.dip_talud, 2) || 0,
           dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
           dip_hw: v.dip !== null && v.dip !== undefined ? roundDec(v.dip, 2) : undefined,
           az_hw: v.azimut_hole !== null && v.azimut_hole !== undefined ? roundDec(v.azimut_hole, 2) : undefined,
@@ -560,23 +559,41 @@ export default function App() {
   };
 
   // Paginación y filtros del Dashboard
+  const handleSearchSubmit = (term: string, globalSearch: boolean) => {
+    setSearchTerm(term);
+    setIsGlobalSearch(globalSearch);
+    setPage(1);
+    fetchWindows(1, pageSize, activeDateRange, term, globalSearch);
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setIsGlobalSearch(false);
+    setPage(1);
+    fetchWindows(1, pageSize, activeDateRange, '', false);
+  };
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetchWindows(newPage, pageSize, activeDateRange);
+    fetchWindows(newPage, pageSize, activeDateRange, searchTerm, isGlobalSearch);
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     setPage(1);
-    fetchWindows(1, newSize, activeDateRange);
+    fetchWindows(1, newSize, activeDateRange, searchTerm, isGlobalSearch);
   };
 
   const handleFilterChange = (filters: { dateRange?: string }) => {
     const newDr = filters.dateRange || activeDateRange;
     if (newDr !== activeDateRange) {
       setActiveDateRange(newDr);
+      const termToKeep = isGlobalSearch ? searchTerm : '';
+      if (!isGlobalSearch) {
+        setSearchTerm('');
+      }
       setPage(1);
-      fetchWindows(1, pageSize, newDr);
+      fetchWindows(1, pageSize, newDr, termToKeep, isGlobalSearch);
     }
   };
 
@@ -638,55 +655,55 @@ export default function App() {
 
     const payload = {
       codigo: activeWindow.header.celda,
-      fecha_mapeo: activeWindow.header.fecha,
-      mapeador: activeWindow.header.mapeador,
+      fecha_mapeo: activeWindow.header.fecha || new Date().toISOString().split('T')[0],
+      mapeador: activeWindow.header.mapeador || 'AS-HM',
       campania: parseInt(String(activeWindow.header.campania)) || 2026,
-      este_ini: activeWindow.header.este_from,
-      norte_ini: activeWindow.header.norte_from,
-      cota_ini: activeWindow.header.cota_from,
-      este_fin: activeWindow.header.este_to,
-      norte_fin: activeWindow.header.norte_to,
-      cota_fin: activeWindow.header.cota_to,
+      este_ini: activeWindow.header.este_from || 0,
+      norte_ini: activeWindow.header.norte_from || 0,
+      cota_ini: activeWindow.header.cota_from || 0,
+      este_fin: activeWindow.header.este_to || 0,
+      norte_fin: activeWindow.header.norte_to || 0,
+      cota_fin: activeWindow.header.cota_to || 0,
       largo_m: calculated.largo,
-      altura_m: activeWindow.header.altura,
-      dip_talud: activeWindow.header.dip_talud,
-      dipdir_talud: activeWindow.header.dipdir_talud,
-      dip_hw: activeWindow.header.dip_hw,
-      az_hw: activeWindow.header.az_hw,
+      altura_m: activeWindow.header.altura || 0,
+      dip_talud: activeWindow.header.dip_talud || 0,
+      dipdir_talud: activeWindow.header.dipdir_talud || 0,
+      dip_hw: activeWindow.header.dip_hw || 0,
+      az_hw: activeWindow.header.az_hw || 0,
       alteracion_codigo: activeWindow.header.alt_zona || 'd',
       intemperismo_codigo: activeWindow.header.intemperia || 'd',
       lito_1: activeWindow.header.lito_1 || '',
       lito_2: activeWindow.header.lito_2 || '',
       lito_3: activeWindow.header.lito_3 || '',
       unidad_litologica: activeWindow.header.unidad_litologica || '',
-      sector: activeWindow.header.sector,
-      fase: parseInt(activeWindow.header.fase || '') || 5,
-      nivel: parseFloat(activeWindow.header.nivel || '') || 3960.0,
-      sector_geotecnico: activeWindow.header.sect_geot,
-      turno: activeWindow.header.turno,
+      sector: activeWindow.header.sector || 'NW1_B',
+      fase: parseInt(String(activeWindow.header.fase || '')) || 5,
+      nivel: activeWindow.header.nivel ? String(activeWindow.header.nivel) : '3960',
+      sector_geotecnico: activeWindow.header.sect_geot || 'PENDIENTE',
+      turno: activeWindow.header.turno || 'Día',
       discontinuidades: nonVacantJoints.map(j => ({
         fam: j.familia,
-        dist: j.distancia,
-        tipo: j.tipo_estructura,
-        dip: j.dip,
-        dipdir: j.dip_dir,
-        aber: j.abertura,
-        esp: j.espesor,
-        cont: j.continuidad,
-        espac: j.espaciamiento,
-        nstr: j.n_estructuras,
+        dist: j.distancia === -1 ? null : j.distancia,
+        tipo: j.tipo_estructura || 'JN',
+        dip: j.dip === -1 ? 0 : j.dip,
+        dipdir: j.dip_dir === -1 ? 0 : j.dip_dir,
+        aber: j.abertura === -1 ? null : j.abertura,
+        esp: j.espesor === -1 ? null : j.espesor,
+        cont: j.continuidad === -1 ? null : j.continuidad,
+        espac: j.espaciamiento === -1 ? null : j.espaciamiento,
+        nstr: j.n_estructuras === -1 ? null : j.n_estructuras,
         next: j.extremos_visibles,
         term: j.terminacion,
         r1: j.relleno1,
         r2: j.relleno2,
-        jrc: j.jrc,
-        rug: j.rugosidad,
+        jrc: j.jrc === -1 ? null : j.jrc,
+        rug: j.rugosidad === -1 ? null : j.rugosidad,
         forma: j.forma,
         alt: j.alteracion
       })),
       rmr_input: {
-        agua_codigo: activeWindow.header.condicion_agua || null,
-        resistencia_codigo: activeWindow.header.resistencia_ucs || null,
+        agua_codigo: activeWindow.header.condicion_agua || '',
+        resistencia_codigo: activeWindow.header.resistencia_ucs || '',
         gsi_estructura: activeWindow.header.gsi_estructura || null,
         gsi_superficie: activeWindow.header.gsi_superficie || null,
         gsi_visual: activeWindow.header.gsi_visual !== undefined ? activeWindow.header.gsi_visual : 0,
@@ -931,6 +948,10 @@ export default function App() {
               totalPages={totalPages}
               loading={loading}
               pendingImports={pendingImports}
+              searchTerm={searchTerm}
+              isGlobalSearch={isGlobalSearch}
+              onSearchSubmit={handleSearchSubmit}
+              onClearSearch={handleClearSearch}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
               onFilterChange={handleFilterChange}

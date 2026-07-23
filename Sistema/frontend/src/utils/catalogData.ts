@@ -6,12 +6,20 @@ export let STRUCTURE_CATALOG: Record<string, string> = {
   SZ: "Zona de Cizalla (SZ)", CON: "Contacto (CON)", DQ: "Dique (DQ)"
 };
 export let RELLENO_CATALOG: Record<string, any> = {
-  cwf: { name: "Limpio sin relleno (cwf)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
-  si: { name: "Silice (si)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
-  ox: { name: "Oxidos (ox)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  ca: { name: "Calcita (ca)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
-  g: { name: "Panizo (g)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  "-1": { name: "Sin información (-1)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
+  c: { name: "Limpio sin relleno (c)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
+  cwf: { name: "Limpio sin relleno (c)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
+  si: { name: "Sílice (si)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  sf: { name: "Sulfuros (sf)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  ep: { name: "Epidota (ep)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  ox: { name: "Óxidos (ox)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  qz: { name: "Cuarzo (qz)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
+  g: { name: "Panizo (Roca Triturada) (g)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
   cl: { name: "Arcilla (cl)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ca: { name: "Calcita (ca)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ys: { name: "Yeso (ys)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  ch: { name: "Clorita (ch)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
+  sa: { name: "Arena (sa)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
 };
 export let ALTERACION_CATALOG: Record<string, any> = {
   f: { name: "f — Fresca", r76: 5, r89: 6 },

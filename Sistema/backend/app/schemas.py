@@ -10,7 +10,7 @@ El frontend nunca ve los IDs internos de GEMA. Esto permite importar Excel
 directamente con códigos y mantener el frontend desacoplado del motor de BD.
 """
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Union, Dict, Any
 from datetime import date, datetime
 
 
@@ -20,19 +20,19 @@ from datetime import date, datetime
 
 class DiscontinuidadBase(BaseModel):
     # Identificación
-    fam: Optional[int] = Field(None, alias="familia_id")
+    fam: Optional[int] = Field(1, alias="familia_id")
     dist: Optional[float] = Field(None, alias="distancia_m")
-    tipo: str = Field(..., alias="tipo_estructura")  # código: "JN", "BED", etc.
+    tipo: Optional[str] = Field("JN", alias="tipo_estructura")  # código: "JN", "BED", etc.
 
-    # Geometría (obligatorios)
-    dip: float
-    dipdir: float = Field(..., alias="dip_dir")
+    # Geometría
+    dip: Optional[float] = 0.0
+    dipdir: Optional[float] = Field(0.0, alias="dip_dir")
 
     # Características físicas
     aber: Optional[float] = Field(None, alias="abertura_mm")
     esp: Optional[float] = Field(None, alias="espesor_mm")
     cont: Optional[float] = Field(None, alias="continuidad_m")
-    espac: float = Field(..., alias="espaciamiento_m")
+    espac: Optional[float] = Field(None, alias="espaciamiento_m")
 
     # Conteos
     nstr: Optional[int] = Field(None, alias="n_estructuras")  # NúmeroEstructuras (conteo, input usuario)
@@ -60,13 +60,13 @@ class DiscontinuidadBase(BaseModel):
 # ============================================================================
 
 class VentanaRmrInputBase(BaseModel):
-    agua_codigo: str                      # C/H/M/E/F
-    resistencia_codigo: str               # R0-R6 (Dureza)
+    agua_codigo: Optional[str] = "C"                      # C/H/M/E/F
+    resistencia_codigo: Optional[str] = "R4"               # R0-R6 (Dureza)
     gsi_estructura: Optional[str] = None  # texto corto
     gsi_superficie: Optional[str] = None  # texto corto
     gsi_visual: Optional[float] = None
-    control_estructural: Optional[int] = None  # 1-5 (backend lo varchar en BD pero int en API)
-    efectos_voladura: Optional[int] = None     # 1-6 (sin 4)
+    control_estructural: Optional[Any] = None  # 1-5 (backend lo varchar en BD pero int en API)
+    efectos_voladura: Optional[Any] = None     # 1-6 (sin 4)
     ucs_mpa: Optional[float] = None
     is50_mpa: Optional[float] = None
     comentario: Optional[str] = None
@@ -82,25 +82,25 @@ class VentanaRmrInputBase(BaseModel):
 class VentanaSaveSchema(BaseModel):
     # Identificación
     codigo: str                            # CodigoCelda
-    campania: int                          # CampañaID (FK)
-    sector_geotecnico: str                 # código sector ("NW1_B")
-    fecha_mapeo: Optional[date] = None
-    nivel: Optional[str] = None            # GEMA usa NVARCHAR(50), admito string
+    campania: Optional[Union[int, str]] = 2026 # CampañaID (FK)
+    sector_geotecnico: Optional[str] = "PENDIENTE" # código sector ("NW1_B")
+    fecha_mapeo: Optional[Union[date, str]] = None
+    nivel: Optional[Union[str, float, int]] = None
 
     # Coordenadas
-    este_ini: float
-    norte_ini: float
-    cota_ini: float
-    este_fin: float
-    norte_fin: float
-    cota_fin: float
+    este_ini: Optional[float] = 0.0
+    norte_ini: Optional[float] = 0.0
+    cota_ini: Optional[float] = 0.0
+    este_fin: Optional[float] = 0.0
+    norte_fin: Optional[float] = 0.0
+    cota_fin: Optional[float] = 0.0
 
     # Geometría bancaria
     distancia_celda: Optional[float] = None  # DistanciaCelda
     altura: Optional[float] = None
     dip: Optional[float] = None              # Dip (del sondaje/celda, no del talud)
     azimut_hole: Optional[float] = None
-    dip_talud: float
+    dip_talud: Optional[float] = 64.0
     dipdir_talud: Optional[float] = None
 
     # Otros campos de cabecera
@@ -110,7 +110,7 @@ class VentanaSaveSchema(BaseModel):
     unidad_litologica: Optional[str] = None  # código ("Intrusivos")
     intemperismo: Optional[str] = None       # código (f/d/m/a/c/s)
     altura_zona: Optional[str] = None       # texto corto (alta/media/baja)
-    fase: Optional[int] = None
+    fase: Optional[Union[int, str]] = None
     turno: Optional[str] = None
     mapeador: Optional[str] = None          # código del geotécnico (triggered a FK)
 

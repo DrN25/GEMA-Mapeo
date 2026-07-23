@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import MapeadorCombobox from './MapeadorCombobox';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
@@ -96,7 +97,7 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
       cota_to: cotaTo === '' ? 0 : Number(cotaTo),
       largo_m: calculatedLargo !== null ? calculatedLargo : 0,
       altura: altura === '' ? 0 : Number(altura),
-      dip_talud: 64.0,
+      dip_talud: 0,
       lito_3: '',
       lito_model: '',
       mapeador: mapeadorId,
@@ -105,8 +106,8 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
       nivel,
       sect_geot: sector,
       fecha: new Date().toISOString().split('T')[0],
-      condicion_agua: 'C',
-      resistencia_ucs: 'R4',
+      condicion_agua: '',
+      resistencia_ucs: '',
       campania: parseInt(campania) || 7,
       turno,
       joints: [],
@@ -158,13 +159,12 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Mapeador</label>
-              <select required value={mapeadorId} onChange={(e) => setMapeadorId(e.target.value)}
-                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer text-slate-100">
-                <option value="">— Seleccionar —</option>
-                {mapeadores.map(m => (
-                  <option key={m.codigo} value={m.codigo} className="bg-navy-950 text-slate-100">{m.nombre}</option>
-                ))}
-              </select>
+              <MapeadorCombobox
+                value={mapeadorId}
+                onChange={(val) => setMapeadorId(val)}
+                options={mapeadores}
+                placeholder="Buscar o crear mapeador..."
+              />
             </div>
           </div>
 

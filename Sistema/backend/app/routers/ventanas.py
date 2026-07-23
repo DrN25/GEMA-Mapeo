@@ -19,7 +19,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, case
 
 from app.database import get_db
 from app import models, schemas, calculator
@@ -38,7 +38,7 @@ class GEMACatalogResolver:
     """
     Resuelve codigos string -> IDs FK leyendo catalogos de GEMA.
     Estrategia de 2 niveles:
-      Grupo A (Litologia, TipoEstructura, UnidadLitologica): NULL si no existe
+      Grupo A (Litologia, TipoEstructura, UnidadLitologica): NULL si no existe o inferir
       Grupo B (Sector, Geotecnico): Crear en GEMA si no existe
     Mantiene cache en sesion por request.
     """
@@ -63,19 +63,60 @@ class GEMACatalogResolver:
     def litologia_id(self, codigo: Optional[str]) -> Optional[int]:
         if not codigo: return None
         m = self._load(models.Litologia, "litologia_id", "codigo", "litologias")
-        return m.get(codigo.strip().upper())
+        code_clean = codigo.strip().upper()
+        if code_clean in m:
+            return m[code_clean]
+        # Synonym fallbacks
+        syns = {
+            "LMT_S2": "LMT_S", "LMT_S3": "LMT_S3", "LMT_S4": "LMT_S4",
+            "SKARN": "GSK", "SKARN_G": "GSK", "SKARN_P": "PSK",
+            "MZB/P": "MZB_P", "MZM/M": "MZM_M", "MZM/F": "MZM_F",
+            "ENDO": "ENDO", "ENDOSKARN": "ENDOSKARN"
+        }
+        target = syns.get(code_clean)
+        if target and target in m:
+            return m[target]
+        return None
 
     def tipo_estructura_id(self, codigo: Optional[str]) -> Optional[int]:
         if not codigo: return None
         m = self._load(models.TipoEstructura, "tipo_estructura_id", "codigo", "tipos_estructura")
         code_clean = codigo.strip().upper()
-        if code_clean == "J": code_clean = "JN"
+        if code_clean in ("J", "JS"): code_clean = "JN"
+        if code_clean == "DQ":
+            # DB might have 'Dq' or 'DQ'
+            return m.get("DQ") or m.get("DQ")
         return m.get(code_clean)
 
     def unidad_litologica_id(self, codigo: Optional[str]) -> Optional[int]:
         if not codigo: return None
+        code_clean = codigo.strip().upper()
+        syns = {
+            "SEDIMENTARIOS": "SEDIMENTARIAS",
+            "SEDIMENTARIO": "SEDIMENTARIAS",
+            "SEDIMENTARIA": "SEDIMENTARIAS",
+            "INTRUSIVA": "INTRUSIVOS",
+            "INTRUSIVAS": "INTRUSIVOS",
+            "INTRUSIVO": "INTRUSIVOS",
+            "METAMORFICO": "METAMORFICAS",
+            "METAMORFICOS": "METAMORFICAS",
+            "METAMORFICA": "METAMORFICAS",
+            "BRECHA": "BRECHAS",
+        }
+        target = syns.get(code_clean, code_clean)
         m = self._load(models.UnidadLitologica, "unidad_id", "codigo", "unidades")
-        return m.get(codigo.strip().upper())
+        return m.get(target) or m.get(code_clean)
+
+    def infer_unidad_id_from_lito(self, lito_code: Optional[str]) -> Optional[int]:
+        if not lito_code: return None
+        code_up = lito_code.strip().upper()
+        match = next(
+            (item for item in LITHOLOGY_CLASSIFICATION if item["lito1"].upper() == code_up or item["lito2"].upper() == code_up or item["lito3"].upper() == code_up),
+            None
+        )
+        if match and match.get("grupo"):
+            return self.unidad_litologica_id(match["grupo"])
+        return None
 
     # ==================== GRUPO B: crear en GEMA si no existe ====================
 
@@ -111,11 +152,27 @@ class GEMACatalogResolver:
         m[code_up] = nuevo.geotecnico_id
         return nuevo.geotecnico_id
 
-    # ==================== ADMIN: rechazar si no existe ====================
+    # ==================== CAMPAÑAS ====================
 
-    def campania_id(self, value: int) -> bool:
-        if not value: return False
-        return self.db.query(models.Campania).filter_by(campania_id=int(value)).first() is not None
+    def resolve_campania_id(self, value: Any) -> Optional[int]:
+        if not value: return None
+        val_str = str(value).strip().lower()
+        try:
+            val_int = int(val_str)
+            row = self.db.query(models.Campania).filter_by(campania_id=val_int).first()
+            if row: return row.campania_id
+        except ValueError:
+            pass
+        # Buscar por coincidencia de año o texto (ej. 2021 -> Campaña 2021)
+        for row in self.db.query(models.Campania).all():
+            if val_str in row.nombre.lower():
+                return row.campania_id
+        # Fallback a Campaña 2026 (7) o primera disponible
+        first_c = self.db.query(models.Campania).first()
+        return first_c.campania_id if first_c else 1
+
+    def campania_id(self, value: Any) -> bool:
+        return self.resolve_campania_id(value) is not None
 
 
 # ============================================================================
@@ -156,15 +213,50 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
         return getattr(obj, code_attr) if obj else None
 
     def _reverse_sector(id_val):
-        """Reverse lookup de sector, retorna None si es PENDIENTE."""
-        code = _reverse(models.SectorGeotecnico, id_val, "codigo")
-        return None if code == "PENDIENTE" else code
+        """Reverse lookup de sector, retorna el código exacto (incluyendo PENDIENTE)."""
+        return _reverse(models.SectorGeotecnico, id_val, "codigo")
+
+    lito1_code = _reverse(models.Litologia, v.litologia1_id, "codigo")
+    lito2_code = _reverse(models.Litologia, v.litologia2_id, "codigo")
+    lito3_code = _reverse(models.Litologia, v.litologia3_id, "codigo")
+    unidad_code = _reverse(models.UnidadLitologica, v.unidad_litologica_id, "codigo")
+    if unidad_code:
+        u_up = unidad_code.strip().upper()
+        syns = {
+            "SEDIMENTARIAS": "SEDIMENTARIAS",
+            "SEDIMENTARIA": "SEDIMENTARIAS",
+            "INTRUSIVOS": "INTRUSIVOS",
+            "INTRUSIVO": "INTRUSIVOS",
+            "METAMORFICAS": "METAMORFICAS",
+            "METAMORFICOS": "METAMORFICAS",
+            "METAMORFICA": "METAMORFICAS",
+            "BRECHAS": "BRECHAS",
+            "BRECHA": "BRECHAS",
+            "VOLCANICAS": "VOLCANICAS",
+            "VOLCANICA": "VOLCANICAS",
+        }
+        unidad_code = syns.get(u_up, u_up)
+
+    # Inferencia inteligente de unidad litológica si en BD estaba en NULL
+    if not unidad_code and lito1_code:
+        l1_up = lito1_code.strip().upper()
+        match = next(
+            (item for item in LITHOLOGY_CLASSIFICATION if item["lito1"].upper() == l1_up or item["lito2"].upper() == l1_up or item["lito3"].upper() == l1_up),
+            None
+        )
+        if match and match.get("grupo"):
+            unidad_code = match["grupo"]
 
     discs = []
-    for e in v.discontinuidades:
+    for idx, e in enumerate(v.discontinuidades, start=1):
+        num_est = e.numero_estructura if (e.numero_estructura is not None and e.numero_estructura > 0) else idx
+        # Agrupación estricta de 3 estructuras por familia (F1=1..3, F2=4..6, F3=7..9)
+        fam_computed = math.ceil(num_est / 3.0)
         tipo_codigo = tipos_map.get(e.tipo_estructura_id) if e.tipo_estructura_id else None
+        if tipo_codigo == "J" or tipo_codigo == "JS":
+            tipo_codigo = "JN"
         discs.append(schemas.DiscontinuidadResponse(
-            fam=e.familia_id,
+            fam=fam_computed,
             dist=float(e.distancia_estructura) if e.distancia_estructura is not None else None,
             tipo=tipo_codigo or "JN",
             dip=float(e.dip),
@@ -172,7 +264,7 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
             aber=float(e.abertura_mm) if e.abertura_mm is not None else None,
             esp=float(e.espesor_mm) if e.espesor_mm is not None else None,
             cont=float(e.continuidad_m) if e.continuidad_m is not None else None,
-            espac=float(e.espaciamiento_m),
+            espac=float(e.espaciamiento_m) if e.espaciamiento_m is not None else None,
             nstr=e.numero_estructuras,
             next=e.numero_extremos_visibles,
             term=e.terminacion,
@@ -227,7 +319,7 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
     return schemas.VentanaResponseSchema(
         codigo=v.codigo_celda,
         campania=v.campania_id,
-        sector_geotecnico=_reverse(models.SectorGeotecnico, v.sector_geotecnico_id, "codigo"),
+        sector_geotecnico=_reverse_sector(v.sector_geotecnico_id),
         fecha_mapeo=v.fecha_mapeo,
         nivel=v.nivel,
         este_ini=float(v.este_from), norte_ini=float(v.norte_from), cota_ini=float(v.cota_from),
@@ -236,12 +328,12 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
         altura=_to_float(v.altura),
         dip=_to_float(v.dip),
         azimut_hole=_to_float(v.azimut_hole),
-        dip_talud=float(v.dip_talud),
+        dip_talud=float(v.dip_talud) if v.dip_talud is not None else 0.0,
         dipdir_talud=_to_float(v.dip_dir_talud),
-        lito_1=_reverse(models.Litologia, v.litologia1_id, "codigo"),
-        lito_2=_reverse(models.Litologia, v.litologia2_id, "codigo"),
-        lito_3=_reverse(models.Litologia, v.litologia3_id, "codigo"),
-        unidad_litologica=_reverse(models.UnidadLitologica, v.unidad_litologica_id, "codigo"),
+        lito_1=lito1_code,
+        lito_2=lito2_code,
+        lito_3=lito3_code,
+        unidad_litologica=unidad_code,
         intemperismo=v.grado_intemperismo,
         altura_zona=v.altura_zona,
         fase=v.fase,
@@ -368,38 +460,59 @@ def get_ventanas(
     q: Optional[str] = Query(None, description="Buscar por código de celda"),
     rmr_min: Optional[float] = Query(None, ge=0, le=100),
     rmr_max: Optional[float] = Query(None, ge=0, le=100),
+    search_global: bool = Query(False, description="Ignorar filtro de fecha y buscar en todo el historial"),
     db: Session = Depends(get_db),
 ):
     # 1. Query base + joins para resolver códigos
     query = db.query(models.Ventana)
 
     # 2. Filtros
-    if fecha_desde:
-        query = query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
-    if sector:
+    has_q = q and isinstance(q, str) and not q.startswith("Query(") and q.strip()
+    if has_q:
+        q_clean = q.strip()
+        query = query.filter(models.Ventana.codigo_celda.ilike(f"%{q_clean}%"))
+        # Si NO es búsqueda global explícita, respetar el rango de fecha activo
+        if not search_global:
+            if fecha_desde and isinstance(fecha_desde, date):
+                query = query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
+            if fecha_hasta and isinstance(fecha_hasta, date):
+                query = query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
+    else:
+        if fecha_desde and isinstance(fecha_desde, date):
+            query = query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
+        if fecha_hasta and isinstance(fecha_hasta, date):
+            query = query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
+
+    if sector and isinstance(sector, str) and not sector.startswith("Query("):
         query = query.join(models.SectorGeotecnico, models.Ventana.sector_geotecnico_id == models.SectorGeotecnico.sector_id)
         query = query.filter(models.SectorGeotecnico.codigo.ilike(f"%{sector}%"))
-    if mapeador:
+    if mapeador and isinstance(mapeador, str) and not mapeador.startswith("Query("):
         query = query.join(models.Geotecnico, models.Ventana.geotecnico_id == models.Geotecnico.geotecnico_id)
         query = query.filter(models.Geotecnico.nombre.ilike(f"%{mapeador}%"))
-    if campania:
+    if campania and isinstance(campania, int):
         query = query.filter(models.Ventana.campania_id == campania)
-    if q:
-        query = query.filter(models.Ventana.codigo_celda.ilike(f"%{q}%"))
-    if rmr_min is not None:
+    if rmr_min is not None and isinstance(rmr_min, (int, float)):
         query = query.filter(models.Ventana.rmr89_total >= rmr_min)
-    if rmr_max is not None:
+    if rmr_max is not None and isinstance(rmr_max, (int, float)):
         query = query.filter(models.Ventana.rmr89_total <= rmr_max)
 
     # 3. Total antes de paginar
     total_filtered = query.count()
 
-    # 4. Ordenamiento
+    # 4. Ordenamiento con priorización de coincidencia exacta (A1 primero que DA1 o ZA1)
     order_col = getattr(models.Ventana, order_by, models.Ventana.fecha_mapeo)
     order_fn = getattr(order_col, order_dir, order_col.desc)
-    query = query.order_by(order_fn(), models.Ventana.ventana_id.desc())
+
+    if has_q:
+        q_clean = q.strip().lower()
+        exact_order = case(
+            (func.lower(models.Ventana.codigo_celda) == q_clean, 0),
+            (func.lower(models.Ventana.codigo_celda).like(f"{q_clean}%"), 1),
+            else_=2
+        )
+        query = query.order_by(exact_order, order_fn(), models.Ventana.ventana_id.desc())
+    else:
+        query = query.order_by(order_fn(), models.Ventana.ventana_id.desc())
 
     # 5. Paginación
     total_pages = max(1, (total_filtered + page_size - 1) // page_size)
@@ -416,24 +529,31 @@ def get_ventanas(
         func.min(models.Ventana.fecha_mapeo),
         func.max(models.Ventana.fecha_mapeo),
     )
-    if fecha_desde: kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
-    if fecha_hasta: kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
-    if sector:
+    if has_q:
+        q_clean = q.strip()
+        kpis_query = kpis_query.filter(models.Ventana.codigo_celda.ilike(f"%{q_clean}%"))
+        if not search_global:
+            if fecha_desde and isinstance(fecha_desde, date): kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
+            if fecha_hasta and isinstance(fecha_hasta, date): kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
+    else:
+        if fecha_desde and isinstance(fecha_desde, date): kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo >= fecha_desde)
+        if fecha_hasta and isinstance(fecha_hasta, date): kpis_query = kpis_query.filter(models.Ventana.fecha_mapeo <= fecha_hasta)
+
+    if sector and isinstance(sector, str) and not sector.startswith("Query("):
         kpis_query = kpis_query.join(models.SectorGeotecnico, models.Ventana.sector_geotecnico_id == models.SectorGeotecnico.sector_id)
         kpis_query = kpis_query.filter(models.SectorGeotecnico.codigo.ilike(f"%{sector}%"))
-    if mapeador:
+    if mapeador and isinstance(mapeador, str) and not mapeador.startswith("Query("):
         kpis_query = kpis_query.join(models.Geotecnico, models.Ventana.geotecnico_id == models.Geotecnico.geotecnico_id)
         kpis_query = kpis_query.filter(models.Geotecnico.nombre.ilike(f"%{mapeador}%"))
-    if campania: kpis_query = kpis_query.filter(models.Ventana.campania_id == campania)
-    if q: kpis_query = kpis_query.filter(models.Ventana.codigo_celda.ilike(f"%{q}%"))
-    if rmr_min is not None: kpis_query = kpis_query.filter(models.Ventana.rmr89_total >= rmr_min)
-    if rmr_max is not None: kpis_query = kpis_query.filter(models.Ventana.rmr89_total <= rmr_max)
+    if campania and isinstance(campania, int): kpis_query = kpis_query.filter(models.Ventana.campania_id == campania)
+    if rmr_min is not None and isinstance(rmr_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr89_total >= rmr_min)
+    if rmr_max is not None and isinstance(rmr_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr89_total <= rmr_max)
 
     kpis_row = kpis_query.first()
 
     # Último mapeador en el subconjunto (más reciente)
     last_mapeador = None
-    if mapeador:
+    if mapeador and isinstance(mapeador, str) and not mapeador.startswith("Query("):
         last_mapeador = mapeador
     else:
         last_v = db.query(models.Ventana).order_by(models.Ventana.fecha_mapeo.desc(), models.Ventana.ventana_id.desc()).first()
@@ -508,6 +628,25 @@ def get_filtros_opciones(db: Session = Depends(get_db)):
     }
 
 
+class GeotecnicoCreateSchema(schemas.BaseModel):
+    nombre: str
+
+@router.post("/geotecnicos")
+def create_geotecnico(data: GeotecnicoCreateSchema, db: Session = Depends(get_db)):
+    """Crea un nuevo geotécnico/mapeador en la base de datos si no existe."""
+    nombre_clean = data.nombre.strip().upper()
+    if not nombre_clean:
+        raise HTTPException(status_code=400, detail="Nombre de geotécnico requerido")
+    existing = db.query(models.Geotecnico).filter(func.upper(models.Geotecnico.nombre) == nombre_clean).first()
+    if existing:
+        return {"id": existing.geotecnico_id, "nombre": existing.nombre, "created": False}
+    nuevo = models.Geotecnico(nombre=nombre_clean, estado="Activo")
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return {"id": nuevo.geotecnico_id, "nombre": nuevo.nombre, "created": True}
+
+
 @router.get("/ventanas/{codigo}", response_model=schemas.VentanaResponseSchema)
 def get_ventana(codigo: str, db: Session = Depends(get_db)):
     code_up = codigo.strip().upper()
@@ -525,13 +664,17 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
     sector_id = resolver.sector_id(data.sector_geotecnico)
     if data.sector_geotecnico and sector_id is None:
         raise HTTPException(status_code=400, detail=f"Sector '{data.sector_geotecnico}' no encontrado en GEMA")
-    if not resolver.campania_id(data.campania):
+    
+    campania_id = resolver.resolve_campania_id(data.campania)
+    if not campania_id:
         raise HTTPException(status_code=400, detail=f"Campaña ID {data.campania} no encontrada en GEMA")
 
     lito1_id = resolver.litologia_id(data.lito_1)
     lito2_id = resolver.litologia_id(data.lito_2)
     lito3_id = resolver.litologia_id(data.lito_3)
     unidad_id = resolver.unidad_litologica_id(data.unidad_litologica)
+    if unidad_id is None and data.lito_1:
+        unidad_id = resolver.infer_unidad_id_from_lito(data.lito_1)
     geotecnico_id = resolver.geotecnico_id(data.mapeador)
 
     def clean(val):
@@ -541,7 +684,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
 
     v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if v:
-        v.campania_id = data.campania
+        v.campania_id = campania_id
         v.sector_geotecnico_id = sector_id
         v.fecha_mapeo = data.fecha_mapeo
         v.nivel = data.nivel
@@ -562,7 +705,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         db.flush()
     else:
         v = models.Ventana(
-            codigo_celda=code_up, campania_id=data.campania,
+            codigo_celda=code_up, campania_id=campania_id,
             sector_geotecnico_id=sector_id,
             fecha_mapeo=data.fecha_mapeo, nivel=data.nivel,
             este_from=data.este_ini, norte_from=data.norte_ini, cota_from=data.cota_ini,
@@ -600,9 +743,11 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         tipo_id = resolver.tipo_estructura_id(d.tipo)
         if d.tipo and tipo_id is None:
             raise HTTPException(status_code=400, detail=f"Tipo estructura '{d.tipo}' no encontrado en GEMA")
+        fam_computed = math.ceil(idx / 3.0)
         e = models.EstructuraGeologica(
             ventana_id=v.ventana_id,
             numero_estructura=idx,
+            familia_id=fam_computed,
             tipo_estructura_id=tipo_id,
             dip=d.dip, dip_dir=d.dipdir,
             distancia_estructura=clean(d.dist),
@@ -617,7 +762,6 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             rugosidad_estructura=str(d.rug) if d.rug is not None else None,
             forma_estructura=d.forma if d.forma and d.forma != "-1" else None,
             alteracion=d.alt if d.alt and d.alt != "-1" else None,
-            familia_id=d.fam,
         )
         db.add(e)
     db.flush()
