@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity, RotateCcw, Loader2 } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -15,6 +15,19 @@ import CatalogsView from './components/CatalogsView';
 import CommentsPhotos from './components/CommentsPhotos';
 import PltEnsayosView from './components/PltEnsayosView';
 
+import SaveConfirmModal from './components/common/SaveConfirmModal';
+import DiscardModal from './components/common/DiscardModal';
+import SaveResultModal from './components/common/SaveResultModal';
+
+import { fastHashObject } from './utils/hashUtils';
+import {
+  computeWindowDiff,
+  computeAllWindowsDiff,
+  type WindowData,
+  type WindowDiffResult,
+  type AllWindowsDiffSummary
+} from './utils/diffUtils';
+
 // --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
 import CongruenceAuditor from './components/CongruenceAuditor/CongruenceAuditor';
@@ -29,11 +42,6 @@ import {
 
 import { validateWindowQAQC } from './utils/qaqcValidator';
 import type { ValidationAlert } from './utils/qaqcValidator';
-
-interface WindowData {
-  header: WindowHeader;
-  joints: JointRow[];
-}
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
@@ -89,17 +97,120 @@ const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): Jo
 };
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<string>('dashboard');
+  // Inicializar vista y paginación desde localStorage de forma síncrona para resiliencia ante F5
+  const [currentView, setCurrentView] = useState<string>(() => {
+    try {
+      const savedView = localStorage.getItem('geolog_window_current_view');
+      if (savedView) return savedView;
+    } catch (e) {}
+    return 'dashboard';
+  });
+
   const [windows, setWindows] = useState<WindowSummary[]>([]);
-  const [activeWindow, setActiveWindow] = useState<WindowData | null>(null);
+
+  // Inicialización síncrona desde localStorage para resiliencia ante recargas (F5)
+  const [activeWindow, setActiveWindow] = useState<WindowData | null>(() => {
+    try {
+      const activeCelda = localStorage.getItem('geolog_active_window_celda');
+      if (activeCelda) {
+        const cached = localStorage.getItem(`geolog_window_${activeCelda}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          parsed.joints = normalizeJoints(parsed.joints || []);
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Error al restaurar celda activa desde localStorage:", e);
+    }
+    return null;
+  });
+
+  const [dbSnapshotData, setDbSnapshotData] = useState<WindowData | null>(() => {
+    try {
+      const activeCelda = localStorage.getItem('geolog_active_window_celda');
+      if (activeCelda) {
+        const cached = localStorage.getItem(`geolog_window_snapshot_${activeCelda}`);
+        if (cached) return JSON.parse(cached);
+      }
+    } catch (e) {}
+    return null;
+  });
+
+  const [dbSnapshotHash, setDbSnapshotHash] = useState<string | null>(() => {
+    try {
+      const activeCelda = localStorage.getItem('geolog_active_window_celda');
+      if (activeCelda) {
+        return localStorage.getItem(`geolog_window_snapshot_hash_${activeCelda}`);
+      }
+    } catch (e) {}
+    return null;
+  });
+
   const [pltEnsayos, setPltEnsayos] = useState<any[]>([]);
   const [showFormulas, setShowFormulas] = useState<boolean>(true);
 
-  // Paginación y filtros del Dashboard
+  // Estados de Modales y Bloqueo Transaccional
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState<boolean>(false);
+  const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
+  const [showSaveResultModal, setShowSaveResultModal] = useState<boolean>(false);
+  const [isLoadingWindow, setIsLoadingWindow] = useState<boolean>(false);
+  const [saveResultData, setSaveResultData] = useState<{ savedCount: number; totalEdits: number; totalJoints: number }>({
+    savedCount: 0,
+    totalEdits: 0,
+    totalJoints: 0
+  });
+
+  // Paginación y filtros del Dashboard con inicialización desde localStorage
   const [loading, setLoading] = useState<boolean>(false);
   const [kpis, setKpis] = useState<any>(null);
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(20);
+  const [page, setPage] = useState<number>(() => {
+    try {
+      const savedPage = localStorage.getItem('geolog_window_dashboard_page');
+      if (savedPage) {
+        const parsed = parseInt(savedPage, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch (e) {}
+    return 1;
+  });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    try {
+      const savedSize = localStorage.getItem('geolog_window_dashboard_pagesize');
+      if (savedSize) {
+        const parsed = parseInt(savedSize, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch (e) {}
+    return 20;
+  });
+
+  // Persistir currentView en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_window_current_view', currentView);
+    } catch (e) {}
+  }, [currentView]);
+
+  // Persistir paginación en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_window_dashboard_page', String(page));
+    } catch (e) {}
+  }, [page]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_window_dashboard_pagesize', String(pageSize));
+    } catch (e) {}
+  }, [pageSize]);
+
+  // Si la vista requiere celda activa pero no hay ninguna seleccionada, redirigir a dashboard
+  useEffect(() => {
+    if (!activeWindow && (currentView === 'mapeo' || currentView === 'grafico')) {
+      setCurrentView('dashboard');
+    }
+  }, [activeWindow, currentView]);
   const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activeDateRange, setActiveDateRange] = useState<string>('todo');
@@ -183,7 +294,33 @@ export default function App() {
       });
   }, []);
 
-  // 3. Keep RMR calculations and QA/QC validation updated in real-time
+  // 3. Auditoría reactiva de diferencias y rastreo de celda activa
+  const workspaceDiff = computeAllWindowsDiff(activeWindow, dbSnapshotData);
+  const unsavedCount = workspaceDiff.totalWindowsWithChanges;
+
+  useEffect(() => {
+    if (!activeWindow) return;
+    const celda = activeWindow.header.celda;
+    localStorage.setItem('geolog_active_window_celda', celda);
+    localStorage.setItem(`geolog_window_${celda}`, JSON.stringify(activeWindow));
+
+    const activeHash = fastHashObject(activeWindow);
+    const savedHash = dbSnapshotHash || localStorage.getItem(`geolog_window_snapshot_hash_${celda}`);
+
+    try {
+      const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
+      const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
+      const hasChanged = activeHash !== savedHash;
+
+      if (hasChanged && !unsavedList.includes(celda)) {
+        localStorage.setItem('geolog_unsaved_windows', JSON.stringify([...unsavedList, celda]));
+      } else if (!hasChanged && unsavedList.includes(celda)) {
+        localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)));
+      }
+    } catch (e) {}
+  }, [activeWindow, dbSnapshotHash]);
+
+  // Keep RMR calculations and QA/QC validation updated in real-time
   useEffect(() => {
     if (activeWindow) {
       const res = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
@@ -463,7 +600,24 @@ export default function App() {
           };
         });
 
-        setActiveWindow({ header, joints: normalizeJoints(joints, header.intemperia) });
+        const loadedWindow: WindowData = { header, joints: normalizeJoints(joints, header.intemperia) };
+        const snapshotHash = fastHashObject(loadedWindow);
+
+        setActiveWindow(loadedWindow);
+        setDbSnapshotData(loadedWindow);
+        setDbSnapshotHash(snapshotHash);
+
+        localStorage.setItem('geolog_active_window_celda', name);
+        localStorage.setItem(`geolog_window_${name}`, JSON.stringify(loadedWindow));
+        localStorage.setItem(`geolog_window_snapshot_${name}`, JSON.stringify(loadedWindow));
+        localStorage.setItem(`geolog_window_snapshot_hash_${name}`, snapshotHash);
+
+        try {
+          const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
+          const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
+          localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== name)));
+        } catch (e) {}
+
         setSyncStatus('synced');
         setCurrentView('mapeo');
         setSelectedRowIndex(0);
@@ -477,6 +631,16 @@ export default function App() {
         const parsed = JSON.parse(cached);
         parsed.joints = normalizeJoints(parsed.joints || []);
         setActiveWindow(parsed);
+
+        const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${name}`);
+        if (snapshotRaw) {
+          const snapParsed = JSON.parse(snapshotRaw);
+          setDbSnapshotData(snapParsed);
+          setDbSnapshotHash(fastHashObject(snapParsed));
+        } else {
+          setDbSnapshotData(parsed);
+          setDbSnapshotHash(fastHashObject(parsed));
+        }
       }
       setSyncStatus('offline');
       setCurrentView('mapeo');
@@ -525,6 +689,10 @@ export default function App() {
     };
 
     setActiveWindow(formatted);
+    setDbSnapshotData(null);
+    setDbSnapshotHash(null);
+    localStorage.setItem('geolog_active_window_celda', formatted.header.celda);
+    localStorage.setItem(`geolog_window_${formatted.header.celda}`, JSON.stringify(formatted));
     setCurrentView('mapeo');
     setSyncStatus('unsaved');
   };
@@ -645,124 +813,194 @@ export default function App() {
     setSyncStatus('unsaved');
   };
 
-  const handleSaveActive = async () => {
-    if (!activeWindow || !calculated) return;
-
+  const handleConfirmSave = async (scope: 'active' | 'all') => {
+    setIsLoadingWindow(true);
+    setShowSaveConfirmModal(false);
     setSyncStatus('saving');
     setSyncMessage("Sincronizando con base de datos SQL Server...");
 
-    const nonVacantJoints = activeWindow.joints.filter(j => !(j.distancia === -1 && j.dip === -1 && j.espaciamiento === -1));
+    let windowsToSave: WindowData[] = [];
+    if (scope === 'active' && activeWindow) {
+      windowsToSave = [activeWindow];
+    } else {
+      const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
+      const unsavedNames: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
+      const allNames = new Set(unsavedNames);
+      if (activeWindow) allNames.add(activeWindow.header.celda);
 
-    const payload = {
-      codigo: activeWindow.header.celda,
-      fecha_mapeo: activeWindow.header.fecha || new Date().toISOString().split('T')[0],
-      mapeador: activeWindow.header.mapeador || 'AS-HM',
-      campania: parseInt(String(activeWindow.header.campania)) || 2026,
-      este_ini: activeWindow.header.este_from || 0,
-      norte_ini: activeWindow.header.norte_from || 0,
-      cota_ini: activeWindow.header.cota_from || 0,
-      este_fin: activeWindow.header.este_to || 0,
-      norte_fin: activeWindow.header.norte_to || 0,
-      cota_fin: activeWindow.header.cota_to || 0,
-      largo_m: calculated.largo,
-      altura_m: activeWindow.header.altura || 0,
-      dip_talud: activeWindow.header.dip_talud || 0,
-      dipdir_talud: activeWindow.header.dipdir_talud || 0,
-      dip_hw: activeWindow.header.dip_hw || 0,
-      az_hw: activeWindow.header.az_hw || 0,
-      alteracion_codigo: activeWindow.header.alt_zona || 'd',
-      intemperismo_codigo: activeWindow.header.intemperia || 'd',
-      lito_1: activeWindow.header.lito_1 || '',
-      lito_2: activeWindow.header.lito_2 || '',
-      lito_3: activeWindow.header.lito_3 || '',
-      unidad_litologica: activeWindow.header.unidad_litologica || '',
-      sector: activeWindow.header.sector || 'NW1_B',
-      fase: parseInt(String(activeWindow.header.fase || '')) || 5,
-      nivel: activeWindow.header.nivel ? String(activeWindow.header.nivel) : '3960',
-      sector_geotecnico: activeWindow.header.sect_geot || 'PENDIENTE',
-      turno: activeWindow.header.turno || 'Día',
-      discontinuidades: nonVacantJoints.map(j => ({
-        fam: j.familia,
-        dist: j.distancia === -1 ? null : j.distancia,
-        tipo: j.tipo_estructura || 'JN',
-        dip: j.dip === -1 ? 0 : j.dip,
-        dipdir: j.dip_dir === -1 ? 0 : j.dip_dir,
-        aber: j.abertura === -1 ? null : j.abertura,
-        esp: j.espesor === -1 ? null : j.espesor,
-        cont: j.continuidad === -1 ? null : j.continuidad,
-        espac: j.espaciamiento === -1 ? null : j.espaciamiento,
-        nstr: j.n_estructuras === -1 ? null : j.n_estructuras,
-        next: j.extremos_visibles,
-        term: j.terminacion,
-        r1: j.relleno1,
-        r2: j.relleno2,
-        jrc: j.jrc === -1 ? null : j.jrc,
-        rug: j.rugosidad === -1 ? null : j.rugosidad,
-        forma: j.forma,
-        alt: j.alteracion
-      })),
-      rmr_input: {
-        agua_codigo: activeWindow.header.condicion_agua || '',
-        resistencia_codigo: activeWindow.header.resistencia_ucs || '',
-        gsi_estructura: activeWindow.header.gsi_estructura || null,
-        gsi_superficie: activeWindow.header.gsi_superficie || null,
-        gsi_visual: activeWindow.header.gsi_visual !== undefined ? activeWindow.header.gsi_visual : 0,
-        control_estructural: activeWindow.header.control_estructural !== undefined ? activeWindow.header.control_estructural : 0,
-        efectos_voladura: activeWindow.header.efectos_voladura !== undefined ? activeWindow.header.efectos_voladura : 0,
-        ucs_mpa: activeWindow.header.ucs_mpa !== undefined ? activeWindow.header.ucs_mpa : 0,
-        is50_mpa: activeWindow.header.is50_mpa !== undefined ? activeWindow.header.is50_mpa : 0,
-        comentario: activeWindow.header.comentario || ""
+      for (const celda of allNames) {
+        if (activeWindow && activeWindow.header.celda === celda) {
+          windowsToSave.push(activeWindow);
+        } else {
+          const cachedRaw = localStorage.getItem(`geolog_window_${celda}`);
+          if (cachedRaw) {
+            windowsToSave.push(JSON.parse(cachedRaw));
+          }
+        }
       }
-    };
+    }
 
-    try {
-      const res = await fetch(`${API_BASE}/api/ventanas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+    let successCount = 0;
+    let totalJointsSaved = 0;
 
-      const resPlt = await fetch(`${API_BASE}/api/ensayos-plt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pltEnsayos)
-      });
+    for (const winData of windowsToSave) {
+      const nonVacantJoints = (winData.joints || []).filter(j => !(j.distancia === -1 && j.dip === -1 && j.espaciamiento === -1));
+      const winCalc = calculateWindowGeomec(winData.header, winData.joints);
 
-      if (res.ok && resPlt.ok) {
-        setSyncStatus('synced');
-        setSyncMessage(`Mapeo Celda ${activeWindow.header.celda} y Ensayos PLT guardados con éxito.`);
-        fetchWindows();
-      } else {
-        throw new Error();
-      }
-    } catch (e) {
-      console.warn("Save database failed, saving locally in cache.", e);
-      localStorage.setItem(`geolog_window_${activeWindow.header.celda}`, JSON.stringify(activeWindow));
-      localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
-
-      const summary: WindowSummary = {
-        name: activeWindow.header.celda,
-        fecha_mapeo: activeWindow.header.fecha || new Date().toISOString().split('T')[0],
-        sector_geotecnico: activeWindow.header.sect_geot || '',
-        geologo: activeWindow.header.mapeador || "N/A",
-        lito_1: activeWindow.header.lito_1 || '',
-        largo: calculated.largo,
-        altura: activeWindow.header.altura,
-        nivel: activeWindow.header.nivel || '',
-        rmr_76: calculated.rmr_76,
-        rmr_89: calculated.rmr_89,
-        class_89: calculated.class_89,
-        rmr_76: calculated.rmr_76,
-        rmr_89: calculated.rmr_89,
-        class_89: calculated.class_89
+      const payload = {
+        codigo: winData.header.celda,
+        fecha_mapeo: winData.header.fecha || new Date().toISOString().split('T')[0],
+        mapeador: winData.header.mapeador || 'AS-HM',
+        campania: parseInt(String(winData.header.campania)) || 2026,
+        este_ini: winData.header.este_from || 0,
+        norte_ini: winData.header.norte_from || 0,
+        cota_ini: winData.header.cota_from || 0,
+        este_fin: winData.header.este_to || 0,
+        norte_fin: winData.header.norte_to || 0,
+        cota_fin: winData.header.cota_to || 0,
+        largo_m: winCalc.largo,
+        altura_m: winData.header.altura || 0,
+        dip_talud: winData.header.dip_talud || 0,
+        dipdir_talud: winData.header.dipdir_talud || 0,
+        dip_hw: winData.header.dip_hw || 0,
+        az_hw: winData.header.az_hw || 0,
+        alteracion_codigo: winData.header.alt_zona || 'd',
+        intemperismo_codigo: winData.header.intemperia || 'd',
+        lito_1: winData.header.lito_1 || '',
+        lito_2: winData.header.lito_2 || '',
+        lito_3: winData.header.lito_3 || '',
+        unidad_litologica: winData.header.unidad_litologica || '',
+        sector: winData.header.sector || 'NW1_B',
+        fase: parseInt(String(winData.header.fase || '')) || 5,
+        nivel: winData.header.nivel ? String(winData.header.nivel) : '3960',
+        sector_geotecnico: winData.header.sect_geot || 'PENDIENTE',
+        turno: winData.header.turno || 'Día',
+        discontinuidades: nonVacantJoints.map(j => ({
+          fam: j.familia,
+          dist: j.distancia === -1 ? null : j.distancia,
+          tipo: j.tipo_estructura || 'JN',
+          dip: j.dip === -1 ? 0 : j.dip,
+          dipdir: j.dip_dir === -1 ? 0 : j.dip_dir,
+          aber: j.abertura === -1 ? null : j.abertura,
+          esp: j.espesor === -1 ? null : j.espesor,
+          cont: j.continuidad === -1 ? null : j.continuidad,
+          espac: j.espaciamiento === -1 ? null : j.espaciamiento,
+          nstr: j.n_estructuras === -1 ? null : j.n_estructuras,
+          next: j.extremos_visibles,
+          term: j.terminacion,
+          r1: j.relleno1,
+          r2: j.relleno2,
+          jrc: j.jrc === -1 ? null : j.jrc,
+          rug: j.rugosidad === -1 ? null : j.rugosidad,
+          forma: j.forma,
+          alt: j.alteracion
+        })),
+        rmr_input: {
+          agua_codigo: winData.header.condicion_agua || '',
+          resistencia_codigo: winData.header.resistencia_ucs || '',
+          gsi_estructura: winData.header.gsi_estructura || null,
+          gsi_superficie: winData.header.gsi_superficie || null,
+          gsi_visual: winData.header.gsi_visual !== undefined ? winData.header.gsi_visual : 0,
+          control_estructural: winData.header.control_estructural !== undefined ? winData.header.control_estructural : 0,
+          efectos_voladura: winData.header.efectos_voladura !== undefined ? winData.header.efectos_voladura : 0,
+          ucs_mpa: winData.header.ucs_mpa !== undefined ? winData.header.ucs_mpa : 0,
+          is50_mpa: winData.header.is50_mpa !== undefined ? winData.header.is50_mpa : 0,
+          comentario: winData.header.comentario || ""
+        }
       };
 
-      const updatedSummaries = [...windows.filter(w => w.name !== activeWindow.header.celda), summary];
-      setWindows(updatedSummaries);
-      localStorage.setItem('geolog_windows_summaries', JSON.stringify(updatedSummaries));
+      try {
+        const res = await fetch(`${API_BASE}/api/ventanas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          successCount++;
+          totalJointsSaved += nonVacantJoints.length;
+          const hash = fastHashObject(winData);
+          localStorage.setItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData));
+          localStorage.setItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData));
+          localStorage.setItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash);
 
-      setSyncStatus('offline');
-      setSyncMessage("Cambios resguardados en almacenamiento local temporal.");
+          if (activeWindow && activeWindow.header.celda === winData.header.celda) {
+            setDbSnapshotData(winData);
+            setDbSnapshotHash(hash);
+          }
+
+          const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
+          const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
+          localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== winData.header.celda)));
+        }
+      } catch (err) {
+        console.warn("Save DB failed, persisting locally in localStorage:", winData.header.celda, err);
+        const hash = fastHashObject(winData);
+        localStorage.setItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData));
+        localStorage.setItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData));
+        localStorage.setItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash);
+        if (activeWindow && activeWindow.header.celda === winData.header.celda) {
+          setDbSnapshotData(winData);
+          setDbSnapshotHash(hash);
+        }
+        successCount++;
+      }
+    }
+
+    // Save PLT ensayos if present
+    if (pltEnsayos.length > 0) {
+      try {
+        await fetch(`${API_BASE}/api/ensayos-plt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pltEnsayos)
+        });
+      } catch (e) {}
+    }
+
+    setIsLoadingWindow(false);
+    setSyncStatus('synced');
+    setSyncMessage(`${successCount} celda(s) sincronizadas con SQL Server.`);
+    fetchWindows();
+
+    setSaveResultData({
+      savedCount: successCount,
+      totalEdits: workspaceDiff.totalCellEditsAll,
+      totalJoints: totalJointsSaved
+    });
+    setShowSaveResultModal(true);
+  };
+
+  const handleConfirmDiscard = (scope: 'active' | 'all') => {
+    setShowDiscardModal(false);
+    if (scope === 'active' && activeWindow) {
+      const celda = activeWindow.header.celda;
+      const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
+      if (snapshotRaw) {
+        const parsed = JSON.parse(snapshotRaw);
+        setActiveWindow(parsed);
+        localStorage.setItem(`geolog_window_${celda}`, JSON.stringify(parsed));
+      }
+      try {
+        const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
+        const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
+        localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)));
+      } catch (e) {}
+    } else {
+      try {
+        const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
+        const unsavedNames: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
+        for (const celda of unsavedNames) {
+          const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
+          if (snapshotRaw) {
+            const parsed = JSON.parse(snapshotRaw);
+            localStorage.setItem(`geolog_window_${celda}`, JSON.stringify(parsed));
+            if (activeWindow && activeWindow.header.celda === celda) {
+              setActiveWindow(parsed);
+            }
+          }
+        }
+        localStorage.setItem('geolog_unsaved_windows', JSON.stringify([]));
+      } catch (e) {}
     }
   };
 
@@ -914,24 +1152,38 @@ export default function App() {
                 </button>
               )}
 
-              {(activeWindow || currentView === 'plt_ensayos') && (
+              {/* Botón Descartar Cambios */}
+              {unsavedCount > 0 && (
                 <button
-                  onClick={currentView === 'plt_ensayos' ? handleSaveActivePlt : handleSaveActive}
-                  disabled={syncStatus === 'saving'}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border ${syncStatus === 'unsaved'
-                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
-                    : syncStatus === 'saving'
-                      ? 'bg-violet-600/35 text-violet-300 border-violet-500/40 cursor-wait'
-                      : syncStatus === 'synced'
-                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                        : 'bg-navy-900 border-navy-800 text-slate-300 hover:text-slate-100'
-                    }`}
-                  title={currentView === 'plt_ensayos' ? "Guardar ensayos PLT" : "Guardar todos los cambios en SQL Server"}
+                  onClick={() => setShowDiscardModal(true)}
+                  disabled={isLoadingWindow}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                  title="Descartar cambios no guardados en el espacio de trabajo"
                 >
-                  <Save size={14} />
-                  <span>{syncStatus === 'saving' ? 'Guardando...' : 'Guardar'}</span>
+                  <RotateCcw size={14} />
+                  <span>Descartar Cambios</span>
                 </button>
               )}
+
+              {/* Botón Guardar Cambios */}
+              <button
+                onClick={() => setShowSaveConfirmModal(true)}
+                disabled={isLoadingWindow || unsavedCount === 0}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative ${
+                  unsavedCount > 0
+                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
+                    : 'bg-navy-900 border-navy-800 text-slate-500 cursor-not-allowed opacity-70'
+                }`}
+                title="Guardar todos los cambios en SQL Server"
+              >
+                <Save size={14} />
+                <span>GUARDAR CAMBIOS</span>
+                {unsavedCount > 0 && (
+                  <span className="ml-1 bg-amber-500 text-navy-950 font-black text-[10px] px-1.5 py-0.5 rounded-full">
+                    {unsavedCount}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </header>
@@ -1304,6 +1556,42 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-6 bg-navy-950/20">
               <CatalogsView mode="plt" />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modales de Confirmación, Descarte y Resultados */}
+      <SaveConfirmModal
+        isOpen={showSaveConfirmModal}
+        onClose={() => setShowSaveConfirmModal(false)}
+        onConfirmSave={handleConfirmSave}
+        activeWindow={activeWindow}
+        workspaceDiff={workspaceDiff}
+      />
+
+      <DiscardModal
+        isOpen={showDiscardModal}
+        onClose={() => setShowDiscardModal(false)}
+        onConfirmDiscard={handleConfirmDiscard}
+        activeWindow={activeWindow}
+        workspaceDiff={workspaceDiff}
+      />
+
+      <SaveResultModal
+        isOpen={showSaveResultModal}
+        onClose={() => setShowSaveResultModal(false)}
+        savedCount={saveResultData.savedCount}
+        totalEdits={saveResultData.totalEdits}
+        totalJoints={saveResultData.totalJoints}
+      />
+
+      {/* Glassmorphic UI Loading Lock Overlay */}
+      {isLoadingWindow && (
+        <div className="fixed inset-0 z-[100] bg-navy-950/70 backdrop-blur-md flex flex-col items-center justify-center gap-4 text-slate-100 pointer-events-auto select-none">
+          <div className="p-6 bg-navy-900 border border-violet-500/30 rounded-2xl shadow-2xl flex flex-col items-center gap-3">
+            <Loader2 size={40} className="text-violet-400 animate-spin" />
+            <p className="text-xs font-black uppercase tracking-wider text-slate-100">Sincronizando ventanas con SQL Server...</p>
+            <p className="text-[11px] text-slate-400 font-medium">Por favor espere a que finalice la transacción en la base de datos.</p>
           </div>
         </div>
       )}

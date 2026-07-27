@@ -6,7 +6,7 @@ HOST=127.0.0.1
 # Si deseas usar SQLite, descomenta la siguiente línea y comenta las de SQL Server:
 
 DB_SERVER=localhost\SQLEXPRESS01
-DB_NAME=ventanas
+DB_NAME=GEMA_V2
 DB_TRUSTED=no
 DB_USER=sa
 DB_PASSWORD=Amphos2026
