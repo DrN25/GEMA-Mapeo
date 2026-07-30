@@ -23,6 +23,10 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Variables de entorno
+.env
+.env*
+
 node_modules/
 dist/
 dist-ssr/
