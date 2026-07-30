@@ -126,8 +126,8 @@ export function computeWindowDiff(
     'este_to', 'norte_to', 'cota_to',
     'altura', 'dip_talud', 'dipdir_talud', 'dip_hw', 'az_hw',
     'unidad_litologica', 'lito_1', 'lito_2', 'lito_3',
-    'mapeador', 'sector', 'fase', 'nivel', 'sect_geot', 'intemperia', 'alt_zona', 'fecha',
-    'condicion_agua', 'resistencia_ucs', 'comentario', 'campania', 'turno',
+    'mapeador', 'sector', 'fase', 'nivel', 'sect_geot', 'intemperia', 'alt_mapeo', 'fecha',
+    'condicion_agua', 'resistencia_ucs', 'comentario', 'campania',
     'gsi_estructura', 'gsi_superficie', 'gsi_visual', 'control_estructural', 'efectos_voladura', 'ucs_mpa', 'is50_mpa'
   ];
 

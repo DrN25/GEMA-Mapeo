@@ -334,9 +334,8 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
         lito_3=lito3_code,
         unidad_litologica=unidad_code,
         intemperismo=v.grado_intemperismo,
-        altura_zona=v.altura_zona,
+        altura_mapeo=v.altura_mapeo,
         fase=v.fase,
-        turno=v.turno,
         mapeador=_reverse(models.Geotecnico, v.geotecnico_id, "nombre"),
         rmr_input=rmr_input,
         agua_r76=_to_float(v.condicion_agua_valor_rmr76),
@@ -732,16 +731,16 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
         v.litologia1_id = lito1_id; v.litologia2_id = lito2_id; v.litologia3_id = lito3_id
         v.unidad_litologica_id = unidad_id
-        raw_alt_zona = data.altura_zona or data.alteracion_codigo
+        raw_alt_zona = data.altura_mapeo or data.alteracion_codigo
         v.grado_intemperismo = data.intemperismo or data.intemperismo_codigo
-        v.altura_zona = raw_alt_zona.lower().strip() if raw_alt_zona else None
-        v.fase = data.fase; v.turno = data.turno
+        v.altura_mapeo = raw_alt_zona.lower().strip() if raw_alt_zona else None
+        v.fase = data.fase
         v.geotecnico_id = geotecnico_id
         for e in list(v.discontinuidades):
             db.delete(e)
         db.flush()
     else:
-        raw_alt_zona = data.altura_zona or data.alteracion_codigo
+        raw_alt_zona = data.altura_mapeo or data.alteracion_codigo
         v = models.Ventana(
             codigo_celda=code_up, campania_id=campania_id,
             sector_geotecnico_id=sector_id,
@@ -754,8 +753,8 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             litologia1_id=lito1_id, litologia2_id=lito2_id, litologia3_id=lito3_id,
             unidad_litologica_id=unidad_id,
             grado_intemperismo=data.intemperismo or data.intemperismo_codigo,
-            altura_zona=raw_alt_zona.lower().strip() if raw_alt_zona else None,
-            fase=data.fase, turno=data.turno,
+            altura_mapeo=raw_alt_zona.lower().strip() if raw_alt_zona else None,
+            fase=data.fase,
             geotecnico_id=geotecnico_id,
         )
         db.add(v)
@@ -848,7 +847,7 @@ def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
         "id", "CELDA", "Campaña", "Sector", "FECHA",
         "ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO",
         "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP_DIR_TALUD",
-        "INTEMPERISMO", "Lito1", "Lito2", "Lito3", "Unidad", "AlturaZona", "Fase", "Turno", "Mapeador",
+        "INTEMPERISMO", "Lito1", "Lito2", "Lito3", "Unidad", "AlturaMapeo", "Fase", "Mapeador",
         "CONDICION_AGUA_76", "VALOR_AGUA_76", "DUREZA_76", "RESISTENCIA_VALOR_76",
         "GSI_VISUAL_76", "CONTROL_ESTRUC_76", "EFECTOS_VOLADURA_76",
         "RQD_VALOR_76", "RQD_76", "FREC_FRACT_76", "TAM_BLOQUES_76",
@@ -874,7 +873,7 @@ def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
             data.distancia_celda, data.altura, data.dip, data.azimut_hole,
             data.dip_talud, data.dipdir_talud,
             data.intemperismo, data.lito_1, data.lito_2, data.lito_3, data.unidad_litologica,
-            data.altura_zona, data.fase, data.turno, data.mapeador,
+            data.altura_mapeo, data.fase, data.mapeador,
             data.rmr_input.agua_codigo if data.rmr_input else None, data.agua_r76,
             data.rmr_input.resistencia_codigo if data.rmr_input else None, data.resist_r76,
             data.rmr_input.gsi_visual if data.rmr_input else None,
@@ -939,8 +938,8 @@ def _populate_ventana_from_schema(v: models.Ventana, data: schemas.VentanaSaveSc
     v.litologia3_id = resolver.litologia_id(data.lito_3) if data.lito_3 else None
     v.unidad_litologica_id = resolver.unidad_litologica_id(data.unidad_litologica) if data.unidad_litologica else None
     v.grado_intemperismo = data.intemperismo
-    v.altura_zona = data.altura_zona
-    v.fase = data.fase; v.turno = data.turno
+    v.altura_mapeo = data.altura_mapeo
+    v.fase = data.fase
     v.geotecnico_id = resolver.geotecnico_id(data.mapeador) if data.mapeador else None
     if data.rmr_input:
         v.condicion_agua_rmr76 = data.rmr_input.agua_codigo

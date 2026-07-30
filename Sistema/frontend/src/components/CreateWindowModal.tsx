@@ -31,7 +31,6 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
   const [mapeadorId, setMapeadorId] = useState('');
   const [sector, setSector] = useState('');
   const [campania, setCampania] = useState('');
-  const [turno, setTurno] = useState('Día');
   const [nivel, setNivel] = useState('');
   const [fase, setFase] = useState('');
   const [esteFrom, setEsteFrom] = useState('');
@@ -109,7 +108,6 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
       condicion_agua: '',
       resistencia_ucs: '',
       campania: parseInt(campania) || 7,
-      turno,
       joints: [],
       calculated: null,
     });
@@ -123,7 +121,6 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
     setMapeadorId('');
     setSector('');
     setCampania('');
-    setTurno('Día');
     setNivel('');
     setFase('');
     setEsteFrom(''); setNorteFrom(''); setCotaFrom('');
@@ -168,8 +165,8 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
             </div>
           </div>
 
-          {/* Fila 2: Campaña, Sector, Nivel, Turno */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Fila 2: Campaña, Sector, Nivel */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Campaña</label>
               <select required value={campania} onChange={(e) => setCampania(e.target.value)}
@@ -195,14 +192,6 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
               <input type="text" required placeholder="ej. 3960" value={nivel}
                 onChange={(e) => setNivel(handleNumberInputLimit(e.target.value, 4, 2))}
                 className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Turno</label>
-              <select value={turno} onChange={(e) => setTurno(e.target.value)}
-                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer">
-                <option value="Día">Día</option>
-                <option value="Noche">Noche</option>
-              </select>
             </div>
           </div>
 

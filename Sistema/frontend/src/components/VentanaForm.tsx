@@ -531,9 +531,8 @@ export default function VentanaForm({
                   <select
                     value={header.lito_1 || ''}
                     onChange={(e) => handleLito1Change(e.target.value)}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${
-                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85'
-                    }`}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85'
+                      }`}
                   >
                     <option value="">— Lito 1 —</option>
                     {uniqueLito1.map(l => (
@@ -547,9 +546,8 @@ export default function VentanaForm({
                   <select
                     value={header.lito_2 || '-1'}
                     onChange={(e) => handleLito2Change(e.target.value)}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${
-                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
-                    }`}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                      }`}
                   >
                     <option value="-1">— Lito 2 —</option>
                     {uniqueLito2.map(l => (
@@ -563,9 +561,8 @@ export default function VentanaForm({
                   <select
                     value={header.lito_3 || '-1'}
                     onChange={(e) => handleLito3Change(e.target.value)}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${
-                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-orange-400'
-                    }`}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-orange-400'
+                      }`}
                   >
                     <option value="-1">— Lito 3 —</option>
                     {uniqueLito3.map(l => (
@@ -579,9 +576,8 @@ export default function VentanaForm({
                   <select
                     value={header.unidad_litologica || ''}
                     onChange={(e) => handleUnidadChange(e.target.value)}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${
-                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
-                    }`}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                      }`}
                   >
                     <option value="">— Unidad —</option>
                     {uniqueUnidades.map(u => (
@@ -650,12 +646,12 @@ export default function VentanaForm({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase block">Alt. de Zona</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Alt. de Mapeo</label>
                   <input
                     type="text"
-                    value={header.alt_zona || ''}
-                    onChange={(e) => handleChange('alt_zona', e.target.value.toLowerCase().slice(0, 32))}
-                    placeholder="ej. baja, media..."
+                    value={header.alt_mapeo || ''}
+                    onChange={(e) => handleChange('alt_mapeo', e.target.value.toLowerCase().slice(0, 32))}
+                    placeholder="ej. m, d..."
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   />
                 </div>

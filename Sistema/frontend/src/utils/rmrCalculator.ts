@@ -54,12 +54,11 @@ export interface WindowHeader {
   mapeador?: string;
   sect_geot?: string;
   intemperia?: string;
-  alt_zona?: string;
+  alt_mapeo?: string;
   condicion_agua: string;
   resistencia_ucs: string;
   comentario?: string;
   campania?: number;
-  turno?: string;
   gsi_estructura?: string;
   gsi_superficie?: string;
   gsi_visual?: number;

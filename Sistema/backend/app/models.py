@@ -142,9 +142,8 @@ class Ventana(Base):
 
     # Cabecera geológica
     grado_intemperismo = Column("GradoIntemperismo", String(10), nullable=True)
-    altura_zona = Column("AlturaZona", String(20), nullable=True)
+    altura_mapeo = Column("AlturaMapeo", String(20), nullable=True)
     fase = Column("Fase", Integer, nullable=True)
-    turno = Column("Turno", String(20), nullable=True)
 
     # GSI inputs
     gsi_superficie = Column("GSISuperficie", String(20), nullable=True)
