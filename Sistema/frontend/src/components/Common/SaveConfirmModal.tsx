@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Save, AlertTriangle, Check, Layers, FileSpreadsheet, X, Activity } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
+import { validateMapeoWindow, validatePltEnsayosList } from '../../utils/mandatoryRules';
 
 export interface PltDiffSummary {
   added: number;
@@ -17,6 +18,7 @@ interface SaveConfirmModalProps {
   activeWindow: WindowData | null;
   workspaceDiff: AllWindowsDiffSummary;
   pltDiff?: PltDiffSummary;
+  pltEnsayos?: any[];
 }
 
 export default function SaveConfirmModal({
@@ -25,13 +27,26 @@ export default function SaveConfirmModal({
   onConfirmSave,
   activeWindow,
   workspaceDiff,
-  pltDiff
+  pltDiff,
+  pltEnsayos = []
 }: SaveConfirmModalProps) {
   if (!isOpen) return null;
 
   const activeHasChanges = workspaceDiff.activeDiff.hasChanges;
   const hasPltChanges = pltDiff && pltDiff.totalChanges > 0;
   const hasAnyWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
+
+  // Auditoría sincrónica de campos obligatorios
+  const mapeoIssues = useMemo(() => {
+    return activeWindow ? validateMapeoWindow(activeWindow) : [];
+  }, [activeWindow]);
+
+  const pltIssues = useMemo(() => {
+    return Array.isArray(pltEnsayos) && pltEnsayos.length > 0 ? validatePltEnsayosList(pltEnsayos) : [];
+  }, [pltEnsayos]);
+
+  const totalBlockingIssues = [...mapeoIssues, ...pltIssues];
+  const hasBlockingErrors = totalBlockingIssues.length > 0;
 
   // Si la celda activa tiene cambios, por defecto seleccionamos 'active'; de lo contrario 'all'
   const [selectedScope, setSelectedScope] = useState<'active' | 'all'>(
@@ -214,11 +229,39 @@ export default function SaveConfirmModal({
             </div>
           )}
 
-          {/* Warning Banner */}
-          <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs">
-            <AlertTriangle size={18} className="shrink-0 text-amber-400" />
-            <span>Al confirmar, los datos serán guardados y auditados de forma permanente en SQL Server.</span>
-          </div>
+          {/* Card de Bloqueo por Campos Obligatorios Pendientes */}
+          {hasBlockingErrors && (
+            <div className="bg-rose-500/10 border border-rose-500/40 rounded-xl p-4 space-y-3 animate-fade-in text-rose-300">
+              <div className="flex items-center gap-2 border-b border-rose-500/20 pb-2">
+                <AlertCircle size={18} className="text-rose-400 shrink-0" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-rose-200">
+                  Guardado Bloqueado: Complete {totalBlockingIssues.length} campo(s) obligatorio(s)
+                </h4>
+              </div>
+              <p className="text-[11px] text-rose-300 font-semibold">
+                No es posible sincronizar con SQL Server hasta completar los siguientes campos requeridos:
+              </p>
+
+              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
+                {totalBlockingIssues.map((issue, idx) => (
+                  <div key={idx} className="text-[11px] bg-rose-950/70 border border-rose-500/30 rounded-lg px-3 py-1.5 flex items-center justify-between text-rose-200">
+                    <span className="font-semibold">{issue.message}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 uppercase shrink-0 ml-2">
+                      {issue.section}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Warning Banner (solo si no hay bloqueo) */}
+          {!hasBlockingErrors && (
+            <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs">
+              <AlertTriangle size={18} className="shrink-0 text-amber-400" />
+              <span>Al confirmar, los datos serán guardados y auditados de forma permanente en SQL Server.</span>
+            </div>
+          )}
 
         </div>
 
@@ -233,8 +276,13 @@ export default function SaveConfirmModal({
           </button>
           <button
             type="button"
-            onClick={() => onConfirmSave(selectedScope)}
-            className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-navy-950 text-xs font-black tracking-wide transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] active:scale-95 flex items-center gap-2"
+            disabled={hasBlockingErrors}
+            onClick={() => !hasBlockingErrors && onConfirmSave(selectedScope)}
+            className={`px-5 py-2 rounded-xl text-xs font-black tracking-wide transition-all shadow-md flex items-center gap-2 ${
+              hasBlockingErrors
+                ? 'bg-navy-900 border border-navy-800 text-slate-500 cursor-not-allowed opacity-50 shadow-none'
+                : 'bg-amber-500 hover:bg-amber-400 text-navy-950 shadow-[0_0_15px_rgba(245,158,11,0.3)] active:scale-95'
+            }`}
           >
             <Check size={16} className="stroke-[3]" />
             <span>Sí, Guardar Cambios</span>

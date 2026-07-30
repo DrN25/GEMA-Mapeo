@@ -267,6 +267,7 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
             espac=float(e.espaciamiento_m) if e.espaciamiento_m is not None else None,
             nstr=e.numero_estructuras,
             next=e.numero_extremos_visibles,
+            term=e.terminacion,
             r1="c" if (not e.tipo_relleno_1 or str(e.tipo_relleno_1).strip().lower() in ("-1", "-1.0", "cwf")) else str(e.tipo_relleno_1).strip().lower(),
             r2=None if (not e.tipo_relleno_2 or str(e.tipo_relleno_2).strip().lower() in ("-1", "-1.0")) else ("c" if str(e.tipo_relleno_2).strip().lower() == "cwf" else str(e.tipo_relleno_2).strip().lower()),
             jrc=float(e.jrc) if e.jrc is not None else None,
@@ -726,8 +727,9 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.este_from = data.este_ini; v.norte_from = data.norte_ini; v.cota_from = data.cota_ini
         v.este_to = data.este_fin; v.norte_to = data.norte_fin; v.cota_to = data.cota_fin
         v.distancia_celda = _safe_distancia_celda(data.distancia_celda)
-        v.altura = data.altura
-        v.dip = data.dip; v.azimut_hole = data.azimut_hole
+        v.altura = data.altura if data.altura is not None else data.altura_m
+        v.dip = data.dip if data.dip is not None else data.dip_hw
+        v.azimut_hole = data.azimut_hole if data.azimut_hole is not None else data.az_hw
         v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
         v.litologia1_id = lito1_id; v.litologia2_id = lito2_id; v.litologia3_id = lito3_id
         v.unidad_litologica_id = unidad_id
@@ -747,8 +749,10 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             fecha_mapeo=data.fecha_mapeo, nivel=data.nivel,
             este_from=data.este_ini, norte_from=data.norte_ini, cota_from=data.cota_ini,
             este_to=data.este_fin, norte_to=data.norte_fin, cota_to=data.cota_fin,
-            distancia_celda=_safe_distancia_celda(data.distancia_celda), altura=data.altura,
-            dip=data.dip, azimut_hole=data.azimut_hole,
+            distancia_celda=_safe_distancia_celda(data.distancia_celda),
+            altura=data.altura if data.altura is not None else data.altura_m,
+            dip=data.dip if data.dip is not None else data.dip_hw,
+            azimut_hole=data.azimut_hole if data.azimut_hole is not None else data.az_hw,
             dip_talud=data.dip_talud, dip_dir_talud=data.dipdir_talud,
             litologia1_id=lito1_id, litologia2_id=lito2_id, litologia3_id=lito3_id,
             unidad_litologica_id=unidad_id,
@@ -930,8 +934,9 @@ def _populate_ventana_from_schema(v: models.Ventana, data: schemas.VentanaSaveSc
     v.este_from = data.este_ini; v.norte_from = data.norte_ini; v.cota_from = data.cota_ini
     v.este_to = data.este_fin; v.norte_to = data.norte_fin; v.cota_to = data.cota_fin
     v.distancia_celda = data.distancia_celda
-    v.altura = data.altura
-    v.dip = data.dip; v.azimut_hole = data.azimut_hole
+    v.altura = data.altura if data.altura is not None else data.altura_m
+    v.dip = data.dip if data.dip is not None else data.dip_hw
+    v.azimut_hole = data.azimut_hole if data.azimut_hole is not None else data.az_hw
     v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
     v.litologia1_id = resolver.litologia_id(data.lito_1) if data.lito_1 else None
     v.litologia2_id = resolver.litologia_id(data.lito_2) if data.lito_2 else None
@@ -983,6 +988,29 @@ def _populate_discontinuidades(db: Session, v: models.Ventana, discs: List[schem
             forma_estructura=d.forma if d.forma and str(d.forma) not in ("-1", "-1.0") else None,
             alteracion=d.alt if d.alt and str(d.alt) not in ("-1", "-1.0") else None,
             familia_id=d.fam,
+
+            # Proyección 3D
+            teta=clean(d.teta),
+            alfa=clean(d.alfa),
+            x=clean(d.x),
+            y=clean(d.y),
+            z=clean(d.z),
+
+            # Sub-ratings RMR '76
+            valor_alteracion_cd76=clean(d.altR76),
+            valor_relleno_cd76=clean(d.relR76),
+            continuidad_cd76=clean(d.contR76),
+            abertura_cd76=clean(d.abR76),
+            rugosidad_cd76=clean(d.rugR76),
+            valor_condicion_cd76=clean(d.totalR76),
+
+            # Sub-ratings RMR '89
+            valor_alteracion_cd89=clean(d.altR89),
+            valor_relleno_cd89=clean(d.relR89),
+            continuidad_cd89=clean(d.contR89),
+            abertura_cd89=clean(d.abR89),
+            rugosidad_cd89=clean(d.rugR89),
+            valor_condicion_cd89=clean(d.totalR89),
         )
         db.add(e)
 # ============================================================================

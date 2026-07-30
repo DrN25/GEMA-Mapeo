@@ -275,25 +275,25 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         calcExplanation: (params) => `RQD: ${params?.rqd !== undefined ? `${params.rqd.toFixed(2)}%` : '—'} ➔ Rating: ${params?.val ?? '—'}`
     },
     jv: {
-        title: `Índice Volumétrico ${COLUMN_NAMES.jv}`,
-        equation: `Jv = Σ(1 / S_promedio_familia_i)`,
-        description: "Estima el número de discontinuidades por metro cúbico sumando la inversa del espaciamiento promedio real de todas las familias mapeadas.",
+        title: `Índice Volumétrico de Juntas (Jv)`,
+        equation: `Jv = 1/Prom1 + 1/Prom2 + ... + 1/PromN`,
+        description: "Suma de las inversas del espaciamiento promedio de cada familia de discontinuidades mapeada.",
         inputs: [COLUMN_NAMES.espac_prom],
-        calcExplanation: (params) => `Espaciamientos por Familia mapeados. Jv total calculado: ${params?.val !== undefined ? params.val.toFixed(4) : '—'}`
+        calcExplanation: (params) => `Jv total: ${params?.val !== undefined ? params.val.toFixed(2) : '—'}`
     },
     block_size: {
-        title: `${COLUMN_NAMES.block_size} Estimado (m³)`,
-        equation: `V_bloque = S_global ^ 3`,
-        description: "Estima de forma simplificada el tamaño tridimensional del bloque de roca intacta elevando al cubo el espaciamiento global promedio.",
-        inputs: [COLUMN_NAMES.global_spacing],
-        calcExplanation: (params) => `S_global: ${params?.global_spacing || '0'} m ➔ (${params?.global_spacing || '0'} m)³ = ${params?.val?.toFixed(4) ?? '—'} m³`
+        title: `Tamaño de Bloque (m³)`,
+        equation: `Tamaño Bloque = Promedio(Prom1, Prom2, ..., PromN)`,
+        description: "Promedio aritmético de los espaciamientos promedios de cada familia de discontinuidades mapeada.",
+        inputs: [COLUMN_NAMES.espac_prom],
+        calcExplanation: (params) => `Tamaño de bloque calculado: ${params?.val !== undefined ? `${params.val.toFixed(2)} m³` : '—'}`
     },
     global_spacing: {
-        title: `${COLUMN_NAMES.global_spacing} (Ponderado)`,
-        equation: `S_global = Σ(Espacamiento_i * n_i) / Σ(n_i)`,
-        description: "Fórmula de espaciamiento global ponderada utilizando la cantidad de estructuras (n) observadas en cada scanline como factor de ponderación.",
-        inputs: [COLUMN_NAMES.espaciamiento, COLUMN_NAMES.n_estructuras],
-        calcExplanation: (params) => `Promedio global ponderado calculado. Espaciamiento: ${params?.val ?? '—'} m`
+        title: `Espaciamiento Promedio (m)`,
+        equation: `Espaciamiento_prom = Σ(N° Estructuras_i * 0.40) / Σ(N° Estructuras_i)`,
+        description: "Promedio ponderado de espaciamiento basado en el conteo de estructuras por la constante de ventana de 0.40 m.",
+        inputs: [COLUMN_NAMES.n_estructuras],
+        calcExplanation: (params) => `Espaciamiento promedio calculado: ${params?.val ?? '—'} m`
     },
     spacing_rating_r89: {
         title: `Rating Espaciamiento (R89)`,

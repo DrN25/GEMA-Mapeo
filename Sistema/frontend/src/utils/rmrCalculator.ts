@@ -105,6 +105,7 @@ export interface CalculatorResult {
   rqd_rating_76: number;
   rqd_rating_89: number;
   global_spacing: number;
+  block_size: number;
   spacing_rating_76: number;
   spacing_rating_89: number;
   condicion_rating_76: number;
@@ -123,9 +124,9 @@ export interface CalculatorResult {
 export function getContinuidadRating(val: number | undefined | null): { r76: number | null; r89: number | null } {
   if (val === undefined || val === null || val === -1) return { r76: null, r89: null };
   if (val < 1.0) return { r76: 5, r89: 6 };
-  if (val <= 3.0) return { r76: 4, r89: 4 };
-  if (val <= 10.0) return { r76: 3, r89: 2 };
-  if (val <= 20.0) return { r76: 1, r89: 1 };
+  if (val < 3.0) return { r76: 4, r89: 4 };
+  if (val < 10.0) return { r76: 3, r89: 2 };
+  if (val < 20.0) return { r76: 1, r89: 1 };
   return { r76: 0, r89: 0 };
 }
 
@@ -133,8 +134,8 @@ export function getAberturaRating(val: number | undefined | null): { r76: number
   if (val === undefined || val === null || val === -1) return { r76: null, r89: null };
   if (val <= 0) return { r76: 5, r89: 6 };
   if (val < 0.1) return { r76: 4, r89: 5 };
-  if (val <= 1.0) return { r76: 3, r89: 3 };
-  if (val <= 5.0) return { r76: 1, r89: 1 };
+  if (val < 1.0) return { r76: 3, r89: 3 };
+  if (val < 5.0) return { r76: 1, r89: 1 };
   return { r76: 0, r89: 0 };
 }
 
@@ -317,58 +318,84 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     };
   });
 
+  // 1. Promedios de Espaciamiento por Familia (Prom1, Prom2, ..., PromN)
   const familias_spacing: Record<number, number> = {};
-  const familias_sum_pond: Record<number, number> = {};
-  const familias_sum_n: Record<number, number> = {};
+  const familias_sum_sp: Record<number, number> = {};
+  const familias_count: Record<number, number> = {};
 
-  joints.forEach(j => {
-    const fam = j.familia;
-    const sp = j.espaciamiento;
+  calculatedJoints.forEach(cj => {
+    const fam = cj.row.familia;
+    if (!fam || fam < 1 || fam > 9) return;
 
-    if (sp !== undefined && sp !== -1 && sp > 0) {
-      if (!familias_sum_pond[fam]) {
-        familias_sum_pond[fam] = 0;
-        familias_sum_n[fam] = 0;
+    let sp = cj.row.espaciamiento;
+    const n = cj.row.n_estructuras;
+
+    // Si espaciamiento no fue ingresado pero sí N° Estructuras (n > 0), derivar sp = 0.40 / n
+    if ((sp === undefined || sp === null || sp === -1 || sp <= 0) && n !== undefined && n !== null && n !== -1 && n > 0) {
+      sp = 0.40 / n;
+    }
+
+    if (sp !== undefined && sp !== null && sp !== -1 && sp > 0) {
+      if (!familias_sum_sp[fam]) {
+        familias_sum_sp[fam] = 0;
+        familias_count[fam] = 0;
       }
-      familias_sum_pond[fam] += sp;
-      familias_sum_n[fam] += 1;
+      familias_sum_sp[fam] += sp;
+      familias_count[fam] += 1;
     }
   });
 
   for (let fam = 1; fam <= 9; fam++) {
-    if (familias_sum_n[fam] > 0) {
-      familias_spacing[fam] = familias_sum_pond[fam] / familias_sum_n[fam];
+    if (familias_count[fam] > 0) {
+      familias_spacing[fam] = Math.round((familias_sum_sp[fam] / familias_count[fam]) * 100) / 100;
     }
   }
 
-  let jv = 0;
-  Object.keys(familias_spacing).forEach(k => {
-    const avgSp = familias_spacing[parseInt(k)];
-    if (avgSp > 0) {
-      jv += 1 / avgSp;
+  // 2. Promedios de Familias activos (Prom1, Prom2, ..., PromN)
+  const familySpacingsList = Object.values(familias_spacing);
+
+  // 3. Tamaño de Bloque m³ = Promedio(Prom1, Prom2, ..., PromN)
+  const block_size = familySpacingsList.length > 0
+    ? Math.round((familySpacingsList.reduce((sum, val) => sum + val, 0) / familySpacingsList.length) * 100) / 100
+    : 0;
+
+  // 4. Espaciamiento prom global (m) = Sumatoria(N de Estructuras * Espaciamiento) / Sumatoria(N de Estructuras) de cada discontinuidad
+  let totalStructures = 0;
+  let spacingWeightedSum = 0;
+
+  calculatedJoints.forEach(cj => {
+    let n = cj.row.n_estructuras;
+    if (n === undefined || n === null || n === -1 || isNaN(n) || n <= 0) {
+      n = 1;
     }
+
+    let sp = cj.row.espaciamiento;
+    if (sp === undefined || sp === null || sp === -1 || isNaN(sp) || sp <= 0) {
+      sp = 0.40 / n;
+    }
+
+    totalStructures += n;
+    spacingWeightedSum += n * sp;
   });
 
-  const hasStructures = (jv > 0) || calculatedJoints.some(cj => cj.row.espaciamiento !== undefined && cj.row.espaciamiento !== -1 && cj.row.espaciamiento > 0);
+  const global_spacing = totalStructures > 0
+    ? Math.round((spacingWeightedSum / totalStructures) * 100) / 100
+    : 0;
+
+  // 5. JV (Índice Volumétrico) = Suma de las inversas de los promedios por familia (1/Prom1 + 1/Prom2 + ...)
+  let jv_sum = 0;
+  Object.values(familias_spacing).forEach(prom => {
+    if (prom > 0) {
+      jv_sum += 1 / prom;
+    }
+  });
+  const jv = Math.round(jv_sum * 10000) / 10000;
+
+  const hasStructures = (global_spacing > 0) || calculatedJoints.some(cj => cj.row.espaciamiento !== undefined && cj.row.espaciamiento !== -1 && cj.row.espaciamiento > 0);
 
   const rqd_est = hasStructures ? Math.max(0, Math.min(100, jv > 0 ? 115 - 3.3 * jv : 0)) : 0;
   const rqd_rating_76 = hasStructures ? getRqdRating76(rqd_est) : 0;
   const rqd_rating_89 = hasStructures ? getRqdRating89(rqd_est, header.campania) : 0;
-
-  let totalStructures = 0;
-  let spacingWeightedSum = 0;
-  calculatedJoints.forEach(cj => {
-    const sp = cj.row.espaciamiento;
-    if (sp !== undefined && sp !== -1 && sp > 0) {
-      let n = cj.row.n_estructuras;
-      if (n === undefined || n === null || n === -1) {
-        n = 0;
-      }
-      totalStructures += n;
-      spacingWeightedSum += sp * n;
-    }
-  });
-  const global_spacing = totalStructures > 0 ? spacingWeightedSum / totalStructures : 0;
 
   const spacing_rating_76 = hasStructures ? getSpacingRating76(global_spacing) : 0;
   const spacing_rating_89 = hasStructures ? getSpacingRating89(global_spacing) : 0;
@@ -380,8 +407,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
 
   calculatedJoints.forEach(cj => {
     let n = cj.row.n_estructuras;
-    if (n === undefined || n === null || n === -1) {
-      n = 0;
+    if (n === undefined || n === null || n === -1 || isNaN(n) || n <= 0) {
+      n = 1;
     }
 
     if (cj.total_condicion_76 !== null) {
@@ -394,8 +421,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     }
   });
 
-  const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 0;
-  const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 0;
+  const condicion_rating_76 = totalCond76Structures > 0 ? Math.round((cond76WeightedSum / totalCond76Structures) * 100) / 100 : 0;
+  const condicion_rating_89 = totalCond89Structures > 0 ? Math.round((cond89WeightedSum / totalCond89Structures) * 100) / 100 : 0;
 
   const hasWater = header.condicion_agua && header.condicion_agua !== '-1';
   const waterItem = hasWater ? (GROUNDWATER_CATALOG[header.condicion_agua] || { rmr76: 0, rmr89: 0 }) : { rmr76: 0, rmr89: 0 };
@@ -427,7 +454,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     rqd_est: Math.round(rqd_est * 100) / 100,
     rqd_rating_76,
     rqd_rating_89,
-    global_spacing: Math.round(global_spacing * 1000) / 1000,
+    global_spacing: Math.round(global_spacing * 100) / 100,
+    block_size,
     spacing_rating_76,
     spacing_rating_89,
     condicion_rating_76,

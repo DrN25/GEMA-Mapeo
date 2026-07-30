@@ -406,12 +406,12 @@ export default function RmrAnalysis({
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
                 <FormulaTooltipTrigger formulaId="jv" params={{ val: calculated.jv }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(2) : '0.00'}</span>
+                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(4) : '0.0000'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
-                <FormulaTooltipTrigger formulaId="block_size" params={{ global_spacing: calculated.global_spacing, val: Math.pow(calculated.global_spacing, 3) }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.global_spacing > 0 ? Math.pow(calculated.global_spacing, 3).toFixed(2) : '0.00'}</span>
+                <FormulaTooltipTrigger formulaId="block_size" params={{ global_spacing: calculated.global_spacing, val: calculated.block_size }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.block_size > 0 ? calculated.block_size.toFixed(2) : '0.00'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-sky-400">
@@ -495,12 +495,12 @@ export default function RmrAnalysis({
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
                 <FormulaTooltipTrigger formulaId="jv" params={{ val: calculated.jv }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(2) : '0.00'}</span>
+                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(4) : '0.0000'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
-                <FormulaTooltipTrigger formulaId="block_size" params={{ global_spacing: calculated.global_spacing, val: Math.pow(calculated.global_spacing, 3) }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.global_spacing > 0 ? Math.pow(calculated.global_spacing, 3).toFixed(2) : '0.00'}</span>
+                <FormulaTooltipTrigger formulaId="block_size" params={{ global_spacing: calculated.global_spacing, val: calculated.block_size }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.block_size > 0 ? calculated.block_size.toFixed(2) : '0.00'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-sky-400">
@@ -532,7 +532,7 @@ export default function RmrAnalysis({
 
       {/* DETALLE FORMULADO */}
       <div className="p-3.5 bg-navy-950/65 rounded-lg border border-navy-900/80 font-mono text-xs text-slate-300 text-left border-l-4 border-indigo-500 shadow-md">
-        <strong>Jv</strong> = (1/{p1}) + (1/{p2}) + (1/{p3}) = <strong>{calculated.jv.toFixed(2)}</strong> &nbsp;|&nbsp; <strong>RQD% Est. (Palmström)</strong> = 115 − 3.3 × {calculated.jv.toFixed(2)} = <strong className="text-sky-400">{calculated.rqd_est.toFixed(2)}%</strong>
+        <strong>Jv</strong> = (1/{p1}) + (1/{p2}) + (1/{p3}) = <strong>{calculated.jv.toFixed(4)}</strong> &nbsp;|&nbsp; <strong>RQD% Est. (Palmström)</strong> = 115 − 3.3 × {calculated.jv.toFixed(4)} = <strong className="text-sky-400">{calculated.rqd_est.toFixed(2)}%</strong>
       </div>
     </div>
   );

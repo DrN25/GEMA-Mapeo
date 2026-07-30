@@ -49,6 +49,29 @@ class DiscontinuidadBase(BaseModel):
     forma: Optional[str] = Field(None, alias="forma_estructura")  # P/C/O/E/I
     alt: Optional[str] = Field(None, alias="alteracion_codigo")  # f/d/m/a/c/s
 
+    # Proyección 3D
+    teta: Optional[float] = None
+    alfa: Optional[float] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    z: Optional[float] = None
+
+    # Sub-ratings RMR '76 por estructura
+    altR76: Optional[float] = Field(None, alias="valor_alteracion_cd76")
+    relR76: Optional[float] = Field(None, alias="valor_relleno_cd76")
+    contR76: Optional[float] = Field(None, alias="continuidad_cd76")
+    abR76: Optional[float] = Field(None, alias="abertura_cd76")
+    rugR76: Optional[float] = Field(None, alias="rugosidad_cd76")
+    totalR76: Optional[float] = Field(None, alias="valor_condicion_cd76")
+
+    # Sub-ratings RMR '89 por estructura
+    altR89: Optional[float] = Field(None, alias="valor_alteracion_cd89")
+    relR89: Optional[float] = Field(None, alias="valor_relleno_cd89")
+    contR89: Optional[float] = Field(None, alias="continuidad_cd89")
+    abR89: Optional[float] = Field(None, alias="abertura_cd89")
+    rugR89: Optional[float] = Field(None, alias="rugosidad_cd89")
+    totalR89: Optional[float] = Field(None, alias="valor_condicion_cd89")
+
     class Config:
         populate_by_name = True
         allow_population_by_field_name = True
@@ -98,8 +121,11 @@ class VentanaSaveSchema(BaseModel):
     # Geometría bancaria
     distancia_celda: Optional[float] = None  # DistanciaCelda
     altura: Optional[float] = None
+    altura_m: Optional[float] = None
     dip: Optional[float] = None              # Dip (del sondaje/celda, no del talud)
+    dip_hw: Optional[float] = None
     azimut_hole: Optional[float] = None
+    az_hw: Optional[float] = None
     dip_talud: Optional[float] = 64.0
     dipdir_talud: Optional[float] = None
 
@@ -190,8 +216,11 @@ class VentanaResponseSchema(BaseModel):
 
     distancia_celda: Optional[float] = None
     altura: Optional[float] = None
+    altura_m: Optional[float] = None
     dip: Optional[float] = None
+    dip_hw: Optional[float] = None
     azimut_hole: Optional[float] = None
+    az_hw: Optional[float] = None
     dip_talud: float
     dipdir_talud: Optional[float] = None
 
