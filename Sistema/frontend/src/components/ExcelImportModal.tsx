@@ -147,7 +147,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
         setColumnsDetected(data.columns_detected || []);
         setColumnMapping(data.mapping_detected || {});
 
-        const initialSelected = new Set((data.celdas || []).map((c: CeldaItem) => c.codigo));
+        const initialSelected = new Set<string>((data.celdas || []).map((c: CeldaItem) => c.codigo));
         setSelectedCodes(initialSelected);
 
         const initNames: Record<string, string> = {};

@@ -131,18 +131,21 @@ export function computeWindowDiff(
     'gsi_estructura', 'gsi_superficie', 'gsi_visual', 'control_estructural', 'efectos_voladura', 'ucs_mpa', 'is50_mpa'
   ];
 
-  for (const key of headerKeys) {
-    const valA = normalizeVal(effectiveBefore.header[key]);
-    const valB = normalizeVal(after.header[key]);
-    if (valA !== valB) {
-      headerEditsCount++;
-      editedFieldsList.push(`Header: ${String(key)}`);
+  if (effectiveBefore) {
+    for (const key of headerKeys) {
+      const valA = normalizeVal(effectiveBefore.header[key]);
+      const valB = normalizeVal(after.header[key]);
+      if (valA !== valB) {
+        headerEditsCount++;
+        editedFieldsList.push(`Header: ${String(key)}`);
+      }
     }
   }
 
   // 2. Comparación de JointRows ignorando plantillas vacías
   const beforeJointsMap = new Map<number, JointRow>();
-  (effectiveBefore.joints || []).forEach(j => beforeJointsMap.set(j.id, j));
+  const beforeJoints = effectiveBefore ? (effectiveBefore.joints || []) : [];
+  beforeJoints.forEach(j => beforeJointsMap.set(j.id, j));
 
   const afterJointsMap = new Map<number, JointRow>();
   (after.joints || []).forEach(j => afterJointsMap.set(j.id, j));

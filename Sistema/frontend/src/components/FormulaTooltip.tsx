@@ -54,7 +54,6 @@ export const COLUMN_NAMES = {
     ucs_mpa: "UCS (MPa)",
     is50_mpa: "is50 (MPa)",
     espac_prom: "Espaciamiento Promedio",
-    espaciamiento: "Espaciamiento de Junta",
 
     // Nuevas columnas de Ensayos PLT
     ancho_w: "Ancho W (cm)",
@@ -64,6 +63,7 @@ export const COLUMN_NAMES = {
     f: "Factor de Corrección f",
     is_mpa: "Is (MPa)",
     is_50: "Is(50) (MPa)",
+    factor_conversion_k: "Factor K",
     ucs: "UCS (MPa)",
     resistencia_isrm: "Resist. ISRM",
     denominacion_isrm: "Denominación ISRM"
@@ -101,14 +101,14 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         }
     },
     alt_r89: {
-        title: `Rating ${COLUMN_NAMES.alteracion_r89}`,
+        title: `Rating ${COLUMN_NAMES.alt_r89}`,
         equation: `Puntaje = Catálogo(${COLUMN_NAMES.alteracion})`,
         description: "Asigna puntaje directo según la clasificación de meteorización/alteración (Fresca, Débil, Moderada, Alta, Completa, Suelo residual).",
         inputs: [COLUMN_NAMES.alteracion],
         calcExplanation: (params) => `Alteración seleccionada: "${params?.code || '—'}" ➔ Rating: ${params?.val ?? '—'}`
     },
     alt_r76: {
-        title: `Rating ${COLUMN_NAMES.alteracion_r76}`,
+        title: `Rating ${COLUMN_NAMES.alt_r76}`,
         equation: `Puntaje = Catálogo(${COLUMN_NAMES.alteracion})`,
         description: "Asigna puntaje para RMR'76 según la meteorización observada en las paredes.",
         inputs: [COLUMN_NAMES.alteracion],

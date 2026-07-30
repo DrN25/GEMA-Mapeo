@@ -279,6 +279,7 @@ export interface PltColumnConfig {
     computed?: boolean;
     options?: string[];
     synonyms?: string[];
+    hidden?: boolean;
 }
 
 export const CAT_TIPO_LITOLOGICO = ["INTRUSIVOS", "SEDIMENTARIOS", "METAMORFICAS", "BRECHAS", "ENDOSKARN"];
@@ -548,10 +549,11 @@ export const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTML
         const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
         if (prevTr) {
             const targetTd = prevTr.cells[cellIndex];
-            if (targetDataInput(targetTd)) {
-                targetDataInput(targetTd).focus();
-                if (targetDataInput(targetTd) instanceof HTMLInputElement) {
-                    (targetDataInput(targetTd) as HTMLInputElement).select();
+            const inputEl = targetDataInput(targetTd);
+            if (inputEl) {
+                inputEl.focus();
+                if (inputEl instanceof HTMLInputElement) {
+                    inputEl.select();
                 }
             }
         }
@@ -560,10 +562,11 @@ export const handleGridKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTML
         const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
         if (nextTr) {
             const targetTd = nextTr.cells[cellIndex];
-            if (targetDataInput(targetTd)) {
-                targetDataInput(targetTd).focus();
-                if (targetDataInput(targetTd) instanceof HTMLInputElement) {
-                    (targetDataInput(targetTd) as HTMLInputElement).select();
+            const inputEl = targetDataInput(targetTd);
+            if (inputEl) {
+                inputEl.focus();
+                if (inputEl instanceof HTMLInputElement) {
+                    inputEl.select();
                 }
             }
         }

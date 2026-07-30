@@ -180,10 +180,11 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
             const prevTr = tr.previousElementSibling as HTMLTableRowElement | null;
             if (prevTr) {
                 const targetTd = prevTr.cells[cellIndex];
-                if (targetDataInput(targetTd)) {
-                    targetDataInput(targetTd).focus();
-                    if (targetDataInput(targetTd) instanceof HTMLInputElement) {
-                        (targetDataInput(targetTd) as HTMLInputElement).select();
+                const inputEl = targetDataInput(targetTd);
+                if (inputEl) {
+                    inputEl.focus();
+                    if (inputEl instanceof HTMLInputElement) {
+                        inputEl.select();
                     }
                 }
             }
@@ -192,10 +193,11 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
             const nextTr = tr.nextElementSibling as HTMLTableRowElement | null;
             if (nextTr) {
                 const targetTd = nextTr.cells[cellIndex];
-                if (targetDataInput(targetTd)) {
-                    targetDataInput(targetTd).focus();
-                    if (targetDataInput(targetTd) instanceof HTMLInputElement) {
-                        (targetDataInput(targetTd) as HTMLInputElement).select();
+                const inputEl = targetDataInput(targetTd);
+                if (inputEl) {
+                    inputEl.focus();
+                    if (inputEl instanceof HTMLInputElement) {
+                        inputEl.select();
                     }
                 }
             }

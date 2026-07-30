@@ -15,9 +15,9 @@ import CatalogsView from './components/CatalogsView';
 import CommentsPhotos from './components/CommentsPhotos';
 import PltEnsayosView from './components/PltEnsayosView';
 
-import SaveConfirmModal from './components/common/SaveConfirmModal';
-import DiscardModal from './components/common/DiscardModal';
-import SaveResultModal from './components/common/SaveResultModal';
+import SaveConfirmModal from './components/Common/SaveConfirmModal';
+import DiscardModal from './components/Common/DiscardModal';
+import SaveResultModal from './components/Common/SaveResultModal';
 
 import { fastHashObject } from './utils/hashUtils';
 import {
@@ -355,12 +355,12 @@ export default function App() {
 
     if (maxLargo > 0) {
       const needsAdjustment = activeWindow.joints.some(
-        j => j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo
+        j => j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo
       );
 
       if (needsAdjustment) {
         const adjustedJoints = activeWindow.joints.map(j => {
-          if (j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
+          if (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
             return { ...j, distancia: maxLargo };
           }
           return j;
@@ -406,7 +406,7 @@ export default function App() {
     window.location.href = `${API_BASE}/api/ventanas/${celda}/exportar`;
   };
 
-  const fetchWindows = async (p?: number, ps?: number, dr?: string, searchTerm?: string) => {
+  const fetchWindows = async (p?: number, ps?: number, dr?: string, searchTerm?: string, isGlobalSearch?: boolean) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -415,6 +415,10 @@ export default function App() {
         order_by: 'fecha_mapeo',
         order_dir: 'desc',
       });
+
+      if (isGlobalSearch !== undefined) {
+        params.set('global_search', String(isGlobalSearch));
+      }
 
       // Calcular fecha_desde/fecha_hasta según dateRange
       const drActive = dr || activeDateRange;
