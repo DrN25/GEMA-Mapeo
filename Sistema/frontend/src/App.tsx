@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity, RotateCcw, Loader2 } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
@@ -42,6 +42,7 @@ import {
 
 import { validateWindowQAQC } from './utils/qaqcValidator';
 import type { ValidationAlert } from './utils/qaqcValidator';
+import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
@@ -148,6 +149,7 @@ export default function App() {
   });
 
   const [pltEnsayos, setPltEnsayos] = useState<any[]>([]);
+  const pltSnapshotRef = useRef<any[]>([]);
   const [showFormulas, setShowFormulas] = useState<boolean>(true);
 
   // Estados de Modales y Bloqueo Transaccional
@@ -285,7 +287,6 @@ export default function App() {
         initCatalogs(data);
         setCatalogsLoaded(true);
         fetchWindows();
-        fetchPltEnsayos();
       })
       .catch(err => {
         console.error("Error loading geomechanical catalogs:", err);
@@ -296,6 +297,37 @@ export default function App() {
 
   // 3. Auditoría reactiva de diferencias y rastreo de celda activa
   const workspaceDiff = computeAllWindowsDiff(activeWindow, dbSnapshotData);
+
+  // 3b. Auditoría reactiva de cambios en Ensayos PLT
+  const pltDiffSummary = useMemo(() => {
+    const snap = pltSnapshotRef.current;
+    const curr = pltEnsayos;
+    const snapIds = new Set(snap.map((r: any) => r.id));
+    const currIds = new Set(curr.map((r: any) => r.id));
+
+    let added = 0;
+    let deleted = 0;
+    let modified = 0;
+
+    for (const row of curr) {
+      if (!snapIds.has(row.id)) {
+        added++;
+      } else {
+        const snapRow = snap.find((s: any) => s.id === row.id);
+        if (snapRow && !arePltRowsEqual(row, snapRow)) {
+          modified++;
+        }
+      }
+    }
+    for (const row of snap) {
+      if (!currIds.has(row.id)) {
+        deleted++;
+      }
+    }
+    const totalChanges = added + modified + deleted;
+    return { added, modified, deleted, totalChanges, totalRows: curr.length };
+  }, [pltEnsayos]);
+
   const unsavedCount = workspaceDiff.totalWindowsWithChanges;
 
   useEffect(() => {
@@ -319,6 +351,26 @@ export default function App() {
       }
     } catch (e) {}
   }, [activeWindow, dbSnapshotHash]);
+
+  useEffect(() => {
+    const targetCelda = activeWindow?.header?.celda?.trim()?.toUpperCase();
+    if (targetCelda && loadedPltCeldaRef.current !== targetCelda) {
+      fetchPltEnsayos(targetCelda, true);
+    }
+  }, [activeWindow?.header?.celda]);
+
+  // Actualización reactiva del estado de sincronización (amarillo / verde)
+  useEffect(() => {
+    const hasWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
+    const hasPltChanges = pltDiffSummary.totalChanges > 0;
+    if (hasWindowChanges || hasPltChanges) {
+      setSyncStatus('unsaved');
+      setSyncMessage('Cambios pendientes por sincronizar en SQL Server.');
+    } else {
+      setSyncStatus('synced');
+      setSyncMessage('SQL Server Conectado. Todos los datos están sincronizados.');
+    }
+  }, [workspaceDiff.totalWindowsWithChanges, pltDiffSummary.totalChanges]);
 
   // Keep RMR calculations and QA/QC validation updated in real-time
   useEffect(() => {
@@ -485,23 +537,49 @@ export default function App() {
     }
   };
 
-  const fetchPltEnsayos = async () => {
+  const loadedPltCeldaRef = useRef<string | null>(null);
+
+  const fetchPltEnsayos = async (celda?: string, force: boolean = false) => {
+    const targetCelda = (celda || activeWindow?.header?.celda || "").trim().toUpperCase();
+    if (!targetCelda) {
+      setPltEnsayos([]);
+      pltSnapshotRef.current = [];
+      loadedPltCeldaRef.current = null;
+      return;
+    }
+
+    if (!force && loadedPltCeldaRef.current === targetCelda) {
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_BASE}/api/ensayos-plt`);
+      const res = await fetch(`${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(targetCelda)}`);
       if (res.ok) {
         const data = await res.json();
-        setPltEnsayos(data);
+        const computed = (data || []).map((r: any) => applyPltFormulas(r));
+        setPltEnsayos(computed);
+        pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
+        loadedPltCeldaRef.current = targetCelda;
       }
     } catch (e) {
       console.warn("Failed to fetch PLT trials from database, checking localStorage.", e);
-      const cached = localStorage.getItem('plt_ensayos_v2');
+      const cached = localStorage.getItem(`plt_ensayos_${targetCelda}`);
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          setPltEnsayos(parsed.rows || parsed || []);
+          const rows = parsed.rows || parsed || [];
+          setPltEnsayos(rows);
+          pltSnapshotRef.current = JSON.parse(JSON.stringify(rows));
+          loadedPltCeldaRef.current = targetCelda;
         } catch (err) {
           setPltEnsayos([]);
+          pltSnapshotRef.current = [];
+          loadedPltCeldaRef.current = targetCelda;
         }
+      } else {
+        setPltEnsayos([]);
+        pltSnapshotRef.current = [];
+        loadedPltCeldaRef.current = targetCelda;
       }
     }
   };
@@ -625,6 +703,7 @@ export default function App() {
           localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== name)));
         } catch (e) {}
 
+        fetchPltEnsayos(name);
         setSyncStatus('synced');
         setCurrentView('mapeo');
         setSelectedRowIndex(0);
@@ -956,15 +1035,29 @@ export default function App() {
       }
     }
 
-    // Save PLT ensayos if present
-    if (pltEnsayos.length > 0) {
+    // Save PLT ensayos if present and changed
+    const pltHasChanges = JSON.stringify(pltEnsayos) !== JSON.stringify(pltSnapshotRef.current);
+    if (pltHasChanges) {
       try {
-        await fetch(`${API_BASE}/api/ensayos-plt`, {
+        const activeCelda = activeWindow?.header.celda;
+        const targetUrl = activeCelda ? `${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(activeCelda)}` : `${API_BASE}/api/ensayos-plt`;
+        const res = await fetch(targetUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(pltEnsayos)
         });
-      } catch (e) {}
+        if (res.ok) {
+          const savedData = await res.json();
+          const computed = (savedData || []).map((r: any) => applyPltFormulas(r));
+          setPltEnsayos(computed);
+          pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
+          if (activeCelda) {
+            loadedPltCeldaRef.current = activeCelda.trim().toUpperCase();
+          }
+        }
+      } catch (e) {
+        console.error("Error saving PLT trials to SQL Server:", e);
+      }
     }
 
     setIsLoadingWindow(false);
@@ -1014,28 +1107,7 @@ export default function App() {
     }
   };
 
-  const handleSaveActivePlt = async () => {
-    setSyncStatus('saving');
-    setSyncMessage("Sincronizando sismología y ensayos PLT...");
-    try {
-      const resPlt = await fetch(`${API_BASE}/api/ensayos-plt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pltEnsayos)
-      });
-      if (resPlt.ok) {
-        setSyncStatus('synced');
-        setSyncMessage("Ensayos PLT guardados con éxito en la base de datos.");
-      } else {
-        throw new Error();
-      }
-    } catch (e) {
-      console.warn("Save PLT failed, saving locally.", e);
-      localStorage.setItem('plt_ensayos_v2', JSON.stringify(pltEnsayos));
-      setSyncStatus('offline');
-      setSyncMessage("No se pudo conectar al servidor. Ensayos PLT guardados localmente.");
-    }
-  };
+
 
   const handleFocusField = (fieldId: string) => {
     if (fieldId.startsWith('header-')) {
@@ -1178,9 +1250,9 @@ export default function App() {
               {/* Botón Guardar Cambios */}
               <button
                 onClick={() => setShowSaveConfirmModal(true)}
-                disabled={isLoadingWindow || unsavedCount === 0}
+                disabled={isLoadingWindow || (unsavedCount === 0 && syncStatus !== 'unsaved')}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative ${
-                  unsavedCount > 0
+                  unsavedCount > 0 || syncStatus === 'unsaved'
                     ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
                     : 'bg-navy-900 border-navy-800 text-slate-500 cursor-not-allowed opacity-70'
                 }`}
@@ -1188,9 +1260,9 @@ export default function App() {
               >
                 <Save size={14} />
                 <span>GUARDAR CAMBIOS</span>
-                {unsavedCount > 0 && (
+                {(unsavedCount > 0 || syncStatus === 'unsaved') && (
                   <span className="ml-1 bg-amber-500 text-navy-950 font-black text-[10px] px-1.5 py-0.5 rounded-full">
-                    {unsavedCount}
+                    {unsavedCount > 0 ? unsavedCount : '!'}
                   </span>
                 )}
               </button>
@@ -1460,16 +1532,9 @@ export default function App() {
           {currentView === 'plt_ensayos' && (
             <PltEnsayosView
               pltEnsayos={pltEnsayos}
-              onChange={(newRows) => {
-                setPltEnsayos(newRows);
-                setSyncStatus('unsaved');
-                setSyncMessage('Ensayos PLT modificados localmente. Presione "Guardar Cambios" para sincronizar.');
-              }}
+              onChange={(newRows) => setPltEnsayos(newRows)}
               activeWindowCelda={activeWindow?.header.celda || null}
-              onSave={handleSaveActivePlt}
-              syncStatus={syncStatus}
-              syncMessage={syncMessage}
-              showFormulas={showFormulas} // Se propaga la propiedad global
+              showFormulas={showFormulas}
             />
           )}
 
@@ -1567,6 +1632,7 @@ export default function App() {
         onConfirmSave={handleConfirmSave}
         activeWindow={activeWindow}
         workspaceDiff={workspaceDiff}
+        pltDiff={pltDiffSummary}
       />
 
       <DiscardModal

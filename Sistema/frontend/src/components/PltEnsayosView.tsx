@@ -34,9 +34,6 @@ interface PltEnsayosViewProps {
   pltEnsayos: any[];
   onChange: (rows: any[]) => void;
   activeWindowCelda: string | null;
-  onSave: () => void;
-  syncStatus: string;
-  syncMessage: string;
   showFormulas?: boolean;
 }
 
@@ -44,9 +41,6 @@ export default function PltEnsayosView({
   pltEnsayos,
   onChange,
   activeWindowCelda,
-  onSave: _onSave,
-  syncStatus: _syncStatus,
-  syncMessage: _syncMessage,
   showFormulas = true
 }: PltEnsayosViewProps) {
   const [filterActiveCell, setFilterActiveCell] = useState(true);
@@ -62,7 +56,7 @@ export default function PltEnsayosView({
   const visibleCols = useMemo(() => COLS.filter(c => !c.hidden), []);
 
   const createEmptyRow = (customId?: number, prefillCelda?: string) => {
-    return {
+    return applyPltFormulas({
       id: customId || Date.now(),
       campana: new Date().getFullYear(),
       fecha_ensayo: new Date().toISOString().split("T")[0],
@@ -70,14 +64,14 @@ export default function PltEnsayosView({
       ejecutado_por: "",
       zona_mapeo: "",
       tipo_ensayo: "i",
-      nivel: 3960.00,
+      nivel: null,
       celda_mapeo: prefillCelda || (filterActiveCell && activeWindowCelda ? activeWindowCelda : ""),
       muestra: "",
       codigo_muestra: "",
       litologia_1: "",
       litologia_2: "",
       litologia_3: "",
-      tipo_litologico: "INTRUSIVOS",
+      tipo_litologico: "",
       este: null,
       norte: null,
       elevacion: null,
@@ -86,12 +80,12 @@ export default function PltEnsayosView({
       ancho_w1: null,
       ancho_w2: null,
       fuerza_p: null,
-      direccion_rotura: "Pa",
-      tipo_fractura: "M",
+      direccion_rotura: "",
+      tipo_fractura: "",
       factor_conversion_k: null,
       observaciones: "",
       _dirty: true
-    };
+    });
   };
 
   const handleAddRow = () => {
@@ -114,21 +108,8 @@ export default function PltEnsayosView({
   };
 
   const filteredRows = useMemo(() => {
-    return pltEnsayos.filter(r => {
-      if (filterActiveCell && activeWindowCelda) {
-        const normRowCell = normalizeCeldaCode(r.celda_mapeo);
-        const normActiveCell = normalizeCeldaCode(activeWindowCelda);
-        if (normRowCell !== normActiveCell) {
-          return false;
-        }
-      }
-      if (fCampana && !String(r.campana || "").toLowerCase().includes(fCampana.toLowerCase())) return false;
-      if (fZona && !String(r.zona_mapeo || "").toLowerCase().includes(fZona.toLowerCase())) return false;
-      if (fLito && !String(r.litologia_1 || "").toLowerCase().includes(fLito.toLowerCase())) return false;
-
-      return true;
-    });
-  }, [pltEnsayos, filterActiveCell, activeWindowCelda, fCampana, fZona, fLito]);
+    return pltEnsayos;
+  }, [pltEnsayos]);
 
   const computedRows = useMemo(() => {
     return filteredRows.map(r => applyPltFormulas(r));
@@ -153,7 +134,7 @@ export default function PltEnsayosView({
         if (key === "litologia_1" || key === "litologia_2" || key === "litologia_3") {
           updatedRow = applyLitoCascade(key, val, updatedRow);
         }
-        return updatedRow;
+        return applyPltFormulas(updatedRow);
       }
       return r;
     });
@@ -189,7 +170,8 @@ export default function PltEnsayosView({
 
     const updated = pltEnsayos.map(r => {
       if (r.id === id) {
-        return { ...r, [key]: val, _dirty: true };
+        let updatedRow = { ...r, [key]: val, _dirty: true };
+        return applyPltFormulas(updatedRow);
       }
       return r;
     });
@@ -201,7 +183,7 @@ export default function PltEnsayosView({
     const updated = pltEnsayos.map(r => {
       if (r.id === id) {
         const cascade = applyLitoCascade(key, val || null, r);
-        return { ...cascade, _dirty: true };
+        return applyPltFormulas({ ...cascade, _dirty: true });
       }
       return r;
     });
@@ -325,50 +307,16 @@ export default function PltEnsayosView({
             <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
             <span>Ensayos PLT Irregulares</span>
           </h2>
-          <span className="text-xs bg-navy-900 border border-navy-800 text-slate-400 font-bold px-2 py-0.5 rounded-full">
-            {filteredRows.length} de {pltEnsayos.length} registros
+          <span className="text-xs bg-violet-500/10 border border-violet-500/30 text-violet-300 font-extrabold px-3 py-1 rounded-lg flex items-center gap-1.5">
+            <span>Celda Activa:</span>
+            <span className="text-amber-400 font-mono">{activeWindowCelda || "Sin Celda Seleccionada"}</span>
           </span>
-
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider ml-4 cursor-pointer hover:text-slate-200 select-none">
-            <input
-              type="checkbox"
-              checked={filterActiveCell}
-              onChange={(e) => setFilterActiveCell(e.target.checked)}
-              onKeyDown={handleGridKeyDown}
-              disabled={!activeWindowCelda}
-              className="accent-violet-500 rounded cursor-pointer"
-            />
-            <span>Filtrar por Celda Actual {activeWindowCelda ? `(${activeWindowCelda})` : ""}</span>
-          </label>
+          <span className="text-xs bg-navy-900 border border-navy-800 text-slate-400 font-bold px-2 py-0.5 rounded-full">
+            {pltEnsayos.length} ensayos PLT
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            placeholder="Campaña"
-            value={fCampana}
-            onChange={(e) => setFCampana(e.target.value)}
-            onKeyDown={handleGridKeyDown}
-            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-2 rounded-lg w-24 outline-none focus:ring-1 focus:ring-violet-500/50"
-          />
-          <input
-            type="text"
-            placeholder="Muestreo"
-            value={fZona}
-            onChange={(e) => setFZona(e.target.value)}
-            onKeyDown={handleGridKeyDown}
-            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-2 rounded-lg w-28 outline-none focus:ring-1 focus:ring-violet-500/50"
-          />
-          <input
-            type="text"
-            placeholder="Litología"
-            value={fLito}
-            onChange={(e) => setFLito(e.target.value)}
-            onKeyDown={handleGridKeyDown}
-            className="bg-navy-900 border border-navy-800 hover:border-navy-700 text-slate-200 text-xs px-2.5 py-2 rounded-lg w-28 outline-none focus:ring-1 focus:ring-violet-500/50"
-          />
-
-          <div className="h-6 w-[1px] bg-navy-800 mx-2" />
 
           <button
             onClick={() => setActiveModal('qaqc')}

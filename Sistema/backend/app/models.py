@@ -294,7 +294,7 @@ class EnsayoPLT(Base):
     __table_args__ = {"schema": "plt"}
 
     ensayo_plt_id = Column("EnsayoPLT_ID", Integer, Identity(always=True), primary_key=True)
-    codigo_muestra = Column("CodigoMuestra", String(20), nullable=False)
+    codigo_muestra = Column("CodigoMuestra", String(20), nullable=True)
     campania_id = Column("CampañaID", Integer, nullable=False)
     litologia1_id = Column("LitologiaID_1", Integer, nullable=True)
     litologia2_id = Column("LitologiaID_2", Integer, nullable=True)

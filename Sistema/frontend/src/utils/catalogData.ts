@@ -67,6 +67,11 @@ export function resolveLithologyCascade(
   const cleanL1 = String(l1 || "").trim().toUpperCase();
   const cleanL2 = String(l2 || "").trim().toUpperCase();
   let cleanL3 = String(l3 || "").trim().toUpperCase();
+
+  if (!cleanL1 && !cleanL2 && (!l3 || cleanL3 === "-" || cleanL3 === "NR" || cleanL3 === "") && !model2022) {
+    return { k: null as any, lito1: "", lito2: "", lito3: "", clase: "" };
+  }
+
   if (!cleanL3 || cleanL3 === "-") cleanL3 = "NR";
 
   const m2022 = String(model2022 || "").trim().toUpperCase();

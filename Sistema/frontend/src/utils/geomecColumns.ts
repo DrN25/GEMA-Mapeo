@@ -297,7 +297,7 @@ export const ISRM_TABLE = [
 ];
 
 export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
-    { key: "campana", label: COLUMN_LABELS.campana, type: "int", width: 80, group: 1, required: true, synonyms: ["campana", "campaña", "campana "] },
+    { key: "campana", label: COLUMN_LABELS.campana, type: "select", width: 90, group: 1, required: true, options: ["2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026", "2027", "2028"], synonyms: ["campana", "campaña", "campana "] },
     { key: "fecha_ensayo", label: COLUMN_LABELS.fecha_ensayo, type: "date", width: 120, group: 1, required: true, synonyms: ["fecha de ensayo", "fechaensayo", "fecha_ensayo", "fecha"] },
     { key: "ejecutado_por", label: COLUMN_LABELS.ejecutado_por, type: "text", width: 110, group: 1, required: true, synonyms: ["ejecutado por", "ejecutadopor", "ejecución de ensayo", "ejecucion de ensayo", "ejecutado"] },
     { key: "tipo_ensayo", label: COLUMN_LABELS.tipo_ensayo, type: "select", width: 100, group: 1, required: true, options: ["i"], synonyms: ["tipo_ensayo", "tipo de ensayo", "tipo ensayo", "tipo"] },
@@ -310,7 +310,7 @@ export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
     { key: "litologia_2", label: COLUMN_LABELS.litologia_2, type: "lito2", width: 90, group: 2, synonyms: ["litologia 2", "litología 2", "litologia_2", "lito2"] },
     { key: "litologia_3", label: COLUMN_LABELS.litologia_3, type: "lito3", width: 90, group: 2, synonyms: ["litologia 3", "litología 3", "litologia_3", "lito3"] },
     { key: "model2022", label: "Model2022", type: "text", width: 100, group: 2, hidden: true, synonyms: ["model2022", "modelo 2022", "modelo2022", "litho 3 - modelo2022"] },
-    { key: "tipo_litologico", label: COLUMN_LABELS.tipo_litologico, type: "text", width: 130, group: 2, required: true, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litólico", "tipo litológico"] },
+    { key: "tipo_litologico", label: COLUMN_LABELS.tipo_litologico, type: "text", width: 130, group: 2, computed: true, required: true, synonyms: ["tipo litologico", "tipolitológico", "tipo_litologico", "tipo litólico", "tipo litológico"] },
 
     { key: "este", label: COLUMN_LABELS.este, type: "decimal", width: 100, group: 3, synonyms: ["este", "este (m)", "east", "este(m)"] },
     { key: "norte", label: COLUMN_LABELS.norte, type: "decimal", width: 110, group: 3, synonyms: ["norte", "norte (m)", "north", "norte(m)"] },
@@ -333,7 +333,7 @@ export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
     { key: "is_mpa", label: COLUMN_LABELS.is_mpa, type: "decimal", width: 80, group: 6, computed: true },
     { key: "is_50", label: COLUMN_LABELS.is_50, type: "decimal", width: 85, group: 6, computed: true },
 
-    { key: "factor_conversion_k", label: COLUMN_LABELS.factor_conversion_k, type: "decimal", width: 80, group: 7, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
+    { key: "factor_conversion_k", label: COLUMN_LABELS.factor_conversion_k, type: "decimal", width: 80, group: 7, computed: true, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
     { key: "ucs", label: COLUMN_LABELS.ucs, type: "decimal", width: 80, group: 7, computed: true },
     { key: "resistencia_isrm", label: COLUMN_LABELS.resistencia_isrm, type: "text", width: 90, group: 7, computed: true },
     { key: "denominacion_isrm", label: COLUMN_LABELS.denominacion_isrm, type: "text", width: 220, group: 7, computed: true, hidden: true },
@@ -381,7 +381,7 @@ export function applyPltFormulas(row: any) {
 
     const celdaStr = String(r.celda_mapeo || "").trim().toUpperCase();
     const muestraStr = String(r.muestra || "").trim();
-    r.codigo_muestra = celdaStr && muestraStr ? `${celdaStr}-${muestraStr}` : "";
+    r.codigo_muestra = celdaStr ? (muestraStr ? `${celdaStr}_${muestraStr}` : celdaStr) : (muestraStr || "");
 
     const w1 = num(r.ancho_w1);
     const w2 = num(r.ancho_w2);
@@ -418,6 +418,27 @@ export function applyPltFormulas(row: any) {
     r.denominacion_isrm = cls ? cls.denominacion : null;
 
     return r;
+}
+
+export function arePltRowsEqual(a: any, b: any): boolean {
+    if (!a || !b) return false;
+    const fields = [
+        'campana', 'fecha_ensayo', 'sector_geotecnico', 'ejecutado_por',
+        'zona_mapeo', 'nivel', 'celda_mapeo', 'muestra', 'codigo_muestra',
+        'litologia_1', 'litologia_2', 'litologia_3', 'tipo_litologico',
+        'este', 'norte', 'elevacion', 'espesor_d', 'longitud_l',
+        'ancho_w1', 'ancho_w2', 'fuerza_p', 'direccion_rotura',
+        'tipo_fractura', 'observaciones'
+    ];
+
+    for (const f of fields) {
+        const valA = (a[f] === null || a[f] === undefined) ? '' : String(a[f]).trim();
+        const valB = (b[f] === null || b[f] === undefined) ? '' : String(b[f]).trim();
+        if (valA !== valB) {
+            return false;
+        }
+    }
+    return true;
 }
 
 export function applyLitoCascade(key: string, val: any, row: any) {
@@ -675,11 +696,12 @@ export const formatCellValue = (val: any, c: any) => {
 };
 
 export const normalizeTipoLitologico = (val: string): string => {
+    if (!val || String(val).trim() === "") return "";
     const s = String(val || "").trim().toLowerCase();
     if (s.includes("intrusiv") || s.includes("pluton") || s.includes("volcan")) return "INTRUSIVOS";
     if (s.includes("sedimentar") || s.includes("caliz")) return "SEDIMENTARIOS";
     if (s.includes("metamorf") || s.includes("marmor") || s.includes("skarn")) return "METAMORFICAS";
     if (s.includes("brecha")) return "BRECHAS";
     if (s.includes("endoskarn")) return "ENDOSKARN";
-    return "INTRUSIVOS";
+    return "";
 };

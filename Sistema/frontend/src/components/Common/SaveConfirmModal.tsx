@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import { Save, AlertTriangle, Check, Layers, FileSpreadsheet, X } from 'lucide-react';
+import { Save, AlertTriangle, Check, Layers, FileSpreadsheet, X, Activity } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
+
+export interface PltDiffSummary {
+  added: number;
+  modified: number;
+  deleted: number;
+  totalChanges: number;
+  totalRows: number;
+}
 
 interface SaveConfirmModalProps {
   isOpen: boolean;
@@ -8,6 +16,7 @@ interface SaveConfirmModalProps {
   onConfirmSave: (scope: 'active' | 'all') => void;
   activeWindow: WindowData | null;
   workspaceDiff: AllWindowsDiffSummary;
+  pltDiff?: PltDiffSummary;
 }
 
 export default function SaveConfirmModal({
@@ -15,11 +24,14 @@ export default function SaveConfirmModal({
   onClose,
   onConfirmSave,
   activeWindow,
-  workspaceDiff
+  workspaceDiff,
+  pltDiff
 }: SaveConfirmModalProps) {
   if (!isOpen) return null;
 
   const activeHasChanges = workspaceDiff.activeDiff.hasChanges;
+  const hasPltChanges = pltDiff && pltDiff.totalChanges > 0;
+  const hasAnyWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
 
   // Si la celda activa tiene cambios, por defecto seleccionamos 'active'; de lo contrario 'all'
   const [selectedScope, setSelectedScope] = useState<'active' | 'all'>(
@@ -68,99 +80,139 @@ export default function SaveConfirmModal({
         {/* Modal Content */}
         <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
           
-          {/* Scope Selector Options */}
-          <div className="space-y-3">
-            <label className="text-xs font-black text-slate-300 uppercase tracking-wider block">
-              Alcance de la Sincronización:
-            </label>
+          {/* Scope Selector Options — solo si hay cambios de ventanas */}
+          {hasAnyWindowChanges && (
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-300 uppercase tracking-wider block">
+                Alcance de la Sincronización (Ventanas):
+              </label>
 
-            <div className="grid grid-cols-1 gap-3">
-              {/* Option 1: Solo Celda Activa (Renderizado si posee cambios) */}
-              {activeHasChanges && (
+              <div className="grid grid-cols-1 gap-3">
+                {/* Option 1: Solo Celda Activa (Renderizado si posee cambios) */}
+                {activeHasChanges && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedScope('active')}
+                    className={`p-4 rounded-xl border text-left transition-all relative flex items-start gap-3 ${
+                      selectedScope === 'active'
+                        ? 'bg-amber-500/10 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                        : 'bg-navy-950/40 border-navy-800 hover:border-navy-700'
+                    }`}
+                  >
+                    <div className={`mt-0.5 p-1 rounded-full border ${selectedScope === 'active' ? 'bg-amber-500 border-amber-400 text-navy-950' : 'border-navy-700'}`}>
+                      <Check size={12} className="stroke-[3]" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-100">
+                          Guardar solo Celda Activa ({activeWindow?.header.celda || 'Celda Activa'})
+                        </span>
+                        <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          {workspaceDiff.activeDiff.totalEdits} cambios
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Sincroniza únicamente la celda que está visualizando en pantalla.
+                      </p>
+                    </div>
+                  </button>
+                )}
+
+                {/* Option 2: Guardar TODAS las Celdas Pendientes */}
                 <button
                   type="button"
-                  onClick={() => setSelectedScope('active')}
+                  onClick={() => setSelectedScope('all')}
                   className={`p-4 rounded-xl border text-left transition-all relative flex items-start gap-3 ${
-                    selectedScope === 'active'
+                    selectedScope === 'all'
                       ? 'bg-amber-500/10 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
                       : 'bg-navy-950/40 border-navy-800 hover:border-navy-700'
                   }`}
                 >
-                  <div className={`mt-0.5 p-1 rounded-full border ${selectedScope === 'active' ? 'bg-amber-500 border-amber-400 text-navy-950' : 'border-navy-700'}`}>
+                  <div className={`mt-0.5 p-1 rounded-full border ${selectedScope === 'all' ? 'bg-amber-500 border-amber-400 text-navy-950' : 'border-navy-700'}`}>
                     <Check size={12} className="stroke-[3]" />
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold text-slate-100">
-                        Guardar solo Celda Activa ({activeWindow?.header.celda || 'Celda Activa'})
+                        Guardar TODAS las Celdas Pendientes ({workspaceDiff.totalWindowsWithChanges} celdas)
                       </span>
                       <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                        {workspaceDiff.activeDiff.totalEdits} cambios
+                        {workspaceDiff.totalCellEditsAll + workspaceDiff.totalJointsAddedAll + workspaceDiff.totalJointsDeletedAll} cambios totales
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                      Sincroniza únicamente la celda que está visualizando en pantalla.
+                      Sincroniza todas las celdas modificadas registradas en su sesión.
                     </p>
                   </div>
                 </button>
-              )}
-
-              {/* Option 2: Guardar TODAS las Celdas Pendientes */}
-              <button
-                type="button"
-                onClick={() => setSelectedScope('all')}
-                className={`p-4 rounded-xl border text-left transition-all relative flex items-start gap-3 ${
-                  selectedScope === 'all'
-                    ? 'bg-amber-500/10 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                    : 'bg-navy-950/40 border-navy-800 hover:border-navy-700'
-                }`}
-              >
-                <div className={`mt-0.5 p-1 rounded-full border ${selectedScope === 'all' ? 'bg-amber-500 border-amber-400 text-navy-950' : 'border-navy-700'}`}>
-                  <Check size={12} className="stroke-[3]" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-100">
-                      Guardar TODAS las Celdas Pendientes ({workspaceDiff.totalWindowsWithChanges} celdas)
-                    </span>
-                    <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                      {workspaceDiff.totalCellEditsAll + workspaceDiff.totalJointsAddedAll + workspaceDiff.totalJointsDeletedAll} cambios totales
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Sincroniza todas las celdas modificadas registradas en su sesión.
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Audit Metrics Breakdown */}
-          <div className="bg-navy-950/60 border border-navy-800 rounded-xl p-4 space-y-3">
-            <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <FileSpreadsheet size={14} className="text-amber-400" />
-              <span>Resumen de Auditoría de Cambios:</span>
-            </h4>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
-                <span className="text-slate-400">Atributos de Header:</span>
-                <span className="font-bold text-amber-400">{targetDiff.headerEditsCount}</span>
-              </div>
-              <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
-                <span className="text-slate-400">Celdas de Discontinuidad:</span>
-                <span className="font-bold text-amber-400">{targetDiff.jointsEditsCount}</span>
-              </div>
-              <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
-                <span className="text-slate-400">Discontinuidades Nuevas:</span>
-                <span className="font-bold text-emerald-400">+{targetDiff.jointsAddedCount}</span>
-              </div>
-              <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
-                <span className="text-slate-400">Discontinuidades Eliminadas:</span>
-                <span className="font-bold text-rose-400">-{targetDiff.jointsDeletedCount}</span>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Audit Metrics Breakdown — Ventanas */}
+          {hasAnyWindowChanges && (
+            <div className="bg-navy-950/60 border border-navy-800 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <FileSpreadsheet size={14} className="text-amber-400" />
+                <span>Resumen de Cambios en Ventanas:</span>
+              </h4>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Atributos de Header:</span>
+                  <span className="font-bold text-amber-400">{targetDiff.headerEditsCount}</span>
+                </div>
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Celdas de Discontinuidad:</span>
+                  <span className="font-bold text-amber-400">{targetDiff.jointsEditsCount}</span>
+                </div>
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Discontinuidades Nuevas:</span>
+                  <span className="font-bold text-emerald-400">+{targetDiff.jointsAddedCount}</span>
+                </div>
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Discontinuidades Eliminadas:</span>
+                  <span className="font-bold text-rose-400">-{targetDiff.jointsDeletedCount}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Audit Metrics Breakdown — Ensayos PLT */}
+          {hasPltChanges && pltDiff && (
+            <div className="bg-navy-950/60 border border-violet-500/20 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Activity size={14} className="text-violet-400" />
+                <span>Resumen de Cambios en Ensayos PLT Irregulares:</span>
+              </h4>
+
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Nuevos:</span>
+                  <span className="font-bold text-emerald-400">+{pltDiff.added}</span>
+                </div>
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Modificados:</span>
+                  <span className="font-bold text-amber-400">{pltDiff.modified}</span>
+                </div>
+                <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
+                  <span className="text-slate-400">Eliminados:</span>
+                  <span className="font-bold text-rose-400">-{pltDiff.deleted}</span>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-500 font-medium">
+                Total de registros PLT en sesión: {pltDiff.totalRows} • {pltDiff.totalChanges} cambio(s) pendiente(s)
+              </p>
+            </div>
+          )}
+
+          {/* Empty state: solo PLT y sin ventanas */}
+          {!hasAnyWindowChanges && !hasPltChanges && (
+            <div className="text-center py-6">
+              <p className="text-xs text-slate-400">No se detectaron cambios pendientes de sincronización.</p>
+            </div>
+          )}
 
           {/* Warning Banner */}
           <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs">

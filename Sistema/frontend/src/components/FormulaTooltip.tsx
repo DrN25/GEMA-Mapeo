@@ -379,7 +379,8 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         calcExplanation: (params) => {
             if (!params) return "";
             const { d, w, val } = params;
-            return `0.3 * W: ${(0.3 * (w || 0)).toFixed(2)} < D: ${d ?? '—'} < W: ${w ?? '—'} ➔ ${val ?? '—'}`;
+            const wVal = typeof w === 'number' ? (0.3 * w).toFixed(2) : '—';
+            return `0.3 * W: ${wVal} < D: ${d ?? '—'} < W: ${w ?? '—'} ➔ ${val ?? '—'}`;
         }
     },
     plt_diam_equiv: {
@@ -401,18 +402,18 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         calcExplanation: (params) => {
             if (!params) return "";
             const { de, val } = params;
-            return `(${de !== undefined ? (de * 10).toFixed(1) : '0'} / 50) ^ 0.45 = ${val ?? '—'}`;
+            return `(${typeof de === 'number' ? (de * 10).toFixed(1) : '0'} / 50) ^ 0.45 = ${val ?? '—'}`;
         }
     },
     plt_is_mpa: {
         title: "Índice Carga Puntual Is (MPa)",
         equation: "Is = P * 1000 / (De * 10)²",
-        description: "Índice de carga puntual no corregido en MPa calculado a partir de la fuerza de ruptura P (kN) y el diámetro equivalente.",
+        description: "Índice de carga puntual no corregido en MPa calculated a partir de la fuerza de ruptura P (kN) y el diámetro equivalente.",
         inputs: ["Fuerza P (kN)", COLUMN_NAMES.diametro_equivalente],
         calcExplanation: (params) => {
             if (!params) return "";
             const { p, de, val } = params;
-            return `${p ?? '0'} * 1000 / (${de !== undefined ? (de * 10).toFixed(1) : '0'})² = ${val ?? '—'} MPa`;
+            return `${p ?? '0'} * 1000 / (${typeof de === 'number' ? (de * 10).toFixed(1) : '0'})² = ${val ?? '—'} MPa`;
         }
     },
     plt_is50: {
@@ -442,21 +443,21 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
         equation: "Clasificación = Lookup(ISRM_TABLE, UCS)",
         description: "Clasifica la resistencia del macizo de roca intacta en los grados normalizados (R0 a R6) según el UCS estimado.",
         inputs: [COLUMN_NAMES.ucs],
-        calcExplanation: (params) => `UCS: ${params?.ucs !== undefined ? params.ucs.toFixed(2) : '—'} ➔ ISRM: ${params?.val ?? '—'}`
+        calcExplanation: (params) => `UCS: ${typeof params?.ucs === 'number' ? params.ucs.toFixed(2) : '—'} ➔ ISRM: ${params?.val ?? '—'}`
     },
     utm_x_proj: {
         title: "Proyección UTM Este (X)",
         equation: "X = Distancia * sin(θ) + Este_FROM",
         description: "Calcula la coordenada Este (X) del plano de la discontinuidad proyectada a lo largo del scanline 3D.",
         inputs: ["Distancia", "Ángulo θ", "Este FROM"],
-        calcExplanation: (params) => `X = ${params?.dist?.toFixed(3) ?? '—'} * sin(${params?.theta?.toFixed(2) ?? '—'}°) + ${params?.este_from?.toFixed(2) ?? '—'} = ${params?.val?.toFixed(4) ?? '—'}`
+        calcExplanation: (params) => `X = ${typeof params?.dist === 'number' ? params.dist.toFixed(3) : '—'} * sin(${typeof params?.theta === 'number' ? params.theta.toFixed(2) : '—'}°) + ${typeof params?.este_from === 'number' ? params.este_from.toFixed(2) : '—'} = ${typeof params?.val === 'number' ? params.val.toFixed(4) : '—'}`
     },
     utm_y_proj: {
         title: "Proyección UTM Norte (Y)",
         equation: "Y = Distancia * cos(θ) + Norte_FROM",
         description: "Calcula la coordenada Norte (Y) de la discontinuidad proyectada.",
         inputs: ["Distancia", "Ángulo θ", "Norte FROM"],
-        calcExplanation: (params) => `Y = ${params?.dist?.toFixed(3) ?? '—'} * cos(${params?.theta?.toFixed(2) ?? '—'}°) + ${params?.norte_from?.toFixed(2) ?? '—'} = ${params?.val?.toFixed(2) ?? '—'}`
+        calcExplanation: (params) => `Y = ${typeof params?.dist === 'number' ? params.dist.toFixed(3) : '—'} * cos(${typeof params?.theta === 'number' ? params.theta.toFixed(2) : '—'}°) + ${typeof params?.norte_from === 'number' ? params.norte_from.toFixed(2) : '—'} = ${typeof params?.val === 'number' ? params.val.toFixed(2) : '—'}`
     },
     utm_z_proj: {
         title: "Proyección UTM Cota (Z)",
