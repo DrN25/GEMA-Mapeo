@@ -170,9 +170,10 @@ def delete_ensayo_plt(plt_id: int, db: Session = Depends(get_db)):
 
 @router.post("/ensayos-plt", response_model=List[s.EnsayoPLTSaveSchema])
 def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    celda_origen = celda.strip().upper() if celda and celda.strip() else None
     affected_celdas = set()
-    if celda and celda.strip():
-        affected_celdas.add(celda.strip().upper())
+    if celda_origen:
+        affected_celdas.add(celda_origen)
     for item in data:
         if item.celda_mapeo and item.celda_mapeo.strip():
             affected_celdas.add(item.celda_mapeo.strip().upper())
@@ -278,6 +279,7 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
             db.add(sql_row)
         else:
             sql_row.codigo_muestra = codigo_m
+            sql_row.campania_id = int(d.campana) if d.campana and str(d.campana).isdigit() else 7
             sql_row.litologia1_id = lito1_id
             sql_row.litologia2_id = lito2_id
             sql_row.litologia3_id = lito3_id
@@ -325,5 +327,4 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
 
     db.commit()
 
-    target_celda = list(affected_celdas)[0] if affected_celdas else None
-    return get_ensayos_plt(celda=target_celda, db=db)
+    return get_ensayos_plt(celda=celda_origen, db=db)

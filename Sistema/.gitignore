@@ -22,6 +22,8 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+*.pyc
+__pycache__
 
 # Variables de entorno
 .env
