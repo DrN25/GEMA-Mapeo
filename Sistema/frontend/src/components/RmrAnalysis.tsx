@@ -101,7 +101,10 @@ export default function RmrAnalysis({
     if (isNaN(num)) {
       onChange({ ...header, [field]: 0 });
     } else {
-      onChange({ ...header, [field]: num });
+      let clamped = num;
+      if (field === 'ucs_mpa') clamped = Math.min(500, Math.max(0, num));
+      else if (field === 'is50_mpa') clamped = Math.min(50, Math.max(0, num));
+      onChange({ ...header, [field]: clamped });
     }
   };
 

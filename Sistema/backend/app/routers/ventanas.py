@@ -360,12 +360,47 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
     )
 
 
+def _safe_distancia_celda(value) -> Optional[float]:
+    """Cap distancia_celda al rango máximo de Numeric(8,3) = 99999.999 m.
+    Si el valor supera ese límite o es negativo, retorna None para evitar
+    un DataError de desbordamiento aritmético en SQL Server."""
+    if value is None:
+        return None
+    try:
+        v = float(value)
+        if v < 0 or v > 99999.999:
+            return None
+        return round(v, 3)
+    except (ValueError, TypeError):
+        return None
+
+
 def calculate_and_persist_subratings(db: Session, v: models.Ventana):
     """Hybrid Cache Writable: recalcular sub-ratings en backend y persistir."""
+    try:
+        ix = float(v.este_from or 0)
+        iy = float(v.norte_from or 0)
+        ic = float(v.cota_from or 0)
+        fx = float(v.este_to or 0)
+        fy = float(v.norte_to or 0)
+        fc = float(v.cota_to or 0)
+    except (TypeError, ValueError):
+        ix = iy = ic = fx = fy = fc = 0.0
+
+    # Solo calcular largo_m si AMBOS extremos son distintos de (0,0,0)
+    # para evitar calcular la magnitud del vector desde el origen (coordenadas UTM brutas)
+    origin_from = (ix == 0.0 and iy == 0.0 and ic == 0.0)
+    origin_to   = (fx == 0.0 and fy == 0.0 and fc == 0.0)
+    valid_coords = not origin_from and not origin_to
+
     header_data = {
-        "este_ini": float(v.este_from), "norte_ini": float(v.norte_from), "cota_ini": float(v.cota_from),
-        "este_fin": float(v.este_to), "norte_fin": float(v.norte_to), "cota_fin": float(v.cota_to),
-        "largo_m": float(v.distancia_celda) if v.distancia_celda is not None else None,
+        "este_ini": ix if valid_coords else None,
+        "norte_ini": iy if valid_coords else None,
+        "cota_ini": ic if valid_coords else None,
+        "este_fin": fx if valid_coords else None,
+        "norte_fin": fy if valid_coords else None,
+        "cota_fin": fc if valid_coords else None,
+        "largo_m": _safe_distancia_celda(v.distancia_celda),
     }
     rows_data = []
     for e in v.discontinuidades:
@@ -418,8 +453,10 @@ def calculate_and_persist_subratings(db: Session, v: models.Ventana):
     if res["espac_prom"]:
         v.tamano_bloques_rmr76 = res["espac_prom"] ** 3
         v.tamano_bloques_rmr89 = res["espac_prom"] ** 3
-    if v.distancia_celda is None and res["largo_m"]:
-        v.distancia_celda = res["largo_m"]
+    if v.distancia_celda is None and res.get("largo_m"):
+        safe_largo = _safe_distancia_celda(res["largo_m"])
+        if safe_largo is not None:
+            v.distancia_celda = safe_largo
 
     for r_calc, e in zip(res["rows"], v.discontinuidades):
         e.valor_alteracion_cd76 = r_calc["alt_r76"]
@@ -690,7 +727,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.nivel = data.nivel
         v.este_from = data.este_ini; v.norte_from = data.norte_ini; v.cota_from = data.cota_ini
         v.este_to = data.este_fin; v.norte_to = data.norte_fin; v.cota_to = data.cota_fin
-        v.distancia_celda = data.distancia_celda
+        v.distancia_celda = _safe_distancia_celda(data.distancia_celda)
         v.altura = data.altura
         v.dip = data.dip; v.azimut_hole = data.azimut_hole
         v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
@@ -710,7 +747,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             fecha_mapeo=data.fecha_mapeo, nivel=data.nivel,
             este_from=data.este_ini, norte_from=data.norte_ini, cota_from=data.cota_ini,
             este_to=data.este_fin, norte_to=data.norte_fin, cota_to=data.cota_fin,
-            distancia_celda=data.distancia_celda, altura=data.altura,
+            distancia_celda=_safe_distancia_celda(data.distancia_celda), altura=data.altura,
             dip=data.dip, azimut_hole=data.azimut_hole,
             dip_talud=data.dip_talud, dip_dir_talud=data.dipdir_talud,
             litologia1_id=lito1_id, litologia2_id=lito2_id, litologia3_id=lito3_id,

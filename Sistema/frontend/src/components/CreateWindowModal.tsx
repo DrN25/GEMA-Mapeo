@@ -281,8 +281,11 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Fase</label>
-                  <input type="text" placeholder="ej. 5" value={fase}
-                    onChange={(e) => setFase(e.target.value)}
+                  <input type="text" inputMode="numeric" placeholder="ej. 5" value={fase}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/\D/g, '').slice(0, 2);
+                      setFase(cleaned);
+                    }}
                     className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold" />
                 </div>
               </div>

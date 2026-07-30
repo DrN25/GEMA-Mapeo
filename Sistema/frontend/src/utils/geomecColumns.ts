@@ -180,6 +180,7 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
         type: 'number',
         width: 144,
         precision: 1,
+        range: [0, 50000],
         formatOnBlur: (val) => val !== undefined && val !== -1 ? `${val.toFixed(1).replace('.', ',')} (${getAberturaClase(val)})` : ''
     },
     {
@@ -188,15 +189,17 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
         type: 'number',
         width: 96,
         precision: 1,
+        range: [0, 50000],
         formatOnBlur: (val) => val !== undefined && val !== -1 ? val.toFixed(1) : ''
     },
-    { key: 'continuidad', label: COLUMN_LABELS.continuidad, type: 'number', width: 96, precision: 2, range: [0, 100] },
+    { key: 'continuidad', label: COLUMN_LABELS.continuidad, type: 'number', width: 96, precision: 2, range: [0, 99] },
     {
         key: 'espaciamiento',
         label: COLUMN_LABELS.espaciamiento,
         type: 'number',
         width: 96,
         precision: 2,
+        range: [0, 99],
         formatOnBlur: (val) => val !== undefined && val !== -1 ? val.toFixed(2) : ''
     },
     {

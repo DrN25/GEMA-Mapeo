@@ -293,24 +293,17 @@ export default function VentanaForm({
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between block w-full">
                   <span>Dist. Celda (m)</span>
-                  {calculatedLargo !== null && (
-                    <span className="text-[10px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.1)] select-none">
-                      AUTO
-                    </span>
-                  )}
+                  <span className="text-[10px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.1)] select-none">
+                    AUTO
+                  </span>
                 </label>
-                <input
-                  type="text"
+                <div
                   id="header-largo"
-                  value={header.largo || ''}
-                  readOnly={calculatedLargo !== null}
-                  onChange={(e) => {
-                    const cleaned = e.target.value.replace(/\D/g, '');
-                    handleChange('largo', cleaned === '' ? '' : parseInt(cleaned, 10));
-                  }}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold text-center transition-all ${calculatedLargo !== null ? 'text-orange-400 border-orange-500/30 bg-orange-500/[0.03] cursor-not-allowed' : 'text-slate-100 border-navy-700/80 bg-navy-900/40'}`}
-                  placeholder="m"
-                />
+                  title="Calculado automáticamente desde coordenadas FROM→TO"
+                  className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                >
+                  {calculatedLargo !== null ? `${calculatedLargo} m` : '—'}
+                </div>
               </div>
             </div>
 
@@ -571,6 +564,7 @@ export default function VentanaForm({
                     value={header.sect_geot || ''}
                     onChange={(e) => handleSectGeotChange(e.target.value)}
                     placeholder="Sector Geot."
+                    maxLength={32}
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   />
                 </div>
@@ -600,8 +594,9 @@ export default function VentanaForm({
                   <input
                     type="text"
                     value={header.alt_zona || ''}
-                    onChange={(e) => handleChange('alt_zona', e.target.value)}
-                    placeholder="Alta / Media / Baja"
+                    onChange={(e) => handleChange('alt_zona', e.target.value.toUpperCase().slice(0, 32))}
+                    placeholder="m / d / ..."
+                    maxLength={1}
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   />
                 </div>
@@ -629,8 +624,12 @@ export default function VentanaForm({
                   <label className="text-xs font-bold text-slate-500 uppercase block">Fase</label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     value={header.fase || ''}
-                    onChange={(e) => handleChange('fase', e.target.value)}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/\D/g, '').slice(0, 2);
+                      handleChange('fase', cleaned === '' ? '' : parseInt(cleaned, 10));
+                    }}
                     placeholder="Fase"
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
                   />

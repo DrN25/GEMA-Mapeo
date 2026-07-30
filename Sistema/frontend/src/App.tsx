@@ -692,7 +692,8 @@ export default function App() {
     setDbSnapshotData(null);
     setDbSnapshotHash(null);
     localStorage.setItem('geolog_active_window_celda', formatted.header.celda);
-    localStorage.setItem(`geolog_window_${formatted.header.celda}`, JSON.stringify(formatted));
+    // NO escribir geolog_window_* aquí: el useEffect de rastreo lo hará en el siguiente ciclo
+    // de render, después de que computeWindowDiff detecte correctamente la celda como nueva.
     setCurrentView('mapeo');
     setSyncStatus('unsaved');
   };
