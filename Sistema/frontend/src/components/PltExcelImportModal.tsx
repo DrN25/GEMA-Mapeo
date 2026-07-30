@@ -35,7 +35,6 @@ export default function PltExcelImportModal({
     const [mappings, setMappings] = useState<Record<string, number>>({});
 
     const [importedRowsState, setImportedRowsState] = useState<any[]>([]);
-    const [importMode, setImportMode] = useState<'filtered' | 'all'>('filtered');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 

@@ -8,7 +8,6 @@ from typing import List, Optional, Any
 
 from app.database import get_db
 from app import models, schemas as s
-from app.routers.ventanas import Resolver
 
 router = APIRouter()
 
@@ -200,7 +199,8 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
             )
         existing_db_rows.extend(q.all())
 
-    resolver = Resolver(db)
+    from app.routers.ventanas import GEMACatalogResolver
+    resolver = GEMACatalogResolver(db)
     processed_rows = []
 
     for d in data:
