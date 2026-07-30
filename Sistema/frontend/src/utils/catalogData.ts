@@ -8,7 +8,6 @@ export let STRUCTURE_CATALOG: Record<string, string> = {
 export let RELLENO_CATALOG: Record<string, any> = {
   "-1": { name: "Sin información (-1)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
   c: { name: "Limpio sin relleno (c)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
-  cwf: { name: "Limpio sin relleno (c)", clase: 3, tipo: "Sin relleno", rmr76: 5, rmr89: 6, rmr76_gt5: 5, rmr89_gt5: 6 },
   si: { name: "Sílice (si)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   sf: { name: "Sulfuros (sf)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
   ep: { name: "Epidota (ep)", clase: 1, tipo: "Duro", rmr76: 4, rmr89: 4, rmr76_gt5: 3, rmr89_gt5: 2 },
@@ -21,6 +20,8 @@ export let RELLENO_CATALOG: Record<string, any> = {
   ch: { name: "Clorita (ch)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
   sa: { name: "Arena (sa)", clase: 2, tipo: "Blando", rmr76: 2, rmr89: 2, rmr76_gt5: 0, rmr89_gt5: 0 },
 };
+// Alias de lectura para retrocompatibilidad con registros 'cwf'
+RELLENO_CATALOG["cwf"] = RELLENO_CATALOG["c"];
 export let ALTERACION_CATALOG: Record<string, any> = {
   f: { name: "f — Fresca", r76: 5, r89: 6 },
   d: { name: "d — Débilmente meteorizada", r76: 5, r89: 5 },
@@ -114,7 +115,7 @@ export function resolveLithologyCascade(
   }
 
   const foundK = lookupPltKOnly(finalL2, finalL3);
-  
+
   const exactMatch = LITHOLOGY_CLASSIFICATION.find(item => {
     const itemL2 = item.litologia.toUpperCase();
     const itemL3 = item.codigo.toUpperCase();
@@ -201,9 +202,10 @@ export function initCatalogs(data: any) {
   // 5. Relleno
   for (const k in RELLENO_CATALOG) delete RELLENO_CATALOG[k];
   data.relleno.forEach((item: any) => {
+    const code = item.codigo === 'cwf' ? 'c' : item.codigo;
     const claseVal = item.tipo === "Blando" ? 1 : (item.tipo === "Duro" ? 2 : 3);
-    RELLENO_CATALOG[item.codigo] = {
-      name: `${item.nombre} (${item.codigo})`,
+    RELLENO_CATALOG[code] = {
+      name: `${item.nombre} (${code})`,
       clase: claseVal,
       tipo: item.tipo,
       rmr76: item.r76_lt5,
@@ -212,6 +214,9 @@ export function initCatalogs(data: any) {
       rmr89_gt5: item.r89_gte5
     };
   });
+  if (RELLENO_CATALOG['c']) {
+    RELLENO_CATALOG['cwf'] = RELLENO_CATALOG['c'];
+  }
 
   // 6. Alteración
   for (const k in ALTERACION_CATALOG) delete ALTERACION_CATALOG[k];

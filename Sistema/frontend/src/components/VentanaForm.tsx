@@ -1,7 +1,7 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
-import { AlignLeft, FileSpreadsheet } from 'lucide-react';
+import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
 
 // Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
@@ -24,8 +24,8 @@ interface VentanaFormProps {
   onOpenImportModal: () => void;
 }
 
-const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
-  const isNegative = value.startsWith('-');
+const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
+  const isNegative = allowNegative && value.startsWith('-');
   const cleaned = value.replace(/[^0-9.]/g, '');
   const parts = cleaned.split('.');
   if (parts.length > 2) return (isNegative ? '-' : '') + cleaned.slice(0, -1);
@@ -45,9 +45,9 @@ const handleNumberInputLimit = (value: string, intDigits: number, decDigits: num
 };
 
 // Sanitizador global de entrada decimal para unificar de coma a punto en tiempo real
-const sanitizeDecimalInput = (val: string, intDigits: number, decDigits: number): string => {
+const sanitizeDecimalInput = (val: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
   const sanitized = val.replace(',', '.');
-  return handleNumberInputLimit(sanitized, intDigits, decDigits);
+  return handleNumberInputLimit(sanitized, intDigits, decDigits, allowNegative);
 };
 
 export default function VentanaForm({
@@ -74,7 +74,7 @@ export default function VentanaForm({
 
   const handleCoordinateInputChange = (field: keyof WindowHeader, val: string, intDigits: number, decDigits: number) => {
     const sanitized = val.replace(',', '.');
-    const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits);
+    const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits, true);
     setLocalValues(prev => ({ ...prev, [field as string]: restricted }));
 
     const num = parseFloat(restricted);
@@ -95,115 +95,113 @@ export default function VentanaForm({
     if (isNaN(num)) {
       handleChange(field, 0);
     } else {
-      handleChange(field, num);
+      handleChange(field, Math.max(0, num));
     }
   };
 
-  const uniqueLito1 = Array.from(new Set([
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.unidad),
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.litologia),
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.codigo),
-    ...(header.lito_1 ? [header.lito_1] : [])
-  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
+  const uniqueLito1 = React.useMemo(() => {
+    const set = new Set<string>();
+    LITHOLOGY_CLASSIFICATION.forEach(item => {
+      if (item.unidad) set.add(item.unidad);
+    });
+    if (header.lito_1) set.add(header.lito_1);
+    return Array.from(set).filter(x => x && x !== '-' && x !== 'NR').sort();
+  }, [header.lito_1]);
 
-  const uniqueUnidades = Array.from(new Set([
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.grupo),
-    ...(header.unidad_litologica ? [header.unidad_litologica, header.unidad_litologica.toUpperCase()] : [])
-  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
+  const uniqueLito2 = React.useMemo(() => {
+    const set = new Set<string>();
+    LITHOLOGY_CLASSIFICATION.forEach(item => {
+      if (item.litologia) set.add(item.litologia);
+    });
+    if (header.lito_2 && header.lito_2 !== '-1') set.add(header.lito_2);
+    return Array.from(set).filter(x => x && x !== '-' && x !== 'NR').sort();
+  }, [header.lito_2]);
 
-  const filteredLito2Options = Array.from(new Set([
-    ...LITHOLOGY_CLASSIFICATION.filter(item => !header.lito_1 || item.unidad === header.lito_1 || item.litologia === header.lito_1 || item.codigo === header.lito_1).map(item => item.litologia),
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.litologia),
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.codigo),
-    ...(header.lito_2 ? [header.lito_2] : [])
-  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
+  const uniqueLito3 = React.useMemo(() => {
+    const set = new Set<string>();
+    LITHOLOGY_CLASSIFICATION.forEach(item => {
+      if (item.codigo) set.add(item.codigo);
+    });
+    if (header.lito_3 && header.lito_3 !== '-1') set.add(header.lito_3);
+    return Array.from(set).filter(x => x && x !== '-' && x !== 'NR').sort();
+  }, [header.lito_3]);
 
-  const filteredLito3Options = Array.from(new Set([
-    ...LITHOLOGY_CLASSIFICATION.filter(item => !header.lito_2 || item.litologia === header.lito_2 || item.codigo === header.lito_2).map(item => item.codigo),
-    ...LITHOLOGY_CLASSIFICATION.map(item => item.codigo),
-    ...(header.lito_3 ? [header.lito_3] : [])
-  ])).filter(x => x && x !== '-' && x !== 'NR').sort();
+  const uniqueUnidades = React.useMemo(() => {
+    const set = new Set<string>();
+    LITHOLOGY_CLASSIFICATION.forEach(item => {
+      if (item.grupo) set.add(item.grupo);
+    });
+    if (header.unidad_litologica) set.add(header.unidad_litologica);
+    return Array.from(set).filter(x => x && x !== '-' && x !== 'NR').sort();
+  }, [header.unidad_litologica]);
+
+  const litoValidation = React.useMemo(() => {
+    const g = (header.unidad_litologica || '').trim().toUpperCase();
+    const u = (header.lito_1 || '').trim().toUpperCase();
+    const l = (header.lito_2 || '').trim().toUpperCase();
+    const c = (header.lito_3 || '').trim().toUpperCase();
+
+    const isGEmpty = !g || g === '-1';
+    const isL1Empty = !u || u === '-1';
+    const isL2Empty = !l || l === '-1';
+    const isL3Empty = !c || c === '-1';
+
+    if (isGEmpty && isL1Empty && isL2Empty && isL3Empty) {
+      return { isInvalid: false, matchedItem: null, reason: null };
+    }
+
+    if (isGEmpty) {
+      return {
+        isInvalid: true,
+        matchedItem: null,
+        reason: 'Se requiere seleccionar obligatoriamente una Unidad Litológica (INTRUSIVOS, SEDIMENTARIOS, METAMORFICAS, BRECHAS, ENDOSKARN).'
+      };
+    }
+
+    const groupSyns: Record<string, string> = {
+      "SEDIMENTARIA": "SEDIMENTARIOS", "SEDIMENTARIAS": "SEDIMENTARIOS", "SEDIMENTARIO": "SEDIMENTARIOS",
+      "INTRUSIVA": "INTRUSIVOS", "INTRUSIVAS": "INTRUSIVOS", "INTRUSIVO": "INTRUSIVOS",
+      "METAMORFICO": "METAMORFICAS", "METAMORFICOS": "METAMORFICAS", "METAMORFICA": "METAMORFICAS",
+      "BRECHA": "BRECHAS"
+    };
+    const normG = groupSyns[g] || g;
+
+    const matches = LITHOLOGY_CLASSIFICATION.filter(item => {
+      const itemG = (item.grupo || '').toUpperCase();
+      const normItemG = groupSyns[itemG] || itemG;
+      const itemU = (item.unidad || '').toUpperCase();
+      const itemL = (item.litologia || '').toUpperCase();
+      const itemC = (item.codigo || '').toUpperCase();
+
+      const mg = normItemG === normG;
+      const m1 = isL1Empty || itemU === u;
+      const m2 = isL2Empty || itemL === l;
+      const m3 = isL3Empty || itemC === c;
+
+      return mg && m1 && m2 && m3;
+    });
+
+    if (matches.length === 0) {
+      return {
+        isInvalid: true,
+        matchedItem: null,
+        reason: `Combinación no existente en GEMA: Unidad (${header.unidad_litologica}) con Lito 1 (${header.lito_1 || '—'}) / Lito 2 (${header.lito_2 || '—'}) / Lito 3 (${header.lito_3 || '—'}).`
+      };
+    }
+
+    return { isInvalid: false, matchedItem: matches[0], reason: null };
+  }, [header.unidad_litologica, header.lito_1, header.lito_2, header.lito_3]);
 
   const handleLito1Change = (val: string) => {
-    if (!val) {
-      onChange({
-        ...header,
-        lito_1: '',
-        lito_2: '',
-        lito_3: '',
-        unidad_litologica: ''
-      });
-      return;
-    }
-    const matches = LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === val);
-    if (matches.length === 1) {
-      onChange({
-        ...header,
-        lito_1: val,
-        lito_2: matches[0].litologia,
-        lito_3: matches[0].codigo,
-        unidad_litologica: matches[0].grupo
-      });
-    } else {
-      const uniqueL2 = Array.from(new Set(matches.map(m => m.litologia)));
-      const uniqueGrup = Array.from(new Set(matches.map(m => m.grupo)));
-      onChange({
-        ...header,
-        lito_1: val,
-        lito_2: uniqueL2.length === 1 ? uniqueL2[0] : '',
-        lito_3: '',
-        unidad_litologica: uniqueGrup.length === 1 ? uniqueGrup[0] : ''
-      });
-    }
+    handleChange('lito_1', val);
   };
 
   const handleLito2Change = (val: string) => {
-    if (!val) {
-      onChange({
-        ...header,
-        lito_2: '',
-        lito_3: '',
-        unidad_litologica: ''
-      });
-      return;
-    }
-    const matches = LITHOLOGY_CLASSIFICATION.filter(
-      item => item.unidad === header.lito_1 && item.litologia === val
-    );
-    if (matches.length === 1) {
-      onChange({
-        ...header,
-        lito_2: val,
-        lito_3: matches[0].codigo,
-        unidad_litologica: matches[0].grupo
-      });
-    } else {
-      onChange({
-        ...header,
-        lito_2: val,
-        lito_3: ''
-      });
-    }
+    handleChange('lito_2', val);
   };
 
   const handleLito3Change = (val: string) => {
-    if (!val) {
-      onChange({ ...header, lito_3: '' });
-      return;
-    }
-    const match = LITHOLOGY_CLASSIFICATION.find(
-      item => item.unidad === header.lito_1 && item.litologia === header.lito_2 && item.codigo === val
-    ) || LITHOLOGY_CLASSIFICATION.find(item => item.codigo === val);
-
-    if (match) {
-      onChange({
-        ...header,
-        lito_1: match.unidad,
-        lito_2: match.litologia,
-        lito_3: match.codigo,
-        unidad_litologica: match.grupo
-      });
-    }
+    handleChange('lito_3', val);
   };
 
   const handleUnidadChange = (val: string) => {
@@ -401,14 +399,15 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">Altura (m)</label>
                 <input
                   type="text"
+                  placeholder="Altura"
                   value={getInputValue('altura', header.altura)}
                   onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 1);
+                    const limited = sanitizeDecimalInput(e.target.value, 2, 1, false);
                     handleChange('altura', limited);
                   }}
                   onBlur={(e) => {
                     const num = parseFloat(e.target.value);
-                    handleChange('altura', isNaN(num) ? 0 : num);
+                    handleChange('altura', isNaN(num) ? 0 : Math.min(99, Math.max(0, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -421,7 +420,7 @@ export default function VentanaForm({
                   placeholder="-90 a 90"
                   value={getInputValue('dip_talud', header.dip_talud)}
                   onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 2, 2);
+                    const limited = sanitizeDecimalInput(e.target.value, 2, 2, true);
                     handleChange('dip_talud', limited);
                   }}
                   onBlur={(e) => {
@@ -439,7 +438,7 @@ export default function VentanaForm({
                   placeholder="0-359"
                   value={getInputValue('dipdir_talud', header.dipdir_talud)}
                   onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 2);
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 2, false);
                     handleChange('dipdir_talud', limited);
                   }}
                   onBlur={(e) => {
@@ -457,7 +456,7 @@ export default function VentanaForm({
                   placeholder="-90-90"
                   value={getInputValue('dip_hw', header.dip_hw)}
                   onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 2);
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 2, true);
                     handleChange('dip_hw', limited);
                   }}
                   onBlur={(e) => {
@@ -475,7 +474,7 @@ export default function VentanaForm({
                   placeholder="0-359"
                   value={getInputValue('az_hw', header.az_hw)}
                   onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 2);
+                    const limited = sanitizeDecimalInput(e.target.value, 3, 2, false);
                     handleChange('az_hw', limited);
                   }}
                   onBlur={(e) => {
@@ -495,63 +494,95 @@ export default function VentanaForm({
               ======================================================== */}
           <div className="lg:col-span-7 space-y-5 lg:border-l lg:border-navy-900 lg:pl-6">
 
-            {/* Bloque Litológico */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">Lito 1</label>
-                <select
-                  value={header.lito_1 || ''}
-                  onChange={(e) => handleLito1Change(e.target.value)}
-                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center"
-                >
-                  <option value="">— Lito 1 —</option>
-                  {uniqueLito1.map(l => (
-                    <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
-                  ))}
-                </select>
+            {/* Bloque Litológico con Selección Independiente y Validación Reactiva */}
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Lito 1</label>
+                  <select
+                    value={header.lito_1 || ''}
+                    onChange={(e) => handleLito1Change(e.target.value)}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${
+                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85'
+                    }`}
+                  >
+                    <option value="">— Lito 1 —</option>
+                    {uniqueLito1.map(l => (
+                      <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Lito 2</label>
+                  <select
+                    value={header.lito_2 || '-1'}
+                    onChange={(e) => handleLito2Change(e.target.value)}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${
+                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                    }`}
+                  >
+                    <option value="-1">— Lito 2 —</option>
+                    {uniqueLito2.map(l => (
+                      <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Lito 3</label>
+                  <select
+                    value={header.lito_3 || '-1'}
+                    onChange={(e) => handleLito3Change(e.target.value)}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${
+                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-orange-400'
+                    }`}
+                  >
+                    <option value="-1">— Lito 3 —</option>
+                    {uniqueLito3.map(l => (
+                      <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Lito</label>
+                  <select
+                    value={header.unidad_litologica || ''}
+                    onChange={(e) => handleUnidadChange(e.target.value)}
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${
+                      litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                    }`}
+                  >
+                    <option value="">— Unidad —</option>
+                    {uniqueUnidades.map(u => (
+                      <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">Lito 2</label>
-                <select
-                  value={header.lito_2 || '-1'}
-                  onChange={(e) => handleLito2Change(e.target.value)}
-                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center"
-                >
-                  <option value="-1">— Lito 2 —</option>
-                  {filteredLito2Options.map(l => (
-                    <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">Lito 3</label>
-                <select
-                  value={header.lito_3 || '-1'}
-                  onChange={(e) => handleLito3Change(e.target.value)}
-                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-orange-400 text-xs font-normal cursor-pointer text-center shadow-[0_0_10px_rgba(245,158,11,0.05)]"
-                >
-                  <option value="-1">— Lito 3 —</option>
-                  {filteredLito3Options.map(l => (
-                    <option key={l} value={l} className="bg-navy-900 text-slate-100 text-xs">{l}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Lito</label>
-                <select
-                  value={header.unidad_litologica || ''}
-                  onChange={(e) => handleUnidadChange(e.target.value)}
-                  className="w-full bg-navy-900 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center"
-                >
-                  <option value="">— Unidad —</option>
-                  {uniqueUnidades.map(u => (
-                    <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Banners Informativos de Validación Litológica */}
+              {litoValidation.isInvalid ? (
+                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+                  <AlertTriangle size={15} className="text-amber-400 shrink-0" />
+                  <span>
+                    <strong>Combinación Litológica no válida:</strong> {litoValidation.reason}
+                  </span>
+                </div>
+              ) : litoValidation.matchedItem ? (
+                <div className="p-1.5 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                    <span>Combinación Válida GEMA: <strong>{litoValidation.matchedItem.grupo}</strong></span>
+                  </div>
+                  {litoValidation.matchedItem.k !== undefined && (
+                    <span className="bg-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-300">
+                      Factor K: {litoValidation.matchedItem.k}
+                    </span>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             {/* Divisor de Sección: Zonificación */}
@@ -564,7 +595,7 @@ export default function VentanaForm({
                     value={header.sect_geot || ''}
                     onChange={(e) => handleSectGeotChange(e.target.value)}
                     placeholder="Sector Geot."
-                    maxLength={32}
+                    maxLength={12}
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   />
                 </div>
@@ -640,7 +671,11 @@ export default function VentanaForm({
                   <input
                     type="text"
                     value={header.nivel || ''}
-                    onChange={(e) => handleChange('nivel', handleNumberInputLimit(e.target.value, 4, 2))}
+                    onChange={(e) => {
+                      const val = e.target.value.replace('-', '');
+                      const limited = handleNumberInputLimit(val, 4, 2);
+                      handleChange('nivel', limited);
+                    }}
                     placeholder="Nivel"
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
                   />

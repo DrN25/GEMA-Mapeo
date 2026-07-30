@@ -73,7 +73,7 @@ export default function RmrAnalysis({
   };
 
   const handleNumericInputChange = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual' | 'control_estructural' | 'efectos_voladura', val: string, intDigits: number, decDigits: number) => {
-    const sanitized = val.replace(',', '.');
+    const sanitized = val.replace(',', '.').replace('-', '');
     const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits);
     setLocalValues(prev => ({ ...prev, [field]: restricted }));
 
@@ -81,7 +81,7 @@ export default function RmrAnalysis({
     if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
       onChange({
         ...header,
-        [field]: num
+        [field]: Math.max(0, num)
       });
     } else if (restricted === '') {
       onChange({
@@ -101,9 +101,9 @@ export default function RmrAnalysis({
     if (isNaN(num)) {
       onChange({ ...header, [field]: 0 });
     } else {
-      let clamped = num;
-      if (field === 'ucs_mpa') clamped = Math.min(500, Math.max(0, num));
-      else if (field === 'is50_mpa') clamped = Math.min(50, Math.max(0, num));
+      let clamped = Math.max(0, num);
+      if (field === 'ucs_mpa') clamped = Math.min(500, clamped);
+      else if (field === 'is50_mpa') clamped = Math.min(50, clamped);
       onChange({ ...header, [field]: clamped });
     }
   };
@@ -229,7 +229,7 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
-            maxLength={20}
+            maxLength={2}
             value={gsiCond}
             onChange={(e) => handleFieldChange('gsi_superficie', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
@@ -242,7 +242,7 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
-            maxLength={20}
+            maxLength={2}
             value={gsiEstruc}
             onChange={(e) => handleFieldChange('gsi_estructura', e.target.value)}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
@@ -257,7 +257,7 @@ export default function RmrAnalysis({
             type="text"
             inputMode="numeric"
             value={getInputValue('gsi_visual', gsiVisual)}
-            onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 2)}
+            onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 0)}
             onBlur={(e) => handleNumericInputBlur('gsi_visual', e.target.value)}
             className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${gsiVisualInvalid ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300' : 'border-navy-700/80'
               }`}
@@ -453,16 +453,16 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
-                <FormulaTooltipTrigger 
-                  formulaId="val_resist_r89" 
-                  params={{ 
-                    code: header.resistencia_ucs, 
+                <FormulaTooltipTrigger
+                  formulaId="val_resist_r89"
+                  params={{
+                    code: header.resistencia_ucs,
                     val: calculated.ucs_rating_89,
                     ucs: header.ucs_mpa,
                     discreto: header.ucs_mpa ? ratingDiscretoResistencia(header.ucs_mpa) : undefined,
                     continuo: header.ucs_mpa ? ratingContinuoResistencia(header.ucs_mpa) : undefined
-                  }} 
-                  position="bottom" 
+                  }}
+                  position="bottom"
                   enabled={showFormulas}
                 >
                   <span>{calculated.ucs_rating_89.toFixed(2)}</span>
@@ -474,15 +474,15 @@ export default function RmrAnalysis({
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
-                <FormulaTooltipTrigger 
-                  formulaId="rqd_rating_r89" 
-                  params={{ 
-                    rqd: calculated.rqd_est, 
+                <FormulaTooltipTrigger
+                  formulaId="rqd_rating_r89"
+                  params={{
+                    rqd: calculated.rqd_est,
                     val: calculated.rqd_rating_89,
                     discreto: ratingDiscretoRqd(calculated.rqd_est),
                     continuo: ratingContinuoRqd(calculated.rqd_est)
-                  }} 
-                  position="bottom" 
+                  }}
+                  position="bottom"
                   enabled={showFormulas}
                 >
                   <span>{calculated.rqd_rating_89.toFixed(2)}</span>

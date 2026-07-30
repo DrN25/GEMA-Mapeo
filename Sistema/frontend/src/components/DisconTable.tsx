@@ -98,8 +98,8 @@ export default function DisconTable({
       const altR89 = altItem ? altItem.r89 : null;
       const altR76 = altItem ? altItem.r76 : null;
 
-      const rel1_ratings = j.relleno1 ? getFillingRatingSingle(j.relleno1, j.espesor) : null;
-      const rel2_ratings = j.relleno2 ? getFillingRatingSingle(j.relleno2, j.espesor) : null;
+      const rel1_ratings = j.relleno1 && j.relleno1 !== '-1' ? getFillingRatingSingle(j.relleno1, j.espesor) : null;
+      const rel2_ratings = j.relleno2 && j.relleno2 !== '-1' ? getFillingRatingSingle(j.relleno2, j.espesor) : null;
 
       const r1_89 = rel1_ratings ? rel1_ratings.r89 : null;
       const r2_89 = rel2_ratings ? rel2_ratings.r89 : null;

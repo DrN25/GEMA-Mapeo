@@ -140,10 +140,13 @@ export function getAberturaRating(val: number | undefined | null): { r76: number
 }
 
 export function getFillingRatingSingle(rellenoCode: string | undefined | null, thicknessMm: number | undefined | null): { r76: number | null; r89: number | null } {
-  if (!rellenoCode) return { r76: null, r89: null };
+  if (!rellenoCode || rellenoCode === '-1' || rellenoCode === '') return { r76: null, r89: null };
 
   const cleanCode = String(rellenoCode).trim().toLowerCase();
-  const item = RELLENO_CATALOG[cleanCode] || RELLENO_CATALOG['-1'];
+  if (cleanCode === '-1' || cleanCode === '') return { r76: null, r89: null };
+
+  const item = RELLENO_CATALOG[cleanCode];
+  if (!item) return { r76: null, r89: null };
 
   if (item.clase === 3 || thicknessMm === 0 || thicknessMm === undefined || thicknessMm === null || thicknessMm === -1) {
     return { r76: item.rmr76, r89: item.rmr89 };
@@ -347,10 +350,11 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     }
   });
 
-  const rqd_est = Math.max(0, Math.min(100, jv > 0 ? 115 - 3.3 * jv : 100));
+  const hasStructures = (jv > 0) || calculatedJoints.some(cj => cj.row.espaciamiento !== undefined && cj.row.espaciamiento !== -1 && cj.row.espaciamiento > 0);
 
-  const rqd_rating_76 = getRqdRating76(rqd_est);
-  const rqd_rating_89 = getRqdRating89(rqd_est, header.campania);
+  const rqd_est = hasStructures ? Math.max(0, Math.min(100, jv > 0 ? 115 - 3.3 * jv : 0)) : 0;
+  const rqd_rating_76 = hasStructures ? getRqdRating76(rqd_est) : 0;
+  const rqd_rating_89 = hasStructures ? getRqdRating89(rqd_est, header.campania) : 0;
 
   let totalStructures = 0;
   let spacingWeightedSum = 0;
@@ -365,10 +369,10 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
       spacingWeightedSum += sp * n;
     }
   });
-  const global_spacing = totalStructures > 0 ? spacingWeightedSum / totalStructures : 0.5;
+  const global_spacing = totalStructures > 0 ? spacingWeightedSum / totalStructures : 0;
 
-  const spacing_rating_76 = getSpacingRating76(global_spacing);
-  const spacing_rating_89 = getSpacingRating89(global_spacing);
+  const spacing_rating_76 = hasStructures ? getSpacingRating76(global_spacing) : 0;
+  const spacing_rating_89 = hasStructures ? getSpacingRating89(global_spacing) : 0;
 
   let totalCond76Structures = 0;
   let totalCond89Structures = 0;
@@ -391,25 +395,28 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     }
   });
 
-  const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 20;
-  const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 25;
+  const condicion_rating_76 = totalCond76Structures > 0 ? Math.round(cond76WeightedSum / totalCond76Structures) : 0;
+  const condicion_rating_89 = totalCond89Structures > 0 ? Math.round(cond89WeightedSum / totalCond89Structures) : 0;
 
-  const waterItem = GROUNDWATER_CATALOG[header.condicion_agua] || { rmr76: 0, rmr89: 0 };
+  const hasWater = header.condicion_agua && header.condicion_agua !== '-1';
+  const waterItem = hasWater ? (GROUNDWATER_CATALOG[header.condicion_agua] || { rmr76: 0, rmr89: 0 }) : { rmr76: 0, rmr89: 0 };
   const water_rating_76 = waterItem.rmr76;
   const water_rating_89 = waterItem.rmr89;
 
-  // RATING DE RESISTENCIA ESTIMADA (UCS) OBTENIDO EXCLUSIVAMENTE DEL INPUT DE CAMPO (ISRM GRADE R0-R6)
-  const strengthItem = STRENGTH_CATALOG[header.resistencia_ucs] || { score: 0 };
+  const hasStrength = header.resistencia_ucs && header.resistencia_ucs !== '-1';
+  const strengthItem = hasStrength ? (STRENGTH_CATALOG[header.resistencia_ucs] || { score: 0 }) : { score: 0 };
   const ucs_rating_76 = strengthItem.score;
   const isUcsMpaValid = header.ucs_mpa !== undefined && header.ucs_mpa !== null && header.ucs_mpa > 0;
   const isCampAnaAbaco = header.campania === 2021 || header.campania === 2022 || header.campania === 2023;
 
-  const ucs_rating_89 = isCampAnaAbaco
-    ? (isUcsMpaValid ? ratingContinuoResistencia(header.ucs_mpa!) : strengthItem.score)
-    : (isUcsMpaValid ? ratingDiscretoResistencia(header.ucs_mpa!) : strengthItem.score);
+  const ucs_rating_89 = hasStrength
+    ? (isCampAnaAbaco
+      ? (isUcsMpaValid ? ratingContinuoResistencia(header.ucs_mpa!) : strengthItem.score)
+      : (isUcsMpaValid ? ratingDiscretoResistencia(header.ucs_mpa!) : strengthItem.score))
+    : 0;
 
-  const rmr_76 = ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
-  const rmr_89 = ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;
+  const rmr_76 = (!hasStructures && !hasWater && !hasStrength) ? 0 : ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
+  const rmr_89 = (!hasStructures && !hasWater && !hasStrength) ? 0 : ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;
 
   return {
     largo,

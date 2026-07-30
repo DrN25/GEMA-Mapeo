@@ -222,9 +222,14 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
                 proms[f] = p_val
                 jv += 1.0 / p_val
 
-    rqd_pct = max(0.0, min(100.0, 115.0 - 3.3 * jv)) if jv > 0 else 100.0
-    rqd_ratings = get_rqd_rating(rqd_pct)
-    
+    has_structures = (jv > 0) or (any(sp > 0 for row in discontinuidades if (sp := row.get("espac")) is not None))
+    if has_structures:
+        rqd_pct = max(0.0, min(100.0, 115.0 - 3.3 * jv)) if jv > 0 else 0.0
+        rqd_ratings = get_rqd_rating(rqd_pct) if jv > 0 else {"r89": 0.0, "r76": 0.0}
+    else:
+        rqd_pct = 0.0
+        rqd_ratings = {"r89": 0.0, "r76": 0.0}
+
     all_spacings = []
     for row in discontinuidades:
         esp = row.get("espac")
@@ -236,8 +241,8 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
 
     sum_espac = sum(sp * n for sp, n in all_spacings)
     sum_n_espac = sum(n for sp, n in all_spacings)
-    espac_prom = sum_espac / sum_n_espac if sum_n_espac > 0 else 0.5
-    spacing_ratings = get_spacing_rating(espac_prom)
+    espac_prom = sum_espac / sum_n_espac if sum_n_espac > 0 else 0.0
+    spacing_ratings = get_spacing_rating(espac_prom) if sum_n_espac > 0 else {"r89": 0.0, "r76": 0.0}
     
     sum_v89 = 0.0
     sum_v76 = 0.0
@@ -250,20 +255,21 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
         sum_v76 += r["v76"] * n
         sum_n_cond += n
     
-    condisc_r89 = sum_v89 / sum_n_cond if sum_n_cond > 0 else 25.0
-    condisc_r76 = sum_v76 / sum_n_cond if sum_n_cond > 0 else 20.0
+    condisc_r89 = sum_v89 / sum_n_cond if sum_n_cond > 0 else 0.0
+    condisc_r76 = sum_v76 / sum_n_cond if sum_n_cond > 0 else 0.0
 
-    w_code = rmr_input.get("agua_codigo") or "C"
-    w_ratings = AGUA_RATING.get(w_code, {"r89": 15, "r76": 10})
+    w_code = rmr_input.get("agua_codigo") if rmr_input else None
+    w_ratings = AGUA_RATING.get(w_code, {"r89": 0.0, "r76": 0.0}) if w_code and str(w_code) not in ("-1", "") else {"r89": 0.0, "r76": 0.0}
     
-    # Código de resistencia obtenido directamente de la estimación de campo (ISRM R0-R6)
-    res_code = rmr_input.get("resistencia_codigo") or "R4"
+    res_code = rmr_input.get("resistencia_codigo") if rmr_input else None
+    res_ratings = RESISTENCIA_RATING.get(res_code, {"r89": 0.0, "r76": 0.0}) if res_code and str(res_code) not in ("-1", "") else {"r89": 0.0, "r76": 0.0}
 
-    # Obtención del rating unificado desde las constantes compartidas
-    res_ratings = RESISTENCIA_RATING.get(res_code, {"r89": 7, "r76": 7})
-
-    rmr_76 = round(w_ratings["r76"] + res_ratings["r76"] + rqd_ratings["r76"] + spacing_ratings["r76"] + condisc_r76)
-    rmr_89 = round(w_ratings["r89"] + res_ratings["r89"] + rqd_ratings["r89"] + spacing_ratings["r89"] + condisc_r89)
+    if not has_structures and not (w_code and str(w_code) not in ("-1", "")) and not (res_code and str(res_code) not in ("-1", "")):
+        rmr_76 = 0.0
+        rmr_89 = 0.0
+    else:
+        rmr_76 = round(w_ratings["r76"] + res_ratings["r76"] + rqd_ratings["r76"] + spacing_ratings["r76"] + condisc_r76)
+        rmr_89 = round(w_ratings["r89"] + res_ratings["r89"] + rqd_ratings["r89"] + spacing_ratings["r89"] + condisc_r89)
     
     return {
         "largo_m": largo, "proms": proms, "jv": jv, "rqd_pct": rqd_pct,

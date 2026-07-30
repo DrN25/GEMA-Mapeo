@@ -72,7 +72,7 @@ const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): Jo
         id: result.length + 1,
         familia: fam,
         distancia: -1,
-        tipo_estructura: 'JN',
+        tipo_estructura: '-1',
         dip: -1,
         dip_dir: -1,
         n_estructuras: -1,
@@ -80,14 +80,14 @@ const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): Jo
         espesor: -1,
         continuidad: -1,
         espaciamiento: -1,
-        extremos_visibles: 1,
-        terminacion: 0,
-        relleno1: 'cwf',
+        extremos_visibles: -1,
+        terminacion: -1,
+        relleno1: '-1',
         relleno2: undefined,
         jrc: -1,
         rugosidad: -1,
-        forma: 'O',
-        alteracion: defaultAlt
+        forma: '-1',
+        alteracion: '-1'
       });
     }
   }
@@ -572,16 +572,19 @@ export default function App() {
           const dip_dir_val = getFieldVal(d, 'dipdir', 'dip_dir', -1);
 
           const rug_val = getFieldVal(d, 'rug', 'rugosidad_codigo', -1);
-          const ext_val = getFieldVal(d, 'next', 'n_extremos_visibles', 1);
-          const term_val = getFieldVal(d, 'term', 'terminacion', 0);
-          const r1_val = getFieldVal(d, 'r1', 'relleno_1_codigo', 'cwf');
-          const r2_val = getFieldVal(d, 'r2', 'relleno_2_codigo', undefined);
+          const ext_val = getFieldVal(d, 'next', 'n_extremos_visibles', -1);
+          const term_val = getFieldVal(d, 'term', 'terminacion', -1);
+          const r1_raw = getFieldVal(d, 'r1', 'relleno_1_codigo', '-1');
+          const r2_raw = getFieldVal(d, 'r2', 'relleno_2_codigo', undefined);
+
+          const r1_val = (!r1_raw || r1_raw === '-1') ? '-1' : (r1_raw === 'cwf' ? 'c' : r1_raw);
+          const r2_val = (!r2_raw || r2_raw === '-1') ? undefined : (r2_raw === 'cwf' ? 'c' : r2_raw);
 
           return {
             id: idx + 1,
             familia: d.fam || d.familia_id || 1,
             distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1,
-            tipo_estructura: d.tipo || d.tipo_estructura || 'JN',
+            tipo_estructura: (d.tipo && d.tipo !== '-1') ? d.tipo : (d.tipo_estructura && d.tipo_estructura !== '-1' ? d.tipo_estructura : '-1'),
             dip: dip_val !== -1 ? roundDec(dip_val, 2) : -1,
             dip_dir: dip_dir_val !== -1 ? roundDec(dip_dir_val, 2) : -1,
             n_estructuras: nstr !== -1 ? (Math.round(nstr) > 0 ? Math.round(nstr) : -1) : -1,
@@ -589,14 +592,14 @@ export default function App() {
             espesor: esp !== -1 ? roundDec(esp, 1) : -1,
             continuidad: cont !== -1 ? roundDec(cont, 2) : -1,
             espaciamiento: espac !== -1 ? roundDec(espac, 2) : -1,
-            extremos_visibles: Math.min(2, Math.max(0, ext_val)),
-            terminacion: Math.min(3, Math.max(0, term_val)),
-            relleno1: r1_val === '-1' ? 'cwf' : r1_val,
-            relleno2: r2_val === '-1' ? undefined : r2_val,
+            extremos_visibles: ext_val !== undefined && ext_val !== null && ext_val !== -1 ? Math.min(2, Math.max(0, ext_val)) : -1,
+            terminacion: term_val !== undefined && term_val !== null && term_val !== -1 ? Math.min(3, Math.max(0, term_val)) : -1,
+            relleno1: r1_val,
+            relleno2: r2_val,
             jrc: d.jrc !== null && d.jrc !== undefined ? Math.min(20, Math.max(0, d.jrc)) : -1,
             rugosidad: rug_val !== -1 ? Math.min(9, Math.max(0, rug_val)) : -1,
-            forma: d.forma || d.forma_estructura || 'O',
-            alteracion: d.alt || d.alteracion_codigo || 'd'
+            forma: (d.forma && d.forma !== '-1') ? d.forma : (d.forma_estructura && d.forma_estructura !== '-1' ? d.forma_estructura : '-1'),
+            alteracion: (d.alt && d.alt !== '-1') ? d.alt : (d.alteracion_codigo && d.alteracion_codigo !== '-1' ? d.alteracion_codigo : '-1')
           };
         });
 
@@ -860,53 +863,53 @@ export default function App() {
         norte_fin: winData.header.norte_to || 0,
         cota_fin: winData.header.cota_to || 0,
         largo_m: winCalc.largo,
-        altura_m: winData.header.altura || 0,
-        dip_talud: winData.header.dip_talud || 0,
-        dipdir_talud: winData.header.dipdir_talud || 0,
-        dip_hw: winData.header.dip_hw || 0,
-        az_hw: winData.header.az_hw || 0,
-        alteracion_codigo: winData.header.alt_zona || 'd',
-        intemperismo_codigo: winData.header.intemperia || 'd',
-        lito_1: winData.header.lito_1 || '',
-        lito_2: winData.header.lito_2 || '',
-        lito_3: winData.header.lito_3 || '',
-        unidad_litologica: winData.header.unidad_litologica || '',
-        sector: winData.header.sector || 'NW1_B',
-        fase: parseInt(String(winData.header.fase || '')) || 5,
-        nivel: winData.header.nivel ? String(winData.header.nivel) : '3960',
-        sector_geotecnico: winData.header.sect_geot || 'PENDIENTE',
-        turno: winData.header.turno || 'Día',
+        altura_m: winData.header.altura || null,
+        dip_talud: winData.header.dip_talud !== undefined && winData.header.dip_talud !== null ? winData.header.dip_talud : null,
+        dipdir_talud: winData.header.dipdir_talud !== undefined && winData.header.dipdir_talud !== null ? winData.header.dipdir_talud : null,
+        dip_hw: winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null,
+        az_hw: winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null,
+        alteracion_codigo: winData.header.alt_zona && winData.header.alt_zona !== '-1' ? winData.header.alt_zona : null,
+        intemperismo_codigo: winData.header.intemperia && winData.header.intemperia !== '-1' ? winData.header.intemperia : null,
+        lito_1: winData.header.lito_1 || null,
+        lito_2: winData.header.lito_2 || null,
+        lito_3: winData.header.lito_3 || null,
+        unidad_litologica: winData.header.unidad_litologica || null,
+        sector: winData.header.sector && winData.header.sector !== '-1' ? winData.header.sector : null,
+        fase: winData.header.fase && String(winData.header.fase).trim() !== '' ? parseInt(String(winData.header.fase)) : null,
+        nivel: winData.header.nivel ? String(winData.header.nivel) : null,
+        sector_geotecnico: winData.header.sect_geot && winData.header.sect_geot !== '-1' ? winData.header.sect_geot : null,
+        turno: winData.header.turno || null,
         discontinuidades: nonVacantJoints.map(j => ({
           fam: j.familia,
           dist: j.distancia === -1 ? null : j.distancia,
-          tipo: j.tipo_estructura || 'JN',
-          dip: j.dip === -1 ? 0 : j.dip,
-          dipdir: j.dip_dir === -1 ? 0 : j.dip_dir,
+          tipo: (j.tipo_estructura && j.tipo_estructura !== '-1') ? j.tipo_estructura : null,
+          dip: j.dip === -1 ? null : j.dip,
+          dipdir: j.dip_dir === -1 ? null : j.dip_dir,
           aber: j.abertura === -1 ? null : j.abertura,
           esp: j.espesor === -1 ? null : j.espesor,
           cont: j.continuidad === -1 ? null : j.continuidad,
           espac: j.espaciamiento === -1 ? null : j.espaciamiento,
           nstr: j.n_estructuras === -1 ? null : j.n_estructuras,
-          next: j.extremos_visibles,
-          term: j.terminacion,
-          r1: j.relleno1,
-          r2: j.relleno2,
+          next: j.extremos_visibles === -1 ? null : j.extremos_visibles,
+          term: j.terminacion === -1 ? null : j.terminacion,
+          r1: (j.relleno1 && j.relleno1 !== '-1') ? j.relleno1 : null,
+          r2: (j.relleno2 && j.relleno2 !== '-1') ? j.relleno2 : null,
           jrc: j.jrc === -1 ? null : j.jrc,
           rug: j.rugosidad === -1 ? null : j.rugosidad,
-          forma: j.forma,
-          alt: j.alteracion
+          forma: (j.forma && j.forma !== '-1') ? j.forma : null,
+          alt: (j.alteracion && j.alteracion !== '-1') ? j.alteracion : null
         })),
         rmr_input: {
-          agua_codigo: winData.header.condicion_agua || '',
-          resistencia_codigo: winData.header.resistencia_ucs || '',
-          gsi_estructura: winData.header.gsi_estructura || null,
-          gsi_superficie: winData.header.gsi_superficie || null,
-          gsi_visual: winData.header.gsi_visual !== undefined ? winData.header.gsi_visual : 0,
-          control_estructural: winData.header.control_estructural !== undefined ? winData.header.control_estructural : 0,
-          efectos_voladura: winData.header.efectos_voladura !== undefined ? winData.header.efectos_voladura : 0,
-          ucs_mpa: winData.header.ucs_mpa !== undefined ? winData.header.ucs_mpa : 0,
-          is50_mpa: winData.header.is50_mpa !== undefined ? winData.header.is50_mpa : 0,
-          comentario: winData.header.comentario || ""
+          agua_codigo: (winData.header.condicion_agua && winData.header.condicion_agua !== '-1') ? winData.header.condicion_agua : null,
+          resistencia_codigo: (winData.header.resistencia_ucs && winData.header.resistencia_ucs !== '-1') ? winData.header.resistencia_ucs : null,
+          gsi_estructura: (winData.header.gsi_estructura && winData.header.gsi_estructura !== '-1') ? winData.header.gsi_estructura : null,
+          gsi_superficie: (winData.header.gsi_superficie && winData.header.gsi_superficie !== '-1') ? winData.header.gsi_superficie : null,
+          gsi_visual: winData.header.gsi_visual || null,
+          control_estructural: winData.header.control_estructural || null,
+          efectos_voladura: winData.header.efectos_voladura || null,
+          ucs_mpa: winData.header.ucs_mpa || null,
+          is50_mpa: winData.header.is50_mpa || null,
+          comentario: winData.header.comentario || null
         }
       };
 

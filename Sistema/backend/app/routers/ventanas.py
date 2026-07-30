@@ -267,9 +267,8 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
             espac=float(e.espaciamiento_m) if e.espaciamiento_m is not None else None,
             nstr=e.numero_estructuras,
             next=e.numero_extremos_visibles,
-            term=e.terminacion,
-            r1=e.tipo_relleno_1,
-            r2=e.tipo_relleno_2,
+            r1="c" if (not e.tipo_relleno_1 or str(e.tipo_relleno_1).strip().lower() in ("-1", "-1.0", "cwf")) else str(e.tipo_relleno_1).strip().lower(),
+            r2=None if (not e.tipo_relleno_2 or str(e.tipo_relleno_2).strip().lower() in ("-1", "-1.0")) else ("c" if str(e.tipo_relleno_2).strip().lower() == "cwf" else str(e.tipo_relleno_2).strip().lower()),
             jrc=float(e.jrc) if e.jrc is not None else None,
             rug=int(e.rugosidad_estructura) if e.rugosidad_estructura is not None else None,
             forma=e.forma_estructura,
@@ -776,9 +775,17 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.is50_mpa = data.rmr_input.is50_mpa
         v.comentarios = data.rmr_input.comentario
 
+    def clean_relleno(val):
+        if not val or val in ("-1", "-1.0"):
+            return None
+        v_clean = str(val).strip().lower()
+        if v_clean == "cwf":
+            return "c"
+        return v_clean
+
     for idx, d in enumerate(data.discontinuidades, start=1):
-        tipo_id = resolver.tipo_estructura_id(d.tipo)
-        if d.tipo and tipo_id is None:
+        tipo_id = resolver.tipo_estructura_id(d.tipo) if d.tipo and str(d.tipo) not in ("-1", "-1.0") else None
+        if d.tipo and str(d.tipo) not in ("-1", "-1.0") and tipo_id is None:
             raise HTTPException(status_code=400, detail=f"Tipo estructura '{d.tipo}' no encontrado en GEMA")
         fam_computed = math.ceil(idx / 3.0)
         e = models.EstructuraGeologica(
@@ -786,19 +793,19 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             numero_estructura=idx,
             familia_id=fam_computed,
             tipo_estructura_id=tipo_id,
-            dip=d.dip, dip_dir=d.dipdir,
+            dip=clean(d.dip), dip_dir=clean(d.dipdir),
             distancia_estructura=clean(d.dist),
             abertura_mm=clean(d.aber), espesor_mm=clean(d.esp),
             continuidad_m=clean(d.cont), espaciamiento_m=clean(d.espac),
             numero_estructuras=clean(d.nstr),
             numero_extremos_visibles=clean(d.next),
             terminacion=clean(d.term),
-            tipo_relleno_1=d.r1 if d.r1 and d.r1 != "-1" else None,
-            tipo_relleno_2=d.r2 if d.r2 and d.r2 != "-1" else None,
+            tipo_relleno_1=clean_relleno(d.r1),
+            tipo_relleno_2=clean_relleno(d.r2),
             jrc=clean(d.jrc),
-            rugosidad_estructura=str(d.rug) if d.rug is not None else None,
-            forma_estructura=d.forma if d.forma and d.forma != "-1" else None,
-            alteracion=d.alt if d.alt and d.alt != "-1" else None,
+            rugosidad_estructura=str(d.rug) if d.rug is not None and str(d.rug) not in ("-1", "-1.0") else None,
+            forma_estructura=d.forma if d.forma and str(d.forma) not in ("-1", "-1.0") else None,
+            alteracion=d.alt if d.alt and str(d.alt) not in ("-1", "-1.0") else None,
         )
         db.add(e)
     db.flush()
@@ -953,28 +960,26 @@ def _populate_ventana_from_schema(v: models.Ventana, data: schemas.VentanaSaveSc
 def _populate_discontinuidades(db: Session, v: models.Ventana, discs: List[schemas.DiscontinuidadBase], resolver: GEMACatalogResolver):
     """Inserta discontinuidades en GEMA desde el schema."""
     for idx, d in enumerate(discs, start=1):
-        tipo_id = resolver.tipo_estructura_id(d.tipo)
-        if not tipo_id:
-            tipo_id = 7137  # fallback a JN (NOT NULL en GEMA)
+        tipo_id = resolver.tipo_estructura_id(d.tipo) if d.tipo and str(d.tipo) not in ("-1", "-1.0") else None
         e = models.EstructuraGeologica(
             ventana_id=v.ventana_id,
             numero_estructura=idx,
             tipo_estructura_id=tipo_id,
-            dip=float(d.dip), dip_dir=float(d.dipdir),
-            distancia_estructura=float(d.dist) if d.dist is not None and d.dist != -1 else None,
-            abertura_mm=float(d.aber) if d.aber is not None and d.aber != -1 else None,
-            espesor_mm=float(d.esp) if d.esp is not None and d.esp != -1 else None,
-            continuidad_m=float(d.cont) if d.cont is not None and d.cont != -1 else None,
-            espaciamiento_m=float(d.espac) if d.espac is not None else 0.5,
-            numero_estructuras=d.nstr if d.nstr is not None and d.nstr != -1 else None,
-            numero_extremos_visibles=d.next if d.next is not None and d.next != -1 else None,
-            terminacion=d.term if d.term is not None and d.term != -1 else None,
-            tipo_relleno_1=d.r1 if d.r1 and d.r1 != "-1" else None,
-            tipo_relleno_2=d.r2 if d.r2 and d.r2 != "-1" else None,
-            jrc=float(d.jrc) if d.jrc is not None and d.jrc != -1 else None,
-            rugosidad_estructura=str(d.rug) if d.rug is not None and d.rug != -1 else None,
-            forma_estructura=d.forma if d.forma and d.forma != "-1" else None,
-            alteracion=d.alt if d.alt and d.alt != "-1" else None,
+            dip=clean(d.dip), dip_dir=clean(d.dipdir),
+            distancia_estructura=clean(d.dist),
+            abertura_mm=clean(d.aber),
+            espesor_mm=clean(d.esp),
+            continuidad_m=clean(d.cont),
+            espaciamiento_m=clean(d.espac),
+            numero_estructuras=clean(d.nstr),
+            numero_extremos_visibles=clean(d.next),
+            terminacion=clean(d.term),
+            tipo_relleno_1=clean_relleno(d.r1),
+            tipo_relleno_2=clean_relleno(d.r2),
+            jrc=clean(d.jrc),
+            rugosidad_estructura=str(d.rug) if d.rug is not None and str(d.rug) not in ("-1", "-1.0") else None,
+            forma_estructura=d.forma if d.forma and str(d.forma) not in ("-1", "-1.0") else None,
+            alteracion=d.alt if d.alt and str(d.alt) not in ("-1", "-1.0") else None,
             familia_id=d.fam,
         )
         db.add(e)

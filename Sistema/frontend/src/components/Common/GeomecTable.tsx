@@ -90,8 +90,13 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
         // CORREGIDO: Sanitizador global de comas decimales regionales en tiempo real
         let val = rawVal.replace(',', '.');
 
+        const isNegativeAllowed = key === 'dip' || key === 'dip_dir' || key === 'dip_talud' || key === 'dip_hw' || key === 'dipdir_talud';
+        if (!isNegativeAllowed) {
+            val = val.replace('-', '');
+        }
+
         if (precision !== undefined) {
-            val = handleNumberLimit(val, precision);
+            val = handleNumberLimit(val, precision, isNegativeAllowed);
         }
         setLocalValues(prev => ({ ...prev, [mapKey]: val }));
 
@@ -103,8 +108,8 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
         }
     };
 
-    const handleNumberLimit = (value: string, precision: number): string => {
-        const isNegative = value.startsWith('-');
+    const handleNumberLimit = (value: string, precision: number, allowNegative: boolean = false): string => {
+        const isNegative = allowNegative && value.startsWith('-');
         const cleaned = value.replace(/[^0-9.]/g, '');
         const parts = cleaned.split('.');
         if (parts.length > 2) return (isNegative ? '-' : '') + cleaned.slice(0, -1);
@@ -146,7 +151,9 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                 return;
             }
             if (col.range) {
-                num = Math.min(col.range[1], Math.max(col.range[0], num));
+                const isNegativeAllowed = col.key === 'dip' || col.key === 'dip_dir' || col.key === 'dip_talud' || col.key === 'dip_hw' || col.key === 'dipdir_talud';
+                const minVal = isNegativeAllowed ? col.range[0] : Math.max(0, col.range[0]);
+                num = Math.min(col.range[1], Math.max(minVal, num));
             }
             onCellChange(rowId, col.key, num);
         } else {
@@ -371,14 +378,22 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                 <div className="absolute inset-0 w-full h-full flex items-center justify-center">
                                                     {c.type === 'select' && c.options ? (
                                                         <select
-                                                            value={val ?? ''}
-                                                            onChange={(e) => onCellChange(row[rowIdKey], c.key, e.target.value || null)}
+                                                            value={val === undefined || val === null || val === -1 || val === '-1' ? '' : String(val)}
+                                                            onChange={(e) => {
+                                                                const raw = e.target.value;
+                                                                if (raw === '' || raw === '-1') {
+                                                                    onCellChange(row[rowIdKey], c.key, c.options?.some(o => typeof o.value === 'number') ? -1 : '-1');
+                                                                } else {
+                                                                    const parsed = c.options?.some(o => typeof o.value === 'number') ? parseInt(raw, 10) : raw;
+                                                                    onCellChange(row[rowIdKey], c.key, isNaN(parsed as number) ? raw : parsed);
+                                                                }
+                                                            }}
                                                             onKeyDown={handleGridKeyDown}
                                                             className="bg-transparent text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-center cursor-pointer w-full h-full text-xs font-normal px-2 border-0"
                                                         >
                                                             <option value="" className="bg-navy-950 text-slate-500">—</option>
-                                                            {c.options.map(o => (
-                                                                <option key={o.value} value={o.value} className="bg-navy-950 text-slate-100">{o.label}</option>
+                                                            {c.options.filter(o => o.value !== '-1' && o.value !== -1).map(o => (
+                                                                <option key={String(o.value)} value={String(o.value)} className="bg-navy-950 text-slate-100">{o.label}</option>
                                                             ))}
                                                         </select>
                                                     ) : (
