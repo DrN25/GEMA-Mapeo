@@ -18,7 +18,7 @@ los modelos catalog y agregar inner join en routers/ventanas.py:resolve_*.
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, Float, String, Numeric, Date, DateTime, ForeignKey, Identity, func
+    Column, Integer, Float, String, Numeric, Date, DateTime, Boolean, ForeignKey, Identity, func
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -283,3 +283,52 @@ class EstructuraGeologica(Base):
 
 # Alias para compatibilidad con código existente
 Discontinuidad = EstructuraGeologica
+
+
+# ============================================================================
+# TABLA DE ENSAYOS PLT IRREGULARES: plt.EnsayoPLT (SQL Server)
+# ============================================================================
+
+class EnsayoPLT(Base):
+    __tablename__ = "EnsayoPLT"
+    __table_args__ = {"schema": "plt"}
+
+    ensayo_plt_id = Column("EnsayoPLT_ID", Integer, Identity(always=True), primary_key=True)
+    codigo_muestra = Column("CodigoMuestra", String(20), nullable=False)
+    campania_id = Column("CampañaID", Integer, nullable=False)
+    litologia1_id = Column("LitologiaID_1", Integer, nullable=True)
+    litologia2_id = Column("LitologiaID_2", Integer, nullable=True)
+    litologia3_id = Column("LitologiaID_3", Integer, nullable=True)
+    ventana_id = Column("VentanaID", Integer, ForeignKey("mapeo.VentanasMapeo.VentanaID"), nullable=True)
+    tipo_ensayo_id = Column("TipoEnsayoPLT_ID", Integer, nullable=True, default=4)
+    direccion_id = Column("DireccionID", Integer, nullable=True)
+    tipo_fractura_id = Column("TipoFracturaPLT_ID", Integer, nullable=True)
+    factor_k_valor = Column("FactorK_Valor", Numeric(5, 2), nullable=True)
+    fecha_ensayo = Column("FechaEnsayo", Date, nullable=True)
+    ejecucion_ensayo = Column("EjecucionEnsayo", String(40), nullable=True)
+    zona_muestreo = Column("ZonaMuestreo", String(60), nullable=True)
+    coordenada_este = Column("CoordenadaEste", Numeric(10, 4), nullable=True)
+    coordenada_norte = Column("CoordenadaNorte", Numeric(11, 4), nullable=True)
+    elevacion = Column("Elevacion", Numeric(8, 2), nullable=True)
+    espesor_d_cm = Column("Espesor_D_cm", Numeric(5, 2), nullable=True)
+    longitud_l_cm = Column("Longitud_L_cm", Numeric(6, 2), nullable=True)
+    ancho_w1_cm = Column("Ancho_W1_cm", Numeric(6, 2), nullable=True)
+    ancho_w2_cm = Column("Ancho_W2_cm", Numeric(6, 2), nullable=True)
+    ancho_w_cm = Column("Ancho_W_cm", Numeric(6, 2), nullable=True)
+    muestra_valida_long = Column("MuestraValidaLong", Boolean, nullable=True)
+    muestra_valida_ancho = Column("MuestraValidaAncho", Boolean, nullable=True)
+    fuerza_p_kn = Column("FuerzaP_kN", Numeric(8, 4), nullable=True)
+    diametro_equiv_cm = Column("DiametroEquiv_cm", Numeric(7, 4), nullable=True)
+    factor_f = Column("FactorF", Numeric(6, 4), nullable=True)
+    is_mpa = Column("Is_MPa", Numeric(8, 4), nullable=True)
+    is50_mpa = Column("Is50_MPa", Numeric(8, 4), nullable=True)
+    ucs_mpa = Column("UCS_MPa", Numeric(9, 3), nullable=True)
+    denominacion_isrm = Column("DenominacionISRM", String(40), nullable=True)
+    observaciones = Column("Observaciones", String(300), nullable=True)
+    fecha_registro = Column("FechaRegistro", DateTime, nullable=False, default=func.getdate(), server_default=func.getdate())
+    usuario_registro = Column("UsuarioRegistro", String(50), nullable=True)
+    origen_plt = Column("OrigenPLT", String(10), nullable=False, default="IRREGULAR")
+    nro_muestra = Column("NroMuestra", String(8), nullable=True)
+    tipo_litologico = Column("TipoLitologico", String(20), nullable=True)
+    nivel = Column("Nivel", String(50), nullable=True)
+    sector_geotecnico_id = Column("SectorGeotecnicoID", Integer, nullable=True)

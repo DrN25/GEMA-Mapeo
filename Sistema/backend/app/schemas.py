@@ -237,19 +237,19 @@ class VentanaResponseSchema(BaseModel):
 # >>> EnsayoPLTSaveSchema — local SQLite (no GEMA)
 class EnsayoPLTSaveSchema(BaseModel):
     id: Optional[int] = None
-    campana: int
-    fecha_ensayo: date
+    campana: Optional[Union[int, str]] = 2026
+    fecha_ensayo: Optional[date] = None
     sector_geotecnico: Optional[str] = None
-    ejecutado_por: str
-    zona_mapeo: str
-    nivel: float
-    celda_mapeo: str
-    muestra: str
-    codigo_muestra: str
-    litologia_1: str
+    ejecutado_por: Optional[str] = None
+    zona_mapeo: Optional[str] = None
+    nivel: Optional[Union[float, str]] = None
+    celda_mapeo: Optional[str] = None
+    muestra: Optional[str] = None
+    codigo_muestra: Optional[str] = None
+    litologia_1: Optional[str] = None
     litologia_2: Optional[str] = None
     litologia_3: Optional[str] = None
-    tipo_litologico: str
+    tipo_litologico: Optional[str] = None
     este: Optional[float] = None
     norte: Optional[float] = None
     elevacion: Optional[float] = None
@@ -257,10 +257,20 @@ class EnsayoPLTSaveSchema(BaseModel):
     longitud_l: Optional[float] = None
     ancho_w1: Optional[float] = None
     ancho_w2: Optional[float] = None
+    ancho_w: Optional[float] = None
+    muestra_valida_longitud: Optional[Union[bool, str]] = None
+    muestra_valida_ancho: Optional[Union[bool, str]] = None
     fuerza_p: Optional[float] = None
     direccion_rotura: Optional[str] = None
     tipo_fractura: Optional[str] = None
+    diametro_equivalente: Optional[float] = None
+    f: Optional[float] = None
+    is_mpa: Optional[float] = None
+    is_50: Optional[float] = None
     factor_conversion_k: Optional[float] = None
+    ucs: Optional[float] = None
+    resistencia_isrm: Optional[str] = None
+    denominacion_isrm: Optional[str] = None
     tipo_ensayo: Optional[str] = "i"
     observaciones: Optional[str] = None
 

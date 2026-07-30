@@ -666,6 +666,9 @@ export const getCellClassName = (c: any, val: any) => {
 export const formatCellValue = (val: any, c: any) => {
     if (val === null || val === undefined || val === "") return "";
     if (c.type === "decimal" && typeof val === "number") {
+        if (c.key === "fuerza_p") return val.toFixed(3);
+        if (["diametro_equivalente", "f", "is_mpa", "is_50", "este", "norte"].includes(c.key)) return val.toFixed(4);
+        if (["ucs", "factor_conversion_k", "ancho_w", "espesor_d", "longitud_l", "ancho_w1", "ancho_w2", "elevacion", "nivel"].includes(c.key)) return val.toFixed(2);
         return val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
     }
     return String(val);

@@ -499,4 +499,18 @@ LITHOLOGY_FULL_CATALOG = [
     {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_M",  "k": 13.34},
     {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_C",  "k": 13.34},
     {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "Varios", "k": 13.34},
+]
+
+# D16. CATÁLOGO DIRECCIÓN DE ROTURA PLT (cat.DireccionRuptura)
+DIRECCION_ROTURA_DISPLAY_CATALOG = [
+    {"codigo": "Pa", "descripcion": "Paralela a los planos de debilidad de la muestra"},
+    {"codigo": "Pe", "descripcion": "Perpendicular a los planos de debilidad de la muestra"},
+    {"codigo": "NA", "descripcion": "No aplica — roca masiva sin planos de debilidad definidos"}
+]
+
+# D17. CATÁLOGO TIPO DE FRACTURA PLT (cat.TipoFracturaPLT)
+TIPO_FRACTURA_DISPLAY_CATALOG = [
+    {"codigo": "M", "descripcion": "Rotura por matriz — falla a través de la roca intacta"},
+    {"codigo": "E", "descripcion": "Rotura por estructura — falla a lo largo de discontinuidad preexistente"},
+    {"codigo": "C", "descripcion": "Rotura combinada — por matriz y estructura simultáneamente"}
 ]

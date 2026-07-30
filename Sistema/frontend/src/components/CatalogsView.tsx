@@ -63,7 +63,8 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    fetch('/api/catalogs/all')
+    const apiBase = import.meta.env.VITE_API_BASE || "";
+    fetch(`${apiBase}/api/catalogs/all`)
       .then(res => {
         if (!res.ok) throw new Error("Server error");
         return res.json();
@@ -73,7 +74,8 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
         setLoading(false);
       })
       .catch(err => {
-        console.error("Error loading catalogs in view:", err);
+        console.warn("No se pudo cargar catálogos desde el servidor backend, continuando en modo fallback local:", err);
+        setLoading(false);
       });
   }, []);
 
@@ -519,6 +521,70 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     <tr key={item.codigo} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 text-orange-400 font-black">{item.codigo}</td>
                       <td className="py-2.5 px-4">{item.nombre}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* DIRECCIÓN DE ROTURA PLT */}
+        {activeTab === 'plt_direccion_rotura' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Compass size={14} className="text-cyan-400" />
+              <span>Tabla de Dirección de Rotura (PLT Irregulares)</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-navy-950 border-b border-navy-900">
+                  <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 text-center w-24">Código</th>
+                    <th className="py-2.5 px-4">Descripción de Orientación respecto a planos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {(catalogs?.direccion_rotura || [
+                    { codigo: "Pa", descripcion: "Paralela a los planos de debilidad de la muestra" },
+                    { codigo: "Pe", descripcion: "Perpendicular a los planos de debilidad de la muestra" },
+                    { codigo: "NA", descripcion: "No aplica — roca masiva sin planos de debilidad definidos" }
+                  ]).map((item: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 text-center font-black text-cyan-400">{item.codigo}</td>
+                      <td className="py-2.5 px-4 text-slate-300 leading-relaxed">{item.descripcion}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TIPO DE FRACTURA PLT */}
+        {activeTab === 'plt_tipo_fractura' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <AlignLeft size={14} className="text-violet-400" />
+              <span>Tabla de Tipo de Fractura (PLT Irregulares)</span>
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-navy-950 border-b border-navy-900">
+                  <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4 text-center w-24">Código</th>
+                    <th className="py-2.5 px-4">Descripción del Modo de Rotura</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {(catalogs?.tipo_fractura || [
+                    { codigo: "M", descripcion: "Rotura por matriz — falla a través de la roca intacta" },
+                    { codigo: "E", descripcion: "Rotura por estructura — falla a lo largo de discontinuidad preexistente" },
+                    { codigo: "C", descripcion: "Rotura combinada — por matriz y estructura simultáneamente" }
+                  ]).map((item: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 text-center font-black text-violet-400">{item.codigo}</td>
+                      <td className="py-2.5 px-4 text-slate-300 leading-relaxed">{item.descripcion}</td>
                     </tr>
                   ))}
                 </tbody>

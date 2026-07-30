@@ -7,16 +7,10 @@ from fastapi.staticfiles import StaticFiles
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Crear tablas PLT en SQLite local al arrancar
-from app.plt_database import engine as plt_engine, Base as PltBase
-from app.plt_models import EnsayoPLTIrregular
-PltBase.metadata.create_all(bind=plt_engine)
-print("Tabla PLT creada/verificada en SQLite local (plt.db)")
-
 app = FastAPI(
     title="Geomechanical Window Mapping API",
-    description="Backend alineado a base GEMA (SQL Server) + PLT local (SQLite)",
-    version="3.1"
+    description="Backend alineado a base GEMA (SQL Server) con persistencia directa en [plt].[EnsayoPLT]",
+    version="3.2"
 )
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

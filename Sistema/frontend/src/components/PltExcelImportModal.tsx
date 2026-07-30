@@ -236,9 +236,20 @@ export default function PltExcelImportModal({
                 longitud_l: getVal(row, 'longitud_l') !== null && getVal(row, 'longitud_l') !== "" ? Math.round(Math.abs(getNum(row, 'longitud_l')) * 100) / 100 : null,
                 ancho_w1: getVal(row, 'ancho_w1') !== null && getVal(row, 'ancho_w1') !== "" ? Math.round(Math.abs(getNum(row, 'ancho_w1')) * 100) / 100 : null,
                 ancho_w2: getVal(row, 'ancho_w2') !== null && getVal(row, 'ancho_w2') !== "" ? Math.round(Math.abs(getNum(row, 'ancho_w2')) * 100) / 100 : null,
-                fuerza_p: getVal(row, 'fuerza_p') !== null && getVal(row, 'fuerza_p') !== "" ? Math.round(Math.abs(getNum(row, 'fuerza_p')) * 100) / 100 : null,
-                direccion_rotura: getStr(row, 'direccion_rotura', 'Pa'),
-                tipo_fractura: getStr(row, 'tipo_fractura', 'M'),
+                fuerza_p: getVal(row, 'fuerza_p') !== null && getVal(row, 'fuerza_p') !== "" ? Math.round(Math.abs(getNum(row, 'fuerza_p')) * 1000) / 1000 : null,
+                direccion_rotura: (() => {
+                    const rawDir = getStr(row, 'direccion_rotura', 'Pa').trim();
+                    const cleanDir = rawDir.toUpperCase().replace(/\//g, "").replace(/\./g, "");
+                    if (cleanDir === "PA" || cleanDir === "PARALELA") return "Pa";
+                    if (cleanDir === "PE" || cleanDir === "PERPENDICULAR") return "Pe";
+                    return "NA";
+                })(),
+                tipo_fractura: (() => {
+                    const rawFrac = getStr(row, 'tipo_fractura', 'M').trim().toUpperCase();
+                    if (rawFrac === "E" || rawFrac.includes("ESTRUCTURA")) return "E";
+                    if (rawFrac === "C" || rawFrac.includes("COMBINADA")) return "C";
+                    return "M";
+                })(),
                 factor_conversion_k: getVal(row, 'factor_conversion_k') !== null && getVal(row, 'factor_conversion_k') !== "" ? Math.round(Math.abs(getNum(row, 'factor_conversion_k')) * 100) / 100 : null,
                 observaciones: getStr(row, 'observaciones'),
                 _dirty: true
