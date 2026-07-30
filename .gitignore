@@ -1,3 +1,35 @@
 Material/
+docs/
+*.zip
+*.rar
+*.7z
+
+# Archivos pesados y de usuario
+backend/uploads/
+Sistema/backend/uploads/
+*.xlsx
+*.csv
+
+# Base de datos local (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos compilados y cachés
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
 node_modules/
-venv/
+dist/
+dist-ssr/
+*.local
+
+# Logs de depuración
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
