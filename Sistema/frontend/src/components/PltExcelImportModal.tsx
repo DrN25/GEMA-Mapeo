@@ -1,6 +1,6 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { X, FileSpreadsheet, Upload, AlertTriangle, Check, ArrowRight, Filter } from 'lucide-react';
+import { X, FileSpreadsheet, Upload, Check, ArrowRight, Filter } from 'lucide-react';
 import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../utils/catalogData';
 import {
     PLT_COLUMN_DEFS as EXPECTED_FIELDS,
@@ -48,7 +48,6 @@ export default function PltExcelImportModal({
         setExcelHeaders([]);
         setMappings({});
         setImportedRowsState([]);
-        setImportMode('filtered');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,23 +286,12 @@ export default function PltExcelImportModal({
         return importedRowsState.filter(r => normalizeCeldaCode(r.celda_mapeo) === activeNorm);
     }, [importedRowsState, activeWindowCelda]);
 
-    useEffect(() => {
-        if (activeWindowCelda && matchingRows.length > 0) {
-            setImportMode('filtered');
-        } else {
-            setImportMode('all');
-        }
-    }, [matchingRows.length, activeWindowCelda]);
-
     const previewRows = useMemo(() => {
-        if (importMode === 'filtered' && activeWindowCelda) {
-            return matchingRows.slice(0, 5);
-        }
-        return importedRowsState.slice(0, 5);
-    }, [importMode, matchingRows, importedRowsState, activeWindowCelda]);
+        return matchingRows.slice(0, 5);
+    }, [matchingRows]);
 
     const handleImportClick = () => {
-        const rowsToImport = importMode === 'filtered' ? matchingRows : importedRowsState;
+        const rowsToImport = matchingRows;
         if (rowsToImport.length === 0) {
             alert("No se encontraron registros de ensayo PLT válidos para importar.");
             return;
@@ -419,19 +407,11 @@ export default function PltExcelImportModal({
                                             </label>
 
                                             {activeWindowCelda ? (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setImportMode('filtered')}
-                                                        disabled={matchingRows.length === 0}
-                                                        className={`p-4 rounded-xl border text-left flex flex-col gap-1 transition-all ${importMode === 'filtered'
-                                                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)] font-bold'
-                                                            : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed'
-                                                            }`}
-                                                    >
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 flex flex-col gap-1">
                                                         <div className="flex justify-between items-center w-full">
                                                             <span className="text-xs uppercase font-extrabold tracking-wider">Ingestar Celda Activa</span>
-                                                            {importMode === 'filtered' && <Check size={14} className="text-emerald-400" />}
+                                                            <Check size={14} className="text-emerald-400" />
                                                         </div>
                                                         <p className="text-[10px] text-slate-400 leading-normal">
                                                             Cargar únicamente los ensayos de la celda activa: <strong className="text-white">{activeWindowCelda}</strong>
@@ -445,27 +425,7 @@ export default function PltExcelImportModal({
                                                                 0 coincidencias halladas
                                                             </span>
                                                         )}
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setImportMode('all')}
-                                                        className={`p-4 rounded-xl border text-left flex flex-col gap-1 transition-all ${importMode === 'all'
-                                                            ? 'bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.15)] font-bold'
-                                                            : 'bg-navy-950/40 border-navy-800 text-slate-400 hover:bg-navy-900/60 hover:text-slate-300'
-                                                            }`}
-                                                    >
-                                                        <div className="flex justify-between items-center w-full">
-                                                            <span className="text-xs uppercase font-extrabold tracking-wider">Ingestar Base Completa</span>
-                                                            {importMode === 'all' && <Check size={14} className="text-orange-400" />}
-                                                        </div>
-                                                        <p className="text-[10px] text-slate-400 leading-normal">
-                                                            Ignorar filtrados por celda e importar todas las filas de ensayos del archivo Excel.
-                                                        </p>
-                                                        <span className="text-[10px] mt-2 bg-orange-500/20 border border-orange-500/35 px-2.5 py-0.5 rounded-full w-fit font-black font-mono">
-                                                            {importedRowsState.length} registros totales
-                                                        </span>
-                                                    </button>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className="grid grid-cols-1 gap-3">
@@ -483,20 +443,10 @@ export default function PltExcelImportModal({
                                         </div>
                                     )}
 
-                                    {importMode === 'all' && importedRowsState.length > 500 && (
-                                        <div className="flex gap-3 p-3 bg-red-500/10 border border-red-500/20 text-red-300 rounded-lg text-xs leading-relaxed animate-pulse">
-                                            <AlertTriangle className="text-red-400 shrink-0 mt-0.5" size={16} />
-                                            <div>
-                                                <span className="font-black uppercase tracking-wider text-[9px] block mb-0.5">Alerta de Rendimiento:</span>
-                                                El archivo tiene <strong className="text-white font-mono">{importedRowsState.length}</strong> registros. Importar todo de golpe ralentizará la base de datos de React. Se aconseja filtrar por celda activa.
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {previewRows.length > 0 && (
                                         <div className="space-y-2">
                                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                                                Vista Previa Dinámica ({importMode === 'filtered' ? `Celda ${activeWindowCelda}` : 'Todos los Registros'} — Primeras 5 Filas):
+                                                Vista Previa Dinámica (Celda {activeWindowCelda} — Primeras 5 Filas):
                                             </h4>
                                             <div className="overflow-x-auto border border-navy-850 rounded-lg">
                                                 <table className="w-full text-xs text-left border-collapse text-slate-300">
@@ -536,7 +486,7 @@ export default function PltExcelImportModal({
                     </button>
                     <button
                         onClick={handleImportClick}
-                        disabled={importedRowsState.length === 0}
+                        disabled={matchingRows.length === 0}
                         className="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 px-4.5 py-2 rounded-lg text-xs font-black flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                         <span>Importar Ensayos</span>
