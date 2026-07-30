@@ -109,7 +109,9 @@ class VentanaSaveSchema(BaseModel):
     lito_3: Optional[str] = None            # código
     unidad_litologica: Optional[str] = None  # código ("Intrusivos")
     intemperismo: Optional[str] = None       # código (f/d/m/a/c/s)
-    altura_zona: Optional[str] = None       # texto corto (alta/media/baja)
+    intemperismo_codigo: Optional[str] = None
+    altura_zona: Optional[str] = None        # texto corto (alta/media/baja)
+    alteracion_codigo: Optional[str] = None
     fase: Optional[Union[int, str]] = None
     turno: Optional[str] = None
     mapeador: Optional[str] = None          # código del geotécnico (triggered a FK)

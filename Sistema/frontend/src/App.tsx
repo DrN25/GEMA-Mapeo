@@ -533,7 +533,7 @@ export default function App() {
           este_to: roundDec(v.este_fin, 4),
           norte_to: roundDec(v.norte_fin, 3),
           cota_to: roundDec(v.cota_fin, 2),
-          altura: roundDec(v.altura_m, 1) || 15.0,
+          altura: (v.altura !== null && v.altura !== undefined) ? roundDec(v.altura, 1) : 0,
           dip_talud: roundDec(v.dip_talud, 2) || 0,
           dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
           dip_hw: v.dip !== null && v.dip !== undefined ? roundDec(v.dip, 2) : undefined,
@@ -872,7 +872,9 @@ export default function App() {
         dipdir_talud: winData.header.dipdir_talud !== undefined && winData.header.dipdir_talud !== null ? winData.header.dipdir_talud : null,
         dip_hw: winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null,
         az_hw: winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null,
-        alteracion_codigo: winData.header.alt_zona && winData.header.alt_zona !== '-1' ? winData.header.alt_zona : null,
+        altura_zona: winData.header.alt_zona && winData.header.alt_zona !== '-1' ? winData.header.alt_zona.toLowerCase().trim() : null,
+        alteracion_codigo: winData.header.alt_zona && winData.header.alt_zona !== '-1' ? winData.header.alt_zona.toLowerCase().trim() : null,
+        intemperismo: winData.header.intemperia && winData.header.intemperia !== '-1' ? winData.header.intemperia : null,
         intemperismo_codigo: winData.header.intemperia && winData.header.intemperia !== '-1' ? winData.header.intemperia : null,
         lito_1: winData.header.lito_1 || null,
         lito_2: winData.header.lito_2 || null,
@@ -1236,17 +1238,7 @@ export default function App() {
               <VentanaForm
                 header={activeWindow.header}
                 onChange={(header) => {
-                  const oldIntemperia = activeWindow.header.intemperia;
-                  const newIntemperia = header.intemperia;
-                  let joints = activeWindow.joints;
-
-                  if (newIntemperia !== oldIntemperia && ['f', 'd', 'm', 'a', 'c', 's'].includes(newIntemperia || '')) {
-                    joints = joints.map(j => ({
-                      ...j,
-                      alteracion: newIntemperia!
-                    }));
-                  }
-                  setActiveWindow({ ...activeWindow, header, joints });
+                  setActiveWindow({ ...activeWindow, header });
                 }}
                 calculated={calculated}
                 onOpenImportModal={() => setIsImportModalOpen(true)}

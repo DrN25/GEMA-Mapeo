@@ -732,14 +732,16 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
         v.litologia1_id = lito1_id; v.litologia2_id = lito2_id; v.litologia3_id = lito3_id
         v.unidad_litologica_id = unidad_id
-        v.grado_intemperismo = data.intemperismo
-        v.altura_zona = data.altura_zona
+        raw_alt_zona = data.altura_zona or data.alteracion_codigo
+        v.grado_intemperismo = data.intemperismo or data.intemperismo_codigo
+        v.altura_zona = raw_alt_zona.lower().strip() if raw_alt_zona else None
         v.fase = data.fase; v.turno = data.turno
         v.geotecnico_id = geotecnico_id
         for e in list(v.discontinuidades):
             db.delete(e)
         db.flush()
     else:
+        raw_alt_zona = data.altura_zona or data.alteracion_codigo
         v = models.Ventana(
             codigo_celda=code_up, campania_id=campania_id,
             sector_geotecnico_id=sector_id,
@@ -751,8 +753,9 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             dip_talud=data.dip_talud, dip_dir_talud=data.dipdir_talud,
             litologia1_id=lito1_id, litologia2_id=lito2_id, litologia3_id=lito3_id,
             unidad_litologica_id=unidad_id,
-            grado_intemperismo=data.intemperismo,
-            altura_zona=data.altura_zona, fase=data.fase, turno=data.turno,
+            grado_intemperismo=data.intemperismo or data.intemperismo_codigo,
+            altura_zona=raw_alt_zona.lower().strip() if raw_alt_zona else None,
+            fase=data.fase, turno=data.turno,
             geotecnico_id=geotecnico_id,
         )
         db.add(v)

@@ -625,9 +625,8 @@ export default function VentanaForm({
                   <input
                     type="text"
                     value={header.alt_zona || ''}
-                    onChange={(e) => handleChange('alt_zona', e.target.value.toUpperCase().slice(0, 32))}
-                    placeholder="m / d / ..."
-                    maxLength={1}
+                    onChange={(e) => handleChange('alt_zona', e.target.value.toLowerCase().slice(0, 32))}
+                    placeholder="ej. baja, media..."
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   />
                 </div>
