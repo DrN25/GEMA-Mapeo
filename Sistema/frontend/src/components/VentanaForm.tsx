@@ -68,7 +68,7 @@ export default function VentanaForm({
 
   const getInputValue = (field: keyof WindowHeader, stateVal: any): string => {
     if (localValues[field as string] !== undefined) return localValues[field as string];
-    if (stateVal === undefined || stateVal === null || stateVal === 0) return '';
+    if (stateVal === undefined || stateVal === null) return '';
     return String(stateVal);
   };
 
@@ -81,7 +81,7 @@ export default function VentanaForm({
     if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
       handleChange(field, num);
     } else if (restricted === '') {
-      handleChange(field, 0);
+      handleChange(field, undefined);
     }
   };
 
@@ -91,9 +91,13 @@ export default function VentanaForm({
       delete copy[field as string];
       return copy;
     });
+    if (!val || val.trim() === '') {
+      handleChange(field, undefined);
+      return;
+    }
     const num = parseFloat(val);
     if (isNaN(num)) {
-      handleChange(field, 0);
+      handleChange(field, undefined);
     } else {
       handleChange(field, Math.max(0, num));
     }
@@ -406,8 +410,13 @@ export default function VentanaForm({
                     handleChange('altura', limited);
                   }}
                   onBlur={(e) => {
-                    const num = parseFloat(e.target.value);
-                    handleChange('altura', isNaN(num) ? 0 : Math.min(99, Math.max(0, num)));
+                    const val = e.target.value.trim();
+                    if (val === '') {
+                      handleChange('altura', undefined);
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    handleChange('altura', isNaN(num) ? undefined : Math.min(99, Math.max(0, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -424,8 +433,13 @@ export default function VentanaForm({
                     handleChange('dip_talud', limited);
                   }}
                   onBlur={(e) => {
-                    const num = parseFloat(e.target.value);
-                    handleChange('dip_talud', isNaN(num) ? 0 : Math.min(90, Math.max(-90, num)));
+                    const val = e.target.value.trim();
+                    if (val === '') {
+                      handleChange('dip_talud', undefined);
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    handleChange('dip_talud', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -442,8 +456,13 @@ export default function VentanaForm({
                     handleChange('dipdir_talud', limited);
                   }}
                   onBlur={(e) => {
-                    const num = parseFloat(e.target.value);
-                    handleChange('dipdir_talud', isNaN(num) ? 0 : Math.min(359.99, Math.max(0, num)));
+                    const val = e.target.value.trim();
+                    if (val === '') {
+                      handleChange('dipdir_talud', undefined);
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    handleChange('dipdir_talud', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -460,8 +479,13 @@ export default function VentanaForm({
                     handleChange('dip_hw', limited);
                   }}
                   onBlur={(e) => {
-                    const num = parseFloat(e.target.value);
-                    handleChange('dip_hw', isNaN(num) ? 0 : Math.min(90, Math.max(-90, num)));
+                    const val = e.target.value.trim();
+                    if (val === '') {
+                      handleChange('dip_hw', undefined);
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    handleChange('dip_hw', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -478,8 +502,13 @@ export default function VentanaForm({
                     handleChange('az_hw', limited);
                   }}
                   onBlur={(e) => {
-                    const num = parseFloat(e.target.value);
-                    handleChange('az_hw', isNaN(num) ? 0 : Math.min(359.99, Math.max(0, num)));
+                    const val = e.target.value.trim();
+                    if (val === '') {
+                      handleChange('az_hw', undefined);
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    handleChange('az_hw', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
