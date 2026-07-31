@@ -335,7 +335,8 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
         lito_3=lito3_code,
         unidad_litologica=unidad_code,
         intemperismo=v.grado_intemperismo,
-        altura_mapeo=v.altura_mapeo,
+        alteracion=v.alteracion if hasattr(v, 'alteracion') and v.alteracion is not None else getattr(v, 'altura_mapeo', None),
+        altura_mapeo=v.alteracion if hasattr(v, 'alteracion') and v.alteracion is not None else getattr(v, 'altura_mapeo', None),
         fase=v.fase,
         mapeador=_reverse(models.Geotecnico, v.geotecnico_id, "nombre"),
         rmr_input=rmr_input,
@@ -733,16 +734,16 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.dip_talud = data.dip_talud; v.dip_dir_talud = data.dipdir_talud
         v.litologia1_id = lito1_id; v.litologia2_id = lito2_id; v.litologia3_id = lito3_id
         v.unidad_litologica_id = unidad_id
-        raw_alt_zona = data.altura_mapeo or data.alteracion_codigo
+        raw_alt_zona = data.alteracion or data.altura_mapeo or data.alteracion_codigo
         v.grado_intemperismo = data.intemperismo or data.intemperismo_codigo
-        v.altura_mapeo = raw_alt_zona.lower().strip() if raw_alt_zona else None
+        v.alteracion = raw_alt_zona.lower().strip() if raw_alt_zona else None
         v.fase = data.fase
         v.geotecnico_id = geotecnico_id
         for e in list(v.discontinuidades):
             db.delete(e)
         db.flush()
     else:
-        raw_alt_zona = data.altura_mapeo or data.alteracion_codigo
+        raw_alt_zona = data.alteracion or data.altura_mapeo or data.alteracion_codigo
         v = models.Ventana(
             codigo_celda=code_up, campania_id=campania_id,
             sector_geotecnico_id=sector_id,
@@ -757,7 +758,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             litologia1_id=lito1_id, litologia2_id=lito2_id, litologia3_id=lito3_id,
             unidad_litologica_id=unidad_id,
             grado_intemperismo=data.intemperismo or data.intemperismo_codigo,
-            altura_mapeo=raw_alt_zona.lower().strip() if raw_alt_zona else None,
+            alteracion=raw_alt_zona.lower().strip() if raw_alt_zona else None,
             fase=data.fase,
             geotecnico_id=geotecnico_id,
         )
@@ -877,7 +878,7 @@ def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
             data.distancia_celda, data.altura, data.dip, data.azimut_hole,
             data.dip_talud, data.dipdir_talud,
             data.intemperismo, data.lito_1, data.lito_2, data.lito_3, data.unidad_litologica,
-            data.altura_mapeo, data.fase, data.mapeador,
+            data.alteracion or data.altura_mapeo, data.fase, data.mapeador,
             data.rmr_input.agua_codigo if data.rmr_input else None, data.agua_r76,
             data.rmr_input.resistencia_codigo if data.rmr_input else None, data.resist_r76,
             data.rmr_input.gsi_visual if data.rmr_input else None,
@@ -943,6 +944,8 @@ def _populate_ventana_from_schema(v: models.Ventana, data: schemas.VentanaSaveSc
     v.litologia3_id = resolver.litologia_id(data.lito_3) if data.lito_3 else None
     v.unidad_litologica_id = resolver.unidad_litologica_id(data.unidad_litologica) if data.unidad_litologica else None
     v.grado_intemperismo = data.intemperismo
+    raw_alt_zona = data.alteracion or data.altura_mapeo or data.alteracion_codigo
+    v.alteracion = raw_alt_zona.lower().strip() if raw_alt_zona else None
     v.altura_mapeo = data.altura_mapeo
     v.fase = data.fase
     v.geotecnico_id = resolver.geotecnico_id(data.mapeador) if data.mapeador else None

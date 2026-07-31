@@ -677,14 +677,27 @@ export default function VentanaForm({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase block">Alt. de Mapeo</label>
-                  <input
-                    type="text"
-                    value={header.alt_mapeo || ''}
-                    onChange={(e) => handleChange('alt_mapeo', e.target.value.toLowerCase().slice(0, 32))}
-                    placeholder="ej. m, d..."
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
-                  />
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Alteración</label>
+                  <select
+                    value={header.alteracion || header.alt_mapeo || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleChange('alteracion', val);
+                      handleChange('alt_mapeo', val);
+                    }}
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
+                  >
+                    <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
+                    {Object.entries(ALTERACION_CATALOG).map(([key, item]) => {
+                      const parts = item.name.split(' — ');
+                      const desc = parts[1] || item.name;
+                      return (
+                        <option key={key} value={key} className="bg-navy-950 text-slate-100 text-xs">
+                          {key} ({desc})
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
             </div>

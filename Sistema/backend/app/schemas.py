@@ -136,7 +136,8 @@ class VentanaSaveSchema(BaseModel):
     unidad_litologica: Optional[str] = None  # código ("Intrusivos")
     intemperismo: Optional[str] = None       # código (f/d/m/a/c/s)
     intemperismo_codigo: Optional[str] = None
-    altura_mapeo: Optional[str] = None        # texto corto (alta/media/baja)
+    alteracion: Optional[str] = None         # texto corto (alteración de zona)
+    altura_mapeo: Optional[str] = None       # retrocompatibilidad
     alteracion_codigo: Optional[str] = None
     fase: Optional[Union[int, str]] = None
     mapeador: Optional[str] = None          # código del geotécnico (triggered a FK)
@@ -229,6 +230,7 @@ class VentanaResponseSchema(BaseModel):
     lito_3: Optional[str] = None
     unidad_litologica: Optional[str] = None
     intemperismo: Optional[str] = None
+    alteracion: Optional[str] = None
     altura_mapeo: Optional[str] = None
     fase: Optional[int] = None
     mapeador: Optional[str] = None

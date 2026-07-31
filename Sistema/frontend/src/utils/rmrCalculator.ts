@@ -54,6 +54,7 @@ export interface WindowHeader {
   mapeador?: string;
   sect_geot?: string;
   intemperia?: string;
+  alteracion?: string;
   alt_mapeo?: string;
   condicion_agua: string;
   resistencia_ucs: string;

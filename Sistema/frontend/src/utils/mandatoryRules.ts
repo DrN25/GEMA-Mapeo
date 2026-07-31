@@ -46,6 +46,7 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
     mapeador: true,
     // OPCIONALES
     alt_mapeo: false,
+    alteracion: false,
     fase: false,
     comentario: false
   },
@@ -144,7 +145,8 @@ const HEADER_FIELD_LABELS: Record<string, string> = {
   campana: 'Campaña',
   nivel: 'Nivel',
   mapeador: 'Geólogo Mapeador',
-  alt_mapeo: 'Altura de Mapeo',
+  alt_mapeo: 'Alteración',
+  alteracion: 'Alteración',
   fase: 'Fase',
   comentario: 'Comentarios'
 };
