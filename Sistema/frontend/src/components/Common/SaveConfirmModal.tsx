@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle } from 'lucide-react';
+import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle, BookOpen } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
 import { validateMapeoWindow, validatePltEnsayosList } from '../../utils/mandatoryRules';
+import { validateWindowQAQC, QAQC_RULE_ENFORCEMENT } from '../../utils/qaqcValidator';
 
 export interface PltDiffSummary {
   added: number;
@@ -19,6 +20,7 @@ interface SaveConfirmModalProps {
   workspaceDiff: AllWindowsDiffSummary;
   pltDiff?: PltDiffSummary;
   pltEnsayos?: any[];
+  onOpenCatalogs?: () => void;
 }
 
 export default function SaveConfirmModal({
@@ -28,7 +30,8 @@ export default function SaveConfirmModal({
   activeWindow,
   workspaceDiff,
   pltDiff,
-  pltEnsayos = []
+  pltEnsayos = [],
+  onOpenCatalogs
 }: SaveConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -45,8 +48,28 @@ export default function SaveConfirmModal({
     return Array.isArray(pltEnsayos) && pltEnsayos.length > 0 ? validatePltEnsayosList(pltEnsayos) : [];
   }, [pltEnsayos]);
 
-  const totalBlockingIssues = [...mapeoIssues, ...pltIssues];
-  const hasBlockingErrors = totalBlockingIssues.length > 0;
+  // Auditoría sincrónica QA/QC de combinaciones inválidas y errores críticos
+  const qaqcErrors = useMemo(() => {
+    if (!activeWindow) return [];
+    const ef = activeWindow.header.este_from || 0;
+    const nf = activeWindow.header.norte_from || 0;
+    const cf = activeWindow.header.cota_from || 0;
+    const et = activeWindow.header.este_to || 0;
+    const nt = activeWindow.header.norte_to || 0;
+    const ct = activeWindow.header.cota_to || 0;
+    const dx = et - ef;
+    const dy = nt - nf;
+    const dz = ct - cf;
+    const distCalc = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const rawLargo = typeof activeWindow.header.largo === 'number' ? activeWindow.header.largo : parseFloat(String(activeWindow.header.largo || 0));
+    const largo = !isNaN(rawLargo) && rawLargo > 0 ? rawLargo : distCalc;
+
+    const alerts = validateWindowQAQC(activeWindow.header, activeWindow.joints, largo);
+    return alerts.filter(a => a.type === 'ERROR' && QAQC_RULE_ENFORCEMENT[a.ruleId || ''] !== false);
+  }, [activeWindow]);
+
+  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcErrors.length;
+  const hasBlockingErrors = totalBlockingIssuesCount > 0;
 
   // Si la celda activa tiene cambios, por defecto seleccionamos 'active'; de lo contrario 'all'
   const [selectedScope, setSelectedScope] = useState<'active' | 'all'>(
@@ -229,29 +252,98 @@ export default function SaveConfirmModal({
             </div>
           )}
 
-          {/* Card de Bloqueo por Campos Obligatorios Pendientes */}
+          {/* Card / Banner de Bloqueo Crítico por Incompatibilidad o Campos Pendientes */}
           {hasBlockingErrors && (
-            <div className="bg-rose-500/10 border border-rose-500/40 rounded-xl p-4 space-y-3 animate-fade-in text-rose-300">
-              <div className="flex items-center gap-2 border-b border-rose-500/20 pb-2">
-                <AlertCircle size={18} className="text-rose-400 shrink-0" />
-                <h4 className="text-xs font-black uppercase tracking-wider text-rose-200">
-                  Guardado Bloqueado: Complete {totalBlockingIssues.length} campo(s) obligatorio(s)
-                </h4>
+            <div className="bg-rose-950/80 border-2 border-rose-500 rounded-2xl p-5 space-y-4 shadow-[0_0_30px_rgba(244,63,94,0.25)] animate-fade-in text-rose-100">
+              
+              {/* Header de la Alerta */}
+              <div className="flex items-start gap-3 border-b border-rose-500/30 pb-3">
+                <div className="p-2.5 bg-rose-500/20 border border-rose-500/50 text-rose-400 rounded-xl shrink-0 shadow-[0_0_15px_rgba(244,63,94,0.3)]">
+                  <AlertCircle size={24} className="stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-rose-100 uppercase tracking-wide">
+                    ¡GUARDADO BLOQUEADO POR COMBINACIÓN INVÁLIDA O CAMPOS FALTANTES!
+                  </h4>
+                  <p className="text-xs text-rose-300 font-medium mt-0.5">
+                    El sistema detectó {totalBlockingIssuesCount} problema(s) crítico(s) que impiden sincronizar con la base de datos SQL.
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-rose-300 font-semibold">
-                No es posible sincronizar con SQL Server hasta completar los siguientes campos requeridos:
-              </p>
 
-              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
-                {totalBlockingIssues.map((issue, idx) => (
-                  <div key={idx} className="text-[11px] bg-rose-950/70 border border-rose-500/30 rounded-lg px-3 py-1.5 flex items-center justify-between text-rose-200">
-                    <span className="font-semibold">{issue.message}</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 uppercase shrink-0 ml-2">
-                      {issue.section}
-                    </span>
-                  </div>
-                ))}
+              {/* Lista Detallada de Problemas Críticos */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block">
+                  Detalle de inconsistencias detectadas:
+                </span>
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                  {/* QA/QC Combinaciones Inválidas */}
+                  {qaqcErrors.map((err, idx) => (
+                    <div key={`qaqc-${idx}`} className="text-xs bg-amber-950/80 border border-amber-500/60 rounded-xl p-3 flex items-center justify-between text-amber-100 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                        <span className="font-semibold leading-tight">{err.message}</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/30 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/40 tracking-wider">
+                        Combinación Inválida
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Campos Obligatorios de Mapeo */}
+                  {mapeoIssues.map((issue, idx) => (
+                    <div key={`map-${idx}`} className="text-xs bg-rose-900/70 border border-rose-500/50 rounded-xl p-3 flex items-center justify-between text-rose-100 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                        <span className="font-semibold leading-tight">{issue.message}</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-rose-500/30 text-rose-200 uppercase shrink-0 ml-2 border border-rose-500/40 tracking-wider">
+                        {issue.section}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Campos Obligatorios PLT */}
+                  {pltIssues.map((issue, idx) => (
+                    <div key={`plt-${idx}`} className="text-xs bg-rose-900/70 border border-rose-500/50 rounded-xl p-3 flex items-center justify-between text-rose-100 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                        <span className="font-semibold leading-tight">{issue.message}</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-rose-500/30 text-rose-200 uppercase shrink-0 ml-2 border border-rose-500/40 tracking-wider">
+                        Ensayos PLT
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* TARJETA PROMINENTE DE RECOMENDACIÓN DE CATÁLOGO */}
+              <div className="bg-amber-500/15 border-2 border-amber-500/50 rounded-xl p-4 space-y-3 text-amber-200 shadow-inner">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wide">
+                    <BookOpen size={18} className="text-amber-400" />
+                    <span>RECOMENDACIÓN CRÍTICA DEL SISTEMA</span>
+                  </div>
+                  {onOpenCatalogs && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onOpenCatalogs) onOpenCatalogs();
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-navy-950 font-black text-xs transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)] active:scale-95 shrink-0"
+                    >
+                      <BookOpen size={14} />
+                      <span>Ver Catálogos Geomecánicos</span>
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-amber-100 font-medium leading-relaxed">
+                  Por favor revise detenidamente el <strong>Catálogo Geomecánico de Referencia</strong> para verificar los rangos y combinaciones compatibles de <strong>Abertura, Relleno, Rugosidad, JRC y Dureza vs Meteorización</strong> antes de corregir el registro.
+                </p>
+              </div>
+
             </div>
           )}
 

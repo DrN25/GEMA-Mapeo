@@ -1330,6 +1330,7 @@ export default function App() {
                 }}
                 calculated={calculated}
                 onOpenImportModal={() => setIsImportModalOpen(true)}
+                onOpenCatalogs={() => setIsCatalogModalOpen(true)}
               />
 
               <DisconTable
@@ -1650,6 +1651,7 @@ export default function App() {
         workspaceDiff={workspaceDiff}
         pltDiff={pltDiffSummary}
         pltEnsayos={pltEnsayos}
+        onOpenCatalogs={() => setIsCatalogModalOpen(true)}
       />
 
       <DiscardModal

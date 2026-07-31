@@ -1,7 +1,7 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
-import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
 
 // Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
@@ -22,6 +22,7 @@ interface VentanaFormProps {
   onChange: (updatedHeader: WindowHeader) => void;
   calculated: CalculatorResult | null;
   onOpenImportModal: () => void;
+  onOpenCatalogs?: () => void;
 }
 
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
@@ -54,7 +55,8 @@ export default function VentanaForm({
   header,
   onChange,
   calculated: _calculated,
-  onOpenImportModal
+  onOpenImportModal,
+  onOpenCatalogs
 }: VentanaFormProps) {
 
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
@@ -587,22 +589,51 @@ export default function VentanaForm({
                 </div>
               </div>
 
-              {/* Banners Informativos de Validación Litológica */}
+              {/* Banners Prominentes de Validación Litológica */}
               {litoValidation.isInvalid ? (
-                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-                  <AlertTriangle size={15} className="text-amber-400 shrink-0" />
-                  <span>
-                    <strong>Combinación Litológica no válida:</strong> {litoValidation.reason}
-                  </span>
+                <div className="p-4 rounded-xl bg-amber-950/80 border-2 border-amber-500/80 text-amber-200 text-xs space-y-3 shadow-[0_0_20px_rgba(245,158,11,0.2)] animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-lg shrink-0">
+                      <AlertTriangle size={20} className="stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-black text-amber-300 uppercase tracking-wide">
+                        ¡COMBINACIÓN LITOLÓGICA INVÁLIDA O INCOMPATIBLE EN GEMA!
+                      </h4>
+                      <p className="text-xs text-amber-200/90 mt-1 font-semibold leading-relaxed">
+                        {litoValidation.reason}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta Prominente de Recomendación de Catálogo con Botón Directo */}
+                  <div className="bg-amber-500/15 border border-amber-500/40 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-100">
+                    <div className="flex items-center gap-2 text-xs font-medium">
+                      <BookOpen size={16} className="text-amber-400 shrink-0" />
+                      <span>
+                        Se recomienda revisar el <strong>Catálogo Geomecánico de Referencia</strong> para verificar las combinaciones compatibles de <strong>Unidad Litológica, Lito 1, Lito 2 y Lito 3</strong>.
+                      </span>
+                    </div>
+                    {onOpenCatalogs && (
+                      <button
+                        type="button"
+                        onClick={onOpenCatalogs}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-navy-950 font-black text-xs transition-all shadow-[0_0_12px_rgba(245,158,11,0.3)] active:scale-95 shrink-0 self-end sm:self-auto"
+                      >
+                        <BookOpen size={14} />
+                        <span>Ver Catálogo</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : litoValidation.matchedItem ? (
-                <div className="p-1.5 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] flex items-center justify-between">
+                <div className="p-2 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between shadow-sm">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
-                    <span>Combinación Válida GEMA: <strong>{litoValidation.matchedItem.grupo}</strong></span>
+                    <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                    <span>Combinación Válida GEMA: <strong>{litoValidation.matchedItem.grupo}</strong> (Lito 1: {litoValidation.matchedItem.unidad} | Lito 2: {litoValidation.matchedItem.litologia})</span>
                   </div>
                   {litoValidation.matchedItem.k !== undefined && (
-                    <span className="bg-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-300">
+                    <span className="bg-emerald-500/20 px-2.5 py-0.5 rounded-md text-xs font-bold text-emerald-300 border border-emerald-500/30">
                       Factor K: {litoValidation.matchedItem.k}
                     </span>
                   )}
