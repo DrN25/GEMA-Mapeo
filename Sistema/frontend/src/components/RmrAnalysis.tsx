@@ -132,9 +132,9 @@ export default function RmrAnalysis({
   // Resistencia estimada ingresada manualmente por el usuario
   const currentResistGrade = header.resistencia_ucs || '';
 
-  const p1 = calculated.familias_spacing[1] ? calculated.familias_spacing[1].toFixed(2) : '0.00';
-  const p2 = calculated.familias_spacing[2] ? calculated.familias_spacing[2].toFixed(2) : '0.00';
-  const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(2) : '0.00';
+  const p1 = calculated.familias_spacing[1] ? calculated.familias_spacing[1].toFixed(4) : '0.0000';
+  const p2 = calculated.familias_spacing[2] ? calculated.familias_spacing[2].toFixed(4) : '0.0000';
+  const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(4) : '0.0000';
 
   const ucsIs50Divergent = ucs !== undefined && is50 !== undefined && ucs <= is50;
   const gsiVisualInvalid = gsiVisual !== undefined && (gsiVisual < 0 || gsiVisual > 100);

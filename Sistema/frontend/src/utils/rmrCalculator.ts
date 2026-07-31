@@ -347,7 +347,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
 
   for (let fam = 1; fam <= 9; fam++) {
     if (familias_count[fam] > 0) {
-      familias_spacing[fam] = Math.round((familias_sum_sp[fam] / familias_count[fam]) * 100) / 100;
+      familias_spacing[fam] = Math.round((familias_sum_sp[fam] / familias_count[fam]) * 10000) / 10000;
     }
   }
 

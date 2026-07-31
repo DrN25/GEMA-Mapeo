@@ -1197,16 +1197,12 @@ export default function App() {
           <div className="flex items-center gap-4">
             {/* Server Connectivity Indicator */}
             <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
-              <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'synced' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' :
-                syncStatus === 'saving' ? 'bg-violet-500 animate-pulse' :
-                  syncStatus === 'unsaved' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
-                    'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+              <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'offline'
+                ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
+                : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
                 }`} />
               <span className="text-xs text-slate-400 font-semibold hidden md:inline" title={syncMessage}>
-                {syncStatus === 'synced' ? 'SQL Server Conectado' :
-                  syncStatus === 'saving' ? 'Guardando...' :
-                    syncStatus === 'unsaved' ? 'Cambios pendientes' :
-                      'Almacenamiento Local Offline'}
+                {syncStatus === 'offline' ? 'SQL Server Desconectado' : 'SQL Server Conectado'}
               </span>
             </div>
 
