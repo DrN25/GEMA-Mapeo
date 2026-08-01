@@ -86,8 +86,12 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
 
   const [step, setStep] = useState<Step>('select');
   const [file, setFile] = useState<File | null>(null);
-  const [mode, setMode] = useState<'auto' | 'estaciones' | 'bd'>('auto');
-  const [activeTab, setActiveTab] = useState<'bd' | 'estaciones'>('bd');
+  // TEMPORALMENTE DESACTIVADO: Selector de modo de importación oculto de la interfaz.
+  // La importación siempre opera en modo automático ('auto').
+  // const [mode, setMode] = useState<'auto' | 'estaciones' | 'bd'>('auto');
+  const mode: 'auto' = 'auto';
+  // TEMPORALMENTE DESACTIVADO: Tab de formato (BD / Estaciones) oculto de la interfaz.
+  // const [activeTab, setActiveTab] = useState<'bd' | 'estaciones'>('bd');
 
   // Preview States
   const [celdas, setCeldas] = useState<CeldaItem[]>([]);
@@ -313,10 +317,10 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
             </div>
             <div>
               <h3 className="text-xs font-black text-slate-100 tracking-wider uppercase">
-                {step === 'preview' ? `Previsualización de Excel BD (${celdas.length} Celdas Encontradas)` : 'Importación de Celdas de Mapeo Geomecánico'}
+                {step === 'preview' ? `Previsualización de Excel (${celdas.length} Celdas Encontradas)` : 'Importación de Celdas de Mapeo Geomecánico'}
               </h3>
               <p className="text-xs text-slate-400">
-                {step === 'preview' ? 'Seleccione las celdas a guardar, mapee columnas y resuelva duplicados.' : 'Cargue un archivo Excel de mapeo (formato compilado o BD).'}
+                {step === 'preview' ? 'Seleccione las celdas a guardar, mapee columnas y resuelva duplicados.' : 'Cargue un archivo Excel de mapeo geomecánico.'}
               </p>
             </div>
           </div>
@@ -328,7 +332,10 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
         {/* PASO 1: SELECCIÓN DE ARCHIVO Y MODO */}
         {step === 'select' && (
           <div className="space-y-5 pt-4">
-            {/* Selector de Modo */}
+            {/* TEMPORALMENTE DESACTIVADO: Selector de Modo de Importación.
+                La importación siempre funciona en modo automático ('auto'),
+                por lo que este bloque permanece comentado.
+            {/*
             <div className="space-y-1.5">
               <label className="text-xs font-black text-slate-400 uppercase tracking-wider block">Modo de Importación</label>
               <div className="grid grid-cols-3 gap-3">
@@ -374,6 +381,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                 </button>
               </div>
             </div>
+            */}
 
             {/* Zona Dropzone para Cargar Archivo */}
             <div
@@ -435,7 +443,9 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
 
             {/* Tabs de Formato + Buscador + Acordeón Toggle */}
             <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-              {/* Tabs */}
+              {/* TEMPORALMENTE DESACTIVADO: Tabs de formato (BD / Estaciones).
+                  La importación siempre opera en modo automático.
+              {/*
               <div className="flex bg-navy-950 p-1 rounded-xl border border-navy-800 text-xs">
                 <button
                   type="button"
@@ -456,6 +466,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                   <span className="text-xs bg-navy-900 text-slate-500 px-1.5 py-0.5 rounded">Próximamente</span>
                 </button>
               </div>
+              */}
 
               {/* Controles de Búsqueda y Mapeo */}
               <div className="flex items-center gap-2">
@@ -539,7 +550,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                     <th className="py-2.5 px-3 text-right">Este / Norte / Cota</th>
                     <th className="py-2.5 px-3 text-center">Estructuras</th>
                     <th className="py-2.5 px-3 text-left">Mapeador</th>
-                    <th className="py-2.5 px-3 text-center">Estado BD</th>
+                    <th className="py-2.5 px-3 text-center">Estado</th>
                     <th className="py-2.5 px-3 text-center">Acciones</th>
                   </tr>
                 </thead>
@@ -656,7 +667,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                 className="bg-emerald-500 hover:bg-emerald-600 text-navy-950 font-black px-5 py-2 rounded-xl text-xs flex items-center gap-2 disabled:opacity-50 transition-all shadow-lg"
               >
                 {importing ? <Loader size={15} className="animate-spin" /> : <Upload size={15} />}
-                {importing ? 'Guardando en BD...' : `Importar ${selectedCodes.size} Celdas Seleccionadas`}
+                {importing ? 'Guardando...' : `Importar ${selectedCodes.size} Celdas Seleccionadas`}
               </button>
             </div>
           </div>

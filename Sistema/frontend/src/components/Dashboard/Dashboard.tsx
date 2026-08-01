@@ -350,9 +350,11 @@ export default function Dashboard({
                   <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
                     <div className="flex items-center gap-2">
                       <span>{w.name}</span>
+                      {/* TEMPORALMENTE DESACTIVADO: Etiqueta IMPORTADO para celdas importadas.
                       {pendingImports.includes(w.name) && (
                         <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">IMPORTADO</span>
                       )}
+                      */}
                     </div>
                   </td>
                   <td className="py-2.5 px-4 text-slate-400 text-[10px]">{w.fecha_mapeo}</td>
