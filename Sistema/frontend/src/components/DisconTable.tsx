@@ -159,6 +159,7 @@ export default function DisconTable({
 
   const createFamily = () => {
     const nextFam = Math.max(0, ...joints.map(j => j.familia)) + 1;
+    setFamilyToDelete(nextFam);
     const newRows: JointRow[] = Array.from({ length: 3 }).map((_, i) => ({
       id: joints.length + 1 + i,
       familia: nextFam,

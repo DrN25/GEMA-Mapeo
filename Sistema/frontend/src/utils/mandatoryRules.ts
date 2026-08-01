@@ -292,9 +292,15 @@ export function validateMapeoWindow(windowData: any): MissingFieldIssue[] {
   // 3. Validar Discontinuidades
   const joints = Array.isArray(windowData.joints) ? windowData.joints : [];
   joints.forEach((j: any, idx: number) => {
-    // Si es una fila vacía o no inicializada, saltarla solo si no tiene tipo de estructura ni dip
-    const isVacant = isBlank(j.tipo_estructura) && isBlank(j.dip) && isBlank(j.dip_dir);
-    if (isVacant && idx > 0) return; // Si la primera fila también se exige, se evalúa
+    // Una fila es "vacante" SOLO si todos sus campos editables están vacíos (plantilla sin datos).
+    // familia se excluye porque siempre tiene valor asignado, y alteracion porque
+    // normalizeJoints puede pre-rellenarla con el intemperismo del header (default).
+    // Si tiene cualquier dato, se exigen todos los campos obligatorios (incluye filas de familias creadas).
+    const jointFields = Object.keys(MANDATORY_FIELD_RULES.discontinuities)
+      .filter(k => k !== 'familia' && k !== 'alteracion');
+    const isVacant = jointFields.every(key => isBlank(getFieldValue(j, key)));
+
+    if (isVacant) return;
 
     for (const [key, isRequired] of Object.entries(MANDATORY_FIELD_RULES.discontinuities)) {
       const val = getFieldValue(j, key);

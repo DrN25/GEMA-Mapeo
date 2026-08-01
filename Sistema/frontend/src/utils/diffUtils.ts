@@ -46,16 +46,23 @@ function normalizeVal(val: any): string {
  */
 export function isNonVacantJoint(j: JointRow): boolean {
   if (!j) return false;
+  const blank = (v: any) => v === undefined || v === null || v === -1 || v === '-1' || v === '';
   return (
-    (j.distancia !== -1 && j.distancia !== null && j.distancia !== undefined) ||
-    (j.dip !== -1 && j.dip !== null && j.dip !== undefined) ||
-    (j.dip_dir !== -1 && j.dip_dir !== null && j.dip_dir !== undefined) ||
-    (j.espaciamiento !== -1 && j.espaciamiento !== null && j.espaciamiento !== undefined) ||
-    (j.abertura !== -1 && j.abertura !== null && j.abertura !== undefined) ||
-    (j.espesor !== -1 && j.espesor !== null && j.espesor !== undefined) ||
-    (j.n_estructuras !== -1 && j.n_estructuras !== null && j.n_estructuras !== undefined) ||
-    (j.jrc !== -1 && j.jrc !== null && j.jrc !== undefined) ||
-    (j.rugosidad !== -1 && j.rugosidad !== null && j.rugosidad !== undefined)
+    !blank(j.distancia) ||
+    !blank(j.dip) ||
+    !blank(j.dip_dir) ||
+    !blank(j.espaciamiento) ||
+    !blank(j.abertura) ||
+    !blank(j.espesor) ||
+    !blank(j.n_estructuras) ||
+    !blank(j.jrc) ||
+    !blank(j.rugosidad) ||
+    !blank(j.tipo_estructura) ||
+    !blank(j.extremos_visibles) ||
+    !blank(j.terminacion) ||
+    !blank(j.relleno1) ||
+    !blank(j.forma) ||
+    !blank(j.continuidad)
   );
 }
 

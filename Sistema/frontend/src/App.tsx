@@ -987,13 +987,12 @@ export default function App() {
       return j;
     });
 
-    const normalized = normalizeJoints(shiftedJoints);
+    const normalized = normalizeJoints(shiftedJoints, activeWindow.header.intemperia);
 
     setActiveWindow({
       ...activeWindow,
       joints: normalized
     });
-    setSyncStatus('unsaved');
   };
 
   const handleConfirmSave = async (scope: 'active' | 'all') => {
