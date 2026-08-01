@@ -221,14 +221,14 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
         label: COLUMN_LABELS.relleno1,
         type: 'select',
         width: 128,
-        options: Object.keys(RELLENO_CATALOG).map(code => ({ value: code, label: code }))
+        options: Object.keys(RELLENO_CATALOG).filter(code => code !== 'cwf').map(code => ({ value: code, label: code }))
     },
     {
         key: 'relleno2',
         label: COLUMN_LABELS.relleno2,
         type: 'select',
         width: 128,
-        options: Object.keys(RELLENO_CATALOG).map(code => ({ value: code, label: code }))
+        options: Object.keys(RELLENO_CATALOG).filter(code => code !== 'cwf').map(code => ({ value: code, label: code }))
     },
 
     { key: 'r1_89', label: COLUMN_LABELS.r1_sub_89, type: 'number', width: 80, isComputed: true, formulaId: 'rel_single_r89', getFormulaParams: (row) => ({ code: row.relleno1, thickness: row.espesor }) },

@@ -60,15 +60,11 @@ def get_ensayos_plt(celda: Optional[str] = Query(None), db: Session = Depends(ge
         v = db.query(models.Ventana).filter_by(codigo_celda=celda_clean).first()
         if v:
             query = query.filter(
-                (models.EnsayoPLT.ventana_id == v.ventana_id) | 
-                (models.EnsayoPLT.codigo_muestra.like(f"{celda_clean}_%")) |
+                (models.EnsayoPLT.ventana_id == v.ventana_id) |
                 (models.EnsayoPLT.codigo_muestra == celda_clean)
             )
         else:
-            query = query.filter(
-                (models.EnsayoPLT.codigo_muestra.like(f"{celda_clean}_%")) |
-                (models.EnsayoPLT.codigo_muestra == celda_clean)
-            )
+            query = query.filter(models.EnsayoPLT.codigo_muestra == celda_clean)
     else:
         query = query.limit(500)
 
@@ -190,14 +186,10 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
         if v_id:
             q = q.filter(
                 (models.EnsayoPLT.ventana_id == v_id) |
-                (models.EnsayoPLT.codigo_muestra.like(f"{celda_clean}_%")) |
                 (models.EnsayoPLT.codigo_muestra == celda_clean)
             )
         else:
-            q = q.filter(
-                (models.EnsayoPLT.codigo_muestra.like(f"{celda_clean}_%")) |
-                (models.EnsayoPLT.codigo_muestra == celda_clean)
-            )
+            q = q.filter(models.EnsayoPLT.codigo_muestra == celda_clean)
         existing_db_rows.extend(q.all())
 
     from app.routers.ventanas import GEMACatalogResolver

@@ -76,7 +76,7 @@ export default function VentanaForm({
 
   const handleCoordinateInputChange = (field: keyof WindowHeader, val: string, intDigits: number, decDigits: number) => {
     const sanitized = val.replace(',', '.');
-    const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits, true);
+    const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits, false);
     setLocalValues(prev => ({ ...prev, [field as string]: restricted }));
 
     const num = parseFloat(restricted);
@@ -287,8 +287,9 @@ export default function VentanaForm({
                 <input
                   type="text"
                   id="header-celda"
+                  maxLength={20}
                   value={header.celda}
-                  onChange={(e) => handleChange('celda', e.target.value.toUpperCase())}
+                  onChange={(e) => handleChange('celda', e.target.value.trim().toUpperCase().slice(0, 20))}
                   placeholder="TD2-001"
                   className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500 text-xs text-center"
                 />

@@ -150,8 +150,8 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Código Celda / Ventana</label>
-              <input type="text" required placeholder="ej. TD2-001" value={celda}
-                onChange={(e) => setCelda(e.target.value.toUpperCase())}
+              <input type="text" required maxLength={20} placeholder="ej. TD2-001" value={celda}
+                onChange={(e) => setCelda(e.target.value.trim().toUpperCase().slice(0, 20))}
                 className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold tracking-wider" />
             </div>
             <div className="space-y-1">
