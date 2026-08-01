@@ -198,12 +198,16 @@ export default function VentanaForm({
     handleChange('lito_3', val);
   };
 
-  // UNIDAD LITOLÓGICA AUTOMÁTICA: cuando la combinación de litos es válida,
-  // la unidad se deriva automáticamente del grupo del match (no es seleccionable).
+  // UNIDAD LITOLÓGICA AUTOMÁTICA: se actualiza en CADA cambio de Lito 1/2/3.
+  // Si hay combinación válida → se deriva del grupo del match.
+  // Si la combinación deja de ser válida (litos vacíos, incompletos o inexistentes)
+  // → la unidad se limpia, para no confundir al usuario con valores obsoletos.
   React.useEffect(() => {
     const grupo = litoValidation.matchedItem?.grupo;
     if (grupo && header.unidad_litologica !== grupo) {
       handleChange('unidad_litologica', grupo);
+    } else if (!grupo && header.unidad_litologica) {
+      handleChange('unidad_litologica', undefined);
     }
   }, [litoValidation.matchedItem]);
 
@@ -588,18 +592,13 @@ export default function VentanaForm({
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Litológica</label>
-                  <select
-                    disabled
-                    value={header.unidad_litologica || ''}
+                  <div
                     title="Se deriva automáticamente de la combinación de litologías válida"
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal text-center cursor-not-allowed opacity-90 ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal text-center select-none ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
                       }`}
                   >
-                    <option value="">— Unidad —</option>
-                    {header.unidad_litologica && (
-                      <option value={header.unidad_litologica} className="bg-navy-900 text-slate-100 text-xs">{header.unidad_litologica}</option>
-                    )}
-                  </select>
+                    {header.unidad_litologica || '—'}
+                  </div>
                 </div>
               </div>
 
