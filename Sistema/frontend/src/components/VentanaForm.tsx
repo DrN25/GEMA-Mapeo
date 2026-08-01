@@ -1,7 +1,7 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
-import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Pencil } from 'lucide-react';
+import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Pencil, Info } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
 
 // Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
@@ -144,61 +144,47 @@ export default function VentanaForm({
   }, [header.unidad_litologica]);
 
   const litoValidation = React.useMemo(() => {
-    const g = (header.unidad_litologica || '').trim().toUpperCase();
     const u = (header.lito_1 || '').trim().toUpperCase();
     const l = (header.lito_2 || '').trim().toUpperCase();
     const c = (header.lito_3 || '').trim().toUpperCase();
 
-    const isGEmpty = !g || g === '-1';
     const isL1Empty = !u || u === '-1';
     const isL2Empty = !l || l === '-1';
-    const isL3Empty = !c || c === '-1';
+    const isL3Empty = !c || c === '-1' || c === '-' || c === 'NR';
 
-    if (isGEmpty && isL1Empty && isL2Empty && isL3Empty) {
-      return { isInvalid: false, matchedItem: null, reason: null };
+    // Lito 1 y Lito 2 son obligatorios: ninguna combinación del catálogo los tiene vacíos.
+    // Lito 3 SÍ puede estar vacío: en el catálogo se representa como '-' o 'NR'
+    // (el select no ofrece esas opciones, solo se deja sin seleccionar).
+    if (isL1Empty || isL2Empty) {
+      return { isInvalid: false, matchedItem: null, reason: null, incomplete: true };
     }
 
-    if (isGEmpty) {
-      return {
-        isInvalid: true,
-        matchedItem: null,
-        reason: 'Se requiere seleccionar obligatoriamente una Unidad Litológica (INTRUSIVOS, SEDIMENTARIOS, METAMORFICAS, BRECHAS, ENDOSKARN).'
-      };
-    }
-
-    const groupSyns: Record<string, string> = {
-      "SEDIMENTARIA": "SEDIMENTARIOS", "SEDIMENTARIAS": "SEDIMENTARIOS", "SEDIMENTARIO": "SEDIMENTARIOS",
-      "INTRUSIVA": "INTRUSIVOS", "INTRUSIVAS": "INTRUSIVOS", "INTRUSIVO": "INTRUSIVOS",
-      "METAMORFICO": "METAMORFICAS", "METAMORFICOS": "METAMORFICAS", "METAMORFICA": "METAMORFICAS",
-      "BRECHA": "BRECHAS"
-    };
-    const normG = groupSyns[g] || g;
-
+    // Buscar en el catálogo la combinación exacta de las 3 litos.
+    // Si lito3 está vacío, matchea los items cuyo lito3 sea comodín ('-' o 'NR').
     const matches = LITHOLOGY_CLASSIFICATION.filter(item => {
-      const itemG = (item.grupo || '').toUpperCase();
-      const normItemG = groupSyns[itemG] || itemG;
       const itemU = (item.unidad || '').toUpperCase();
       const itemL = (item.litologia || '').toUpperCase();
       const itemC = (item.codigo || '').toUpperCase();
 
-      const mg = normItemG === normG;
-      const m1 = isL1Empty || itemU === u;
-      const m2 = isL2Empty || itemL === l;
-      const m3 = isL3Empty || itemC === c;
+      const uMatch = itemU === u;
+      const lMatch = itemL === l;
+      const cMatch = isL3Empty
+        ? (itemC === '-' || itemC === 'NR' || !itemC)
+        : (itemC === c);
 
-      return mg && m1 && m2 && m3;
+      return uMatch && lMatch && cMatch;
     });
 
     if (matches.length === 0) {
       return {
         isInvalid: true,
         matchedItem: null,
-        reason: `Combinación no existente en GEMA: Unidad (${header.unidad_litologica}) con Lito 1 (${header.lito_1 || '—'}) / Lito 2 (${header.lito_2 || '—'}) / Lito 3 (${header.lito_3 || '—'}).`
+        reason: `Combinación no existente en GEMA: Lito 1 (${header.lito_1 || '—'}) / Lito 2 (${header.lito_2 || '—'}) / Lito 3 (${header.lito_3 || '—'}).`
       };
     }
 
-    return { isInvalid: false, matchedItem: matches[0], reason: null };
-  }, [header.unidad_litologica, header.lito_1, header.lito_2, header.lito_3]);
+    return { isInvalid: false, matchedItem: matches[0], reason: null, incomplete: false };
+  }, [header.lito_1, header.lito_2, header.lito_3]);
 
   const handleLito1Change = (val: string) => {
     handleChange('lito_1', val);
@@ -212,9 +198,14 @@ export default function VentanaForm({
     handleChange('lito_3', val);
   };
 
-  const handleUnidadChange = (val: string) => {
-    handleChange('unidad_litologica', val);
-  };
+  // UNIDAD LITOLÓGICA AUTOMÁTICA: cuando la combinación de litos es válida,
+  // la unidad se deriva automáticamente del grupo del match (no es seleccionable).
+  React.useEffect(() => {
+    const grupo = litoValidation.matchedItem?.grupo;
+    if (grupo && header.unidad_litologica !== grupo) {
+      handleChange('unidad_litologica', grupo);
+    }
+  }, [litoValidation.matchedItem]);
 
   const handleSectGeotChange = (val: string) => {
     onChange({
@@ -596,17 +587,18 @@ export default function VentanaForm({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Lito</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Litológica</label>
                   <select
+                    disabled
                     value={header.unidad_litologica || ''}
-                    onChange={(e) => handleUnidadChange(e.target.value)}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                    title="Se deriva automáticamente de la combinación de litologías válida"
+                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal text-center cursor-not-allowed opacity-90 ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
                       }`}
                   >
                     <option value="">— Unidad —</option>
-                    {uniqueUnidades.map(u => (
-                      <option key={u} value={u} className="bg-navy-900 text-slate-100 text-xs">{u}</option>
-                    ))}
+                    {header.unidad_litologica && (
+                      <option value={header.unidad_litologica} className="bg-navy-900 text-slate-100 text-xs">{header.unidad_litologica}</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -647,6 +639,11 @@ export default function VentanaForm({
                       </button>
                     )}
                   </div>
+                </div>
+              ) : litoValidation.incomplete ? (
+                <div className="p-2 px-3.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs flex items-center gap-2 shadow-sm">
+                  <Info size={16} className="text-sky-400 shrink-0" />
+                  <span>Seleccione <strong>Lito 1</strong> y <strong>Lito 2</strong> para validar la combinación litológica. <strong>Lito 3</strong> puede quedar vacío si la combinación lo permite.</span>
                 </div>
               ) : litoValidation.matchedItem ? (
                 <div className="p-2 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between shadow-sm">
