@@ -1677,6 +1677,10 @@ export default function App() {
           fetchWindows();
           setSyncStatus('synced');
           setSyncMessage(`${cellCodes.length} celda(s) importadas correctamente.`);
+          const firstCell = cellCodes?.[0];
+          if (firstCell) {
+            handleSelectWindow(firstCell);
+          }
         }}
       />
       {isCatalogModalOpen && (
