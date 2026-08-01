@@ -12,6 +12,7 @@ import {
   ratingContinuoResistencia,
   ratingPromedioResistencia
 } from '../utils/rmrInterpolation';
+import tablaLitologiasImg from '../images/catalogs/tabla_litologias.png';
 
 const getGroupBadge = (grupo: string) => {
   const g = String(grupo).toUpperCase();
@@ -147,11 +148,10 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all text-left ${
-                    active
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all text-left ${active
                       ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/10'
                       : 'text-slate-400 hover:bg-navy-900/60 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   <Icon size={14} className={active ? 'text-white' : 'text-slate-400'} />
                   <span>{item.label}</span>
@@ -164,90 +164,110 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
 
       {/* CONTENT TAB */}
       <div className="flex-1 bg-navy-900/10 p-5 rounded-2xl border border-navy-900/55 min-w-0">
-        
+
         {/* 1. LITOLOGÍA Y K */}
         {activeTab === 'litologia' && (
-          <div className="flex flex-col gap-8">
-            {/* TABLA 1 */}
-            <div className="space-y-3">
-              <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-                <Layers size={14} className="text-cyan-400 animate-pulse" />
-                <span>Factor de correlación para ensayos de carga puntual (SRK, 2023)</span>
-              </h3>
-              <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
-                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="py-2.5 px-4">Clase / Grupo</th>
-                      <th className="py-2.5 px-4">Litología 1 (Lito 1)</th>
-                      <th className="py-2.5 px-4">Litología 2 (Lito 2)</th>
-                      <th className="py-2.5 px-4">Litología 3 (Lito 3)</th>
-                      <th className="py-2.5 px-4 text-center text-cyan-400">Factor K</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                    {catalogs.litologia.tabla_colores.map((item: any, idx: number) => {
-                      const lito2Up = item.lito2.toUpperCase();
-                      let grupo = "INTRUSIVOS";
-                      if (["GSK", "PSK", "MSK", "ESK", "MBC", "MBL"].includes(lito2Up)) {
-                        grupo = "METAMORFICAS";
-                      } else {
-                        const l1 = item.lito1.toUpperCase();
-                        if (["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"].includes(l1)) {
-                          grupo = "INTRUSIVOS";
-                        } else if (["LMT", "SHL", "SND"].includes(l1)) {
-                          grupo = "SEDIMENTARIAS";
-                        } else if (l1 === "INTRUSIVO") {
-                          grupo = "ENDOSKARN";
-                        } else if (["TBX", "HBX", "MBX / VARIOS", "BX"].includes(l1)) {
-                          grupo = "BRECHAS";
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Tablas de litología */}
+            <div className="flex-1 min-w-0 flex flex-col gap-8">
+              {/* TABLA 1 */}
+              <div className="space-y-3">
+                <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+                  <Layers size={14} className="text-cyan-400 animate-pulse" />
+                  <span>Factor de correlación para ensayos de carga puntual (SRK, 2023)</span>
+                </h3>
+                <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
+                      <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="py-2.5 px-4">Clase / Grupo</th>
+                        <th className="py-2.5 px-4">Litología 1 (Lito 1)</th>
+                        <th className="py-2.5 px-4">Litología 2 (Lito 2)</th>
+                        <th className="py-2.5 px-4">Litología 3 (Lito 3)</th>
+                        <th className="py-2.5 px-4 text-center text-cyan-400">Factor K</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                      {catalogs.litologia.tabla_colores.map((item: any, idx: number) => {
+                        const lito2Up = item.lito2.toUpperCase();
+                        let grupo = "INTRUSIVOS";
+                        if (["GSK", "PSK", "MSK", "ESK", "MBC", "MBL"].includes(lito2Up)) {
+                          grupo = "METAMORFICAS";
+                        } else {
+                          const l1 = item.lito1.toUpperCase();
+                          if (["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"].includes(l1)) {
+                            grupo = "INTRUSIVOS";
+                          } else if (["LMT", "SHL", "SND"].includes(l1)) {
+                            grupo = "SEDIMENTARIAS";
+                          } else if (l1 === "INTRUSIVO") {
+                            grupo = "ENDOSKARN";
+                          } else if (["TBX", "HBX", "MBX / VARIOS", "BX"].includes(l1)) {
+                            grupo = "BRECHAS";
+                          }
                         }
-                      }
-                      
-                      return (
+
+                        return (
+                          <tr key={idx} className="hover:bg-navy-900/20">
+                            <td className="py-2 px-4">{getGroupBadge(grupo)}</td>
+                            <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito1}</td>
+                            <td className="py-2 px-4 text-slate-300">{item.lito2}</td>
+                            <td className="py-2 px-4 text-slate-300">{item.lito3}</td>
+                            <td className="py-2 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* TABLA 2 */}
+              <div className="space-y-3">
+                <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+                  <Layers size={14} className="text-violet-500 animate-pulse" />
+                  <span>Factor de correlación para ensayos de carga puntual (Detallado)</span>
+                </h3>
+                <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
+                      <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="py-2.5 px-4">Unidad Geotécnica</th>
+                        <th className="py-2.5 px-4">Lito 2</th>
+                        <th className="py-2.5 px-4">Lito 3</th>
+                        <th className="py-2.5 px-4">Validación Lito</th>
+                        <th className="py-2.5 px-4 text-center text-cyan-400">Factor K (K)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                      {catalogs.litologia.tabla_validacion.map((item: any, idx: number) => (
                         <tr key={idx} className="hover:bg-navy-900/20">
-                          <td className="py-2 px-4">{getGroupBadge(grupo)}</td>
-                          <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito1}</td>
-                          <td className="py-2 px-4 text-slate-300">{item.lito2}</td>
+                          <td className="py-2 px-4">{getGroupBadge(item.grupo)}</td>
+                          <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito2}</td>
                           <td className="py-2 px-4 text-slate-300">{item.lito3}</td>
+                          <td className="py-2 px-4 text-slate-400 font-mono text-[11px]">{item.validacion}</td>
                           <td className="py-2 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            {/* TABLA 2 */}
-            <div className="space-y-3">
-              <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-                <Layers size={14} className="text-violet-500 animate-pulse" />
-                <span>Factor de correlación para ensayos de carga puntual (Detallado)</span>
-              </h3>
-              <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
-                    <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="py-2.5 px-4">Unidad Geotécnica</th>
-                      <th className="py-2.5 px-4">Lito 2</th>
-                      <th className="py-2.5 px-4">Lito 3</th>
-                      <th className="py-2.5 px-4">Validación Lito</th>
-                      <th className="py-2.5 px-4 text-center text-cyan-400">Factor K (K)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
-                    {catalogs.litologia.tabla_validacion.map((item: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-navy-900/20">
-                        <td className="py-2 px-4">{getGroupBadge(item.grupo)}</td>
-                        <td className="py-2 px-4 text-slate-300 font-semibold">{item.lito2}</td>
-                        <td className="py-2 px-4 text-slate-300">{item.lito3}</td>
-                        <td className="py-2 px-4 text-slate-400 font-mono text-[11px]">{item.validacion}</td>
-                        <td className="py-2 px-4 text-center font-bold text-cyan-400">{item.k.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Imagen de referencia: Tabla de Litologías */}
+            <div className="lg:w-[380px] shrink-0">
+              <div className="lg:sticky lg:top-0 space-y-3">
+                <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+                  <Layers size={14} className="text-emerald-400 animate-pulse" />
+                  <span>Tabla de Litologías</span>
+                </h3>
+                <div className="rounded-lg border border-navy-900 overflow-hidden bg-navy-950/40">
+                  <img
+                    src={tablaLitologiasImg}
+                    alt="Tabla de Litologías"
+                    className="w-full h-auto object-contain"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -293,7 +313,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                 <Shield size={14} className="text-orange-500" />
                 <span>Resistencia de la Roca Intacta</span>
               </h3>
-              
+
               <div className="bg-navy-950/40 border border-violet-500/20 p-3.5 rounded-xl text-xs space-y-2 text-slate-350 max-w-3xl">
                 <span className="font-black text-[10px] uppercase text-violet-400 tracking-wider flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping"></span>
@@ -1049,13 +1069,13 @@ function RqdRatingChart() {
     const rect = e.currentTarget.getBoundingClientRect();
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
-    
+
     // Convert to SVG design coordinates (0 to 800)
     const svgX = (clientX / rect.width) * width;
-    
+
     let val = ((svgX - paddingLeft) / chartWidth) * 100;
     val = Math.max(0, Math.min(100, val));
-    
+
     setHoveredVal(val);
     setMousePos({ x: clientX, y: clientY, rectWidth: rect.width });
   };
@@ -1088,13 +1108,13 @@ function RqdRatingChart() {
           <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Ábaco Continuo</span>
         </div>
       </div>
-      
+
       {/* direct wrapper that has the exact bounds of the SVG */}
       <div className="relative overflow-visible">
-        <svg 
-          width="100%" 
-          height={height} 
-          viewBox={`0 0 ${width} ${height}`} 
+        <svg
+          width="100%"
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
           className="overflow-visible select-none cursor-crosshair"
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
@@ -1105,20 +1125,20 @@ function RqdRatingChart() {
             const isMajor = rating % 10 === 0;
             return (
               <g key={rating}>
-                <line 
-                  x1={paddingLeft} 
-                  y1={cy} 
-                  x2={width - paddingRight} 
-                  y2={cy} 
-                  stroke={isMajor ? "#334155" : "#1e293b"} 
-                  strokeWidth={isMajor ? 1.0 : 0.6} 
-                  strokeDasharray={isMajor ? undefined : "2,2"} 
+                <line
+                  x1={paddingLeft}
+                  y1={cy}
+                  x2={width - paddingRight}
+                  y2={cy}
+                  stroke={isMajor ? "#334155" : "#1e293b"}
+                  strokeWidth={isMajor ? 1.0 : 0.6}
+                  strokeDasharray={isMajor ? undefined : "2,2"}
                 />
-                <text 
-                  x={paddingLeft - 10} 
-                  y={cy + 4} 
-                  fill={isMajor ? "#94a3b8" : "#475569"} 
-                  className="font-bold font-mono text-right" 
+                <text
+                  x={paddingLeft - 10}
+                  y={cy + 4}
+                  fill={isMajor ? "#94a3b8" : "#475569"}
+                  className="font-bold font-mono text-right"
                   style={{ fontSize: "12px" }}
                   textAnchor="end"
                 >
@@ -1134,20 +1154,20 @@ function RqdRatingChart() {
             const isMajor = [0, 25, 50, 75, 90, 100].includes(pct);
             return (
               <g key={pct}>
-                <line 
-                  x1={cx} 
-                  y1={paddingTop} 
-                  x2={cx} 
-                  y2={height - paddingBottom} 
-                  stroke={isMajor ? "#334155" : "#1e293b"} 
-                  strokeWidth={isMajor ? 1.0 : 0.6} 
-                  strokeDasharray={isMajor ? undefined : "3,3"} 
+                <line
+                  x1={cx}
+                  y1={paddingTop}
+                  x2={cx}
+                  y2={height - paddingBottom}
+                  stroke={isMajor ? "#334155" : "#1e293b"}
+                  strokeWidth={isMajor ? 1.0 : 0.6}
+                  strokeDasharray={isMajor ? undefined : "3,3"}
                 />
-                <text 
-                  x={cx} 
-                  y={height - paddingBottom + 18} 
-                  fill={isMajor ? "#94a3b8" : "#475569"} 
-                  className="font-bold font-mono" 
+                <text
+                  x={cx}
+                  y={height - paddingBottom + 18}
+                  fill={isMajor ? "#94a3b8" : "#475569"}
+                  className="font-bold font-mono"
                   style={{ fontSize: "12px" }}
                   textAnchor="middle"
                 >
@@ -1162,22 +1182,22 @@ function RqdRatingChart() {
           <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} stroke="#475569" strokeWidth={1.5} />
 
           {/* Axis Titles (min 12px) */}
-          <text 
-            transform="rotate(-90)" 
-            x={- (paddingTop + chartHeight / 2)} 
-            y={20} 
-            fill="#94a3b8" 
-            className="font-bold tracking-wider" 
+          <text
+            transform="rotate(-90)"
+            x={- (paddingTop + chartHeight / 2)}
+            y={20}
+            fill="#94a3b8"
+            className="font-bold tracking-wider"
             style={{ fontSize: "12px" }}
             textAnchor="middle"
           >
             Rating RMR'89 (Eje Y)
           </text>
-          <text 
-            x={paddingLeft + chartWidth / 2} 
-            y={height - 20} 
-            fill="#94a3b8" 
-            className="font-bold tracking-wider" 
+          <text
+            x={paddingLeft + chartWidth / 2}
+            y={height - 20}
+            fill="#94a3b8"
+            className="font-bold tracking-wider"
             style={{ fontSize: "12px" }}
             textAnchor="middle"
           >
@@ -1190,22 +1210,22 @@ function RqdRatingChart() {
           {/* Hover elements */}
           {hoveredVal !== null && (
             <>
-              <line 
-                x1={paddingLeft + (hoveredVal / 100) * chartWidth} 
-                y1={paddingTop} 
-                x2={paddingLeft + (hoveredVal / 100) * chartWidth} 
-                y2={height - paddingBottom} 
-                stroke="#06b6d4" 
-                strokeWidth={1} 
-                strokeDasharray="2,2" 
+              <line
+                x1={paddingLeft + (hoveredVal / 100) * chartWidth}
+                y1={paddingTop}
+                x2={paddingLeft + (hoveredVal / 100) * chartWidth}
+                y2={height - paddingBottom}
+                stroke="#06b6d4"
+                strokeWidth={1}
+                strokeDasharray="2,2"
               />
-              <circle 
-                cx={paddingLeft + (hoveredVal / 100) * chartWidth} 
-                cy={height - paddingBottom - (h_cont / 20) * chartHeight} 
-                r={5} 
-                fill="#06b6d4" 
-                stroke="#fff" 
-                strokeWidth={1.5} 
+              <circle
+                cx={paddingLeft + (hoveredVal / 100) * chartWidth}
+                cy={height - paddingBottom - (h_cont / 20) * chartHeight}
+                r={5}
+                fill="#06b6d4"
+                stroke="#fff"
+                strokeWidth={1.5}
               />
             </>
           )}
@@ -1213,12 +1233,12 @@ function RqdRatingChart() {
 
         {/* HTML Tooltip (absolutely positioned within the exact wrapper) */}
         {hoveredVal !== null && (
-          <div 
+          <div
             className="absolute z-10 pointer-events-none bg-slate-900/95 border border-navy-800 text-xs rounded-lg p-3 shadow-xl space-y-1.5 w-56 text-slate-200"
-            style={{ 
-              left: `${tooltipLeft}px`, 
-              top: `${tooltipTop}px` 
-              }}
+            style={{
+              left: `${tooltipLeft}px`,
+              top: `${tooltipTop}px`
+            }}
           >
             <div className="font-bold text-slate-300 border-b border-navy-850 pb-1 flex justify-between">
               <span>RQD% (Eje X):</span>
@@ -1265,13 +1285,13 @@ function ResistenciaRatingChart() {
     const rect = e.currentTarget.getBoundingClientRect();
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
-    
+
     // Convert to SVG design coordinates (0 to 260)
     const svgX = (clientX / rect.width) * width;
-    
+
     let val = ((svgX - paddingLeft) / chartWidth) * 260;
     val = Math.max(0, Math.min(260, val));
-    
+
     setHoveredVal(val);
     setMousePos({ x: clientX, y: clientY, rectWidth: rect.width });
   };
@@ -1304,13 +1324,13 @@ function ResistenciaRatingChart() {
           <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-400"></span> Ábaco Continuo</span>
         </div>
       </div>
-      
+
       {/* direct wrapper that has the exact bounds of the SVG */}
       <div className="relative overflow-visible">
-        <svg 
-          width="100%" 
-          height={height} 
-          viewBox={`0 0 ${width} ${height}`} 
+        <svg
+          width="100%"
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
           className="overflow-visible select-none cursor-crosshair"
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
@@ -1321,20 +1341,20 @@ function ResistenciaRatingChart() {
             const isMajor = rating % 6 === 0 || rating === 15;
             return (
               <g key={rating}>
-                <line 
-                  x1={paddingLeft} 
-                  y1={cy} 
-                  x2={width - paddingRight} 
-                  y2={cy} 
-                  stroke={isMajor ? "#334155" : "#1e293b"} 
-                  strokeWidth={isMajor ? 1.0 : 0.6} 
-                  strokeDasharray={isMajor ? undefined : "2,2"} 
+                <line
+                  x1={paddingLeft}
+                  y1={cy}
+                  x2={width - paddingRight}
+                  y2={cy}
+                  stroke={isMajor ? "#334155" : "#1e293b"}
+                  strokeWidth={isMajor ? 1.0 : 0.6}
+                  strokeDasharray={isMajor ? undefined : "2,2"}
                 />
-                <text 
-                  x={paddingLeft - 10} 
-                  y={cy + 4} 
-                  fill={isMajor ? "#94a3b8" : "#475569"} 
-                  className="font-bold font-mono text-right" 
+                <text
+                  x={paddingLeft - 10}
+                  y={cy + 4}
+                  fill={isMajor ? "#94a3b8" : "#475569"}
+                  className="font-bold font-mono text-right"
                   style={{ fontSize: "12px" }}
                   textAnchor="end"
                 >
@@ -1350,20 +1370,20 @@ function ResistenciaRatingChart() {
             const isMajor = [0, 50, 100, 200, 250].includes(ucsVal);
             return (
               <g key={ucsVal}>
-                <line 
-                  x1={cx} 
-                  y1={paddingTop} 
-                  x2={cx} 
-                  y2={height - paddingBottom} 
-                  stroke={isMajor ? "#334155" : "#1e293b"} 
-                  strokeWidth={isMajor ? 1.0 : 0.6} 
-                  strokeDasharray={isMajor ? undefined : "3,3"} 
+                <line
+                  x1={cx}
+                  y1={paddingTop}
+                  x2={cx}
+                  y2={height - paddingBottom}
+                  stroke={isMajor ? "#334155" : "#1e293b"}
+                  strokeWidth={isMajor ? 1.0 : 0.6}
+                  strokeDasharray={isMajor ? undefined : "3,3"}
                 />
-                <text 
-                  x={cx} 
-                  y={height - paddingBottom + 18} 
-                  fill={isMajor ? "#94a3b8" : "#475569"} 
-                  className="font-bold font-mono" 
+                <text
+                  x={cx}
+                  y={height - paddingBottom + 18}
+                  fill={isMajor ? "#94a3b8" : "#475569"}
+                  className="font-bold font-mono"
                   style={{ fontSize: "12px" }}
                   textAnchor="middle"
                 >
@@ -1378,22 +1398,22 @@ function ResistenciaRatingChart() {
           <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} stroke="#475569" strokeWidth={1.5} />
 
           {/* Axis Titles (min 12px) */}
-          <text 
-            transform="rotate(-90)" 
-            x={- (paddingTop + chartHeight / 2)} 
-            y={20} 
-            fill="#94a3b8" 
-            className="font-bold tracking-wider" 
+          <text
+            transform="rotate(-90)"
+            x={- (paddingTop + chartHeight / 2)}
+            y={20}
+            fill="#94a3b8"
+            className="font-bold tracking-wider"
             style={{ fontSize: "12px" }}
             textAnchor="middle"
           >
             Rating RMR'89 (Eje Y)
           </text>
-          <text 
-            x={paddingLeft + chartWidth / 2} 
-            y={height - 20} 
-            fill="#94a3b8" 
-            className="font-bold tracking-wider" 
+          <text
+            x={paddingLeft + chartWidth / 2}
+            y={height - 20}
+            fill="#94a3b8"
+            className="font-bold tracking-wider"
             style={{ fontSize: "12px" }}
             textAnchor="middle"
           >
@@ -1406,22 +1426,22 @@ function ResistenciaRatingChart() {
           {/* Hover elements */}
           {hoveredVal !== null && (
             <>
-              <line 
-                x1={paddingLeft + (hoveredVal / 260) * chartWidth} 
-                y1={paddingTop} 
-                x2={paddingLeft + (hoveredVal / 260) * chartWidth} 
-                y2={height - paddingBottom} 
-                stroke="#06b6d4" 
-                strokeWidth={1} 
-                strokeDasharray="2,2" 
+              <line
+                x1={paddingLeft + (hoveredVal / 260) * chartWidth}
+                y1={paddingTop}
+                x2={paddingLeft + (hoveredVal / 260) * chartWidth}
+                y2={height - paddingBottom}
+                stroke="#06b6d4"
+                strokeWidth={1}
+                strokeDasharray="2,2"
               />
-              <circle 
-                cx={paddingLeft + (hoveredVal / 260) * chartWidth} 
-                cy={height - paddingBottom - (h_cont / 15) * chartHeight} 
-                r={4.5} 
-                fill="#06b6d4" 
-                stroke="#fff" 
-                strokeWidth={1.5} 
+              <circle
+                cx={paddingLeft + (hoveredVal / 260) * chartWidth}
+                cy={height - paddingBottom - (h_cont / 15) * chartHeight}
+                r={4.5}
+                fill="#06b6d4"
+                stroke="#fff"
+                strokeWidth={1.5}
               />
             </>
           )}
@@ -1429,12 +1449,12 @@ function ResistenciaRatingChart() {
 
         {/* HTML Tooltip (absolutely positioned within the exact wrapper) */}
         {hoveredVal !== null && (
-          <div 
+          <div
             className="absolute z-10 pointer-events-none bg-slate-900/95 border border-navy-800 text-xs rounded-lg p-3 shadow-xl space-y-1.5 w-56 text-slate-200"
-            style={{ 
-              left: `${tooltipLeft}px`, 
-              top: `${tooltipTop}px` 
-              }}
+            style={{
+              left: `${tooltipLeft}px`,
+              top: `${tooltipTop}px`
+            }}
           >
             <div className="font-bold text-slate-300 border-b border-navy-850 pb-1 flex justify-between">
               <span>UCS (Eje X):</span>

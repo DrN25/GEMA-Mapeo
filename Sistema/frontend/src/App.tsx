@@ -104,7 +104,7 @@ export default function App() {
     try {
       const savedView = localStorage.getItem('geolog_window_current_view');
       if (savedView) return savedView;
-    } catch (e) {}
+    } catch (e) { }
     return 'dashboard';
   });
 
@@ -135,7 +135,7 @@ export default function App() {
         const cached = localStorage.getItem(`geolog_window_snapshot_${activeCelda}`);
         if (cached) return JSON.parse(cached);
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -145,7 +145,7 @@ export default function App() {
       if (activeCelda) {
         return localStorage.getItem(`geolog_window_snapshot_hash_${activeCelda}`);
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -174,7 +174,7 @@ export default function App() {
         const parsed = parseInt(savedPage, 10);
         if (!isNaN(parsed) && parsed > 0) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return 1;
   });
   const [pageSize, setPageSize] = useState<number>(() => {
@@ -184,7 +184,7 @@ export default function App() {
         const parsed = parseInt(savedSize, 10);
         if (!isNaN(parsed) && parsed > 0) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return 20;
   });
 
@@ -192,20 +192,20 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('geolog_window_current_view', currentView);
-    } catch (e) {}
+    } catch (e) { }
   }, [currentView]);
 
   // Persistir paginación en localStorage
   useEffect(() => {
     try {
       localStorage.setItem('geolog_window_dashboard_page', String(page));
-    } catch (e) {}
+    } catch (e) { }
   }, [page]);
 
   useEffect(() => {
     try {
       localStorage.setItem('geolog_window_dashboard_pagesize', String(pageSize));
-    } catch (e) {}
+    } catch (e) { }
   }, [pageSize]);
 
   // Si la vista requiere celda activa pero no hay ninguna seleccionada, redirigir a dashboard
@@ -351,7 +351,7 @@ export default function App() {
       } else if (!hasChanged && unsavedList.includes(celda)) {
         localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)));
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [activeWindow, dbSnapshotHash]);
 
   useEffect(() => {
@@ -706,7 +706,7 @@ export default function App() {
           const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
           const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
           localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== name)));
-        } catch (e) {}
+        } catch (e) { }
 
         fetchPltEnsayos(name);
         setSyncStatus('synced');
@@ -1208,7 +1208,7 @@ export default function App() {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
         const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
         localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)));
-      } catch (e) {}
+      } catch (e) { }
     } else {
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
@@ -1224,7 +1224,7 @@ export default function App() {
           }
         }
         localStorage.setItem('geolog_unsaved_windows', JSON.stringify([]));
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 
@@ -1368,11 +1368,10 @@ export default function App() {
               <button
                 onClick={() => setShowSaveConfirmModal(true)}
                 disabled={isLoadingWindow || (unsavedCount === 0 && syncStatus !== 'unsaved')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative ${
-                  unsavedCount > 0 || syncStatus === 'unsaved'
-                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
-                    : 'bg-navy-900 border-navy-800 text-slate-500 cursor-not-allowed opacity-70'
-                }`}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative ${unsavedCount > 0 || syncStatus === 'unsaved'
+                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
+                  : 'bg-navy-900 border-navy-800 text-slate-500 cursor-not-allowed opacity-70'
+                  }`}
                 title="Guardar todos los cambios en SQL Server"
               >
                 <Save size={14} />
@@ -1682,7 +1681,7 @@ export default function App() {
       />
       {isCatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
-          <div className="glass-panel w-full max-w-6xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
+          <div className="glass-panel w-full max-w-[72vw] max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
             <div className="h-1.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-500 w-full" />
 
             <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
@@ -1714,7 +1713,7 @@ export default function App() {
 
       {isPltCatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
-          <div className="glass-panel w-full max-w-6xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
+          <div className="glass-panel w-full max-w-[95vw] max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
             <div className="h-1.5 bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-500 w-full" />
 
             <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">

@@ -37,7 +37,7 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
     az_hw: true,
     lito_1: true,
     lito_2: true,
-    lito_3: true,
+    lito_3: false,
     unidad_litologica: true,
     sect_geot: true,
     intemperia: true,
