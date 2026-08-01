@@ -491,6 +491,7 @@ export default function Dashboard({
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onCreate={onCreateWindow}
+        existingCeldas={windows.map(w => w.name)}
       />
     </div>
     </>

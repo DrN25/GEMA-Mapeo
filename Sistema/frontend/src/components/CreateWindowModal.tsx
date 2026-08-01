@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
@@ -8,6 +8,7 @@ interface CreateWindowModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (data: any) => void;
+  existingCeldas?: string[];
 }
 
 interface CatalogOption {
@@ -26,8 +27,11 @@ const handleNumberInputLimit = (value: string, intDigits: number, decDigits: num
   return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
 };
 
-export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateWindowModalProps) {
+export default function CreateWindowModal({ isOpen, onClose, onCreate, existingCeldas = [] }: CreateWindowModalProps) {
   const [celda, setCelda] = useState('');
+  const [nameCheckStatus, setNameCheckStatus] = useState<'idle' | 'checking' | 'available' | 'duplicate'>('idle');
+  const [nameCheckMsg, setNameCheckMsg] = useState('');
+
   const [mapeadorId, setMapeadorId] = useState('');
   const [sector, setSector] = useState('');
   const [campania, setCampania] = useState('');
@@ -46,6 +50,54 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
   const [campanias, setCampanias] = useState<{ id: number; nombre: string }[]>([]);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [showMore, setShowMore] = useState(false);
+
+  // Validación reactiva de nombre de celda duplicado
+  useEffect(() => {
+    let isCancelled = false;
+    const clean = celda.trim().toUpperCase();
+
+    if (!clean) {
+      setNameCheckStatus('idle');
+      setNameCheckMsg('');
+      return;
+    }
+
+    const isLocalDuplicate = existingCeldas.some(c => c.trim().toUpperCase() === clean);
+
+    setNameCheckStatus('checking');
+    const timer = setTimeout(() => {
+      fetch(`${API_BASE}/api/ventanas-check/${encodeURIComponent(clean)}`)
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(data => {
+          if (isCancelled) return;
+          if (data.exists || isLocalDuplicate) {
+            setNameCheckStatus('duplicate');
+            setNameCheckMsg(`¡El código de celda '${clean}' ya existe en el sistema!`);
+          } else {
+            setNameCheckStatus('available');
+            setNameCheckMsg(`Código de celda disponible`);
+          }
+        })
+        .catch(() => {
+          if (isCancelled) return;
+          if (isLocalDuplicate) {
+            setNameCheckStatus('duplicate');
+            setNameCheckMsg(`¡La celda '${clean}' ya existe en el sistema!`);
+          } else {
+            setNameCheckStatus('available');
+            setNameCheckMsg(`Código de celda disponible`);
+          }
+        });
+    }, 200);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [celda, existingCeldas]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -149,10 +201,45 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
           {/* Fila 1: Celda + Mapeador (select) */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Código Celda / Ventana</label>
-              <input type="text" required maxLength={20} placeholder="ej. TD2-001" value={celda}
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Código Celda / Ventana</label>
+                {nameCheckStatus === 'checking' && (
+                  <span className="text-[10px] text-slate-400 animate-pulse flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" /> Verificando...
+                  </span>
+                )}
+                {nameCheckStatus === 'available' && (
+                  <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 size={11} /> Disponible
+                  </span>
+                )}
+                {nameCheckStatus === 'duplicate' && (
+                  <span className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
+                    <AlertTriangle size={11} /> Ya existe
+                  </span>
+                )}
+              </div>
+              <input
+                type="text"
+                required
+                maxLength={20}
+                placeholder="ej. TD2-001"
+                value={celda}
                 onChange={(e) => setCelda(e.target.value.trim().toUpperCase().slice(0, 20))}
-                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold tracking-wider" />
+                className={`w-full bg-navy-950 border rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none font-bold tracking-wider ${
+                  nameCheckStatus === 'duplicate'
+                    ? 'border-rose-500/80 bg-rose-950/20 text-rose-200 focus:ring-1 focus:ring-rose-500'
+                    : nameCheckStatus === 'available'
+                    ? 'border-emerald-500/80 bg-emerald-950/20 text-emerald-200 focus:ring-1 focus:ring-emerald-500'
+                    : 'border-navy-800 focus:ring-1 focus:ring-indigo-500'
+                }`}
+              />
+              {nameCheckStatus === 'duplicate' && (
+                <p className="text-[10px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                  <AlertTriangle size={12} className="shrink-0" />
+                  <span>{nameCheckMsg}</span>
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Mapeador</label>
@@ -287,8 +374,8 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate }: CreateW
               className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-95">
               Cancelar
             </button>
-            <button type="submit" disabled={loadingCatalogs}
-              className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-50">
+            <button type="submit" disabled={loadingCatalogs || nameCheckStatus === 'duplicate' || !celda.trim()}
+              className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
               <Plus size={14} /> Crear Celda
             </button>
           </div>

@@ -684,6 +684,25 @@ def create_geotecnico(data: GeotecnicoCreateSchema, db: Session = Depends(get_db
     return {"id": nuevo.geotecnico_id, "nombre": nuevo.nombre, "created": True}
 
 
+@router.get("/ventanas-check/{codigo}")
+@router.get("/ventanas/check-codigo/{codigo}")
+def check_codigo_celda(codigo: str, current_codigo: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    clean_code = codigo.strip().upper()
+    if not clean_code:
+        return {"codigo": "", "exists": False, "valid": False}
+    
+    query = db.query(models.Ventana).filter(models.Ventana.codigo_celda == clean_code)
+    if current_codigo:
+        query = query.filter(models.Ventana.codigo_celda != current_codigo.strip().upper())
+    
+    existing = query.first()
+    return {
+        "codigo": clean_code,
+        "exists": existing is not None,
+        "valid": True
+    }
+
+
 @router.get("/ventanas/{codigo}", response_model=schemas.VentanaResponseSchema)
 def get_ventana(codigo: str, db: Session = Depends(get_db)):
     code_up = codigo.strip().upper()
@@ -831,6 +850,32 @@ def delete_ventana(codigo: str, db: Session = Depends(get_db)):
     db.delete(v)
     db.commit()
     return {"status": "success", "message": f"Ventana {code_up} eliminada de GEMA"}
+
+
+@router.put("/ventanas/{codigo}/rename")
+def rename_ventana(codigo: str, payload: Dict[str, str], db: Session = Depends(get_db)):
+    old_code = codigo.strip().upper()
+    new_code = payload.get("new_codigo", "").strip().upper()
+    
+    if not new_code:
+        raise HTTPException(status_code=400, detail="El nuevo nombre de celda no puede estar vacío.")
+    
+    if old_code == new_code:
+        return {"status": "ok", "message": "El nombre es idéntico, no se requiere cambio.", "old_codigo": old_code, "new_codigo": new_code}
+    
+    # Verificar si new_code ya existe en la BD SQL Server
+    exists = db.query(models.Ventana).filter(models.Ventana.codigo_celda == new_code).first()
+    if exists:
+        raise HTTPException(status_code=400, detail=f"La celda con el código '{new_code}' ya existe en SQL Server.")
+    
+    v = db.query(models.Ventana).filter(models.Ventana.codigo_celda == old_code).first()
+    if not v:
+        # Si la celda aún no ha sido persistida en SQL Server (solo existe localmente)
+        return {"status": "ok", "message": "Renombrado local completado.", "old_codigo": old_code, "new_codigo": new_code}
+    
+    v.codigo_celda = new_code
+    db.commit()
+    return {"status": "ok", "message": f"Celda renombrada de '{old_code}' a '{new_code}'.", "old_codigo": old_code, "new_codigo": new_code}
 
 
 # ============================================================================

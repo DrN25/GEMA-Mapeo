@@ -18,6 +18,7 @@ import PltEnsayosView from './components/PltEnsayosView';
 import SaveConfirmModal from './components/Common/SaveConfirmModal';
 import DiscardModal from './components/Common/DiscardModal';
 import SaveResultModal from './components/Common/SaveResultModal';
+import RenameCellModal from './components/RenameCellModal';
 
 import { fastHashObject } from './utils/hashUtils';
 import {
@@ -243,6 +244,7 @@ export default function App() {
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
   const [isPltCatalogModalOpen, setIsPltCatalogModalOpen] = useState<boolean>(false);
   const [isCommentsExpanded, setIsCommentsExpanded] = useState<boolean>(false);
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState<boolean>(false);
 
   // 1. Initialize Dark Mode Theme
   useEffect(() => {
@@ -812,6 +814,94 @@ export default function App() {
     setCurrentView('dashboard');
   };
 
+  const handleRenameActiveCelda = async (newCeldaName: string) => {
+    if (!activeWindow) return;
+    const oldCeldaName = activeWindow.header.celda;
+    const cleanNewName = newCeldaName.trim().toUpperCase();
+
+    if (!cleanNewName || oldCeldaName === cleanNewName) return;
+
+    // 1. Actualizar estado local inmediatamente
+    const updatedHeader: WindowHeader = {
+      ...activeWindow.header,
+      celda: cleanNewName
+    };
+
+    const updatedWindow: WindowData = {
+      ...activeWindow,
+      header: updatedHeader
+    };
+
+    // 2. Intentar actualizar en servidor SQL Server
+    try {
+      const res = await fetch(`${RESOLVED_API_BASE}/api/ventanas/${encodeURIComponent(oldCeldaName)}/rename`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_codigo: cleanNewName })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Error al renombrar la celda en el servidor.");
+      }
+      setSyncStatus('synced');
+      setSyncMessage(`Celda renombrada a '${cleanNewName}' en SQL Server.`);
+    } catch (err) {
+      console.warn("Backend rename offline or failed, applying local snapshot migration:", err);
+      setSyncStatus('offline');
+      setSyncMessage(`Celda renombrada localmente a '${cleanNewName}'.`);
+    }
+
+    // 3. Migrar llaves de LocalStorage y snapshot tree
+    try {
+      const windowCache = localStorage.getItem(`geolog_window_${oldCeldaName}`);
+      if (windowCache) {
+        const parsed = JSON.parse(windowCache);
+        parsed.header.celda = cleanNewName;
+        localStorage.setItem(`geolog_window_${cleanNewName}`, JSON.stringify(parsed));
+        localStorage.removeItem(`geolog_window_${oldCeldaName}`);
+      } else {
+        localStorage.setItem(`geolog_window_${cleanNewName}`, JSON.stringify(updatedWindow));
+      }
+
+      const snapshotCache = localStorage.getItem(`geolog_window_snapshot_${oldCeldaName}`);
+      if (snapshotCache) {
+        const parsedSnap = JSON.parse(snapshotCache);
+        parsedSnap.header.celda = cleanNewName;
+        localStorage.setItem(`geolog_window_snapshot_${cleanNewName}`, JSON.stringify(parsedSnap));
+        localStorage.removeItem(`geolog_window_snapshot_${oldCeldaName}`);
+      }
+
+      const hashCache = localStorage.getItem(`geolog_window_snapshot_hash_${oldCeldaName}`);
+      if (hashCache) {
+        localStorage.setItem(`geolog_window_snapshot_hash_${cleanNewName}`, hashCache);
+        localStorage.removeItem(`geolog_window_snapshot_hash_${oldCeldaName}`);
+      }
+
+      const pltCache = localStorage.getItem(`plt_ensayos_${oldCeldaName}`);
+      if (pltCache) {
+        localStorage.setItem(`plt_ensayos_${cleanNewName}`, pltCache);
+        localStorage.removeItem(`plt_ensayos_${oldCeldaName}`);
+      }
+
+      localStorage.setItem('geolog_active_window_celda', cleanNewName);
+    } catch (e) {
+      console.error("Error al migrar claves de LocalStorage:", e);
+    }
+
+    // 4. Actualizar referencias en estado React
+    setActiveWindow(updatedWindow);
+
+    if (dbSnapshotData) {
+      setDbSnapshotData({
+        ...dbSnapshotData,
+        header: { ...dbSnapshotData.header, celda: cleanNewName }
+      });
+    }
+
+    // Refrescar listado de celdas
+    fetchWindows();
+  };
+
   // Paginación y filtros del Dashboard
   const handleSearchSubmit = (term: string, globalSearch: boolean) => {
     setSearchTerm(term);
@@ -861,18 +951,25 @@ export default function App() {
 
     const familyJoints = activeWindow.joints.filter(j => j.familia === famId);
 
+    const isBlankVal = (v: any) => v === undefined || v === null || v === -1 || v === '-1' || v === '';
+
     const hasData = familyJoints.some(j =>
-      (j.distancia !== -1 && j.distancia !== null) ||
-      (j.dip !== -1 && j.dip !== null) ||
-      (j.dip_dir !== -1 && j.dip_dir !== null) ||
-      (j.espaciamiento !== -1 && j.espaciamiento !== null) ||
-      (j.abertura !== -1 && j.abertura !== null) ||
-      (j.espesor !== -1 && j.espesor !== null) ||
-      (j.jrc !== -1 && j.jrc !== null) ||
-      (j.rugosidad !== -1 && j.rugosidad !== 1 && j.rugosidad !== null) ||
-      j.tipo_estructura !== 'JN' ||
-      j.alteracion !== 'd' ||
-      j.forma !== 'O'
+      !isBlankVal(j.distancia) ||
+      !isBlankVal(j.dip) ||
+      !isBlankVal(j.dip_dir) ||
+      !isBlankVal(j.espaciamiento) ||
+      !isBlankVal(j.abertura) ||
+      !isBlankVal(j.espesor) ||
+      !isBlankVal(j.jrc) ||
+      !isBlankVal(j.rugosidad) ||
+      !isBlankVal(j.tipo_estructura) ||
+      !isBlankVal(j.alteracion) ||
+      !isBlankVal(j.forma) ||
+      !isBlankVal(j.extremos_visibles) ||
+      !isBlankVal(j.terminacion) ||
+      !isBlankVal(j.relleno1) ||
+      !isBlankVal(j.n_estructuras) ||
+      !isBlankVal(j.continuidad)
     );
 
     if (hasData) {
@@ -1333,6 +1430,7 @@ export default function App() {
                 calculated={calculated}
                 onOpenImportModal={() => setIsImportModalOpen(true)}
                 onOpenCatalogs={() => setIsCatalogModalOpen(true)}
+                onOpenRenameModal={() => setIsRenameModalOpen(true)}
               />
 
               <DisconTable
@@ -1670,6 +1768,14 @@ export default function App() {
         savedCount={saveResultData.savedCount}
         totalEdits={saveResultData.totalEdits}
         totalJoints={saveResultData.totalJoints}
+      />
+
+      <RenameCellModal
+        isOpen={isRenameModalOpen}
+        onClose={() => setIsRenameModalOpen(false)}
+        currentCelda={activeWindow?.header?.celda || ''}
+        existingCeldas={windows.map(w => w.name)}
+        onRename={handleRenameActiveCelda}
       />
 
       {/* Glassmorphic UI Loading Lock Overlay */}

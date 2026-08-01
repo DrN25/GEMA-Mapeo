@@ -1,7 +1,7 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
-import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen } from 'lucide-react';
+import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Pencil } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
 
 // Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
@@ -23,6 +23,7 @@ interface VentanaFormProps {
   calculated: CalculatorResult | null;
   onOpenImportModal: () => void;
   onOpenCatalogs?: () => void;
+  onOpenRenameModal?: () => void;
 }
 
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
@@ -56,7 +57,8 @@ export default function VentanaForm({
   onChange,
   calculated: _calculated,
   onOpenImportModal,
-  onOpenCatalogs
+  onOpenCatalogs,
+  onOpenRenameModal
 }: VentanaFormProps) {
 
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
@@ -284,15 +286,27 @@ export default function VentanaForm({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Celda</label>
-                <input
-                  type="text"
-                  id="header-celda"
-                  maxLength={20}
-                  value={header.celda}
-                  onChange={(e) => handleChange('celda', e.target.value.trim().toUpperCase().slice(0, 20))}
-                  placeholder="TD2-001"
-                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500 text-xs text-center"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    id="header-celda"
+                    readOnly
+                    value={header.celda || ''}
+                    title="El código de celda no se edita directamente para evitar duplicados. Use el botón 'Editar'."
+                    className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-1.5 text-slate-200 font-black tracking-wider text-xs text-center cursor-not-allowed select-none opacity-90"
+                  />
+                  {onOpenRenameModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenRenameModal}
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:text-indigo-200 font-bold text-xs transition-all active:scale-95 shrink-0 shadow-sm"
+                      title="Editar o renombrar el código de esta celda"
+                    >
+                      <Pencil size={13} />
+                      <span>Editar</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1">
