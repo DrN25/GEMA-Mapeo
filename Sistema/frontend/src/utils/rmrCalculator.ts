@@ -31,15 +31,15 @@ export interface JointRow {
 
 export interface WindowHeader {
   celda: string;
-  este_from: number;
-  norte_from: number;
-  cota_from: number;
-  este_to: number;
-  norte_to: number;
-  cota_to: number;
+  este_from?: number;
+  norte_from?: number;
+  cota_from?: number;
+  este_to?: number;
+  norte_to?: number;
+  cota_to?: number;
   largo?: number | string;
-  altura: number;
-  dip_talud: number;
+  altura?: number;
+  dip_talud?: number;
   dipdir_talud?: number;
   dip_hw?: number;
   az_hw?: number;
