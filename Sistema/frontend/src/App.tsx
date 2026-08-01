@@ -618,6 +618,9 @@ export default function App() {
           dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
           dip_hw: v.dip !== null && v.dip !== undefined ? roundDec(v.dip, 2) : undefined,
           az_hw: v.azimut_hole !== null && v.azimut_hole !== undefined ? roundDec(v.azimut_hole, 2) : undefined,
+          largo: v.largo_m !== null && v.largo_m !== undefined
+            ? v.largo_m
+            : (v.distancia_celda !== null && v.distancia_celda !== undefined ? v.distancia_celda : undefined),
           unidad_litologica: v.unidad_litologica || '',
           lito_1: v.lito_1 || '',
           lito_2: v.lito_2 || '',

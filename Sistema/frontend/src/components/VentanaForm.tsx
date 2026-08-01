@@ -235,6 +235,8 @@ export default function VentanaForm({
   const calculatedLargo = hasCoords
     ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
     : null;
+  const headerLargoNum = header.largo !== undefined && header.largo !== null ? Number(header.largo) : NaN;
+  const displayLargo = calculatedLargo !== null ? calculatedLargo : (!isNaN(headerLargoNum) && headerLargoNum > 0 ? Math.round(headerLargoNum) : null);
 
   React.useEffect(() => {
     if (calculatedLargo !== null) {
@@ -242,7 +244,12 @@ export default function VentanaForm({
         handleChange('largo', calculatedLargo);
       }
     }
-  }, [calculatedLargo]);
+    // Si no hay coordenadas calculables pero la celda trae un largo de BD (importado),
+    // asegurar que header.largo lo conserve para las validaciones de guardado.
+    else if (!isNaN(headerLargoNum) && headerLargoNum > 0 && Number(header.largo) !== headerLargoNum) {
+      handleChange('largo', headerLargoNum);
+    }
+  }, [calculatedLargo, headerLargoNum]);
 
   return (
     <div className="space-y-4 select-none text-left">
@@ -321,7 +328,7 @@ export default function VentanaForm({
                   title="Calculado automáticamente desde coordenadas FROM→TO"
                   className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
                 >
-                  {calculatedLargo !== null ? `${calculatedLargo} m` : '—'}
+                  {displayLargo !== null ? `${displayLargo} m` : '—'}
                 </div>
               </div>
             </div>

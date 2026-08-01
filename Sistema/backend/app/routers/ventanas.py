@@ -312,7 +312,14 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
     try:
         ix, iy, ic = float(v.este_from), float(v.norte_from), float(v.cota_from)
         fx, fy, fc = float(v.este_to), float(v.norte_to), float(v.cota_to)
-        largo_m = math.sqrt((fx-ix)**2 + (fy-iy)**2 + (fc-ic)**2)
+        # Solo calcular largo_m si AMBOS extremos son distintos de (0,0,0)
+        # para evitar calcular la magnitud del vector desde el origen (coordenadas UTM brutas)
+        origin_from = (ix == 0.0 and iy == 0.0 and ic == 0.0)
+        origin_to   = (fx == 0.0 and fy == 0.0 and fc == 0.0)
+        if not origin_from and not origin_to:
+            largo_m = math.sqrt((fx-ix)**2 + (fy-iy)**2 + (fc-ic)**2)
+        else:
+            largo_m = float(v.distancia_celda) if v.distancia_celda is not None else None
     except Exception:
         largo_m = float(v.distancia_celda) if v.distancia_celda is not None else None
 
