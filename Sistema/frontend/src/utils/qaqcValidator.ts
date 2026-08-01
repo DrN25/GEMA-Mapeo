@@ -83,14 +83,14 @@ export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], lar
     }
   }
 
-  if (header.altura <= 0) {
+  if ((header.altura ?? 0) <= 0) {
     alerts.push({
       fieldId: "header-altura",
       type: "ERROR",
       ruleId: "SCANLINE_BOUNDS",
       message: "La altura de la ventana de mapeo debe ser mayor a 0 metros."
     });
-  } else if (header.altura > 30) {
+  } else if ((header.altura ?? 0) > 30) {
     alerts.push({
       fieldId: "header-altura",
       type: "WARNING",
