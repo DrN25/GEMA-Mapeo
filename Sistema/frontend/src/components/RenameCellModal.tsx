@@ -186,8 +186,8 @@ export default function RenameCellModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || nameCheckStatus === 'duplicate' || nameCheckStatus === 'same' || !newCelda.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-md active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting || nameCheckStatus !== 'available'}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-md active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
               {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
               <span>Renombrar Celda</span>

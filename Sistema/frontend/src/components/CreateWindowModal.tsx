@@ -374,8 +374,8 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
               className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-95">
               Cancelar
             </button>
-            <button type="submit" disabled={loadingCatalogs || nameCheckStatus === 'duplicate' || !celda.trim()}
-              className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="submit" disabled={loadingCatalogs || nameCheckStatus !== 'available'}
+              className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
               <Plus size={14} /> Crear Celda
             </button>
           </div>
