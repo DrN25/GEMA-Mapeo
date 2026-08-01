@@ -159,12 +159,11 @@ export default function DisconTable({
 
   const createFamily = () => {
     const nextFam = Math.max(0, ...joints.map(j => j.familia)) + 1;
-    const defaultAlt = (intemperia && ['f', 'd', 'm', 'a', 'c', 's'].includes(intemperia)) ? intemperia : 'd';
     const newRows: JointRow[] = Array.from({ length: 3 }).map((_, i) => ({
       id: joints.length + 1 + i,
       familia: nextFam,
       distancia: -1,
-      tipo_estructura: 'JN',
+      tipo_estructura: '-1',
       dip: -1,
       dip_dir: -1,
       n_estructuras: -1,
@@ -172,27 +171,26 @@ export default function DisconTable({
       espesor: -1,
       continuidad: -1,
       espaciamiento: -1,
-      extremos_visibles: 1,
-      terminacion: 0,
-      relleno1: 'c',
+      extremos_visibles: -1,
+      terminacion: -1,
+      relleno1: '-1',
       relleno2: undefined,
       jrc: -1,
       rugosidad: -1,
-      forma: 'O',
-      alteracion: defaultAlt
+      forma: '-1',
+      alteracion: '-1'
     }));
     onChange([...joints, ...newRows]);
     onSelectRow(joints.length);
   };
 
   const clearRow = (rowId: any) => {
-    const defaultAlt = (intemperia && ['f', 'd', 'm', 'a', 'c', 's'].includes(intemperia)) ? intemperia : 'd';
     const updated = joints.map(j => {
       if (j.id === rowId) {
         return {
           ...j,
           distancia: -1,
-          tipo_estructura: 'JN',
+          tipo_estructura: '-1',
           dip: -1,
           dip_dir: -1,
           n_estructuras: -1,
@@ -200,14 +198,14 @@ export default function DisconTable({
           espesor: -1,
           continuidad: -1,
           espaciamiento: -1,
-          extremos_visibles: 1,
-          terminacion: 0,
-          relleno1: 'c',
+          extremos_visibles: -1,
+          terminacion: -1,
+          relleno1: '-1',
           relleno2: undefined,
           jrc: -1,
           rugosidad: -1,
-          forma: 'O',
-          alteracion: defaultAlt
+          forma: '-1',
+          alteracion: '-1'
         };
       }
       return j;
