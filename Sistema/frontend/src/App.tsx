@@ -388,7 +388,7 @@ export default function App() {
     if (activeWindow) {
       const res = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
       setCalculated(res);
-      const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap());
+      const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap(), true);
       const vacios = toVacioAlerts(validateMapeoWindow(activeWindow));
       setAlerts([...errs, ...vacios]);
     } else {
