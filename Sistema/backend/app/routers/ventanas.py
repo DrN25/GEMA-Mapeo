@@ -859,6 +859,12 @@ def delete_ventana(codigo: str, db: Session = Depends(get_db)):
     v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if not v:
         raise HTTPException(status_code=404, detail="Ventana no encontrada")
+    # Borrar discontinuidades asociadas (la FK no tiene ON DELETE CASCADE)
+    for est in list(v.discontinuidades):
+        db.delete(est)
+    # Borrar ensayos PLT asociados a la ventana (si existen)
+    for plt in db.query(models.EnsayoPLT).filter(models.EnsayoPLT.ventana_id == v.ventana_id).all():
+        db.delete(plt)
     db.delete(v)
     db.commit()
     return {"status": "success", "message": f"Ventana {code_up} eliminada de GEMA"}

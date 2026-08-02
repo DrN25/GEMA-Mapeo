@@ -495,6 +495,13 @@ async def preview_import_excel(
             "estructuras": estructuras_preview
         })
 
+    # Lista completa de códigos existentes en BD: sirve para que el frontend
+    # detecte si un NOMBRE RENOMBRADO colisiona con otra celda existente
+    # (aunque esa celda no venga en el Excel importado).
+    all_existing_codes = [
+        c[0] for c in db.query(models.Ventana.codigo_celda).all() if c[0]
+    ]
+
     return {
         "status": "success",
         "formato_detectado": "bd",
@@ -503,6 +510,7 @@ async def preview_import_excel(
         "total_duplicados": sum(1 for c in celdas_preview if c["is_duplicate"]),
         "columns_detected": excel_cols,
         "mapping_detected": detected_mapping,
+        "existing_codes": all_existing_codes,
         "celdas": celdas_preview
     }
 
@@ -542,6 +550,10 @@ def _preview_excel_a(ws, db: Session, hoja: str):
             )
         )
 
+    all_existing_codes = [
+        c[0] for c in db.query(models.Ventana.codigo_celda).all() if c[0]
+    ]
+
     return {
         "status": "success",
         "formato_detectado": "a",
@@ -550,6 +562,7 @@ def _preview_excel_a(ws, db: Session, hoja: str):
         "total_duplicados": sum(1 for c in celdas_preview if c["is_duplicate"]),
         "columns_detected": [],
         "mapping_detected": {},
+        "existing_codes": all_existing_codes,
         "celdas": celdas_preview
     }
 

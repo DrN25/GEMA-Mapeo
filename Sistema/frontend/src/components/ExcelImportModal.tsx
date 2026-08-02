@@ -107,6 +107,10 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
   const [editedNames, setEditedNames] = useState<Record<string, string>>({});
+  // Todos los códigos existentes en BD (los devuelve el preview): sirven
+  // para detectar si un nombre RENOMBRADO colisiona con otra celda que no
+  // venía en el Excel importado.
+  const [existingCodes, setExistingCodes] = useState<string[]>([]);
 
   // Search & Filtering
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,11 +131,17 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Códigos que el backend confirmó que YA EXISTEN en BD (los marcó como
-  // duplicados usando el nombre original del Excel).
+  // Códigos que YA EXISTEN en BD (todos los que devolvió el preview,
+  // más los marcados como duplicados con el nombre original del Excel).
   const existingDbCodes = useMemo(() => {
-    return new Set(celdas.filter(c => c.is_duplicate).map(c => c.codigo.trim().toUpperCase()));
-  }, [celdas]);
+    const set = new Set<string>(
+      (existingCodes || []).map(c => c.trim().toUpperCase())
+    );
+    celdas.filter(c => c.is_duplicate).forEach(c => {
+      set.add(c.codigo.trim().toUpperCase());
+    });
+    return set;
+  }, [existingCodes, celdas]);
 
   // Una celda es duplicada si su NOMBRE FINAL (con renombrado aplicado)
   // coincide con algún código existente en BD. Si el usuario renombró la
@@ -154,6 +164,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
       setCeldas([]);
       setSelectedCodes(new Set());
       setEditedNames({});
+      setExistingCodes([]);
       setError(null);
       setStep('select');
       // Limpiar el estado de hojas SÍNCRONAMENTE para evitar que se vea
@@ -209,6 +220,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
         setCeldas(data.celdas || []);
         setColumnsDetected(data.columns_detected || []);
         setColumnMapping(data.mapping_detected || {});
+        setExistingCodes(data.existing_codes || []);
 
         const initialSelected = new Set<string>((data.celdas || []).map((c: CeldaItem) => c.codigo));
         setSelectedCodes(initialSelected);
@@ -312,6 +324,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
     setCeldas([]);
     setSelectedCodes(new Set());
     setEditedNames({});
+    setExistingCodes([]);
     setError(null);
     setSearchQuery('');
     setComparingCelda(null);
@@ -381,7 +394,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                 {step === 'preview' ? `Previsualización de Excel (${celdas.length} Celdas Encontradas)` : 'Importación de Celdas de Mapeo Geomecánico'}
               </h3>
               <p className="text-xs text-slate-400">
-                {step === 'preview' ? 'Seleccione las celdas a guardar, mapee columnas y resuelva duplicados.' : `Cargue un archivo Excel de mapeo geomecánico. (Límite Máximo: ${MAX_FILE_SIZE_MB})`}
+                {step === 'preview' ? 'Seleccione las celdas a guardar, mapee columnas y resuelva duplicados.' : `Cargue un archivo Excel de mapeo geomecánico. (Límite Máximo: ${MAX_FILE_SIZE_MB} Mb.)`}
               </p>
             </div>
           </div>
@@ -602,8 +615,8 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                   type="button"
                   onClick={() => setShowMappingAccordion(!showMappingAccordion)}
                   className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${showMappingAccordion
-                      ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                      : 'bg-navy-950 border-navy-800 text-slate-400 hover:bg-navy-800'
+                    ? 'bg-purple-600/20 border-purple-500 text-purple-300'
+                    : 'bg-navy-950 border-navy-800 text-slate-400 hover:bg-navy-800'
                     }`}
                 >
                   <Settings size={13} />
