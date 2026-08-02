@@ -11,6 +11,8 @@ from app.database import SessionLocal
 from app import models, schemas
 from app.routers.ventanas import GEMACatalogResolver, serialize_ventana, get_db, calculate_and_persist_subratings
 from app.utils.validator import get_row_val, sanitize_value
+from app.core.catalogs import infer_lithology_from_lito3
+from app.parsers.excel_a import detect_format, parse_excel_a, normalize_station_to_celda
 
 router = APIRouter()
 
@@ -62,8 +64,49 @@ def get_row_val_robust(row_dict: dict, possible_names):
     return None
 
 
-STANDARD_FIELD_MAPPINGS = {
-    "codigo_celda": ["CELDA", "CELDA_PADRE", "CODIGOCELDA", "CELDA.1"],
+def check_duplicate(db: Session, code_celda: str):
+    """Busca una celda en SQL Server y devuelve (is_duplicate, existing_data)."""
+    code_up = code_celda.strip().upper()
+    db_ventana = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
+    is_duplicate = db_ventana is not None
+    existing_data = None
+
+    if db_ventana:
+        lito1_code = db.query(models.Litologia.codigo).filter_by(litologia_id=db_ventana.litologia1_id).scalar() if db_ventana.litologia1_id else ''
+        lito2_code = db.query(models.Litologia.codigo).filter_by(litologia_id=db_ventana.litologia2_id).scalar() if db_ventana.litologia2_id else ''
+        lito3_code = db.query(models.Litologia.codigo).filter_by(litologia_id=db_ventana.litologia3_id).scalar() if db_ventana.litologia3_id else ''
+        unidad_code = db.query(models.UnidadLitologica.codigo).filter_by(unidad_id=db_ventana.unidad_litologica_id).scalar() if db_ventana.unidad_litologica_id else ''
+        sector_code = db.query(models.SectorGeotecnico.codigo).filter_by(sector_id=db_ventana.sector_geotecnico_id).scalar() if db_ventana.sector_geotecnico_id else 'PENDIENTE'
+        geotecnico_name = db.query(models.Geotecnico.nombre).filter_by(geotecnico_id=db_ventana.geotecnico_id).scalar() if db_ventana.geotecnico_id else 'SRK'
+        campania_name = db.query(models.Campania.nombre).filter_by(campania_id=db_ventana.campania_id).scalar() if db_ventana.campania_id else '2026'
+
+        existing_data = {
+            "codigo": db_ventana.codigo_celda,
+            "campania": campania_name or 2026,
+            "sector": sector_code or 'PENDIENTE',
+            "este_ini": float(db_ventana.este_from or 0.0),
+            "norte_ini": float(db_ventana.norte_from or 0.0),
+            "cota_ini": float(db_ventana.cota_from or 0.0),
+            "este_fin": float(db_ventana.este_to or 0.0),
+            "norte_fin": float(db_ventana.norte_to or 0.0),
+            "cota_fin": float(db_ventana.cota_to or 0.0),
+            "largo_m": float(db_ventana.distancia_celda or 15.0),
+            "altura_m": float(db_ventana.altura or 15.0),
+            "lito_1": lito1_code or '',
+            "lito_2": lito2_code or '',
+            "lito_3": lito3_code or '',
+            "unidad_litologica": unidad_code or '',
+            "mapeador": geotecnico_name or 'N/A',
+            "fecha": str(db_ventana.fecha_mapeo) if db_ventana.fecha_mapeo else 'N/A',
+            "n_discontinuidades": len(db_ventana.discontinuidades),
+            "rmr_76": float(db_ventana.rmr76_total) if db_ventana.rmr76_total is not None else None,
+            "rmr_89": float(db_ventana.rmr89_total) if db_ventana.rmr89_total is not None else None
+        }
+
+    return is_duplicate, existing_data
+
+
+STANDARD_FIELD_MAPPINGS = {    "codigo_celda": ["CELDA", "CELDA_PADRE", "CODIGOCELDA", "CELDA.1"],
     "este_from": ["ESTE_FROM", "ESTE_INI", "ESTE"],
     "norte_from": ["NORTE_FROM", "NORTE_INI", "NORTE"],
     "cota_from": ["COTA", "COTA_FROM", "COTA_INI", "ELEVACION"],
@@ -111,17 +154,40 @@ STANDARD_FIELD_MAPPINGS = {
 async def preview_import_excel(
     file: UploadFile = File(...),
     formato: str = "auto",
+    hoja: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Previsualiza las celdas y discontinuidades de un Excel B, detectando
-    mapeo de columnas y celdas duplicadas en la base de datos SQL Server.
+    Previsualiza las celdas y discontinuidades de un Excel de mapeo.
+    Detecta automáticamente el formato:
+      - 'a' (estaciones): bloques por ancla 'UBICACIÓN' (parser excel_a).
+      - 'b' (base de datos): tabla plana con columna 'CELDA' (lógica actual).
+    Se procesa la hoja indicada (o la primera si no se especifica).
     """
     contents = await file.read()
+
+    # Leer hojas disponibles con openpyxl (para selección y auto-detección)
     try:
-        df = pd.read_excel(io.BytesIO(contents))
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True, read_only=False)
+        sheet_names = wb.sheetnames
+        if hoja and hoja in sheet_names:
+            ws = wb[hoja]
+        else:
+            ws = wb[sheet_names[0]]
+            hoja = sheet_names[0]
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
+
+    fmt = detect_format(ws)
+    if fmt == "a":
+        return _preview_excel_a(ws, db, hoja)
+
+    # ---- Formato B: tabla plana con columna CELDA ----
+    try:
+        df = pd.read_excel(io.BytesIO(contents), sheet_name=hoja)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer la hoja '{hoja}': {e}")
 
     if formato == "estaciones":
         raise HTTPException(
@@ -275,42 +341,7 @@ async def preview_import_excel(
             })
 
         # Buscar coincidencia en la Base de Datos SQL Server
-        code_up = code_celda.strip().upper()
-        db_ventana = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
-        is_duplicate = db_ventana is not None
-        existing_data = None
-
-        if db_ventana:
-            lito1_code = db.query(models.Litologia.codigo).filter_by(litologia_id=db_ventana.litologia1_id).scalar() if db_ventana.litologia1_id else ''
-            lito2_code = db.query(models.Litologia.codigo).filter_by(litologia_id=db_ventana.litologia2_id).scalar() if db_ventana.litologia2_id else ''
-            lito3_code = db.query(models.Litologia.codigo).filter_by(litologia_id=db_ventana.litologia3_id).scalar() if db_ventana.litologia3_id else ''
-            unidad_code = db.query(models.UnidadLitologica.codigo).filter_by(unidad_id=db_ventana.unidad_litologica_id).scalar() if db_ventana.unidad_litologica_id else ''
-            sector_code = db.query(models.SectorGeotecnico.codigo).filter_by(sector_id=db_ventana.sector_geotecnico_id).scalar() if db_ventana.sector_geotecnico_id else 'PENDIENTE'
-            geotecnico_name = db.query(models.Geotecnico.nombre).filter_by(geotecnico_id=db_ventana.geotecnico_id).scalar() if db_ventana.geotecnico_id else 'SRK'
-            campania_name = db.query(models.Campania.nombre).filter_by(campania_id=db_ventana.campania_id).scalar() if db_ventana.campania_id else '2026'
-
-            existing_data = {
-                "codigo": db_ventana.codigo_celda,
-                "campania": campania_name or 2026,
-                "sector": sector_code or 'PENDIENTE',
-                "este_ini": float(db_ventana.este_from or 0.0),
-                "norte_ini": float(db_ventana.norte_from or 0.0),
-                "cota_ini": float(db_ventana.cota_from or 0.0),
-                "este_fin": float(db_ventana.este_to or 0.0),
-                "norte_fin": float(db_ventana.norte_to or 0.0),
-                "cota_fin": float(db_ventana.cota_to or 0.0),
-                "largo_m": float(db_ventana.distancia_celda or 15.0),
-                "altura_m": float(db_ventana.altura or 15.0),
-                "lito_1": lito1_code or '',
-                "lito_2": lito2_code or '',
-                "lito_3": lito3_code or '',
-                "unidad_litologica": unidad_code or '',
-                "mapeador": geotecnico_name or 'N/A',
-                "fecha": str(db_ventana.fecha_mapeo) if db_ventana.fecha_mapeo else 'N/A',
-                "n_discontinuidades": len(db_ventana.discontinuidades),
-                "rmr_76": float(db_ventana.rmr76_total) if db_ventana.rmr76_total is not None else None,
-                "rmr_89": float(db_ventana.rmr89_total) if db_ventana.rmr89_total is not None else None
-            }
+        is_duplicate, existing_data = check_duplicate(db, code_celda)
 
         # Extraer metadatos de cabecera y geomecanica del Excel
         dip_val = clean_num(get_row_val_robust(header_row, ['DIP']))
@@ -430,10 +461,39 @@ async def preview_import_excel(
     return {
         "status": "success",
         "formato_detectado": "bd",
+        "hoja": hoja,
         "total_celdas": len(celdas_preview),
         "total_duplicados": sum(1 for c in celdas_preview if c["is_duplicate"]),
         "columns_detected": excel_cols,
         "mapping_detected": detected_mapping,
+        "celdas": celdas_preview
+    }
+
+
+def _preview_excel_a(ws, db: Session, hoja: str):
+    """Procesa una hoja en formato A (estaciones) y devuelve la misma
+    estructura de respuesta que el preview del formato B."""
+    stations = parse_excel_a(ws)
+    celdas_preview = []
+
+    for station in stations:
+        celda = normalize_station_to_celda(station, infer_lito=infer_lithology_from_lito3)
+        if not celda.get("codigo"):
+            continue
+        code_celda = celda["codigo"]
+        is_duplicate, existing_data = check_duplicate(db, code_celda)
+        celda["is_duplicate"] = is_duplicate
+        celda["existing_data"] = existing_data
+        celdas_preview.append(celda)
+
+    return {
+        "status": "success",
+        "formato_detectado": "a",
+        "hoja": hoja,
+        "total_celdas": len(celdas_preview),
+        "total_duplicados": sum(1 for c in celdas_preview if c["is_duplicate"]),
+        "columns_detected": [],
+        "mapping_detected": {},
         "celdas": celdas_preview
     }
 
@@ -541,6 +601,10 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
         v.litologia3_id = lito3_id
         v.unidad_litologica_id = unidad_id
         v.grado_intemperismo = clean_str(h.get("intemperismo"))
+        v.alteracion = clean_str(h.get("alteracion"))
+        v.fase = sanitize_value(h.get("fase"), int)
+        v.gsi_superficie = clean_str(h.get("gsi_superficie"))
+        v.gsi_estructura = clean_str(h.get("gsi_estructura"))
         v.geotecnico_id = geotecnico_id
         v.comentarios = clean_str(h.get("comentarios"))
 
@@ -596,7 +660,9 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
             tipo_id = resolver.tipo_estructura_id(tipo_str)
 
             num_est_slot = s_idx + 1
-            fam_id = math.ceil(num_est_slot / 3.0)
+            # Respetar familia explícita si viene (Excel A trae ID por
+            # estructura); si no, se deriva por el patrón de 3 por familia.
+            fam_id = s.get("familia_id") or math.ceil(num_est_slot / 3.0)
 
             est = models.EstructuraGeologica(
                 ventana_id=v.ventana_id,
@@ -611,6 +677,7 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
                 espaciamiento_m=s.get("espaciamiento_m"),
                 numero_estructuras=s.get("n_estructuras"),
                 numero_extremos_visibles=s.get("n_extremos_visibles"),
+                terminacion=s.get("terminacion"),
                 tipo_relleno_1=s.get("relleno_1_codigo"),
                 tipo_relleno_2=s.get("relleno_2_codigo"),
                 jrc=s.get("jrc"),

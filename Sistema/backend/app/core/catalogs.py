@@ -1,5 +1,7 @@
 MANDATORY_COLS_COUNT = 77
 
+from typing import Optional
+
 NORM_GROUP_MAP = {
     "SEDIMENTARIAS": "SEDIMENTARIOS",
     "SEDIMENTARIOS": "SEDIMENTARIOS",
@@ -513,4 +515,61 @@ TIPO_FRACTURA_DISPLAY_CATALOG = [
     {"codigo": "M", "descripcion": "Rotura por matriz — falla a través de la roca intacta"},
     {"codigo": "E", "descripcion": "Rotura por estructura — falla a lo largo de discontinuidad preexistente"},
     {"codigo": "C", "descripcion": "Rotura combinada — por matriz y estructura simultáneamente"}
-]
+]
+
+# D18. SINÓNIMOS DE GRUPOS LITOLÓGICOS (normalización a singular/plural)
+LITHOLOGY_GROUP_SYNONYMS = {
+    "SEDIMENTARIA": "SEDIMENTARIAS",
+    "SEDIMENTARIO": "SEDIMENTARIAS",
+    "SEDIMENTARIOS": "SEDIMENTARIAS",
+    "INTRUSIVA": "INTRUSIVOS",
+    "INTRUSIVAS": "INTRUSIVOS",
+    "INTRUSIVO": "INTRUSIVOS",
+    "METAMORFICO": "METAMORFICAS",
+    "METAMORFICOS": "METAMORFICAS",
+    "METAMORFICA": "METAMORFICAS",
+    "BRECHA": "BRECHAS",
+}
+
+
+def _norm_litho(val) -> str:
+    return str(val or "").strip().upper()
+
+
+def infer_lithology_from_lito3(lito3: str) -> Optional[dict]:
+    """Dado un código de Lito 3 (ej. 'MZQ', 'LMT_M', 'MZB_P'), busca en el
+    catálogo LITHOLOGY_FULL_CATALOG la primera combinación válida de
+    lito1/lito2/lito3 que lo acepte y devuelve:
+        {"lito1": ..., "lito2": ..., "lito3": ..., "grupo": ..., "k": ...}
+    o None si no se encuentra.
+
+    Estrategia:
+      1. Match exacto de lito3 (priorizando lito1 == lito2, combinación
+         "directa" más probable).
+      2. Si no, primer match exacto de lito3.
+      3. Si no, match por comodines del catálogo ('Varios', '-', 'NR').
+    """
+    target = _norm_litho(lito3)
+    if not target:
+        return None
+
+    exact = [it for it in LITHOLOGY_FULL_CATALOG if _norm_litho(it.get("lito3")) == target]
+    if exact:
+        direct = next(
+            (it for it in exact if _norm_litho(it.get("lito1")) == _norm_litho(it.get("lito2"))),
+            None,
+        )
+        chosen = direct or exact[0]
+        return {
+            "lito1": chosen.get("lito1"),
+            "lito2": chosen.get("lito2"),
+            "lito3": chosen.get("lito3"),
+            "grupo": chosen.get("grupo"),
+            "k": chosen.get("k"),
+        }
+
+    # Comodines: lito3 en catálogo es 'Varios', '-' o 'NR' — cualquier
+    # combinación que acepte el lito3 entrante como específico no aplica
+    # aquí (el comodín es para el otro sentido). Se devuelve None para que
+    # el importador deje los litos vacíos y el usuario los complete.
+    return None

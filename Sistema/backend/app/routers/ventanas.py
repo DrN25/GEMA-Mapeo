@@ -18,7 +18,7 @@ from datetime import date, datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, or_, case
 
 from app.database import get_db
@@ -508,7 +508,10 @@ def get_ventanas(
     db: Session = Depends(get_db),
 ):
     # 1. Query base + joins para resolver códigos
-    query = db.query(models.Ventana)
+    # Eager loading de relaciones para evitar N+1 (SmarterASP limita conexiones).
+    query = db.query(models.Ventana).options(
+        selectinload(models.Ventana.discontinuidades),
+    )
 
     # 2. Filtros
     has_q = q and isinstance(q, str) and not q.startswith("Query(") and q.strip()
@@ -618,27 +621,29 @@ def get_ventanas(
     )
 
     # 7. Serializar items (información liviana, sin sub-ratings)
+    # Precargar catálogos en lote para evitar N+1 (SmarterASP limita conexiones).
+    geo_ids = {v.geotecnico_id for v in items if v.geotecnico_id}
+    sec_ids = {v.sector_geotecnico_id for v in items if v.sector_geotecnico_id}
+    lito_ids = {v.litologia1_id for v in items if v.litologia1_id}
+
+    geo_map = {}
+    if geo_ids:
+        geo_map = {g.geotecnico_id: g.nombre for g in db.query(models.Geotecnico).filter(models.Geotecnico.geotecnico_id.in_(geo_ids)).all()}
+    sec_map = {}
+    if sec_ids:
+        sec_map = {s.sector_id: s.codigo for s in db.query(models.SectorGeotecnico).filter(models.SectorGeotecnico.sector_id.in_(sec_ids)).all()}
+    lito_map = {}
+    if lito_ids:
+        lito_map = {l.litologia_id: l.codigo for l in db.query(models.Litologia).filter(models.Litologia.litologia_id.in_(lito_ids)).all()}
+
     items_data = []
     for v in items:
-        geologo = None
-        if v.geotecnico_id:
-            geo = db.query(models.Geotecnico).filter_by(geotecnico_id=v.geotecnico_id).first()
-            if geo:
-                geologo = geo.nombre
-        sector_code = None
-        if v.sector_geotecnico_id:
-            sec = db.query(models.SectorGeotecnico).filter_by(sector_id=v.sector_geotecnico_id).first()
-            if sec:
-                sector_code = sec.codigo
         items_data.append(schemas.VentanaListItemSchema(
             codigo=v.codigo_celda,
             fecha_mapeo=v.fecha_mapeo,
-            sector_geotecnico=sector_code,
-            mapeador=geologo,
-            lito_1=(
-                db.query(models.Litologia).filter_by(litologia_id=v.litologia1_id).first().codigo
-                if v.litologia1_id else None
-            ),
+            sector_geotecnico=sec_map.get(v.sector_geotecnico_id),
+            mapeador=geo_map.get(v.geotecnico_id),
+            lito_1=lito_map.get(v.litologia1_id),
             largo_m=float(v.distancia_celda) if v.distancia_celda is not None else None,
             altura_m=float(v.altura) if v.altura is not None else None,
             nivel=v.nivel,

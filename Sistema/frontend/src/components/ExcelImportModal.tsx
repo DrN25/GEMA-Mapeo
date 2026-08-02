@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   X, FileSpreadsheet, Upload, Check, AlertTriangle, Loader,
   Settings, Table, CheckCircle, Search, ChevronDown, ChevronUp,
@@ -86,6 +87,8 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
 
   const [step, setStep] = useState<Step>('select');
   const [file, setFile] = useState<File | null>(null);
+  const [sheets, setSheets] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState<string>('');
   // TEMPORALMENTE DESACTIVADO: Selector de modo de importación oculto de la interfaz.
   // La importación siempre opera en modo automático ('auto').
   // const [mode, setMode] = useState<'auto' | 'estaciones' | 'bd'>('auto');
@@ -129,6 +132,23 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
       setEditedNames({});
       setError(null);
       setStep('select');
+      // Leer hojas disponibles del Excel (SheetJS) para que el usuario
+      // elija cuál procesar antes de apretar "Procesar Excel".
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: 'array' });
+          const names = wb.SheetNames || [];
+          setSheets(names);
+          setSelectedSheet(names[0] || '');
+        } catch (err) {
+          console.warn("No se pudieron leer las hojas del Excel:", err);
+          setSheets([]);
+          setSelectedSheet('');
+        }
+      };
+      reader.readAsArrayBuffer(f);
     }
   };
 
@@ -137,7 +157,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
     setLoading(true);
     setError(null);
 
-    const targetUrl = `${apiBaseUrl}/api/importar-excel/preview?formato=${mode}`;
+    const targetUrl = `${apiBaseUrl}/api/importar-excel/preview?formato=${mode}${selectedSheet ? `&hoja=${encodeURIComponent(selectedSheet)}` : ''}`;
 
     try {
       const formData = new FormData();
@@ -403,6 +423,28 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                 </div>
               )}
             </div>
+
+            {/* Selector de Hoja a procesar */}
+            {file && sheets.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 p-3.5 bg-navy-950/60 border border-navy-800 rounded-xl">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Table size={14} className="text-indigo-400" />
+                  <span>Hoja a procesar:</span>
+                </div>
+                <select
+                  value={selectedSheet}
+                  onChange={(e) => setSelectedSheet(e.target.value)}
+                  className="flex-1 min-w-[200px] bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {sheets.map(s => (
+                    <option key={s} value={s} className="bg-navy-950 text-slate-200">{s}</option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  El formato (Estaciones / Base de Datos) se detecta automáticamente al procesar.
+                </span>
+              </div>
+            )}
 
             {error && (
               <div className="p-3.5 rounded-xl border text-xs font-semibold flex items-start gap-2 bg-red-500/10 border-red-500/30 text-red-400">
