@@ -217,22 +217,19 @@ def build_column_names(ws: Worksheet, header_row: int, last_col: int) -> Dict[in
                 return suf
         return None
 
-    # Caso especial: par "Valor de relleno 1/2" duplicado (JC76 luego JC89)
+    # Caso especial: par "Valor de relleno 1/2" duplicado (JC76 luego JC89).
+    # NO se asumen posiciones fijas (rompe Exceles sin ese par duplicado:
+    # el sufijo caería sobre JRC/Rugosidad, etc.). Se buscan las columnas
+    # cuyo encabezado contiene "Valor de relleno": las primeras dos = JC76,
+    # las siguientes dos = JC89.
     relleno_pair_cols: Dict[int, str] = {}
-    tipo_relleno_1_col = None
+    valor_relleno_cols = []
     for c in range(1, last_col + 1):
         v = ws.cell(row=header_row, column=c).value
-        if text_matches(v, "Tipo de Relleno 1"):
-            tipo_relleno_1_col = c
-            break
-    if tipo_relleno_1_col:
-        c2 = tipo_relleno_1_col + 1
-        pair76 = (c2 + 1, c2 + 2)
-        pair89 = (c2 + 3, c2 + 4)
-        relleno_pair_cols = {
-            pair76[0]: "JC76", pair76[1]: "JC76",
-            pair89[0]: "JC89", pair89[1]: "JC89",
-        }
+        if isinstance(v, str) and "valor de relleno" in normalize(v):
+            valor_relleno_cols.append(c)
+    for i, col in enumerate(valor_relleno_cols):
+        relleno_pair_cols[col] = "JC76" if i < 2 else "JC89"
 
     names: Dict[int, str] = {}
     seen: Dict[str, int] = {}
@@ -256,6 +253,28 @@ def build_column_names(ws: Worksheet, header_row: int, last_col: int) -> Dict[in
         names[c] = name
 
     return names
+
+
+def _row_has_real_data(record: Dict[str, Any]) -> bool:
+    """True si la fila trae al menos un dato real de discontinuidad.
+    Se ignoran los campos calculados por el propio Excel (valores JC76/JC89,
+    promedios) y se exige un mínimo de datos estructurales: si SOLO hay
+    campos de rating (Valor de Alteracion, Continuidad, etc.) con valores,
+    pero ningún dato de entrada (distancia/dip/tipo), se descarta."""
+    INPUT_KEYS = (
+        "Distancia (m)", "Tipo de Estructura", "Dip", "Dip Dir",
+        "N de Estructuras", "Abertura(mm)", "Espesor (mm)", "Continuidad (m)",
+        "Espaciamiento (m)", "N de Extremos Visibles", "TERMINACION",
+        "Tipo de Relleno 1", "Tipo de Relleno 2", "JRC",
+        "Rugosidad de Estructura", "Forma de Estructura", "Alteracion",
+    )
+    for key in INPUT_KEYS:
+        v = record.get(key)
+        if v is not None:
+            s = str(v).strip()
+            if s and s not in ("-", "NR", "N/A"):
+                return True
+    return False
 
 
 def parse_structures_table(ws: Worksheet, block_top: int, block_bottom: int) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[int]]:
@@ -290,7 +309,10 @@ def parse_structures_table(ws: Worksheet, block_top: int, block_bottom: int) -> 
         is_id = isinstance(a, (int, float)) and (not isinstance(a, float) or a == int(a))
         if is_id:
             record = {names[c]: ws.cell(row=r, column=c).value for c in names}
-            rows.append(record)
+            # Descartar filas "fantasma": solo traen el ID pero ningún dato
+            # real de discontinuidad (distancia, dip, dip_dir, etc.).
+            if _row_has_real_data(record):
+                rows.append(record)
             r += 1
             continue
         if a is None and ws.cell(row=r, column=2).value is None:
@@ -449,9 +471,13 @@ def _to_str(val: Any) -> Optional[str]:
 
 def _norm_tipo_estructura(val: Any) -> str:
     """Normaliza el tipo de estructura: 'J'/'JS' -> 'JN' (igual que el
-    resolver del backend), devolviendo '-' si no hay valor."""
-    s = _to_str(val) or '-'
+    resolver del backend). Si no hay valor, usa 'JN' por defecto (mismo
+    comportamiento que el importador Excel B) — la columna
+    TipoEstructuraID de la BD NO acepta NULL."""
+    s = _to_str(val) or ''
     up = s.strip().upper()
+    if not up:
+        return "JN"
     if up in ("J", "JS"):
         return "JN"
     return s
@@ -553,26 +579,40 @@ def normalize_station_to_celda(station: Dict[str, Any], infer_lito: callable = N
     estructuras: List[Dict[str, Any]] = []
     for idx, e in enumerate(station.get("estructuras") or []):
         familia = _to_int(e.get("ID")) or (math.ceil((idx + 1) / 3.0))
+        # Búsqueda tolerante a sufijos (JC76)/(JC89): si la hoja agrupa
+        # columnas por método, el nombre puede venir como "JRC (JC76)".
+        def _get_e(*variants: str) -> Any:
+            for v in variants:
+                val = e.get(v)
+                if val is not None:
+                    return val
+            for key, val in e.items():
+                k_norm = normalize(key)
+                for v in variants:
+                    if k_norm.startswith(normalize(v)):
+                        return val
+            return None
+
         estructuras.append({
             "numero_estructura": idx + 1,
             "familia_id": familia,
             "tipo_estructura": _norm_tipo_estructura(e.get("Tipo de Estructura")),
             "dip": _to_float(e.get("Dip")) or 0.0,
             "dip_dir": _to_float(e.get("Dip Dir")) or 0.0,
-            "distancia_m": _to_float(e.get("Distancia (m)")),
-            "abertura_mm": _to_float(e.get("Abertura(mm)")),
-            "espesor_mm": _to_float(e.get("Espesor (mm)")),
-            "continuidad_m": _to_float(e.get("Continuidad (m)")),
-            "espaciamiento_m": _to_float(e.get("Espaciamiento (m)")),
-            "n_estructuras": _to_int(e.get("N de Estructuras")),
-            "n_extremos_visibles": _to_int(e.get("N de Extremos Visibles")),
-            "terminacion": _to_int(e.get("TERMINACION")),
+            "distancia_m": _to_float(_get_e("Distancia (m)")),
+            "abertura_mm": _to_float(_get_e("Abertura(mm)", "Abertura (mm)")),
+            "espesor_mm": _to_float(_get_e("Espesor (mm)")),
+            "continuidad_m": _to_float(_get_e("Continuidad (m)")),
+            "espaciamiento_m": _to_float(_get_e("Espaciamiento (m)")),
+            "n_estructuras": _to_int(_get_e("N de Estructuras")),
+            "n_extremos_visibles": _to_int(_get_e("N de Extremos Visibles")),
+            "terminacion": _to_int(_get_e("TERMINACION")),
             "relleno_1_codigo": _to_str(e.get("Tipo de Relleno 1")),
             "relleno_2_codigo": _to_str(e.get("Tipo de Relleno 2")),
-            "jrc": _to_float(e.get("JRC")),
-            "rugosidad_codigo": _to_str(e.get("Rugosidad de Estructura")),
-            "forma_estructura": _to_str(e.get("Forma de Estructura")),
-            "alteracion_codigo": _to_str(e.get("Alteracion")),
+            "jrc": _to_float(_get_e("JRC")),
+            "rugosidad_codigo": _to_str(_get_e("Rugosidad de Estructura")),
+            "forma_estructura": _to_str(_get_e("Forma de Estructura")),
+            "alteracion_codigo": _to_str(_get_e("Alteracion")),
         })
 
     return {

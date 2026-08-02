@@ -1,5 +1,4 @@
-import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   X, FileSpreadsheet, Upload, Check, AlertTriangle, Loader,
   Settings, Table, CheckCircle, Search, ChevronDown, ChevronUp,
@@ -7,6 +6,12 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+
+// Tamaño máximo permitido por archivo Excel (MB).
+// Nota: Render free tiene 512 MB de RAM; un xlsx se expande al descomprimirse,
+// por lo que archivos > 100 MB pueden matar el proceso. Si notas OOM, baja este límite.
+const MAX_FILE_SIZE_MB = 100;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 interface ExcelImportModalProps {
   isOpen: boolean;
@@ -118,10 +123,29 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ ventanas: number; estructuras: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sheetsLoading, setSheetsLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Códigos que el backend confirmó que YA EXISTEN en BD (los marcó como
+  // duplicados usando el nombre original del Excel).
+  const existingDbCodes = useMemo(() => {
+    return new Set(celdas.filter(c => c.is_duplicate).map(c => c.codigo.trim().toUpperCase()));
+  }, [celdas]);
+
+  // Una celda es duplicada si su NOMBRE FINAL (con renombrado aplicado)
+  // coincide con algún código existente en BD. Si el usuario renombró la
+  // celda a un código nuevo, deja de ser duplicada.
+  const isDuplicateFinal = (c: CeldaItem): boolean => {
+    const finalName = (editedNames[c.codigo] || c.codigo).trim().toUpperCase();
+    return existingDbCodes.has(finalName);
+  };
+
   if (!isOpen) return null;
+
+  // Validaciones previas al botón "Procesar Excel"
+  const fileTooBig = file ? file.size > MAX_FILE_SIZE_BYTES : false;
+  const sheetsReady = !!file && !fileTooBig && !sheetsLoading && sheets.length > 0 && !!selectedSheet;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -133,26 +157,37 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
       setError(null);
       setStep('select');
       // Limpiar el estado de hojas SÍNCRONAMENTE para evitar que se vea
-      // la hoja del archivo anterior durante la lectura asíncrona.
+      // la hoja del archivo anterior durante la carga.
       setSheets([]);
       setSelectedSheet('');
-      // Leer hojas disponibles del Excel (SheetJS) para que el usuario
-      // elija cuál procesar antes de apretar "Procesar Excel".
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        try {
-          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: 'array' });
-          const names = wb.SheetNames || [];
+
+      // Validación de tamaño: si excede el límite, no intentar listar hojas.
+      if (f.size > MAX_FILE_SIZE_BYTES) {
+        setSheetsLoading(false);
+        return;
+      }
+
+      // Listar las hojas en el BACKEND (openpyxl read_only — streaming,
+      // no descomprime el libro completo). Parsear el Excel en el
+      // navegador (SheetJS) tarda minutos en archivos grandes.
+      setSheetsLoading(true);
+      const fd = new FormData();
+      fd.append('file', f);
+      fetch(`${apiBaseUrl}/api/importar-excel/hojas`, { method: 'POST', body: fd })
+        .then(res => res.json().catch(() => null))
+        .then(data => {
+          const names = data?.hojas || [];
           setSheets(names);
           setSelectedSheet(names[0] || '');
-        } catch (err) {
+        })
+        .catch(err => {
           console.warn("No se pudieron leer las hojas del Excel:", err);
           setSheets([]);
           setSelectedSheet('');
-        }
-      };
-      reader.readAsArrayBuffer(f);
+        })
+        .finally(() => {
+          setSheetsLoading(false);
+        });
     }
   };
 
@@ -190,8 +225,8 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
         const errorMsg = typeof detailMsg === 'string'
           ? detailMsg
           : (Array.isArray(detailMsg)
-              ? detailMsg.map((e: any) => e.msg || JSON.stringify(e)).join(', ')
-              : (detailMsg ? JSON.stringify(detailMsg) : `Error HTTP ${res.status}: No se pudo procesar la plantilla Excel.`));
+            ? detailMsg.map((e: any) => e.msg || JSON.stringify(e)).join(', ')
+            : (detailMsg ? JSON.stringify(detailMsg) : `Error HTTP ${res.status}: No se pudo procesar la plantilla Excel.`));
         setError(errorMsg);
       }
     } catch (err: any) {
@@ -206,7 +241,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
   const handleInitiateImport = () => {
     if (selectedCodes.size === 0) return;
 
-    const duplicatesSelected = celdas.filter(c => selectedCodes.has(c.codigo) && c.is_duplicate);
+    const duplicatesSelected = celdas.filter(c => selectedCodes.has(c.codigo) && isDuplicateFinal(c));
 
     if (duplicatesSelected.length > 0) {
       setShowDoubleConfirmModal(true);
@@ -258,8 +293,8 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
         const errorMsg = typeof detailMsg === 'string'
           ? detailMsg
           : (Array.isArray(detailMsg)
-              ? detailMsg.map((e: any) => e.msg || JSON.stringify(e)).join(', ')
-              : (detailMsg ? JSON.stringify(detailMsg) : `Error HTTP ${res.status}: Fallo al persistir celdas.`));
+            ? detailMsg.map((e: any) => e.msg || JSON.stringify(e)).join(', ')
+            : (detailMsg ? JSON.stringify(detailMsg) : `Error HTTP ${res.status}: Fallo al persistir celdas.`));
         setError(errorMsg);
       }
     } catch (err: any) {
@@ -287,11 +322,11 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
   const filteredCeldas = celdas.filter(c => {
     const code = editedNames[c.codigo] || c.codigo;
     return code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           (c.excel_data.sector || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-           (c.excel_data.mapeador || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (c.excel_data.sector || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.excel_data.mapeador || '').toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const selectedDuplicates = celdas.filter(c => selectedCodes.has(c.codigo) && c.is_duplicate);
+  const selectedDuplicates = celdas.filter(c => selectedCodes.has(c.codigo) && isDuplicateFinal(c));
 
   const toggleSelectAll = () => {
     if (selectedCodes.size === filteredCeldas.length) {
@@ -346,7 +381,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                 {step === 'preview' ? `Previsualización de Excel (${celdas.length} Celdas Encontradas)` : 'Importación de Celdas de Mapeo Geomecánico'}
               </h3>
               <p className="text-xs text-slate-400">
-                {step === 'preview' ? 'Seleccione las celdas a guardar, mapee columnas y resuelva duplicados.' : 'Cargue un archivo Excel de mapeo geomecánico.'}
+                {step === 'preview' ? 'Seleccione las celdas a guardar, mapee columnas y resuelva duplicados.' : `Cargue un archivo Excel de mapeo geomecánico. (Límite Máximo: ${MAX_FILE_SIZE_MB})`}
               </p>
             </div>
           </div>
@@ -437,7 +472,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                   <Table size={14} className={file ? 'text-indigo-400' : 'text-slate-600'} />
                   <span>Seleccionar Hoja del Excel</span>
                 </div>
-                {file && sheets.length > 0 && (
+                {file && !fileTooBig && sheets.length > 0 && (
                   <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
                     {sheets.length} hoja{sheets.length !== 1 ? 's' : ''} detectada{sheets.length !== 1 ? 's' : ''}
                   </span>
@@ -445,7 +480,20 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
               </div>
 
               {file ? (
-                sheets.length > 0 ? (
+                fileTooBig ? (
+                  <div className="flex items-start gap-2 text-xs text-rose-400/90 leading-relaxed">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <span>
+                      El archivo supera el límite de <strong>{MAX_FILE_SIZE_MB} MB</strong> permitido.
+                      Elija otro Excel o separe el archivo en partes que solo contengan las hojas que necesita.
+                    </span>
+                  </div>
+                ) : sheetsLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-amber-400/90">
+                    <Loader size={14} className="animate-spin" />
+                    <span>Leyendo hojas del archivo...</span>
+                  </div>
+                ) : sheets.length > 0 ? (
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <select
                       value={selectedSheet}
@@ -461,9 +509,9 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-xs text-amber-400/90">
-                    <Loader size={14} className="animate-spin" />
-                    <span>Leyendo hojas del archivo...</span>
+                  <div className="flex items-start gap-2 text-xs text-rose-400/90 leading-relaxed">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <span>No se pudieron leer las hojas del archivo. Intente con otro Excel.</span>
                   </div>
                 )
               ) : (
@@ -487,7 +535,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
               </button>
               <button
                 onClick={handlePreview}
-                disabled={!file || loading}
+                disabled={!sheetsReady || loading}
                 className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 disabled:opacity-50 transition-all shadow-lg"
               >
                 {loading ? <Loader size={15} className="animate-spin" /> : <Table size={15} />}
@@ -553,11 +601,10 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
                 <button
                   type="button"
                   onClick={() => setShowMappingAccordion(!showMappingAccordion)}
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
-                    showMappingAccordion
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${showMappingAccordion
                       ? 'bg-purple-600/20 border-purple-500 text-purple-300'
                       : 'bg-navy-950 border-navy-800 text-slate-400 hover:bg-navy-800'
-                  }`}
+                    }`}
                 >
                   <Settings size={13} />
                   <span>Mapeo de Columnas</span>
@@ -677,9 +724,9 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
 
                         <td className="py-2.5 px-3 text-slate-300 font-medium">{c.excel_data.mapeador}</td>
 
-                        {/* Badge de Estado en Base de Datos */}
+                        {/* Badge de Estado en Base de Datos (evaluado con el nombre final) */}
                         <td className="py-2.5 px-3 text-center">
-                          {c.is_duplicate ? (
+                          {isDuplicateFinal(c) ? (
                             <button
                               type="button"
                               onClick={() => setComparingCelda(c)}
@@ -748,7 +795,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
           <div className="glass-panel w-full max-w-xl p-6 rounded-2xl border border-amber-500/40 shadow-2xl bg-navy-900/95 relative overflow-hidden flex flex-col space-y-4">
             <div className="h-1.5 bg-amber-500 w-full absolute top-0 left-0" />
-            
+
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
                 <AlertTriangle size={24} />

@@ -150,6 +150,24 @@ STANDARD_FIELD_MAPPINGS = {    "codigo_celda": ["CELDA", "CELDA_PADRE", "CODIGOC
 }
 
 
+@router.post("/importar-excel/hojas")
+async def list_excel_sheets(file: UploadFile = File(...)):
+    """
+    Devuelve SOLO los nombres de hojas de un libro Excel, sin parsear el
+    contenido de las celdas (openpyxl en modo read_only lee únicamente
+    xl/workbook.xml). Es instantáneo incluso para archivos muy grandes.
+    """
+    contents = await file.read()
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True, data_only=False)
+        names = list(wb.sheetnames)
+        wb.close()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
+    return {"status": "success", "hojas": names}
+
+
 @router.post("/importar-excel/preview")
 async def preview_import_excel(
     file: UploadFile = File(...),
@@ -696,6 +714,10 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
             dipdir_v = float(s.get("dip_dir") or 0.0)
             tipo_str = str(s.get("tipo_estructura") or 'JN').strip()
             tipo_id = resolver.tipo_estructura_id(tipo_str)
+            # La columna TipoEstructuraID NO acepta NULL: si el tipo no se
+            # resolvió (código desconocido o vacío), caer a 'JN'.
+            if tipo_id is None:
+                tipo_id = resolver.tipo_estructura_id("JN")
 
             num_est_slot = s_idx + 1
             # Respetar familia explícita si viene (Excel A trae ID por
