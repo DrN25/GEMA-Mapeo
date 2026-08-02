@@ -656,7 +656,7 @@ export default function VentanaForm({
                 <div className="p-2 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between shadow-sm">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                    <span>Combinación Válida GEMA: <strong>{litoValidation.matchedItem.grupo}</strong> (Lito 1: {litoValidation.matchedItem.unidad} | Lito 2: {litoValidation.matchedItem.litologia})</span>
+                    <span>Combinación Válida GEMA: <strong>{litoValidation.matchedItem.grupo}</strong> (Lito 1: {litoValidation.matchedItem.unidad} | Lito 2: {litoValidation.matchedItem.litologia} | Lito 3: {litoValidation.matchedItem.codigo || '—'})</span>
                   </div>
                   {litoValidation.matchedItem.k !== undefined && (
                     <span className="bg-emerald-500/20 px-2.5 py-0.5 rounded-md text-xs font-bold text-emerald-300 border border-emerald-500/30">

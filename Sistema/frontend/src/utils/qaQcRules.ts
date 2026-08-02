@@ -271,7 +271,7 @@ const RULES: QaQcRuleDef[] = [
       // Lito 1 y Lito 2 obligatorios; Lito 3 puede quedar vacío (comodín NR/-).
       if (isL1Empty || isL2Empty) return null;
 
-      const normL3 = (c === '-' || c === 'NR') ? 'NR' : c;
+      const normL3 = isL3Empty ? 'NR' : c;
       const matches = LITHOLOGY_CLASSIFICATION.filter(item => {
         const itemU = (item.unidad || '').toUpperCase();
         const itemL = (item.litologia || '').toUpperCase();
