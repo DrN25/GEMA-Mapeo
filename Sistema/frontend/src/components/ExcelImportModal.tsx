@@ -132,6 +132,10 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
       setEditedNames({});
       setError(null);
       setStep('select');
+      // Limpiar el estado de hojas SÍNCRONAMENTE para evitar que se vea
+      // la hoja del archivo anterior durante la lectura asíncrona.
+      setSheets([]);
+      setSelectedSheet('');
       // Leer hojas disponibles del Excel (SheetJS) para que el usuario
       // elija cuál procesar antes de apretar "Procesar Excel".
       const reader = new FileReader();
@@ -268,6 +272,8 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
   const resetAndStartOver = () => {
     setStep('select');
     setFile(null);
+    setSheets([]);
+    setSelectedSheet('');
     setCeldas([]);
     setSelectedCodes(new Set());
     setEditedNames({});
@@ -424,27 +430,48 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
               )}
             </div>
 
-            {/* Selector de Hoja a procesar */}
-            {file && sheets.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 p-3.5 bg-navy-950/60 border border-navy-800 rounded-xl">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                  <Table size={14} className="text-indigo-400" />
-                  <span>Hoja a procesar:</span>
+            {/* Selección de Hoja del Libro (siempre visible, deshabilitado sin archivo) */}
+            <div className={`p-4 rounded-xl border transition-all ${file ? 'bg-navy-950/60 border-indigo-500/40' : 'bg-navy-950/30 border-navy-800/60'}`}>
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <div className="flex items-center gap-2 text-xs font-black text-slate-300 uppercase tracking-wider">
+                  <Table size={14} className={file ? 'text-indigo-400' : 'text-slate-600'} />
+                  <span>Seleccionar Hoja del Excel</span>
                 </div>
-                <select
-                  value={selectedSheet}
-                  onChange={(e) => setSelectedSheet(e.target.value)}
-                  className="flex-1 min-w-[200px] bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                >
-                  {sheets.map(s => (
-                    <option key={s} value={s} className="bg-navy-950 text-slate-200">{s}</option>
-                  ))}
-                </select>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  El formato (Estaciones / Base de Datos) se detecta automáticamente al procesar.
-                </span>
+                {file && sheets.length > 0 && (
+                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                    {sheets.length} hoja{sheets.length !== 1 ? 's' : ''} detectada{sheets.length !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
-            )}
+
+              {file ? (
+                sheets.length > 0 ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <select
+                      value={selectedSheet}
+                      onChange={(e) => setSelectedSheet(e.target.value)}
+                      className="flex-1 min-w-[220px] bg-navy-900 border border-indigo-500/40 rounded-lg px-3 py-2 text-xs text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    >
+                      {sheets.map(s => (
+                        <option key={s} value={s} className="bg-navy-950 text-slate-200">{s}</option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] text-slate-400 font-medium leading-snug">
+                      El formato del archivo se detecta automáticamente al procesar.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-amber-400/90">
+                    <Loader size={14} className="animate-spin" />
+                    <span>Leyendo hojas del archivo...</span>
+                  </div>
+                )
+              ) : (
+                <p className="text-xs text-slate-500 font-medium">
+                  Cargue primero un archivo Excel para seleccionar la hoja que desea procesar.
+                </p>
+              )}
+            </div>
 
             {error && (
               <div className="p-3.5 rounded-xl border text-xs font-semibold flex items-start gap-2 bg-red-500/10 border-red-500/30 text-red-400">

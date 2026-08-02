@@ -180,6 +180,15 @@ async def preview_import_excel(
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
 
     fmt = detect_format(ws)
+    if fmt == "unknown":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "El formato del archivo no es soportado o la hoja seleccionada no contiene datos de mapeo. "
+                "Verifique que esté usando una plantilla válida de mapeo geomecánico "
+                "e intente con otra hoja del libro."
+            )
+        )
     if fmt == "a":
         return _preview_excel_a(ws, db, hoja)
 
@@ -192,7 +201,7 @@ async def preview_import_excel(
     if formato == "estaciones":
         raise HTTPException(
             status_code=400,
-            detail="El formato de Estaciones (Excel A) se encuentra en desarrollo. Por favor seleccione el modo Base de Datos (Excel B) o Automático."
+            detail="El modo de importación seleccionado no está disponible. Por favor utilice el modo Automático."
         )
 
     # Encontrar la columna de Celda
@@ -208,6 +217,16 @@ async def preview_import_excel(
         raise HTTPException(
             status_code=400,
             detail=f"Formato no reconocido: No se encontró la columna obligatoria 'CELDA' o 'CELDA_PADRE' en el archivo Excel. Se detectaron las columnas: [{cols_preview}]. Verifique la plantilla."
+        )
+
+    if df.empty or df.dropna(how='all').empty:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "La hoja seleccionada está vacía o no contiene datos de mapeo. "
+                "Verifique que esté usando una plantilla válida de mapeo geomecánico "
+                "o intente con otra hoja del libro."
+            )
         )
 
     # Detectar mapeo de columnas encontradas
@@ -474,6 +493,15 @@ def _preview_excel_a(ws, db: Session, hoja: str):
     """Procesa una hoja en formato A (estaciones) y devuelve la misma
     estructura de respuesta que el preview del formato B."""
     stations = parse_excel_a(ws)
+    if not stations:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No se detectaron estaciones de mapeo en la hoja seleccionada. "
+                "Verifique que la hoja contenga bloques de estación (TD1, TD2, ...) "
+                "o intente con otra hoja del archivo."
+            )
+        )
     celdas_preview = []
 
     for station in stations:
@@ -485,6 +513,16 @@ def _preview_excel_a(ws, db: Session, hoja: str):
         celda["is_duplicate"] = is_duplicate
         celda["existing_data"] = existing_data
         celdas_preview.append(celda)
+
+    if not celdas_preview:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "La hoja seleccionada no contiene celdas de mapeo válidas. "
+                "Verifique que el archivo tenga el formato de mapeo esperado "
+                "o intente con otra hoja del libro."
+            )
+        )
 
     return {
         "status": "success",
