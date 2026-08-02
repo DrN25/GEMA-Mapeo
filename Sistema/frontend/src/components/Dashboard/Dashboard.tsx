@@ -44,6 +44,9 @@ interface DashboardProps {
   onPageSizeChange: (size: number) => void;
   onFilterChange: (filters: { dateRange?: string }) => void;
   activeDateRange: string;
+  advancedFilters: { sector: string; rmrMin: string; rmrMax: string };
+  onAdvancedFilterChange: (filters: { sector: string; rmrMin: string; rmrMax: string }) => void;
+  onClearAdvancedFilters: () => void;
   onSelectWindow: (name: string) => void;
   onCreateWindow: (newWindow: any) => void;
   onDeleteWindow: (name: string) => void;
@@ -67,6 +70,9 @@ export default function Dashboard({
   onPageSizeChange,
   onFilterChange,
   activeDateRange,
+  advancedFilters,
+  onAdvancedFilterChange,
+  onClearAdvancedFilters,
   onSelectWindow,
   onCreateWindow,
   onDeleteWindow,
@@ -74,10 +80,27 @@ export default function Dashboard({
 }: DashboardProps) {
   const [showModal, setShowModal] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchTerm);
+  const [localAdv, setLocalAdv] = useState(advancedFilters);
 
   React.useEffect(() => {
     setLocalSearch(searchTerm);
   }, [searchTerm]);
+
+  React.useEffect(() => {
+    setLocalAdv(advancedFilters);
+  }, [advancedFilters]);
+
+  const hasAdvancedFilters = !!(
+    localAdv.sector.trim() || localAdv.rmrMin !== '' || localAdv.rmrMax !== ''
+  );
+
+  const applyAdvancedFilters = () => {
+    onAdvancedFilterChange({
+      sector: localAdv.sector.trim(),
+      rmrMin: localAdv.rmrMin,
+      rmrMax: localAdv.rmrMax,
+    });
+  };
 
   const filteredWindows = windows;
 
@@ -158,33 +181,60 @@ export default function Dashboard({
           <span>Filtros avanzados</span>
           <ChevronDown size={12} className="group-open:rotate-180 transition-transform" />
         </summary>
-        <div className="mt-3 p-4 bg-navy-950/30 border border-navy-800 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="mt-3 p-4 bg-navy-950/30 border border-navy-800 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Sector</label>
-            <input type="text" placeholder="NW1_B, E1..."
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Mapeador</label>
-            <input type="text" placeholder="SRK, JAMH..."
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            <input
+              type="text"
+              placeholder="NW1_B, E1..."
+              value={localAdv.sector}
+              onChange={(e) => setLocalAdv({ ...localAdv, sector: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RMR mínimo</label>
-            <input type="number" min="0" max="100" placeholder="0"
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              placeholder="0"
+              value={localAdv.rmrMin}
+              onChange={(e) => setLocalAdv({ ...localAdv, rmrMin: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RMR máximo</label>
-            <input type="number" min="0" max="100" placeholder="100"
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              placeholder="100"
+              value={localAdv.rmrMax}
+              onChange={(e) => setLocalAdv({ ...localAdv, rmrMax: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
+              onClick={applyAdvancedFilters}
               className="w-full bg-indigo-500/10 border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
             >
               Aplicar
             </button>
+            {hasAdvancedFilters && (
+              <button
+                onClick={onClearAdvancedFilters}
+                className="p-1.5 rounded-lg border border-navy-700 text-slate-500 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
+                title="Limpiar filtros avanzados"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
       </details>

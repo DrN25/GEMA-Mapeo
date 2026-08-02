@@ -222,6 +222,11 @@ export default function App() {
   const [activeDateRange, setActiveDateRange] = useState<string>('todo');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isGlobalSearch, setIsGlobalSearch] = useState<boolean>(false);
+  const [advancedFilters, setAdvancedFilters] = useState<{ sector: string; rmrMin: string; rmrMax: string }>({
+    sector: '',
+    rmrMin: '',
+    rmrMax: '',
+  });
   const [pendingImports, setPendingImports] = useState<string[]>([]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -475,7 +480,7 @@ export default function App() {
     window.location.href = `${API_BASE}/api/ventanas/${celda}/exportar`;
   };
 
-  const fetchWindows = async (p?: number, ps?: number, dr?: string, searchTerm?: string, isGlobalSearch?: boolean) => {
+  const fetchWindows = async (p?: number, ps?: number, dr?: string, searchTerm?: string, isGlobalSearch?: boolean, advFilters?: typeof advancedFilters) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -486,8 +491,13 @@ export default function App() {
       });
 
       if (isGlobalSearch !== undefined) {
-        params.set('global_search', String(isGlobalSearch));
+        params.set('search_global', String(isGlobalSearch));
       }
+
+      const af = advFilters || advancedFilters;
+      if (af.sector.trim()) params.set('sector', af.sector.trim());
+      if (af.rmrMin !== '') params.set('rmr_min', String(Number(af.rmrMin)));
+      if (af.rmrMax !== '') params.set('rmr_max', String(Number(af.rmrMax)));
 
       // Calcular fecha_desde/fecha_hasta según dateRange
       const drActive = dr || activeDateRange;
@@ -955,8 +965,21 @@ export default function App() {
         setSearchTerm('');
       }
       setPage(1);
-      fetchWindows(1, pageSize, newDr, termToKeep, isGlobalSearch);
+      fetchWindows(1, pageSize, newDr, termToKeep, isGlobalSearch, advancedFilters);
     }
+  };
+
+  const handleAdvancedFilterChange = (filters: { sector: string; rmrMin: string; rmrMax: string }) => {
+    setAdvancedFilters(filters);
+    setPage(1);
+    fetchWindows(1, pageSize, activeDateRange, searchTerm, isGlobalSearch, filters);
+  };
+
+  const handleClearAdvancedFilters = () => {
+    const cleared = { sector: '', rmrMin: '', rmrMax: '' };
+    setAdvancedFilters(cleared);
+    setPage(1);
+    fetchWindows(1, pageSize, activeDateRange, searchTerm, isGlobalSearch, cleared);
   };
 
   const handleDeleteFamily = (famId: number) => {
@@ -1421,6 +1444,9 @@ export default function App() {
               onPageSizeChange={handlePageSizeChange}
               onFilterChange={handleFilterChange}
               activeDateRange={activeDateRange}
+              advancedFilters={advancedFilters}
+              onAdvancedFilterChange={handleAdvancedFilterChange}
+              onClearAdvancedFilters={handleClearAdvancedFilters}
               onSelectWindow={handleSelectWindow}
               onCreateWindow={handleCreateWindow}
               onDeleteWindow={handleDeleteWindow}
