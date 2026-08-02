@@ -28,17 +28,21 @@ export const QAQC_RULE_ENFORCEMENT: Record<string, boolean> = {
 };
 
 // Función auxiliar para estimar el perfil de rugosidad teórico según el JRC geomecánico
+// Tabla de referencia (rangos abiertos ]x - y[ = los extremos no se incluyen):
+//   ]0 - 2[ → 9 | ]2 - 4[ → 8 | ]4 - 6[ → 7 | ]6 - 8[ → 6 | ]8 - 10[ → 6
+//   ]10 - 12[ → 5 | ]12 - 14[ → 4 | ]14 - 16[ → 3 | ]16 - 18[ → 2 | ]18 - 20[ → 1
 function getExpectedProfileFromJRC(jrc: number): number | null {
   if (jrc < 0 || jrc > 20) return null;
-  if (jrc <= 2) return 9;
-  if (jrc <= 4) return 8;
-  if (jrc <= 6) return 7;
-  if (jrc <= 8) return 6;
-  if (jrc <= 10) return 5;
-  if (jrc <= 12) return 4;
-  if (jrc <= 14) return 3;
-  if (jrc <= 16) return 2;
-  return 1; // JRC entre 16 y 20
+  if (jrc < 2) return 9;
+  if (jrc < 4) return 8;
+  if (jrc < 6) return 7;
+  if (jrc < 8) return 6;
+  if (jrc < 10) return 6;
+  if (jrc < 12) return 5;
+  if (jrc < 14) return 4;
+  if (jrc < 16) return 3;
+  if (jrc < 18) return 2;
+  return 1; // JRC entre 18 y 20
 }
 
 export function validateWindowQAQC(header: WindowHeader, joints: JointRow[], largo: number): ValidationAlert[] {

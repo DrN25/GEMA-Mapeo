@@ -874,19 +874,19 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                 </thead>
                 <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                   {[
-                    { range: "0 - 2", profile: 9 },
-                    { range: "2 - 4", profile: 8 },
-                    { range: "4 - 6", profile: 7 },
-                    { range: "6 - 8", profile: 6 },
-                    { range: "8 - 10", profile: 5 },
-                    { range: "10 - 12", profile: 4 },
-                    { range: "12 - 14", profile: 3 },
-                    { range: "14 - 16", profile: 2 },
-                    { range: "16 - 18", profile: 1 },
-                    { range: "18 - 20", profile: 1 }
+                    { range: "]0 - 2[", profile: 9 },
+                    { range: "]2 - 4[", profile: 8 },
+                    { range: "]4 - 6[", profile: 7 },
+                    { range: "]6 - 8[", profile: 6 },
+                    { range: "]8 - 10[", profile: 6 },
+                    { range: "]10 - 12[", profile: 5 },
+                    { range: "]12 - 14[", profile: 4 },
+                    { range: "]14 - 16[", profile: 3 },
+                    { range: "]16 - 18[", profile: 2 },
+                    { range: "]18 - 20[", profile: 1 }
                   ].map((item, idx) => (
                     <tr key={idx} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-semibold">{item.range}</td>
+                      <td className="py-2.5 px-4 font-semibold font-mono">{item.range}</td>
                       <td className="py-2.5 px-4 text-center font-bold text-orange-400">{item.profile}</td>
                     </tr>
                   ))}
