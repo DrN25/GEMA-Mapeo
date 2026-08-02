@@ -42,7 +42,10 @@ import {
 } from './utils/rmrCalculator';
 
 import { validateWindowQAQC } from './utils/qaqcValidator';
-import type { ValidationAlert } from './utils/qaqcValidator';
+import type { QaQcAlert } from './utils/qaQcRules';
+import { buildCampaniaYearMap } from './utils/qaQcRules';
+import { resetTouchedFields, subscribeTouched } from './utils/qaQcTouch';
+import { validateMapeoWindow, toVacioAlerts, type MissingFieldIssue } from './utils/mandatoryRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -234,7 +237,7 @@ export default function App() {
 
   // Real-time calculated results & alerts
   const [calculated, setCalculated] = useState<CalculatorResult | null>(null);
-  const [alerts, setAlerts] = useState<ValidationAlert[]>([]);
+  const [alerts, setAlerts] = useState<QaQcAlert[]>([]);
   const [catalogsLoaded, setCatalogsLoaded] = useState<boolean>(false);
 
   // Photos & Captions states
@@ -374,18 +377,30 @@ export default function App() {
     }
   }, [workspaceDiff.totalWindowsWithChanges, pltDiffSummary.totalChanges]);
 
+  // Re-render de validaciones cuando se marca un campo como "tocado" (blur)
+  const [touchedTick, setTouchedTick] = useState(0);
+  useEffect(() => {
+    return subscribeTouched(() => setTouchedTick(t => t + 1));
+  }, []);
+
   // Keep RMR calculations and QA/QC validation updated in real-time
   useEffect(() => {
     if (activeWindow) {
       const res = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
       setCalculated(res);
-      const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo);
-      setAlerts(errs);
+      const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap());
+      const vacios = toVacioAlerts(validateMapeoWindow(activeWindow));
+      setAlerts([...errs, ...vacios]);
     } else {
       setCalculated(null);
       setAlerts([]);
     }
-  }, [activeWindow]);
+  }, [activeWindow, touchedTick]);
+
+  // Resetear el registro de campos "tocados" al cambiar de ventana activa
+  useEffect(() => {
+    resetTouchedFields();
+  }, [activeWindow?.header?.celda]);
 
   // Reevaluación en cascada de distancias (m) al largo máximo de la celda
   useEffect(() => {

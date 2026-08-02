@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { ColumnConfig } from '../../utils/geomecColumns';
 import { FormulaTooltipTrigger } from '../FormulaTooltip';
+import { markFieldTouched } from '../../utils/qaQcTouch';
 
 interface GeomecTableProps<T> {
     data: T[];
@@ -380,6 +381,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                 <div className="absolute inset-0 w-full h-full flex items-center justify-center">
                                                     {c.type === 'select' && c.options ? (
                                                         <select
+                                                            id={`joint-${c.key}-${idx}`}
                                                             value={val === undefined || val === null || val === -1 || val === '-1' ? '' : String(val)}
                                                             onChange={(e) => {
                                                                 const raw = e.target.value;
@@ -390,6 +392,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                                     onCellChange(row[rowIdKey], c.key, isNaN(parsed as number) ? raw : parsed);
                                                                 }
                                                             }}
+                                                            onBlur={() => markFieldTouched(`joint-${c.key}-${idx}`)}
                                                             onKeyDown={handleGridKeyDown}
                                                             className="bg-transparent text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-center cursor-pointer w-full h-full text-xs font-normal px-2 border-0"
                                                         >
@@ -400,11 +403,15 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                         </select>
                                                     ) : (
                                                         <input
+                                                            id={`joint-${c.key}-${idx}`}
                                                             type={c.type === 'date' ? 'date' : 'text'}
                                                             value={getInputValue(row[rowIdKey], c.key, formatCellValue(val, c, isFocused))}
                                                             onFocus={() => setFocusedField(mapKey)}
                                                             onChange={(e) => handleInputChange(row[rowIdKey], c.key, e.target.value, c.precision)}
-                                                            onBlur={(e) => handleInputBlur(row[rowIdKey], c, e.target.value)}
+                                                            onBlur={(e) => {
+                                                                markFieldTouched(`joint-${c.key}-${idx}`);
+                                                                handleInputBlur(row[rowIdKey], c, e.target.value);
+                                                            }}
                                                             onKeyDown={handleGridKeyDown}
                                                             className="w-full h-full bg-transparent text-slate-100 text-center focus:outline-none focus:bg-navy-900/50 focus:ring-1 focus:ring-indigo-500/40 border-0 px-2 text-xs font-normal transition-all"
                                                         />

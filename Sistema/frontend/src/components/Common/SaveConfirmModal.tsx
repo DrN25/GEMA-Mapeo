@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle, BookOpen } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
 import { validateMapeoWindow, validatePltEnsayosList } from '../../utils/mandatoryRules';
-import { validateWindowQAQC, QAQC_RULE_ENFORCEMENT } from '../../utils/qaqcValidator';
+import { validateWindowQAQC } from '../../utils/qaqcValidator';
 
 export interface PltDiffSummary {
   added: number;
@@ -49,7 +49,7 @@ export default function SaveConfirmModal({
   }, [pltEnsayos]);
 
   // Auditoría sincrónica QA/QC de combinaciones inválidas y errores críticos
-  const qaqcErrors = useMemo(() => {
+  const qaqcAlerts = useMemo(() => {
     if (!activeWindow) return [];
     const ef = activeWindow.header.este_from || 0;
     const nf = activeWindow.header.norte_from || 0;
@@ -64,11 +64,13 @@ export default function SaveConfirmModal({
     const rawLargo = typeof activeWindow.header.largo === 'number' ? activeWindow.header.largo : parseFloat(String(activeWindow.header.largo || 0));
     const largo = !isNaN(rawLargo) && rawLargo > 0 ? rawLargo : distCalc;
 
-    const alerts = validateWindowQAQC(activeWindow.header, activeWindow.joints, largo);
-    return alerts.filter(a => a.type === 'ERROR' && QAQC_RULE_ENFORCEMENT[a.ruleId || ''] !== false);
+    return validateWindowQAQC(activeWindow.header, activeWindow.joints, largo, undefined, true);
   }, [activeWindow]);
 
-  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcErrors.length;
+  // CRITICAS y VACIOS bloquean el guardado; ADVERTENCIAS no.
+  const qaqcCriticas = qaqcAlerts.filter(a => a.type === 'CRITICA');
+  const qaqcAdvertencias = qaqcAlerts.filter(a => a.type === 'ADVERTENCIA');
+  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcCriticas.length;
   const hasBlockingErrors = totalBlockingIssuesCount > 0;
 
   // Si la celda activa tiene cambios, por defecto seleccionamos 'active'; de lo contrario 'all'
@@ -277,27 +279,27 @@ export default function SaveConfirmModal({
                   Detalle de inconsistencias detectadas:
                 </span>
                 <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                  {/* QA/QC Combinaciones Inválidas */}
-                  {qaqcErrors.map((err, idx) => (
-                    <div key={`qaqc-${idx}`} className="text-xs bg-amber-950/80 border border-amber-500/60 rounded-xl p-3 flex items-center justify-between text-amber-100 shadow-sm">
+                  {/* QA/QC Críticas */}
+                  {qaqcCriticas.map((err, idx) => (
+                    <div key={`qaqc-${idx}`} className="text-xs bg-red-950/70 border border-red-500/50 rounded-xl p-3 flex items-center justify-between text-red-100 shadow-sm">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
                         <span className="font-semibold leading-tight">{err.message}</span>
                       </div>
-                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/30 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/40 tracking-wider">
-                        Combinación Inválida
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-red-500/30 text-red-200 uppercase shrink-0 ml-2 border border-red-500/40 tracking-wider">
+                        Crítico
                       </span>
                     </div>
                   ))}
 
                   {/* Campos Obligatorios de Mapeo */}
                   {mapeoIssues.map((issue, idx) => (
-                    <div key={`map-${idx}`} className="text-xs bg-rose-900/70 border border-rose-500/50 rounded-xl p-3 flex items-center justify-between text-rose-100 shadow-sm">
+                    <div key={`map-${idx}`} className="text-xs bg-violet-900/60 border border-violet-500/40 rounded-xl p-3 flex items-center justify-between text-violet-100 shadow-sm">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0 shadow-[0_0_8px_rgba(139,92,246,0.6)]" />
                         <span className="font-semibold leading-tight">{issue.message}</span>
                       </div>
-                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-rose-500/30 text-rose-200 uppercase shrink-0 ml-2 border border-rose-500/40 tracking-wider">
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-violet-500/30 text-violet-200 uppercase shrink-0 ml-2 border border-violet-500/40 tracking-wider">
                         {issue.section}
                       </span>
                     </div>
@@ -305,13 +307,26 @@ export default function SaveConfirmModal({
 
                   {/* Campos Obligatorios PLT */}
                   {pltIssues.map((issue, idx) => (
-                    <div key={`plt-${idx}`} className="text-xs bg-rose-900/70 border border-rose-500/50 rounded-xl p-3 flex items-center justify-between text-rose-100 shadow-sm">
+                    <div key={`plt-${idx}`} className="text-xs bg-violet-900/60 border border-violet-500/40 rounded-xl p-3 flex items-center justify-between text-violet-100 shadow-sm">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0 shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0 shadow-[0_0_8px_rgba(139,92,246,0.6)]" />
                         <span className="font-semibold leading-tight">{issue.message}</span>
                       </div>
-                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-rose-500/30 text-rose-200 uppercase shrink-0 ml-2 border border-rose-500/40 tracking-wider">
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-violet-500/30 text-violet-200 uppercase shrink-0 ml-2 border border-violet-500/40 tracking-wider">
                         Ensayos PLT
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* QA/QC Advertencias (no bloquean) */}
+                  {qaqcAdvertencias.map((err, idx) => (
+                    <div key={`qaqc-warn-${idx}`} className="text-xs bg-amber-950/60 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between text-amber-100 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                        <span className="font-semibold leading-tight">{err.message}</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/30 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/40 tracking-wider">
+                        Advertencia
                       </span>
                     </div>
                   ))}

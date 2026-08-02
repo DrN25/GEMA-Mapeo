@@ -9,6 +9,7 @@ import {
   ratingDiscretoResistencia,
   ratingContinuoResistencia
 } from '../utils/rmrInterpolation';
+import { markFieldTouched } from '../utils/qaQcTouch';
 
 interface RmrAnalysisProps {
   header: WindowHeader;
@@ -175,8 +176,10 @@ export default function RmrAnalysis({
             {COLUMN_LABELS.condicion_agua}
           </label>
           <select
+            id="header-condicion_agua"
             value={header.condicion_agua || ''}
             onChange={handleWaterChange}
+            onBlur={() => markFieldTouched('header-condicion_agua')}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">-- Seleccione --</option>
@@ -193,8 +196,10 @@ export default function RmrAnalysis({
             {COLUMN_LABELS.resistencia_ucs}
           </label>
           <select
+            id="header-resistencia_ucs"
             value={header.resistencia_ucs || ''}
             onChange={(e) => handleFieldChange('resistencia_ucs', e.target.value)}
+            onBlur={() => markFieldTouched('header-resistencia_ucs')}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>
@@ -214,10 +219,14 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
+            id="header-is50_mpa"
             inputMode="decimal"
             value={getInputValue('is50_mpa', is50)}
             onChange={(e) => handleNumericInputChange('is50_mpa', e.target.value, 4, 2)}
-            onBlur={(e) => handleNumericInputBlur('is50_mpa', e.target.value)}
+            onBlur={(e) => {
+              markFieldTouched('header-is50_mpa');
+              handleNumericInputBlur('is50_mpa', e.target.value);
+            }}
             className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${ucsIs50Divergent ? 'border-red-500/80 bg-red-950/20 shadow-[0_0_8px_rgba(239,68,68,0.15)] text-red-300 font-bold' : 'border-navy-700/80'
               }`}
           />
@@ -229,9 +238,11 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
+            id="header-gsi_superficie"
             maxLength={2}
             value={gsiCond}
             onChange={(e) => handleFieldChange('gsi_superficie', e.target.value)}
+            onBlur={() => markFieldTouched('header-gsi_superficie')}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
           />
         </div>
@@ -242,9 +253,11 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
+            id="header-gsi_estructura"
             maxLength={2}
             value={gsiEstruc}
             onChange={(e) => handleFieldChange('gsi_estructura', e.target.value)}
+            onBlur={() => markFieldTouched('header-gsi_estructura')}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
           />
         </div>
@@ -255,10 +268,14 @@ export default function RmrAnalysis({
           </label>
           <input
             type="text"
+            id="header-gsi_visual"
             inputMode="numeric"
             value={getInputValue('gsi_visual', gsiVisual)}
             onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 0)}
-            onBlur={(e) => handleNumericInputBlur('gsi_visual', e.target.value)}
+            onBlur={(e) => {
+              markFieldTouched('header-gsi_visual');
+              handleNumericInputBlur('gsi_visual', e.target.value);
+            }}
             className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${gsiVisualInvalid ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300' : 'border-navy-700/80'
               }`}
           />
@@ -269,11 +286,13 @@ export default function RmrAnalysis({
             {COLUMN_LABELS.control_estructural}
           </label>
           <select
+            id="header-control_estructural"
             value={ctrl !== undefined ? String(ctrl) : ''}
             onChange={(e) => {
               const val = e.target.value === "" ? 0 : parseInt(e.target.value);
               handleFieldChange('control_estructural', val);
             }}
+            onBlur={() => markFieldTouched('header-control_estructural')}
             className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>

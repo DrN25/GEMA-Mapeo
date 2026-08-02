@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { User, Check, Plus, ChevronDown } from 'lucide-react';
+import { markFieldTouched } from '../utils/qaQcTouch';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
@@ -15,6 +16,7 @@ interface MapeadorComboboxProps {
   options?: CatalogOption[];
   placeholder?: string;
   className?: string;
+  inputId?: string;
 }
 
 export default function MapeadorCombobox({
@@ -22,7 +24,8 @@ export default function MapeadorCombobox({
   onChange,
   options: externalOptions,
   placeholder = 'Seleccionar o escribir mapeador...',
-  className = ''
+  className = '',
+  inputId,
 }: MapeadorComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState(value || '');
@@ -180,6 +183,7 @@ export default function MapeadorCombobox({
         <User size={13} className="absolute left-2.5 top-2.5 text-slate-500 pointer-events-none" />
         <input
           type="text"
+          id={inputId}
           value={query}
           onFocus={() => {
             updateCoords();
@@ -191,6 +195,7 @@ export default function MapeadorCombobox({
             updateCoords();
             setIsOpen(true);
           }}
+          onBlur={() => { if (inputId) markFieldTouched(inputId); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();

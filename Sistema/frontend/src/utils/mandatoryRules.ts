@@ -19,6 +19,36 @@ export interface MissingFieldIssue {
   message: string;
 }
 
+/**
+ * Convierte una lista de campos vacíos a alertas QA/QC tipo 'VACIO'
+ * con el fieldId correcto para el enfoque de campos.
+ */
+export function toVacioAlerts(issues: MissingFieldIssue[]): Array<{
+  fieldId: string;
+  type: 'VACIO';
+  message: string;
+  ruleId: string;
+  section: string;
+}> {
+  return issues.map(issue => {
+    let fieldId: string;
+    if (issue.group === 'plt') {
+      fieldId = `plt-${issue.fieldKey}${issue.rowIndex !== undefined ? `-${issue.rowIndex - 1}` : ''}`;
+    } else if (issue.section === 'DISCONTINUIDADES') {
+      fieldId = `joint-${issue.fieldKey}-${issue.rowIndex !== undefined ? issue.rowIndex - 1 : 0}`;
+    } else {
+      fieldId = `header-${issue.fieldKey}`;
+    }
+    return {
+      fieldId,
+      type: 'VACIO' as const,
+      message: issue.message,
+      ruleId: 'CAMPO_OBLIGATORIO_VACIO',
+      section: issue.section,
+    };
+  });
+}
+
 export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
   header: {
     celda: true,

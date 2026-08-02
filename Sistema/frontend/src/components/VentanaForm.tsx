@@ -3,19 +3,11 @@ import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
 import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Pencil, Info } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
+import { markFieldTouched } from '../utils/qaQcTouch';
+import { CAMPANAS_HARDCODED } from '../utils/campaniasCatalog';
 
-// Catálogo de Campañas (alineado a dbo.Campañas de GEMA.sql)
-// Hardcodeado temporalmente; al migrar a la nueva BD se cargará dinámicamente desde /api/catalogos/campanas
-const CAMPANAS_HARDCODED = [
-  { id: 1, label: 'Campaña 2020' },
-  { id: 2, label: 'Campaña 2021' },
-  { id: 3, label: 'Campaña 2022' },
-  { id: 4, label: 'Campaña 2023' },
-  { id: 5, label: 'Campaña 2024' },
-  { id: 6, label: 'Campaña 2025' },
-  { id: 7, label: 'Campaña 2026' },
-  { id: 8, label: 'Campaña 2019' },
-];
+// Helper: marca el campo como tocado (blur) para habilitar su evaluación QA/QC
+const touchField = (fieldId: string) => () => markFieldTouched(fieldId);
 
 interface VentanaFormProps {
   header: WindowHeader;
@@ -422,6 +414,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">Altura (m)</label>
                 <input
                   type="text"
+                  id="header-altura"
                   placeholder="Altura"
                   value={getInputValue('altura', header.altura)}
                   onChange={(e) => {
@@ -429,6 +422,7 @@ export default function VentanaForm({
                     handleChange('altura', limited);
                   }}
                   onBlur={(e) => {
+                    touchField('header-altura')();
                     const val = e.target.value.trim();
                     if (val === '') {
                       handleChange('altura', undefined);
@@ -445,6 +439,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">Dip Talud°</label>
                 <input
                   type="text"
+                  id="header-dip_talud"
                   placeholder="-90 a 90"
                   value={getInputValue('dip_talud', header.dip_talud)}
                   onChange={(e) => {
@@ -452,6 +447,7 @@ export default function VentanaForm({
                     handleChange('dip_talud', limited);
                   }}
                   onBlur={(e) => {
+                    touchField('header-dip_talud')();
                     const val = e.target.value.trim();
                     if (val === '') {
                       handleChange('dip_talud', undefined);
@@ -468,6 +464,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">DipDir Talud°</label>
                 <input
                   type="text"
+                  id="header-dipdir_talud"
                   placeholder="0-359"
                   value={getInputValue('dipdir_talud', header.dipdir_talud)}
                   onChange={(e) => {
@@ -475,6 +472,7 @@ export default function VentanaForm({
                     handleChange('dipdir_talud', limited);
                   }}
                   onBlur={(e) => {
+                    touchField('header-dipdir_talud')();
                     const val = e.target.value.trim();
                     if (val === '') {
                       handleChange('dipdir_talud', undefined);
@@ -491,6 +489,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">DIP°</label>
                 <input
                   type="text"
+                  id="header-dip_hw"
                   placeholder="-90-90"
                   value={getInputValue('dip_hw', header.dip_hw)}
                   onChange={(e) => {
@@ -498,6 +497,7 @@ export default function VentanaForm({
                     handleChange('dip_hw', limited);
                   }}
                   onBlur={(e) => {
+                    touchField('header-dip_hw')();
                     const val = e.target.value.trim();
                     if (val === '') {
                       handleChange('dip_hw', undefined);
@@ -514,6 +514,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block">AZ_HOLE°</label>
                 <input
                   type="text"
+                  id="header-az_hw"
                   placeholder="0-359"
                   value={getInputValue('az_hw', header.az_hw)}
                   onChange={(e) => {
@@ -521,6 +522,7 @@ export default function VentanaForm({
                     handleChange('az_hw', limited);
                   }}
                   onBlur={(e) => {
+                    touchField('header-az_hw')();
                     const val = e.target.value.trim();
                     if (val === '') {
                       handleChange('az_hw', undefined);
@@ -548,8 +550,10 @@ export default function VentanaForm({
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Lito 1</label>
                   <select
+                    id="header-lito_1"
                     value={header.lito_1 || ''}
                     onChange={(e) => handleLito1Change(e.target.value)}
+                    onBlur={touchField('header-lito_1')}
                     className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85'
                       }`}
                   >
@@ -563,8 +567,10 @@ export default function VentanaForm({
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Lito 2</label>
                   <select
+                    id="header-lito_2"
                     value={header.lito_2 || '-1'}
                     onChange={(e) => handleLito2Change(e.target.value)}
+                    onBlur={touchField('header-lito_2')}
                     className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
                       }`}
                   >
@@ -578,8 +584,10 @@ export default function VentanaForm({
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Lito 3</label>
                   <select
+                    id="header-lito_3"
                     value={header.lito_3 || '-1'}
                     onChange={(e) => handleLito3Change(e.target.value)}
+                    onBlur={touchField('header-lito_3')}
                     className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-orange-400'
                       }`}
                   >
@@ -666,8 +674,10 @@ export default function VentanaForm({
                   <label className="text-xs font-bold text-slate-500 uppercase block">Sector Geotécnico</label>
                   <input
                     type="text"
+                    id="header-sect_geot"
                     value={header.sect_geot || ''}
                     onChange={(e) => handleSectGeotChange(e.target.value)}
+                    onBlur={touchField('header-sect_geot')}
                     placeholder="Sector Geot."
                     maxLength={12}
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
@@ -677,8 +687,10 @@ export default function VentanaForm({
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Intemperismo / Meteorización</label>
                   <select
+                    id="header-intemperia"
                     value={header.intemperia || ''}
                     onChange={(e) => handleChange('intemperia', e.target.value)}
+                    onBlur={touchField('header-intemperia')}
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
                   >
                     <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
@@ -726,8 +738,10 @@ export default function VentanaForm({
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Campaña</label>
                   <select
+                    id="header-campania"
                     value={header.campania !== undefined && header.campania !== null ? String(header.campania) : ''}
                     onChange={(e) => handleChange('campania', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    onBlur={touchField('header-campania')}
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   >
                     <option value="" className="bg-navy-950 text-slate-500">— Campaña —</option>
@@ -741,12 +755,14 @@ export default function VentanaForm({
                   <label className="text-xs font-bold text-slate-500 uppercase block">Fase</label>
                   <input
                     type="text"
+                    id="header-fase"
                     inputMode="numeric"
                     value={header.fase || ''}
                     onChange={(e) => {
                       const cleaned = e.target.value.replace(/\D/g, '').slice(0, 2);
                       handleChange('fase', cleaned === '' ? '' : parseInt(cleaned, 10));
                     }}
+                    onBlur={touchField('header-fase')}
                     placeholder="Fase"
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
                   />
@@ -756,12 +772,14 @@ export default function VentanaForm({
                   <label className="text-xs font-bold text-slate-500 uppercase block">Nivel</label>
                   <input
                     type="text"
+                    id="header-nivel"
                     value={header.nivel || ''}
                     onChange={(e) => {
                       const val = e.target.value.replace('-', '');
                       const limited = handleNumberInputLimit(val, 4, 2);
                       handleChange('nivel', limited);
                     }}
+                    onBlur={touchField('header-nivel')}
                     placeholder="Nivel"
                     className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
                   />
@@ -772,8 +790,10 @@ export default function VentanaForm({
                   <div className="relative">
                     <input
                       type="date"
+                      id="header-fecha"
                       value={header.fecha || ''}
                       onChange={(e) => handleChange('fecha', e.target.value)}
+                      onBlur={touchField('header-fecha')}
                       className="w-full bg-navy-900/40 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer"
                     />
                   </div>
@@ -782,6 +802,7 @@ export default function VentanaForm({
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Mapeador</label>
                   <MapeadorCombobox
+                    inputId="header-mapeador"
                     value={header.mapeador || ''}
                     onChange={(val) => handleChange('mapeador', val)}
                     placeholder="Buscar o crear mapeador..."
