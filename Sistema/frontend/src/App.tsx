@@ -225,29 +225,19 @@ export default function App() {
   const [advancedFilters, setAdvancedFilters] = useState<{
     celda: string;
     sector: string;
-    rmr76Min: string;
-    rmr76Max: string;
-    rmr89Min: string;
-    rmr89Max: string;
-    rqdMin: string;
-    rqdMax: string;
-    largoMin: string;
-    largoMax: string;
-    alturaMin: string;
-    alturaMax: string;
+    rmr76: string;
+    rmr89: string;
+    rqd76: string;
+    rqd89: string;
+    gsi: string;
   }>({
     celda: '',
     sector: '',
-    rmr76Min: '',
-    rmr76Max: '',
-    rmr89Min: '',
-    rmr89Max: '',
-    rqdMin: '',
-    rqdMax: '',
-    largoMin: '',
-    largoMax: '',
-    alturaMin: '',
-    alturaMax: '',
+    rmr76: '',
+    rmr89: '',
+    rqd76: '',
+    rqd89: '',
+    gsi: '',
   });
   const [pendingImports, setPendingImports] = useState<string[]>([]);
 
@@ -519,16 +509,11 @@ export default function App() {
       const af = advFilters || advancedFilters;
       if (af.celda.trim()) params.set('q', af.celda.trim());
       if (af.sector.trim()) params.set('sector', af.sector.trim());
-      if (af.rmr76Min !== '') params.set('rmr76_min', String(Number(af.rmr76Min)));
-      if (af.rmr76Max !== '') params.set('rmr76_max', String(Number(af.rmr76Max)));
-      if (af.rmr89Min !== '') params.set('rmr89_min', String(Number(af.rmr89Min)));
-      if (af.rmr89Max !== '') params.set('rmr89_max', String(Number(af.rmr89Max)));
-      if (af.rqdMin !== '') params.set('rqd_min', String(Number(af.rqdMin)));
-      if (af.rqdMax !== '') params.set('rqd_max', String(Number(af.rqdMax)));
-      if (af.largoMin !== '') params.set('largo_min', String(Number(af.largoMin)));
-      if (af.largoMax !== '') params.set('largo_max', String(Number(af.largoMax)));
-      if (af.alturaMin !== '') params.set('altura_min', String(Number(af.alturaMin)));
-      if (af.alturaMax !== '') params.set('altura_max', String(Number(af.alturaMax)));
+      if (af.rmr76 !== '') params.set('rmr76', String(Number(af.rmr76)));
+      if (af.rmr89 !== '') params.set('rmr89', String(Number(af.rmr89)));
+      if (af.rqd76 !== '') params.set('rqd76', String(Number(af.rqd76)));
+      if (af.rqd89 !== '') params.set('rqd89', String(Number(af.rqd89)));
+      if (af.gsi !== '') params.set('gsi', String(Number(af.gsi)));
 
       // Calcular fecha_desde/fecha_hasta según dateRange
       const drActive = dr || activeDateRange;
@@ -573,7 +558,9 @@ export default function App() {
           nivel: v.nivel || '',
           rmr_76: v.rmr_76 !== null ? v.rmr_76 : 0,
           rmr_89: v.rmr_89 !== null ? v.rmr_89 : 0,
-          rqd_pct: v.rqd_pct !== null && v.rqd_pct !== undefined ? v.rqd_pct : null,
+          rqd76_pct: v.rqd76_pct !== null && v.rqd76_pct !== undefined ? v.rqd76_pct : null,
+          rqd89_pct: v.rqd89_pct !== null && v.rqd89_pct !== undefined ? v.rqd89_pct : null,
+          gsi_visual: v.gsi_visual !== null && v.gsi_visual !== undefined ? v.gsi_visual : null,
           class_89: v.rmr_89 >= 81 ? 'MUY BUENA' : v.rmr_89 >= 61 ? 'BUENA' : v.rmr_89 >= 41 ? 'MALA' : 'MUY MALA',
         }));
         setWindows(summaries);
@@ -1004,16 +991,11 @@ export default function App() {
   const handleAdvancedFilterChange = (filters: {
     celda: string;
     sector: string;
-    rmr76Min: string;
-    rmr76Max: string;
-    rmr89Min: string;
-    rmr89Max: string;
-    rqdMin: string;
-    rqdMax: string;
-    largoMin: string;
-    largoMax: string;
-    alturaMin: string;
-    alturaMax: string;
+    rmr76: string;
+    rmr89: string;
+    rqd76: string;
+    rqd89: string;
+    gsi: string;
   }) => {
     setAdvancedFilters(filters);
     setPage(1);
@@ -1024,16 +1006,11 @@ export default function App() {
     const cleared = {
       celda: '',
       sector: '',
-      rmr76Min: '',
-      rmr76Max: '',
-      rmr89Min: '',
-      rmr89Max: '',
-      rqdMin: '',
-      rqdMax: '',
-      largoMin: '',
-      largoMax: '',
-      alturaMin: '',
-      alturaMax: '',
+      rmr76: '',
+      rmr89: '',
+      rqd76: '',
+      rqd89: '',
+      gsi: '',
     };
     setAdvancedFilters(cleared);
     setPage(1);

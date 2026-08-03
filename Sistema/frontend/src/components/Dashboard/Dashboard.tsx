@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight, Filter, X, ChevronDown } from 'lucide-react';
 import CreateWindowModal from '../CreateWindowModal';
+import { limitNumberWithMax } from '../../utils/inputLimits';
 
 export interface WindowSummary {
   name: string;
@@ -13,7 +14,9 @@ export interface WindowSummary {
   nivel?: string;
   rmr_76: number;
   rmr_89: number;
-  rqd_pct: number | null;
+  rqd76_pct: number | null;
+  rqd89_pct: number | null;
+  gsi_visual: number | null;
   class_89: string;
 }
 
@@ -48,30 +51,20 @@ interface DashboardProps {
   advancedFilters: {
     celda: string;
     sector: string;
-    rmr76Min: string;
-    rmr76Max: string;
-    rmr89Min: string;
-    rmr89Max: string;
-    rqdMin: string;
-    rqdMax: string;
-    largoMin: string;
-    largoMax: string;
-    alturaMin: string;
-    alturaMax: string;
+    rmr76: string;
+    rmr89: string;
+    rqd76: string;
+    rqd89: string;
+    gsi: string;
   };
   onAdvancedFilterChange: (filters: {
     celda: string;
     sector: string;
-    rmr76Min: string;
-    rmr76Max: string;
-    rmr89Min: string;
-    rmr89Max: string;
-    rqdMin: string;
-    rqdMax: string;
-    largoMin: string;
-    largoMax: string;
-    alturaMin: string;
-    alturaMax: string;
+    rmr76: string;
+    rmr89: string;
+    rqd76: string;
+    rqd89: string;
+    gsi: string;
   }) => void;
   onClearAdvancedFilters: () => void;
   onSelectWindow: (name: string) => void;
@@ -118,25 +111,19 @@ export default function Dashboard({
   }, [advancedFilters]);
 
   const hasAdvancedFilters = !!(
-    localAdv.celda.trim() || localAdv.sector.trim() || localAdv.rmr76Min !== '' || localAdv.rmr76Max !== '' ||
-    localAdv.rmr89Min !== '' || localAdv.rmr89Max !== '' || localAdv.rqdMin !== '' || localAdv.rqdMax !== '' ||
-    localAdv.largoMin !== '' || localAdv.largoMax !== '' || localAdv.alturaMin !== '' || localAdv.alturaMax !== ''
+    localAdv.celda.trim() || localAdv.sector.trim() || localAdv.rmr76 !== '' ||
+    localAdv.rmr89 !== '' || localAdv.rqd76 !== '' || localAdv.rqd89 !== '' || localAdv.gsi !== ''
   );
 
   const applyAdvancedFilters = () => {
     onAdvancedFilterChange({
       celda: localAdv.celda.trim(),
       sector: localAdv.sector.trim(),
-      rmr76Min: localAdv.rmr76Min,
-      rmr76Max: localAdv.rmr76Max,
-      rmr89Min: localAdv.rmr89Min,
-      rmr89Max: localAdv.rmr89Max,
-      rqdMin: localAdv.rqdMin,
-      rqdMax: localAdv.rqdMax,
-      largoMin: localAdv.largoMin,
-      largoMax: localAdv.largoMax,
-      alturaMin: localAdv.alturaMin,
-      alturaMax: localAdv.alturaMax,
+      rmr76: localAdv.rmr76,
+      rmr89: localAdv.rmr89,
+      rqd76: localAdv.rqd76,
+      rqd89: localAdv.rqd89,
+      gsi: localAdv.gsi,
     });
   };
 
@@ -224,11 +211,11 @@ export default function Dashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
-                  Código de Celda <span className="text-violet-500">(búsqueda)</span>
+                  Código de Celda <span className="text-violet-500">(coincidencia exacta primero)</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. A1, TR13, NW1_B-01..."
+                  placeholder="Ej. TEST, A1, TR13..."
                   value={localAdv.celda}
                   onChange={(e) => setLocalAdv({ ...localAdv, celda: e.target.value })}
                   onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
@@ -248,147 +235,76 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* Fila 2: Rangos RMR 76 / RMR 89 */}
-            <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-2">Rango RMR</label>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 76 mín</label>
-                  <input
-                    type="number" min="0" max="100" step="any" placeholder="0"
-                    value={localAdv.rmr76Min}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr76Min: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 76 máx</label>
-                  <input
-                    type="number" min="0" max="100" step="any" placeholder="100"
-                    value={localAdv.rmr76Max}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr76Max: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 89 mín</label>
-                  <input
-                    type="number" min="0" max="100" step="any" placeholder="0"
-                    value={localAdv.rmr89Min}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr89Min: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 89 máx</label>
-                  <input
-                    type="number" min="0" max="100" step="any" placeholder="100"
-                    value={localAdv.rmr89Max}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr89Max: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
+            {/* Fila 2: RMR 76 + RMR 89 + GSI Visual */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RMR 76</label>
+                <input
+                  type="text" inputMode="decimal" placeholder="Ej. 55.25"
+                  value={localAdv.rmr76}
+                  onChange={(e) => {
+                    const v = limitNumberWithMax(e.target.value, 3, 2, 100);
+                    if (v !== null) setLocalAdv({ ...localAdv, rmr76: v });
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RMR 89</label>
+                <input
+                  type="text" inputMode="decimal" placeholder="Ej. 55.25"
+                  value={localAdv.rmr89}
+                  onChange={(e) => {
+                    const v = limitNumberWithMax(e.target.value, 3, 2, 100);
+                    if (v !== null) setLocalAdv({ ...localAdv, rmr89: v });
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">GSI Visual</label>
+                <input
+                  type="text" inputMode="numeric" placeholder="Ej. 60"
+                  value={localAdv.gsi}
+                  onChange={(e) => {
+                    const v = limitNumberWithMax(e.target.value, 3, 0, 100);
+                    if (v !== null) setLocalAdv({ ...localAdv, gsi: v });
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
               </div>
             </div>
 
-            {/* Fila 3: RQD + Dimensiones (min/max) */}
-            <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-2">RQD y Dimensiones (m)</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RQD mín (%)</label>
-                  <input
-                    type="number" min="0" max="100" step="any" placeholder="0"
-                    value={localAdv.rqdMin}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rqdMin: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RQD máx (%)</label>
-                  <input
-                    type="number" min="0" max="100" step="any" placeholder="100"
-                    value={localAdv.rqdMax}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rqdMax: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Largo mín</label>
-                  <input
-                    type="number" min="0" max="99" step="1" placeholder="0"
-                    value={localAdv.largoMin}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, largoMin: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Largo máx</label>
-                  <input
-                    type="number" min="0" max="99" step="1" placeholder="99"
-                    value={localAdv.largoMax}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, largoMax: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Altura mín</label>
-                  <input
-                    type="number" min="0" max="99" step="1" placeholder="0"
-                    value={localAdv.alturaMin}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, alturaMin: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Altura máx</label>
-                  <input
-                    type="number" min="0" max="99" step="1" placeholder="99"
-                    value={localAdv.alturaMax}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, alturaMax: v });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
+            {/* Fila 3: RQD % 76 + RQD % 89 */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RQD % 76</label>
+                <input
+                  type="text" inputMode="decimal" placeholder="Ej. 80.5"
+                  value={localAdv.rqd76}
+                  onChange={(e) => {
+                    const v = limitNumberWithMax(e.target.value, 3, 2, 100);
+                    if (v !== null) setLocalAdv({ ...localAdv, rqd76: v });
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RQD % 89</label>
+                <input
+                  type="text" inputMode="decimal" placeholder="Ej. 80.5"
+                  value={localAdv.rqd89}
+                  onChange={(e) => {
+                    const v = limitNumberWithMax(e.target.value, 3, 2, 100);
+                    if (v !== null) setLocalAdv({ ...localAdv, rqd89: v });
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
               </div>
             </div>
 
@@ -413,7 +329,7 @@ export default function Dashboard({
         </details>
 
         {/* KPIs contextuales */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
             <div className="space-y-1">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Rango activo</span>
@@ -439,6 +355,15 @@ export default function Dashboard({
               <span className="text-[10px] font-bold text-emerald-400 block leading-none">Longitud total</span>
             </div>
             <Map size={22} className="text-emerald-500/40 animate-pulse" />
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">RMR Promedio</span>
+              <span className="text-xl font-black text-indigo-400 block">{kpis?.rmr_76_promedio !== null ? kpis?.rmr_76_promedio?.toFixed(1) : '—'}</span>
+              <span className="text-[10px] font-bold text-indigo-400 block leading-none">RMR 76</span>
+            </div>
+            <TrendingUp size={22} className="text-indigo-400/40" />
           </div>
 
           <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
@@ -549,11 +474,11 @@ export default function Dashboard({
                   <th className="py-2 px-4">Celda</th>
                   <th className="py-2 px-4">Fecha</th>
                   <th className="py-2 px-4">Sector</th>
-                  <th className="py-2 px-4 text-center">Largo (m)</th>
-                  <th className="py-2 px-4 text-center">Altura (m)</th>
-                  <th className="py-2 px-4">Mapeador</th>
-                  <th className="py-2 px-4 text-center">RMR 89</th>
-                  <th className="py-2 px-4 text-center">Clase</th>
+                  <th className="py-2 px-4 text-center text-amber-400">RMR 76</th>
+                  <th className="py-2 px-4 text-center text-pink-400">RMR 89</th>
+                  <th className="py-2 px-4 text-center text-amber-400">RQD % 76</th>
+                  <th className="py-2 px-4 text-center text-pink-400">RQD % 89</th>
+                  <th className="py-2 px-4 text-center text-violet-400">GSI Visual</th>
                   <th className="py-2 px-4 text-center">Acción</th>
                 </tr>
               </thead>
@@ -585,32 +510,11 @@ export default function Dashboard({
                     </td>
                     <td className="py-2.5 px-4 text-slate-400 text-[10px]">{w.fecha_mapeo}</td>
                     <td className="py-2.5 px-4 text-slate-400">{w.sector_geotecnico || '—'}</td>
-                    <td className="py-2.5 px-4 text-center text-slate-300 font-bold">
-                      {w.largo ? `${w.largo.toFixed(2)} m` : '—'}
-                    </td>
-                    <td className="py-2.5 px-4 text-center text-slate-400">
-                      {w.altura ? `${w.altura.toFixed(1)} m` : '—'}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <User size={12} className="text-slate-500" />
-                        <span>{w.geologo || '—'}</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-4 text-center font-bold text-indigo-400">{w.rmr_89}</td>
-                    <td className="py-2.5 px-4 text-center">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${w.rmr_89 >= 81 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        w.rmr_89 >= 61 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                          w.rmr_89 >= 51 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                            w.rmr_89 >= 41 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                              'bg-red-500/10 text-red-400 border border-red-500/20'
-                        }`}>
-                        {w.rmr_89 >= 81 ? 'MUY BUENA' :
-                          w.rmr_89 >= 61 ? 'BUENA' :
-                            w.rmr_89 >= 51 ? 'REGULAR' :
-                              w.rmr_89 >= 41 ? 'MALA' : 'MUY MALA'}
-                      </span>
-                    </td>
+                    <td className="py-2.5 px-4 text-center font-bold text-amber-400">{w.rmr_76.toFixed(2)}</td>
+                    <td className="py-2.5 px-4 text-center font-bold text-pink-400">{w.rmr_89.toFixed(2)}</td>
+                    <td className="py-2.5 px-4 text-center text-amber-400">{w.rqd76_pct !== null ? w.rqd76_pct.toFixed(2) : '—'}</td>
+                    <td className="py-2.5 px-4 text-center text-pink-400">{w.rqd89_pct !== null ? w.rqd89_pct.toFixed(2) : '—'}</td>
+                    <td className="py-2.5 px-4 text-center text-violet-400">{w.gsi_visual !== null ? Math.round(w.gsi_visual) : '—'}</td>
                     <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-2 justify-center">
                         <button

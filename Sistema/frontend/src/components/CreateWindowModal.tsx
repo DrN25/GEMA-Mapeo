@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import MapeadorCombobox from './MapeadorCombobox';
+import { handleNumberInputLimit } from '../utils/inputLimits';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
@@ -15,17 +16,6 @@ interface CatalogOption {
   codigo: string;
   nombre: string;
 }
-
-const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number): string => {
-  const cleaned = value.replace(/[^0-9.]/g, '');
-  const parts = cleaned.split('.');
-  if (parts.length > 2) return cleaned.slice(0, -1);
-  let integerPart = parts[0];
-  let decimalPart = parts[1];
-  if (integerPart.length > intDigits) integerPart = integerPart.slice(0, intDigits);
-  if (decimalPart !== undefined && decimalPart.length > decDigits) decimalPart = decimalPart.slice(0, decDigits);
-  return decimalPart !== undefined ? `${integerPart}.${decimalPart}` : integerPart;
-};
 
 export default function CreateWindowModal({ isOpen, onClose, onCreate, existingCeldas = [] }: CreateWindowModalProps) {
   const [celda, setCelda] = useState('');

@@ -324,7 +324,9 @@ class VentanaListItemSchema(BaseModel):
     nivel: Optional[str] = None
     rmr_76: Optional[float] = None
     rmr_89: Optional[float] = None
-    rqd_pct: Optional[float] = None
+    rqd76_pct: Optional[float] = None
+    rqd89_pct: Optional[float] = None
+    gsi_visual: Optional[float] = None
     discontinuidades_count: int = 0
     creado_en: Optional[datetime] = None
 
