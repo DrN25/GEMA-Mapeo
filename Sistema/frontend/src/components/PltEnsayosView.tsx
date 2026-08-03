@@ -3,7 +3,6 @@ import * as XLSX from 'xlsx';
 import {
   FileSpreadsheet,
   Download,
-  ShieldCheck,
   Activity,
   Plus,
   Trash2,
@@ -49,7 +48,7 @@ export default function PltEnsayosView({
   const [fZona, setFZona] = useState('');
   const [fLito, setFLito] = useState('');
 
-  const [activeModal, setActiveModal] = useState<'qaqc' | 'reporte' | 'import_excel' | null>(null);
+  const [activeModal, setActiveModal] = useState<'reporte' | 'import_excel' | null>(null);
   const [editCell, setEditCell] = useState<{ id: number; key: string } | null>(null);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
 
@@ -205,53 +204,6 @@ export default function PltEnsayosView({
     XLSX.writeFile(wb, "plt_ensayos_irregulares.xlsx");
   };
 
-  const qaqcDetails = useMemo(() => {
-    return computedRows.map(r => {
-      const required = ["campana", "fecha_ensayo", "ejecutado_por", "tipo_ensayo", "zona_mapeo", "nivel", "celda_mapeo", "muestra", "codigo_muestra", "litologia_1"];
-      const camposOk = required.every(k => r[k] !== null && r[k] !== undefined && r[k] !== "");
-      const longitudOk = r.muestra_valida_longitud !== null ? (r.muestra_valida_longitud === "SÍ") : null;
-      const anchoOk = r.muestra_valida_ancho !== null ? (r.muestra_valida_ancho === "SÍ") : null;
-      const fuerzaOk = typeof r.fuerza_p === "number" && r.fuerza_p > 0;
-      const factorKOk = typeof r.factor_conversion_k === "number" && r.factor_conversion_k > 0;
-      const ucsOk = typeof r.ucs === "number" && r.ucs > 0;
-      const fracOk = !!r.tipo_fractura;
-      const dirOk = !!r.direccion_rotura;
-
-      const issues = [];
-      if (!camposOk) issues.push("Campos obligatorios incompletos");
-      if (longitudOk === false) issues.push("L < D (Longitud inválida)");
-      if (anchoOk === false) issues.push("D/W fuera de rango (Ancho inválido)");
-      if (!fuerzaOk) issues.push("Fuerza P faltante");
-      if (!factorKOk) issues.push("Factor K sin asignar");
-      if (!ucsOk) issues.push("UCS no calculable");
-      if (!fracOk) issues.push("Tipo fractura faltante");
-      if (!dirOk) issues.push("Dirección rotura faltante");
-
-      return {
-        id: r.id,
-        codigo: r.codigo_muestra || `ID ${r.id}`,
-        camposOk,
-        longitudOk,
-        anchoOk,
-        fuerzaOk,
-        factorKOk,
-        ucsOk,
-        fracOk,
-        dirOk,
-        issues
-      };
-    });
-  }, [computedRows]);
-
-  const qaqcStats = useMemo(() => {
-    const total = qaqcDetails.length;
-    const okCount = qaqcDetails.filter(r => r.issues.length === 0).length;
-    const errCount = total - okCount;
-    const valLong = qaqcDetails.filter(r => r.longitudOk === true).length;
-    const valAncho = qaqcDetails.filter(r => r.anchoOk === true).length;
-    return { total, okCount, errCount, valLong, valAncho };
-  }, [qaqcDetails]);
-
   const reportStats = useMemo(() => {
     const rr = computedRows;
     const total = rr.length;
@@ -317,14 +269,6 @@ export default function PltEnsayosView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-
-          <button
-            onClick={() => setActiveModal('qaqc')}
-            className="px-4 py-2 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(14,165,233,0.12)] rounded-lg flex items-center justify-center gap-2"
-          >
-            <ShieldCheck size={14} className="text-sky-400" />
-            <span>Control QA/QC</span>
-          </button>
 
           <button
             onClick={() => setActiveModal('reporte')}
@@ -547,95 +491,6 @@ export default function PltEnsayosView({
         </table>
       </div>
 
-      {/* 🛡 QA/QC MODAL */}
-      {activeModal === 'qaqc' && (
-        <div
-          onClick={() => setActiveModal(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="glass-panel w-full max-w-4xl p-6 rounded-xl border border-navy-800 space-y-4 text-left shadow-2xl bg-navy-900/95 max-h-[85vh] flex flex-col"
-          >
-            <div className="flex justify-between items-center border-b border-navy-800 pb-3">
-              <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                <span>Control de Calidad QA/QC</span>
-                <span className="text-xs bg-navy-950 border border-navy-800 px-2 py-0.5 rounded-full font-bold text-orange-400">
-                  {qaqcStats.okCount} / {qaqcStats.total} OK
-                </span>
-              </h3>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-100 text-lg">✕</button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-emerald-400 font-mono">{qaqcStats.okCount}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Sin observaciones</div>
-              </div>
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-rose-400 font-mono">{qaqcStats.errCount}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Con errores</div>
-              </div>
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-orange-400 font-mono">{qaqcStats.valLong}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidas Longitud (L ≥ D)</div>
-              </div>
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-blue-400 font-mono">{qaqcStats.valAncho}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidas Ancho (0.3W &lt; D &lt; W)</div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-[10px] font-bold text-slate-400">
-              {["Campos obligatorios", "L ≥ D", "0.3W < D < W", "Fuerza P > 0", "Factor K", "UCS calc", "Fractura", "Dirección"].map(t => (
-                <span key={t} className="bg-navy-950 border border-navy-850 px-2 py-0.5 rounded text-slate-400 font-mono">{t}</span>
-              ))}
-            </div>
-
-            <div className="overflow-y-auto flex-1 border border-navy-850 rounded-lg">
-              <table className="w-full border-collapse text-left text-xs">
-                <thead className="sticky top-0 bg-navy-950 z-10">
-                  <tr className="border-b border-navy-850 text-slate-400">
-                    <th className="py-2 px-3">Muestra</th>
-                    <th className="py-2 px-2 text-center">Campos</th>
-                    <th className="py-2 px-2 text-center">L ≥ D</th>
-                    <th className="py-2 px-2 text-center">D vs W</th>
-                    <th className="py-2 px-2 text-center">Fuerza P</th>
-                    <th className="py-2 px-2 text-center">K</th>
-                    <th className="py-2 px-2 text-center">UCS</th>
-                    <th className="py-2 px-2 text-center">Frac</th>
-                    <th className="py-2 px-2 text-center">Dir</th>
-                    <th className="py-2 px-3">Observaciones QC</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-900/30">
-                  {qaqcDetails.map((r, i) => (
-                    <tr key={r.id} className={`${i % 2 === 0 ? "bg-navy-900/5" : "bg-navy-950/20"} ${r.issues.length ? "border-l-2 border-rose-500" : ""}`}>
-                      <td className="py-2 px-3 font-mono font-bold text-slate-300">{r.codigo}</td>
-                      <td className="py-2 px-2 text-center font-bold">{r.camposOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}</td>
-                      <td className="py-2 px-2 text-center font-bold">
-                        {r.longitudOk === null ? <span className="text-slate-600">—</span> : r.longitudOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}
-                      </td>
-                      <td className="py-2 px-2 text-center font-bold">
-                        {r.anchoOk === null ? <span className="text-slate-600">—</span> : r.anchoOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}
-                      </td>
-                      <td className="py-2 px-2 text-center font-bold">{r.fuerzaOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}</td>
-                      <td className="py-2 px-2 text-center font-bold">{r.factorKOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}</td>
-                      <td className="py-2 px-2 text-center font-bold">{r.ucsOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}</td>
-                      <td className="py-2 px-2 text-center font-bold">{r.fracOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}</td>
-                      <td className="py-2 px-2 text-center font-bold">{r.dirOk ? <span className="text-emerald-400">✓</span> : <span className="text-rose-400">✗</span>}</td>
-                      <td className={`py-2 px-3 font-mono text-[10px] ${r.issues.length ? "text-rose-400 font-bold" : "text-emerald-400/80"}`}>
-                        {r.issues.length ? r.issues.join(" · ") : "Estable"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 📊 REPORT MODAL */}
       {activeModal === 'reporte' && (
         <div
@@ -651,31 +506,6 @@ export default function PltEnsayosView({
                 Reportabilidad — Resumen de Ensayos PLT
               </h3>
               <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-100 text-lg">✕</button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-emerald-400 font-mono">{qaqcStats.okCount}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Sin observaciones</div>
-              </div>
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-rose-400 font-mono">{qaqcStats.errCount}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Con errores</div>
-              </div>
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-orange-400 font-mono">{qaqcStats.valLong}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidas Longitud (L ≥ D)</div>
-              </div>
-              <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                <div className="text-2xl font-black text-blue-400 font-mono">{qaqcStats.valAncho}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidas Ancho (0.3W &lt; D &lt; W)</div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-[10px] font-bold text-slate-400">
-              {["Campos obligatorios", "L ≥ D", "0.3W < D < W", "Fuerza P > 0", "Factor K", "UCS calc", "Fractura", "Dirección"].map(t => (
-                <span key={t} className="bg-navy-950 border border-navy-850 px-2 py-0.5 rounded text-slate-400 font-mono">{t}</span>
-              ))}
             </div>
 
             <div className="overflow-y-auto flex-1 space-y-6 pr-1">
