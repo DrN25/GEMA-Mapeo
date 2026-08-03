@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { AlertOctagon, AlertTriangle, CircleSlash, CheckCircle, Minimize2, MapPin, Tag } from 'lucide-react';
 import type { QaQcAlert } from '../utils/qaQcRules';
+import { PLT_FIELD_LABELS } from '../utils/mandatoryRules';
 
 interface ValidationPanelProps {
   alerts: QaQcAlert[];
@@ -35,7 +36,18 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
       else if (colName === 'campania') column = 'Campaña';
       else if (colName === 'lito_1' || colName === 'lito_2' || colName === 'lito_3' || colName === 'unidad_litologica') column = 'Litología';
       else if (colName === 'gsi_visual') column = 'GSI Visual';
-      return { tab: 'Cabecera', column };
+      return { tab: 'Mapeo Cabecera', column };
+    }
+
+    if (fieldId.startsWith('plt-')) {
+      const parts = fieldId.split('-');
+      const colName = parts[1] || '';
+      const rowIdx = parts[2] !== undefined ? Number(parts[2]) + 1 : null;
+      return {
+        tab: 'Ensayos PLT',
+        column: PLT_FIELD_LABELS[colName] || colName || 'General',
+        row: rowIdx,
+      };
     }
 
     if (fieldId.startsWith('joint-')) {
@@ -231,6 +243,11 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
                               <Tag size={8} className="shrink-0" />
                               {context.column}
                             </span>
+                            {context.row !== undefined && context.row !== null && (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300">
+                                Fila {context.row}
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs leading-snug text-slate-200 font-medium">{alert.message}</p>
                         </div>

@@ -412,6 +412,7 @@ export default function PltEnsayosView({
 
                               return (
                                 <select
+                                  id={`plt-${c.key}-${idx}`}
                                   value={val ?? (c.key === "tipo_ensayo" ? "i" : "")}
                                   onChange={(e) => handleCommitSelect(row.id, c.key, e.target.value)}
                                   className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs font-semibold py-2 px-1 focus:ring-1 focus:ring-violet-500/50"
@@ -427,6 +428,7 @@ export default function PltEnsayosView({
                             })()
                           ) : (
                             <input
+                              id={`plt-${c.key}-${idx}`}
                               type={c.type === "date" ? "date" : "text"}
                               value={getInputValue(row.id, c.key, val)}
                               onChange={(e) => {

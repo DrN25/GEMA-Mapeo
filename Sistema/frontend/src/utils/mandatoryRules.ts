@@ -213,7 +213,7 @@ const RMR_GSI_FIELD_LABELS: Record<string, string> = {
   efectos_voladura: 'Efectos de Voladura'
 };
 
-const PLT_FIELD_LABELS: Record<string, string> = {
+export const PLT_FIELD_LABELS: Record<string, string> = {
   campana: 'Campaña',
   fecha_ensayo: 'Fecha de Ensayo',
   ejecutado_por: 'Ejecutado Por',

@@ -45,7 +45,7 @@ import { validateWindowQAQC } from './utils/qaqcValidator';
 import type { QaQcAlert } from './utils/qaQcRules';
 import { buildCampaniaYearMap } from './utils/qaQcRules';
 import { resetTouchedFields, subscribeTouched } from './utils/qaQcTouch';
-import { validateMapeoWindow, toVacioAlerts, type MissingFieldIssue } from './utils/mandatoryRules';
+import { validateMapeoWindow, validatePltEnsayosList, toVacioAlerts, type MissingFieldIssue } from './utils/mandatoryRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -411,12 +411,14 @@ export default function App() {
       setCalculated(res);
       const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap(), true);
       const vacios = toVacioAlerts(validateMapeoWindow(activeWindow));
-      setAlerts([...errs, ...vacios]);
+      const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
+      setAlerts([...errs, ...vacios, ...pltVacios]);
     } else {
+      const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
       setCalculated(null);
-      setAlerts([]);
+      setAlerts([...pltVacios]);
     }
-  }, [activeWindow, touchedTick, catalogsLoaded]);
+  }, [activeWindow, touchedTick, catalogsLoaded, pltEnsayos]);
 
   // Resetear el registro de campos "tocados" al cambiar de ventana activa
   useEffect(() => {
@@ -1308,10 +1310,10 @@ export default function App() {
 
 
   const handleFocusField = (fieldId: string) => {
-    if (fieldId.startsWith('header-')) {
+    if (fieldId.startsWith('header-') || fieldId.startsWith('joint-')) {
       setCurrentView('mapeo');
-    } else if (fieldId.startsWith('joint-')) {
-      setCurrentView('mapeo');
+    } else if (fieldId.startsWith('plt-')) {
+      setCurrentView('plt_ensayos');
     }
 
     setTimeout(() => {
@@ -1739,7 +1741,7 @@ export default function App() {
         </main>
 
         {/* 3. QA/QC VALIDATION PANEL */}
-        {activeWindow && alerts.length > 0 && (
+        {alerts.length > 0 && (activeWindow || currentView === 'plt_ensayos') && (
           <div className="absolute bottom-6 right-6 z-50">
             <ValidationPanel
               alerts={alerts}
