@@ -268,8 +268,8 @@ def calculate_geomechanics(header, discontinuidades, rmr_input):
         rmr_76 = 0.0
         rmr_89 = 0.0
     else:
-        rmr_76 = round(w_ratings["r76"] + res_ratings["r76"] + rqd_ratings["r76"] + spacing_ratings["r76"] + condisc_r76)
-        rmr_89 = round(w_ratings["r89"] + res_ratings["r89"] + rqd_ratings["r89"] + spacing_ratings["r89"] + condisc_r89)
+        rmr_76 = round(w_ratings["r76"] + res_ratings["r76"] + rqd_ratings["r76"] + spacing_ratings["r76"] + condisc_r76, 2)
+        rmr_89 = round(w_ratings["r89"] + res_ratings["r89"] + rqd_ratings["r89"] + spacing_ratings["r89"] + condisc_r89, 2)
     
     return {
         "largo_m": largo, "proms": proms, "jv": jv, "rqd_pct": rqd_pct,
