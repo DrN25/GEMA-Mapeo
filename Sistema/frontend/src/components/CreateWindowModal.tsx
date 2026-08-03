@@ -226,13 +226,12 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
                 placeholder="ej. TD2-001"
                 value={celda}
                 onChange={(e) => setCelda(e.target.value.trim().toUpperCase().slice(0, 20))}
-                className={`w-full bg-navy-950 border rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none font-bold tracking-wider ${
-                  nameCheckStatus === 'duplicate'
-                    ? 'border-rose-500/80 bg-rose-950/20 text-rose-200 focus:ring-1 focus:ring-rose-500'
-                    : nameCheckStatus === 'available'
+                className={`w-full bg-navy-950 border rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none font-bold tracking-wider ${nameCheckStatus === 'duplicate'
+                  ? 'border-rose-500/80 bg-rose-950/20 text-rose-200 focus:ring-1 focus:ring-rose-500'
+                  : nameCheckStatus === 'available'
                     ? 'border-emerald-500/80 bg-emerald-950/20 text-emerald-200 focus:ring-1 focus:ring-emerald-500'
                     : 'border-navy-800 focus:ring-1 focus:ring-indigo-500'
-                }`}
+                  }`}
               />
               {nameCheckStatus === 'duplicate' && (
                 <p className="text-[10px] font-bold text-rose-400 mt-1 flex items-center gap-1">
@@ -342,14 +341,8 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase block">Altura Ventana (m)</label>
-                  <input type="number" step="0.5" min="0" max="99" required placeholder="15.0" value={altura}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === '') { setAltura(''); return; }
-                      if (!/^\d{1,2}(\.\d{1})?$/.test(raw)) return;
-                      const n = parseFloat(raw);
-                      if (n >= 0 && n <= 99) setAltura(raw);
-                    }}
+                  <input type="text" required placeholder="ej. 15" value={altura}
+                    onChange={(e) => setAltura(handleNumberInputLimit(e.target.value, 2, 1))}
                     className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium" />
                 </div>
                 <div className="space-y-1">
