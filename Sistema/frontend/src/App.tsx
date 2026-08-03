@@ -402,6 +402,10 @@ export default function App() {
 
   // Keep RMR calculations and QA/QC validation updated in real-time
   useEffect(() => {
+    if (!catalogsLoaded) {
+      setAlerts([]);
+      return;
+    }
     if (activeWindow) {
       const res = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
       setCalculated(res);
@@ -412,7 +416,7 @@ export default function App() {
       setCalculated(null);
       setAlerts([]);
     }
-  }, [activeWindow, touchedTick]);
+  }, [activeWindow, touchedTick, catalogsLoaded]);
 
   // Resetear el registro de campos "tocados" al cambiar de ventana activa
   useEffect(() => {
