@@ -13,6 +13,7 @@ export interface WindowSummary {
   nivel?: string;
   rmr_76: number;
   rmr_89: number;
+  rqd_pct: number | null;
   class_89: string;
 }
 
@@ -44,8 +45,34 @@ interface DashboardProps {
   onPageSizeChange: (size: number) => void;
   onFilterChange: (filters: { dateRange?: string }) => void;
   activeDateRange: string;
-  advancedFilters: { sector: string; rmrMin: string; rmrMax: string };
-  onAdvancedFilterChange: (filters: { sector: string; rmrMin: string; rmrMax: string }) => void;
+  advancedFilters: {
+    celda: string;
+    sector: string;
+    rmr76Min: string;
+    rmr76Max: string;
+    rmr89Min: string;
+    rmr89Max: string;
+    rqdMin: string;
+    rqdMax: string;
+    largoMin: string;
+    largoMax: string;
+    alturaMin: string;
+    alturaMax: string;
+  };
+  onAdvancedFilterChange: (filters: {
+    celda: string;
+    sector: string;
+    rmr76Min: string;
+    rmr76Max: string;
+    rmr89Min: string;
+    rmr89Max: string;
+    rqdMin: string;
+    rqdMax: string;
+    largoMin: string;
+    largoMax: string;
+    alturaMin: string;
+    alturaMax: string;
+  }) => void;
   onClearAdvancedFilters: () => void;
   onSelectWindow: (name: string) => void;
   onCreateWindow: (newWindow: any) => void;
@@ -91,14 +118,25 @@ export default function Dashboard({
   }, [advancedFilters]);
 
   const hasAdvancedFilters = !!(
-    localAdv.sector.trim() || localAdv.rmrMin !== '' || localAdv.rmrMax !== ''
+    localAdv.celda.trim() || localAdv.sector.trim() || localAdv.rmr76Min !== '' || localAdv.rmr76Max !== '' ||
+    localAdv.rmr89Min !== '' || localAdv.rmr89Max !== '' || localAdv.rqdMin !== '' || localAdv.rqdMax !== '' ||
+    localAdv.largoMin !== '' || localAdv.largoMax !== '' || localAdv.alturaMin !== '' || localAdv.alturaMax !== ''
   );
 
   const applyAdvancedFilters = () => {
     onAdvancedFilterChange({
+      celda: localAdv.celda.trim(),
       sector: localAdv.sector.trim(),
-      rmrMin: localAdv.rmrMin,
-      rmrMax: localAdv.rmrMax,
+      rmr76Min: localAdv.rmr76Min,
+      rmr76Max: localAdv.rmr76Max,
+      rmr89Min: localAdv.rmr89Min,
+      rmr89Max: localAdv.rmr89Max,
+      rqdMin: localAdv.rqdMin,
+      rqdMax: localAdv.rqdMax,
+      largoMin: localAdv.largoMin,
+      largoMax: localAdv.largoMax,
+      alturaMin: localAdv.alturaMin,
+      alturaMax: localAdv.alturaMax,
     });
   };
 
@@ -114,438 +152,574 @@ export default function Dashboard({
   const dateObj = new Date();
   const filterLabel = activeDateRange === 'hoy' ? 'Hoy' :
     activeDateRange === 'ayer' ? 'Ayer' :
-    activeDateRange === 'semana' ? 'Esta semana' :
-    activeDateRange === 'mes' ? 'Este mes' :
-    activeDateRange === 'ano' ? 'Este año' : 'Todo';
+      activeDateRange === 'semana' ? 'Esta semana' :
+        activeDateRange === 'mes' ? 'Este mes' :
+          activeDateRange === 'ano' ? 'Este año' : 'Todo';
   const kpiSubset = totalFiltered !== (kpis?.total_global || 0) && kpis
     ? `Sobre ${totalFiltered.toLocaleString()} celdas de ${kpis.total_global.toLocaleString()} totales`
     : `Total: ${(kpis?.total_global || 0).toLocaleString()} celdas`;
 
   return (
     <>
-    <div className="space-y-6 select-none w-full animate-fade-in text-left">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-100 tracking-wide flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
-            <span>Mapeo Geomecánico de Ventanas de Detalle</span>
-          </h2>
-          <p className="text-slate-400 text-xs mt-1 font-semibold">{kpiSubset}</p>
+      <div className="space-y-6 select-none w-full animate-fade-in text-left">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-100 tracking-wide flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
+              <span>Mapeo Geomecánico de Ventanas de Detalle</span>
+            </h2>
+            <p className="text-slate-400 text-xs mt-1 font-semibold">{kpiSubset}</p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={onOpenImportModal}
+              className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95"
+            >
+              <FileSpreadsheet size={16} className="text-emerald-400" />
+              <span>Importar Excel</span>
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] px-4 py-2 rounded-lg text-xs"
+            >
+              <Plus size={16} />
+              <span>Nueva Celda</span>
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={onOpenImportModal}
-            className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95"
-          >
-            <FileSpreadsheet size={16} className="text-emerald-400" />
-            <span>Importar Excel</span>
-          </button>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] px-4 py-2 rounded-lg text-xs"
-          >
-            <Plus size={16} />
-            <span>Nueva Celda</span>
-          </button>
-        </div>
-      </div>
 
-      {/* Date range chips */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { key: 'hoy', label: 'Hoy' },
-          { key: 'ayer', label: 'Ayer' },
-          { key: 'semana', label: 'Esta semana' },
-          { key: 'mes', label: 'Este mes' },
-          { key: 'ano', label: 'Este año' },
-          { key: 'todo', label: 'Todo' },
-        ].map(chip => (
-          <button
-            key={chip.key}
-            onClick={() => onFilterChange({ dateRange: chip.key })}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 border ${
-              activeDateRange === chip.key
+        {/* Date range chips */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'hoy', label: 'Hoy' },
+            { key: 'ayer', label: 'Ayer' },
+            { key: 'semana', label: 'Esta semana' },
+            { key: 'mes', label: 'Este mes' },
+            { key: 'ano', label: 'Este año' },
+            { key: 'todo', label: 'Todo' },
+          ].map(chip => (
+            <button
+              key={chip.key}
+              onClick={() => onFilterChange({ dateRange: chip.key })}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 border ${activeDateRange === chip.key
                 ? 'bg-violet-500/20 border-violet-500/50 text-violet-300 shadow-[0_0_10px_rgba(139,92,246,0.15)]'
                 : 'bg-navy-900/40 border-navy-700/70 text-slate-400 hover:text-slate-200 hover:border-navy-600'
-            }`}
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filtros avanzados colapsable */}
-      <details className="group">
-        <summary className="flex items-center gap-2 text-xs text-slate-500 font-semibold cursor-pointer hover:text-slate-300 transition-all select-none list-none">
-          <Filter size={14} />
-          <span>Filtros avanzados</span>
-          <ChevronDown size={12} className="group-open:rotate-180 transition-transform" />
-        </summary>
-        <div className="mt-3 p-4 bg-navy-950/30 border border-navy-800 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Sector</label>
-            <input
-              type="text"
-              placeholder="NW1_B, E1..."
-              value={localAdv.sector}
-              onChange={(e) => setLocalAdv({ ...localAdv, sector: e.target.value })}
-              onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RMR mínimo</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              placeholder="0"
-              value={localAdv.rmrMin}
-              onChange={(e) => setLocalAdv({ ...localAdv, rmrMin: e.target.value })}
-              onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">RMR máximo</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              placeholder="100"
-              value={localAdv.rmrMax}
-              onChange={(e) => setLocalAdv({ ...localAdv, rmrMax: e.target.value })}
-              onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
-              className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="flex items-end gap-2">
-            <button
-              onClick={applyAdvancedFilters}
-              className="w-full bg-indigo-500/10 border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                }`}
             >
-              Aplicar
+              {chip.label}
             </button>
-            {hasAdvancedFilters && (
+          ))}
+        </div>
+
+        {/* Filtros avanzados colapsable */}
+        <details className="group">
+          <summary className="flex items-center gap-2 text-xs text-slate-500 font-semibold cursor-pointer hover:text-slate-300 transition-all select-none list-none">
+            <Filter size={14} />
+            <span>Filtros avanzados</span>
+            <ChevronDown size={12} className="group-open:rotate-180 transition-transform" />
+          </summary>
+
+          <div className="mt-3 p-4 bg-navy-950/30 border border-navy-800 rounded-xl space-y-4">
+            {/* Fila 1: Código de Celda + Sector */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                  Código de Celda <span className="text-violet-500">(búsqueda)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. A1, TR13, NW1_B-01..."
+                  value={localAdv.celda}
+                  onChange={(e) => setLocalAdv({ ...localAdv, celda: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Sector</label>
+                <input
+                  type="text"
+                  placeholder="NW1_B, E1..."
+                  value={localAdv.sector}
+                  onChange={(e) => setLocalAdv({ ...localAdv, sector: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Fila 2: Rangos RMR 76 / RMR 89 */}
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-2">Rango RMR</label>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 76 mín</label>
+                  <input
+                    type="number" min="0" max="100" step="any" placeholder="0"
+                    value={localAdv.rmr76Min}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr76Min: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 76 máx</label>
+                  <input
+                    type="number" min="0" max="100" step="any" placeholder="100"
+                    value={localAdv.rmr76Max}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr76Max: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 89 mín</label>
+                  <input
+                    type="number" min="0" max="100" step="any" placeholder="0"
+                    value={localAdv.rmr89Min}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr89Min: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RMR 89 máx</label>
+                  <input
+                    type="number" min="0" max="100" step="any" placeholder="100"
+                    value={localAdv.rmr89Max}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rmr89Max: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Fila 3: RQD + Dimensiones (min/max) */}
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-2">RQD y Dimensiones (m)</label>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RQD mín (%)</label>
+                  <input
+                    type="number" min="0" max="100" step="any" placeholder="0"
+                    value={localAdv.rqdMin}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rqdMin: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">RQD máx (%)</label>
+                  <input
+                    type="number" min="0" max="100" step="any" placeholder="100"
+                    value={localAdv.rqdMax}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setLocalAdv({ ...localAdv, rqdMax: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Largo mín</label>
+                  <input
+                    type="number" min="0" max="99" step="1" placeholder="0"
+                    value={localAdv.largoMin}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, largoMin: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Largo máx</label>
+                  <input
+                    type="number" min="0" max="99" step="1" placeholder="99"
+                    value={localAdv.largoMax}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, largoMax: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Altura mín</label>
+                  <input
+                    type="number" min="0" max="99" step="1" placeholder="0"
+                    value={localAdv.alturaMin}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, alturaMin: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Altura máx</label>
+                  <input
+                    type="number" min="0" max="99" step="1" placeholder="99"
+                    value={localAdv.alturaMax}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d{0,2}$/.test(v)) setLocalAdv({ ...localAdv, alturaMax: v });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyAdvancedFilters(); }}
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Fila 4: Botones */}
+            <div className="flex items-center gap-2 justify-end">
+              {hasAdvancedFilters && (
+                <button
+                  onClick={onClearAdvancedFilters}
+                  className="px-3 py-1.5 rounded-lg border border-navy-700 text-slate-500 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95 text-xs font-bold"
+                >
+                  Limpiar filtros
+                </button>
+              )}
               <button
-                onClick={onClearAdvancedFilters}
-                className="p-1.5 rounded-lg border border-navy-700 text-slate-500 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
-                title="Limpiar filtros avanzados"
+                onClick={applyAdvancedFilters}
+                className="bg-indigo-500/10 border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/20 px-5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
               >
-                <X size={13} />
+                Aplicar
               </button>
-            )}
+            </div>
+          </div>
+        </details>
+
+        {/* KPIs contextuales */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Rango activo</span>
+              <span className="text-base font-black text-slate-100 block">{filterLabel}</span>
+              <span className="text-[10px] font-bold text-violet-400 block leading-none">{formatDate(dateObj)}</span>
+            </div>
+            <Calendar size={22} className="text-indigo-500/40" />
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Total Celdas</span>
+              <span className="text-xl font-black text-slate-100 block">{(kpis?.celdas_count || 0).toLocaleString()}</span>
+              <span className="text-[10px] font-bold text-slate-400 block leading-none">{kpiSubset}</span>
+            </div>
+            <LayoutGrid size={22} className="text-indigo-500/40" />
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Avance Escaneado</span>
+              <span className="text-xl font-black text-slate-100 block">{(kpis?.largo_total_m || 0).toFixed(1)} m</span>
+              <span className="text-[10px] font-bold text-emerald-400 block leading-none">Longitud total</span>
+            </div>
+            <Map size={22} className="text-emerald-500/40 animate-pulse" />
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">RMR Promedio</span>
+              <span className="text-xl font-black text-indigo-400 block">{kpis?.rmr_89_promedio !== null ? kpis?.rmr_89_promedio?.toFixed(1) : '—'}</span>
+              <span className="text-[10px] font-bold text-indigo-400 block leading-none">RMR 89</span>
+            </div>
+            <TrendingUp size={22} className="text-indigo-400/40" />
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Último Mapeador</span>
+              <span className="text-base font-black text-slate-200 block truncate max-w-[130px]">
+                {kpis?.mapeador_mas_reciente || 'N/A'}
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 block leading-none">Responsable más reciente</span>
+            </div>
+            <User size={22} className="text-indigo-500/40" />
           </div>
         </div>
-      </details>
 
-      {/* KPIs contextuales */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Rango activo</span>
-            <span className="text-base font-black text-slate-100 block">{filterLabel}</span>
-            <span className="text-[10px] font-bold text-violet-400 block leading-none">{formatDate(dateObj)}</span>
-          </div>
-          <Calendar size={22} className="text-indigo-500/40" />
-        </div>
+        {/* Search + Grid */}
+        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/15 shadow-xl space-y-4">
+          {/* BÚSQUEDA POR NOMBRE DE CELDA DESACTIVADA (solicitud de negocio):
+              La búsqueda por código de celda ahora vive en "Filtros avanzados".
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-2xl w-full">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-3.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Escriba código de celda (ej. A1, TR13)..."
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      onSearchSubmit(localSearch, isGlobalSearch);
+                    }
+                  }}
+                  className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                {localSearch && (
+                  <button
+                    onClick={() => {
+                      setLocalSearch('');
+                      onClearSearch();
+                    }}
+                    className="absolute right-2.5 top-3 text-slate-500 hover:text-slate-200 transition-colors"
+                    title="Limpiar texto de búsqueda"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
 
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Total Celdas</span>
-            <span className="text-xl font-black text-slate-100 block">{(kpis?.celdas_count || 0).toLocaleString()}</span>
-            <span className="text-[10px] font-bold text-slate-400 block leading-none">{kpiSubset}</span>
-          </div>
-          <LayoutGrid size={22} className="text-indigo-500/40" />
-        </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onSearchSubmit(localSearch, false)}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+                  title={`Buscar dentro del rango activo (${filterLabel})`}
+                >
+                  <Search size={13} />
+                  <span>Buscar en {filterLabel}</span>
+                </button>
 
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Avance Escaneado</span>
-            <span className="text-xl font-black text-slate-100 block">{(kpis?.largo_total_m || 0).toFixed(1)} m</span>
-            <span className="text-[10px] font-bold text-emerald-400 block leading-none">Longitud total</span>
-          </div>
-          <Map size={22} className="text-emerald-500/40 animate-pulse" />
-        </div>
+                <button
+                  onClick={() => onSearchSubmit(localSearch, true)}
+                  className={`border font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap ${
+                    isGlobalSearch && searchTerm.trim()
+                      ? 'bg-violet-500 border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]'
+                      : 'bg-navy-900 border-navy-700 text-slate-300 hover:text-white hover:border-navy-600'
+                  }`}
+                  title="Buscar en todo el historial completo de la base de datos (ignora filtro de fecha)"
+                >
+                  <span>🌐 Buscar en todo</span>
+                </button>
+              </div>
+            </div>
 
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">RMR Promedio</span>
-            <span className="text-xl font-black text-indigo-400 block">{kpis?.rmr_89_promedio !== null ? kpis?.rmr_89_promedio?.toFixed(1) : '—'}</span>
-            <span className="text-[10px] font-bold text-indigo-400 block leading-none">RMR 89</span>
-          </div>
-          <TrendingUp size={22} className="text-indigo-400/40" />
-        </div>
-
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Último Mapeador</span>
-            <span className="text-base font-black text-slate-200 block truncate max-w-[130px]">
-              {kpis?.mapeador_mas_reciente || 'N/A'}
-            </span>
-            <span className="text-[10px] font-bold text-slate-400 block leading-none">Responsable más reciente</span>
-          </div>
-          <User size={22} className="text-indigo-500/40" />
-        </div>
-      </div>
-
-      {/* Search + Grid */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/15 shadow-xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-2xl w-full">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-3.5 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Escriba código de celda (ej. A1, TR13)..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    onSearchSubmit(localSearch, isGlobalSearch);
-                  }
-                }}
-                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              {localSearch && (
+            {searchTerm.trim() && (
+              <div className="flex items-center justify-between gap-3 bg-violet-500/10 border border-violet-500/30 rounded-lg px-3.5 py-2 text-xs text-violet-300 animate-fade-in">
+                <div className="flex items-center gap-2 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-violet-400 animate-ping" />
+                  <span>
+                    {isGlobalSearch ? '🌐 Todo el historial' : `📅 En ${filterLabel}`}: Buscando <strong className="text-white">"{searchTerm}"</strong> (Coincidencia exacta prioritario)
+                  </span>
+                </div>
                 <button
                   onClick={() => {
                     setLocalSearch('');
                     onClearSearch();
                   }}
-                  className="absolute right-2.5 top-3 text-slate-500 hover:text-slate-200 transition-colors"
-                  title="Limpiar texto de búsqueda"
+                  className="text-[11px] font-bold text-violet-400 hover:text-violet-200 underline cursor-pointer ml-3 whitespace-nowrap"
                 >
-                  <X size={14} />
+                  Limpiar búsqueda
                 </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onSearchSubmit(localSearch, false)}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
-                title={`Buscar dentro del rango activo (${filterLabel})`}
-              >
-                <Search size={13} />
-                <span>Buscar en {filterLabel}</span>
-              </button>
-
-              <button
-                onClick={() => onSearchSubmit(localSearch, true)}
-                className={`border font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap ${
-                  isGlobalSearch && searchTerm.trim()
-                    ? 'bg-violet-500 border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]'
-                    : 'bg-navy-900 border-navy-700 text-slate-300 hover:text-white hover:border-navy-600'
-                }`}
-                title="Buscar en todo el historial completo de la base de datos (ignora filtro de fecha)"
-              >
-                <span>🌐 Buscar en todo</span>
-              </button>
-            </div>
-          </div>
-
-          {searchTerm.trim() && (
-            <div className="flex items-center justify-between gap-3 bg-violet-500/10 border border-violet-500/30 rounded-lg px-3.5 py-2 text-xs text-violet-300 animate-fade-in">
-              <div className="flex items-center gap-2 font-medium">
-                <span className="w-2 h-2 rounded-full bg-violet-400 animate-ping" />
-                <span>
-                  {isGlobalSearch ? '🌐 Todo el historial' : `📅 En ${filterLabel}`}: Buscando <strong className="text-white">"{searchTerm}"</strong> (Coincidencia exacta prioritario)
-                </span>
               </div>
-              <button
-                onClick={() => {
-                  setLocalSearch('');
-                  onClearSearch();
-                }}
-                className="text-[11px] font-bold text-violet-400 hover:text-violet-200 underline cursor-pointer ml-3 whitespace-nowrap"
-              >
-                Limpiar búsqueda
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+          */}
 
-        <div className="overflow-x-auto rounded-lg border border-navy-900 bg-navy-950/30">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-navy-800/80 bg-navy-900/40 h-9">
-                <th className="py-2 px-4">Celda</th>
-                <th className="py-2 px-4">Fecha</th>
-                <th className="py-2 px-4">Sector</th>
-                <th className="py-2 px-4 text-center">Largo (m)</th>
-                <th className="py-2 px-4 text-center">Altura (m)</th>
-                <th className="py-2 px-4">Mapeador</th>
-                <th className="py-2 px-4 text-center">RMR 89</th>
-                <th className="py-2 px-4 text-center">Clase</th>
-                <th className="py-2 px-4 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-navy-900/30 text-slate-200 font-medium">
-              {loading && [...Array(pageSize)].map((_, i) => (
-                <tr key={`skeleton-${i}`} className="h-11 animate-pulse">
-                  {[...Array(9)].map((_, j) => (
-                    <td key={j} className="py-2.5 px-4">
-                      <div className="h-3 bg-navy-800/60 rounded w-3/4 mx-auto" />
-                    </td>
-                  ))}
+          <div className="overflow-x-auto rounded-lg border border-navy-900 bg-navy-950/30">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-navy-800/80 bg-navy-900/40 h-9">
+                  <th className="py-2 px-4">Celda</th>
+                  <th className="py-2 px-4">Fecha</th>
+                  <th className="py-2 px-4">Sector</th>
+                  <th className="py-2 px-4 text-center">Largo (m)</th>
+                  <th className="py-2 px-4 text-center">Altura (m)</th>
+                  <th className="py-2 px-4">Mapeador</th>
+                  <th className="py-2 px-4 text-center">RMR 89</th>
+                  <th className="py-2 px-4 text-center">Clase</th>
+                  <th className="py-2 px-4 text-center">Acción</th>
                 </tr>
-              ))}
-              {!loading && filteredWindows.map(w => (
-                <tr
-                  key={w.name}
-                  onClick={() => onSelectWindow(w.name)}
-                  className="hover:bg-navy-900/20 cursor-pointer transition-colors h-11"
-                >
-                  <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
-                    <div className="flex items-center gap-2">
-                      <span>{w.name}</span>
-                      {/* TEMPORALMENTE DESACTIVADO: Etiqueta IMPORTADO para celdas importadas.
+              </thead>
+              <tbody className="divide-y divide-navy-900/30 text-slate-200 font-medium">
+                {loading && [...Array(pageSize)].map((_, i) => (
+                  <tr key={`skeleton-${i}`} className="h-11 animate-pulse">
+                    {[...Array(9)].map((_, j) => (
+                      <td key={j} className="py-2.5 px-4">
+                        <div className="h-3 bg-navy-800/60 rounded w-3/4 mx-auto" />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {!loading && filteredWindows.map(w => (
+                  <tr
+                    key={w.name}
+                    onClick={() => onSelectWindow(w.name)}
+                    className="hover:bg-navy-900/20 cursor-pointer transition-colors h-11"
+                  >
+                    <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
+                      <div className="flex items-center gap-2">
+                        <span>{w.name}</span>
+                        {/* TEMPORALMENTE DESACTIVADO: Etiqueta IMPORTADO para celdas importadas.
                       {pendingImports.includes(w.name) && (
                         <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">IMPORTADO</span>
                       )}
                       */}
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 text-slate-400 text-[10px]">{w.fecha_mapeo}</td>
-                  <td className="py-2.5 px-4 text-slate-400">{w.sector_geotecnico || '—'}</td>
-                  <td className="py-2.5 px-4 text-center text-slate-300 font-bold">
-                    {w.largo ? `${w.largo.toFixed(2)} m` : '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-center text-slate-400">
-                    {w.altura ? `${w.altura.toFixed(1)} m` : '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <User size={12} className="text-slate-500" />
-                      <span>{w.geologo || '—'}</span>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 text-center font-bold text-indigo-400">{w.rmr_89}</td>
-                  <td className="py-2.5 px-4 text-center">
-                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${
-                      w.rmr_89 >= 81 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                      w.rmr_89 >= 61 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                      w.rmr_89 >= 51 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                      w.rmr_89 >= 41 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                      'bg-red-500/10 text-red-400 border border-red-500/20'
-                    }`}>
-                      {w.rmr_89 >= 81 ? 'MUY BUENA' :
-                       w.rmr_89 >= 61 ? 'BUENA' :
-                       w.rmr_89 >= 51 ? 'REGULAR' :
-                       w.rmr_89 >= 41 ? 'MALA' : 'MUY MALA'}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={() => onSelectWindow(w.name)}
-                        className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs"
-                      >
-                        Mapear
-                      </button>
-                      <button
-                        onClick={() => onDeleteWindow(w.name)}
-                        className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-90"
-                        title="Eliminar celda"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredWindows.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500 text-xs font-semibold">
-                    No se encontraron celdas en este rango. {activeDateRange === 'hoy' ? 'Crea la primera del día.' : 'Prueba con otro filtro.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paginación */}
-        {totalPages > 1 && (
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>Filas por página:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="bg-navy-950 border border-navy-800 rounded px-2 py-1 text-slate-200 text-xs"
-              >
-                {[20, 50, 100, 200].map(s => (
-                  <option key={s} value={s}>{s}</option>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-400 text-[10px]">{w.fecha_mapeo}</td>
+                    <td className="py-2.5 px-4 text-slate-400">{w.sector_geotecnico || '—'}</td>
+                    <td className="py-2.5 px-4 text-center text-slate-300 font-bold">
+                      {w.largo ? `${w.largo.toFixed(2)} m` : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-slate-400">
+                      {w.altura ? `${w.altura.toFixed(1)} m` : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <User size={12} className="text-slate-500" />
+                        <span>{w.geologo || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-bold text-indigo-400">{w.rmr_89}</td>
+                    <td className="py-2.5 px-4 text-center">
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${w.rmr_89 >= 81 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                        w.rmr_89 >= 61 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          w.rmr_89 >= 51 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                            w.rmr_89 >= 41 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                              'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                        {w.rmr_89 >= 81 ? 'MUY BUENA' :
+                          w.rmr_89 >= 61 ? 'BUENA' :
+                            w.rmr_89 >= 51 ? 'REGULAR' :
+                              w.rmr_89 >= 41 ? 'MALA' : 'MUY MALA'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => onSelectWindow(w.name)}
+                          className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs"
+                        >
+                          Mapear
+                        </button>
+                        <button
+                          onClick={() => onDeleteWindow(w.name)}
+                          className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-90"
+                          title="Eliminar celda"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => onPageChange(page - 1)}
-                disabled={page <= 1}
-                className="p-1.5 rounded border border-navy-800 bg-navy-900/40 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {(() => {
-                const pages = [];
-                const maxVisible = 7;
-                let start = Math.max(1, page - Math.floor(maxVisible / 2));
-                const end = Math.min(totalPages, start + maxVisible - 1);
-                if (end - start + 1 < maxVisible) {
-                  start = Math.max(1, end - maxVisible + 1);
-                }
-                if (start > 1) {
-                  pages.push(
-                    <button key={1} onClick={() => onPageChange(1)} className="px-2.5 py-1 rounded text-xs text-slate-500 hover:text-slate-200">1</button>
-                  );
-                  if (start > 2) pages.push(<span key="dots1" className="text-slate-600 px-1">...</span>);
-                }
-                for (let i = start; i <= end; i++) {
-                  pages.push(
-                    <button
-                      key={i}
-                      onClick={() => onPageChange(i)}
-                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                        i === page
+                {filteredWindows.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-500 text-xs font-semibold">
+                      No se encontraron celdas en este rango. {activeDateRange === 'hoy' ? 'Crea la primera del día.' : 'Prueba con otro filtro.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span>Filas por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                  className="bg-navy-950 border border-navy-800 rounded px-2 py-1 text-slate-200 text-xs"
+                >
+                  {[20, 50, 100, 200].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => onPageChange(page - 1)}
+                  disabled={page <= 1}
+                  className="p-1.5 rounded border border-navy-800 bg-navy-900/40 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                {(() => {
+                  const pages = [];
+                  const maxVisible = 7;
+                  let start = Math.max(1, page - Math.floor(maxVisible / 2));
+                  const end = Math.min(totalPages, start + maxVisible - 1);
+                  if (end - start + 1 < maxVisible) {
+                    start = Math.max(1, end - maxVisible + 1);
+                  }
+                  if (start > 1) {
+                    pages.push(
+                      <button key={1} onClick={() => onPageChange(1)} className="px-2.5 py-1 rounded text-xs text-slate-500 hover:text-slate-200">1</button>
+                    );
+                    if (start > 2) pages.push(<span key="dots1" className="text-slate-600 px-1">...</span>);
+                  }
+                  for (let i = start; i <= end; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        onClick={() => onPageChange(i)}
+                        className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${i === page
                           ? 'bg-violet-500/20 text-violet-300 border border-violet-500/40'
                           : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {i}
-                    </button>
-                  );
-                }
-                if (end < totalPages) {
-                  if (end < totalPages - 1) pages.push(<span key="dots2" className="text-slate-600 px-1">...</span>);
-                  pages.push(
-                    <button key={totalPages} onClick={() => onPageChange(totalPages)} className="px-2.5 py-1 rounded text-xs text-slate-500 hover:text-slate-200">{totalPages}</button>
-                  );
-                }
-                return pages;
-              })()}
-              <button
-                onClick={() => onPageChange(page + 1)}
-                disabled={page >= totalPages}
-                className="p-1.5 rounded border border-navy-800 bg-navy-900/40 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronRight size={14} />
-              </button>
+                          }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+                  if (end < totalPages) {
+                    if (end < totalPages - 1) pages.push(<span key="dots2" className="text-slate-600 px-1">...</span>);
+                    pages.push(
+                      <button key={totalPages} onClick={() => onPageChange(totalPages)} className="px-2.5 py-1 rounded text-xs text-slate-500 hover:text-slate-200">{totalPages}</button>
+                    );
+                  }
+                  return pages;
+                })()}
+                <button
+                  onClick={() => onPageChange(page + 1)}
+                  disabled={page >= totalPages}
+                  className="p-1.5 rounded border border-navy-800 bg-navy-900/40 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* CreateWindowModal */}
-      <CreateWindowModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onCreate={onCreateWindow}
-        existingCeldas={windows.map(w => w.name)}
-      />
-    </div>
+        {/* CreateWindowModal */}
+        <CreateWindowModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onCreate={onCreateWindow}
+          existingCeldas={windows.map(w => w.name)}
+        />
+      </div>
     </>
   );
 }

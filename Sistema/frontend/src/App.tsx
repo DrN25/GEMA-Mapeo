@@ -222,10 +222,32 @@ export default function App() {
   const [activeDateRange, setActiveDateRange] = useState<string>('todo');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isGlobalSearch, setIsGlobalSearch] = useState<boolean>(false);
-  const [advancedFilters, setAdvancedFilters] = useState<{ sector: string; rmrMin: string; rmrMax: string }>({
+  const [advancedFilters, setAdvancedFilters] = useState<{
+    celda: string;
+    sector: string;
+    rmr76Min: string;
+    rmr76Max: string;
+    rmr89Min: string;
+    rmr89Max: string;
+    rqdMin: string;
+    rqdMax: string;
+    largoMin: string;
+    largoMax: string;
+    alturaMin: string;
+    alturaMax: string;
+  }>({
+    celda: '',
     sector: '',
-    rmrMin: '',
-    rmrMax: '',
+    rmr76Min: '',
+    rmr76Max: '',
+    rmr89Min: '',
+    rmr89Max: '',
+    rqdMin: '',
+    rqdMax: '',
+    largoMin: '',
+    largoMax: '',
+    alturaMin: '',
+    alturaMax: '',
   });
   const [pendingImports, setPendingImports] = useState<string[]>([]);
 
@@ -495,9 +517,18 @@ export default function App() {
       }
 
       const af = advFilters || advancedFilters;
+      if (af.celda.trim()) params.set('q', af.celda.trim());
       if (af.sector.trim()) params.set('sector', af.sector.trim());
-      if (af.rmrMin !== '') params.set('rmr_min', String(Number(af.rmrMin)));
-      if (af.rmrMax !== '') params.set('rmr_max', String(Number(af.rmrMax)));
+      if (af.rmr76Min !== '') params.set('rmr76_min', String(Number(af.rmr76Min)));
+      if (af.rmr76Max !== '') params.set('rmr76_max', String(Number(af.rmr76Max)));
+      if (af.rmr89Min !== '') params.set('rmr89_min', String(Number(af.rmr89Min)));
+      if (af.rmr89Max !== '') params.set('rmr89_max', String(Number(af.rmr89Max)));
+      if (af.rqdMin !== '') params.set('rqd_min', String(Number(af.rqdMin)));
+      if (af.rqdMax !== '') params.set('rqd_max', String(Number(af.rqdMax)));
+      if (af.largoMin !== '') params.set('largo_min', String(Number(af.largoMin)));
+      if (af.largoMax !== '') params.set('largo_max', String(Number(af.largoMax)));
+      if (af.alturaMin !== '') params.set('altura_min', String(Number(af.alturaMin)));
+      if (af.alturaMax !== '') params.set('altura_max', String(Number(af.alturaMax)));
 
       // Calcular fecha_desde/fecha_hasta según dateRange
       const drActive = dr || activeDateRange;
@@ -542,6 +573,7 @@ export default function App() {
           nivel: v.nivel || '',
           rmr_76: v.rmr_76 !== null ? v.rmr_76 : 0,
           rmr_89: v.rmr_89 !== null ? v.rmr_89 : 0,
+          rqd_pct: v.rqd_pct !== null && v.rqd_pct !== undefined ? v.rqd_pct : null,
           class_89: v.rmr_89 >= 81 ? 'MUY BUENA' : v.rmr_89 >= 61 ? 'BUENA' : v.rmr_89 >= 41 ? 'MALA' : 'MUY MALA',
         }));
         setWindows(summaries);
@@ -969,14 +1001,40 @@ export default function App() {
     }
   };
 
-  const handleAdvancedFilterChange = (filters: { sector: string; rmrMin: string; rmrMax: string }) => {
+  const handleAdvancedFilterChange = (filters: {
+    celda: string;
+    sector: string;
+    rmr76Min: string;
+    rmr76Max: string;
+    rmr89Min: string;
+    rmr89Max: string;
+    rqdMin: string;
+    rqdMax: string;
+    largoMin: string;
+    largoMax: string;
+    alturaMin: string;
+    alturaMax: string;
+  }) => {
     setAdvancedFilters(filters);
     setPage(1);
     fetchWindows(1, pageSize, activeDateRange, searchTerm, isGlobalSearch, filters);
   };
 
   const handleClearAdvancedFilters = () => {
-    const cleared = { sector: '', rmrMin: '', rmrMax: '' };
+    const cleared = {
+      celda: '',
+      sector: '',
+      rmr76Min: '',
+      rmr76Max: '',
+      rmr89Min: '',
+      rmr89Max: '',
+      rqdMin: '',
+      rqdMax: '',
+      largoMin: '',
+      largoMax: '',
+      alturaMin: '',
+      alturaMax: '',
+    };
     setAdvancedFilters(cleared);
     setPage(1);
     fetchWindows(1, pageSize, activeDateRange, searchTerm, isGlobalSearch, cleared);

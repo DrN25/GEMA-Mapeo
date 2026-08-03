@@ -502,8 +502,16 @@ def get_ventanas(
     mapeador: Optional[str] = Query(None),
     campania: Optional[int] = Query(None),
     q: Optional[str] = Query(None, description="Buscar por código de celda"),
-    rmr_min: Optional[float] = Query(None, ge=0, le=100),
-    rmr_max: Optional[float] = Query(None, ge=0, le=100),
+    rmr76_min: Optional[float] = Query(None, ge=0, le=100),
+    rmr76_max: Optional[float] = Query(None, ge=0, le=100),
+    rmr89_min: Optional[float] = Query(None, ge=0, le=100),
+    rmr89_max: Optional[float] = Query(None, ge=0, le=100),
+    rqd_min: Optional[float] = Query(None, ge=0, le=100),
+    rqd_max: Optional[float] = Query(None, ge=0, le=100),
+    largo_min: Optional[float] = Query(None, ge=0),
+    largo_max: Optional[float] = Query(None, ge=0),
+    altura_min: Optional[float] = Query(None, ge=0),
+    altura_max: Optional[float] = Query(None, ge=0),
     search_global: bool = Query(False, description="Ignorar filtro de fecha y buscar en todo el historial"),
     db: Session = Depends(get_db),
 ):
@@ -538,10 +546,26 @@ def get_ventanas(
         query = query.filter(models.Geotecnico.nombre.ilike(f"%{mapeador}%"))
     if campania and isinstance(campania, int):
         query = query.filter(models.Ventana.campania_id == campania)
-    if rmr_min is not None and isinstance(rmr_min, (int, float)):
-        query = query.filter(models.Ventana.rmr89_total >= rmr_min)
-    if rmr_max is not None and isinstance(rmr_max, (int, float)):
-        query = query.filter(models.Ventana.rmr89_total <= rmr_max)
+    if rmr76_min is not None and isinstance(rmr76_min, (int, float)):
+        query = query.filter(models.Ventana.rmr76_total >= rmr76_min)
+    if rmr76_max is not None and isinstance(rmr76_max, (int, float)):
+        query = query.filter(models.Ventana.rmr76_total <= rmr76_max)
+    if rmr89_min is not None and isinstance(rmr89_min, (int, float)):
+        query = query.filter(models.Ventana.rmr89_total >= rmr89_min)
+    if rmr89_max is not None and isinstance(rmr89_max, (int, float)):
+        query = query.filter(models.Ventana.rmr89_total <= rmr89_max)
+    if rqd_min is not None and isinstance(rqd_min, (int, float)):
+        query = query.filter(models.Ventana.rqd_rmr89 >= rqd_min)
+    if rqd_max is not None and isinstance(rqd_max, (int, float)):
+        query = query.filter(models.Ventana.rqd_rmr89 <= rqd_max)
+    if largo_min is not None and isinstance(largo_min, (int, float)):
+        query = query.filter(models.Ventana.distancia_celda >= largo_min)
+    if largo_max is not None and isinstance(largo_max, (int, float)):
+        query = query.filter(models.Ventana.distancia_celda <= largo_max)
+    if altura_min is not None and isinstance(altura_min, (int, float)):
+        query = query.filter(models.Ventana.altura >= altura_min)
+    if altura_max is not None and isinstance(altura_max, (int, float)):
+        query = query.filter(models.Ventana.altura <= altura_max)
 
     # 3. Total antes de paginar
     total_filtered = query.count()
@@ -593,8 +617,16 @@ def get_ventanas(
         kpis_query = kpis_query.join(models.Geotecnico, models.Ventana.geotecnico_id == models.Geotecnico.geotecnico_id)
         kpis_query = kpis_query.filter(models.Geotecnico.nombre.ilike(f"%{mapeador}%"))
     if campania and isinstance(campania, int): kpis_query = kpis_query.filter(models.Ventana.campania_id == campania)
-    if rmr_min is not None and isinstance(rmr_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr89_total >= rmr_min)
-    if rmr_max is not None and isinstance(rmr_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr89_total <= rmr_max)
+    if rmr76_min is not None and isinstance(rmr76_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr76_total >= rmr76_min)
+    if rmr76_max is not None and isinstance(rmr76_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr76_total <= rmr76_max)
+    if rmr89_min is not None and isinstance(rmr89_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr89_total >= rmr89_min)
+    if rmr89_max is not None and isinstance(rmr89_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rmr89_total <= rmr89_max)
+    if rqd_min is not None and isinstance(rqd_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rqd_rmr89 >= rqd_min)
+    if rqd_max is not None and isinstance(rqd_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.rqd_rmr89 <= rqd_max)
+    if largo_min is not None and isinstance(largo_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.distancia_celda >= largo_min)
+    if largo_max is not None and isinstance(largo_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.distancia_celda <= largo_max)
+    if altura_min is not None and isinstance(altura_min, (int, float)): kpis_query = kpis_query.filter(models.Ventana.altura >= altura_min)
+    if altura_max is not None and isinstance(altura_max, (int, float)): kpis_query = kpis_query.filter(models.Ventana.altura <= altura_max)
 
     kpis_row = kpis_query.first()
 
@@ -649,6 +681,7 @@ def get_ventanas(
             nivel=v.nivel,
             rmr_76=float(v.rmr76_total) if v.rmr76_total is not None else None,
             rmr_89=float(v.rmr89_total) if v.rmr89_total is not None else None,
+            rqd_pct=float(v.rqd_rmr89) if v.rqd_rmr89 is not None else None,
             discontinuidades_count=len(v.discontinuidades),
             creado_en=v.fecha_registro,
         ))
