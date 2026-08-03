@@ -6,7 +6,8 @@ import {
   Activity,
   Plus,
   Trash2,
-  Filter
+  BarChart3,
+  X
 } from 'lucide-react';
 import { FormulaTooltipTrigger } from './FormulaTooltip';
 import PltExcelImportModal from './PltExcelImportModal';
@@ -223,9 +224,9 @@ export default function PltEnsayosView({
       if (r.resistencia_isrm) isrmCnt[r.resistencia_isrm] = (isrmCnt[r.resistencia_isrm] || 0) + 1;
     });
 
-    const litoCnt: Record<string, number> = {};
+    const tipoCnt: Record<string, number> = {};
     rr.forEach(r => {
-      if (r.litologia_1) litoCnt[r.litologia_1] = (litoCnt[r.litologia_1] || 0) + 1;
+      if (r.tipo_litologico) tipoCnt[r.tipo_litologico] = (tipoCnt[r.tipo_litologico] || 0) + 1;
     });
 
     return {
@@ -247,7 +248,7 @@ export default function PltEnsayosView({
       is50Avg: is50V.length ? avg(is50V) : null,
 
       isrmCnt,
-      litoCnt
+      tipoCnt
     };
   }, [computedRows]);
 
@@ -499,134 +500,221 @@ export default function PltEnsayosView({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="glass-panel w-full max-w-3xl p-6 rounded-xl border border-navy-800 space-y-4 text-left shadow-2xl bg-navy-900/95 max-h-[85vh] flex flex-col"
+            className="glass-panel w-full max-w-4xl max-h-[88vh] flex flex-col rounded-2xl border border-navy-800 shadow-2xl relative overflow-hidden bg-navy-900/95"
           >
-            <div className="flex justify-between items-center border-b border-navy-800 pb-3">
-              <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest">
-                Reportabilidad — Resumen de Ensayos PLT
-              </h3>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-100 text-lg">✕</button>
+            <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600 w-full shrink-0" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-navy-800/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-violet-500/10 border border-violet-500/20 text-violet-400 rounded-lg">
+                  <BarChart3 size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
+                    Reporte Resumen — Ensayos PLT
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Indicadores y estadísticas de los ensayos de carga puntual
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-violet-500/10 border border-violet-500/30 text-violet-300 font-extrabold px-3 py-1 rounded-lg hidden sm:flex items-center gap-1.5">
+                  <span>Celda:</span>
+                  <span className="text-amber-400 font-mono">{activeWindowCelda || "Sin Celda"}</span>
+                </span>
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="p-1.5 rounded-md text-slate-400 hover:text-slate-100 hover:bg-navy-800 transition-colors"
+                  title="Cerrar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-y-auto flex-1 space-y-6 pr-1">
-              <div className="grid grid-cols-4 gap-3">
-                <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-black text-cyan-400 font-mono">{reportStats.total}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Total Ensayos</div>
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-5">
+              {reportStats.total === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500">
+                  <BarChart3 size={42} className="text-slate-700/60 mb-3" />
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                    Sin ensayos PLT para reportar
+                  </p>
+                  <p className="text-xs mt-1.5 text-slate-500">
+                    Agrega filas con "Nueva Fila" o importa un Excel para ver el resumen.
+                  </p>
                 </div>
-                <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-black text-emerald-400 font-mono">{reportStats.withUcs}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Con UCS calculado</div>
-                </div>
-                <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-black text-orange-400 font-mono">{reportStats.valL}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidos Longitud</div>
-                </div>
-                <div className="bg-navy-950/40 border border-navy-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-black text-purple-400 font-mono">{reportStats.valA}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Válidos Ancho</div>
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* KPIs */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-gradient-to-br from-cyan-500/[0.06] to-transparent border border-cyan-500/20 rounded-xl p-4 text-center shadow-[0_4px_20px_rgba(6,182,212,0.04)]">
+                      <div className="text-3xl font-black text-cyan-400 font-mono">{reportStats.total}</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">Total Ensayos</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-emerald-500/[0.06] to-transparent border border-emerald-500/20 rounded-xl p-4 text-center shadow-[0_4px_20px_rgba(16,185,129,0.04)]">
+                      <div className="text-3xl font-black text-emerald-400 font-mono">{reportStats.withUcs}</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">Con UCS calculado</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-orange-500/[0.06] to-transparent border border-orange-500/20 rounded-xl p-4 text-center shadow-[0_4px_20px_rgba(245,158,11,0.04)]">
+                      <div className="text-3xl font-black text-orange-400 font-mono">{reportStats.valL}</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">Válidos Longitud (L ≥ D)</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-500/[0.06] to-transparent border border-purple-500/20 rounded-xl p-4 text-center shadow-[0_4px_20px_rgba(168,85,247,0.04)]">
+                      <div className="text-3xl font-black text-purple-400 font-mono">{reportStats.valA}</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">Válidos Ancho (0.3W &lt; D &lt; W)</div>
+                    </div>
+                  </div>
 
-              {/* METRICAS AVANZADAS PLT (Is, Is50, UCS) con Mínimo, Máximo y Promedio de cada uno */}
-              <div className="space-y-4">
-                <div className="bg-navy-950/40 border border-teal-500/20 bg-gradient-to-br from-teal-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(20,184,166,0.02)]">
-                  <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
-                    <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest block">Índice Is — Carga Puntual No Corregido</span>
-                    <span className="text-[9px] bg-teal-500/10 border border-teal-500/30 text-teal-400 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Is (MPa)</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-rose-500/[0.02] border border-rose-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
-                      <span className="text-[10px] text-rose-400/70 font-bold uppercase tracking-wider mb-1">Mínimo</span>
-                      <span className="font-mono font-bold text-rose-300 text-sm">{reportStats.isMin !== null ? reportStats.isMin.toFixed(4) : "—"}</span>
+                  {/* METRICAS AVANZADAS PLT (Is, Is50, UCS) con Mínimo, Máximo y Promedio de cada uno */}
+                  <div className="space-y-4">
+                    <div className="bg-navy-950/40 border border-teal-500/20 bg-gradient-to-br from-teal-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(20,184,166,0.02)]">
+                      <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
+                        <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest block">Índice Is — Carga Puntual No Corregido</span>
+                        <span className="text-[9px] bg-teal-500/10 border border-teal-500/30 text-teal-400 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Is (MPa)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-rose-500/[0.02] border border-rose-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
+                          <span className="text-[10px] text-rose-400/70 font-bold uppercase tracking-wider mb-1">Mínimo</span>
+                          <span className="font-mono font-bold text-rose-300 text-sm">{reportStats.isMin !== null ? reportStats.isMin.toFixed(4) : "—"}</span>
+                        </div>
+                        <div className="bg-emerald-500/[0.02] border border-emerald-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
+                          <span className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-1">Máximo</span>
+                          <span className="font-mono font-bold text-emerald-300 text-sm">{reportStats.isMax !== null ? reportStats.isMax.toFixed(4) : "—"}</span>
+                        </div>
+                        <div className="bg-teal-500/5 border border-teal-500/20 p-3 rounded-lg flex flex-col justify-center items-center text-center shadow-[0_0_15px_rgba(20,184,166,0.03)]">
+                          <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider mb-1">Promedio</span>
+                          <span className="font-mono font-black text-teal-300 text-sm drop-shadow-[0_0_8px_rgba(20,184,166,0.25)]">{reportStats.isAvg !== null ? reportStats.isAvg.toFixed(4) : "—"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-emerald-500/[0.02] border border-emerald-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
-                      <span className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-1">Máximo</span>
-                      <span className="font-mono font-bold text-emerald-300 text-sm">{reportStats.isMax !== null ? reportStats.isMax.toFixed(4) : "—"}</span>
-                    </div>
-                    <div className="bg-teal-500/5 border border-teal-500/20 p-3 rounded-lg flex flex-col justify-center items-center text-center shadow-[0_0_15px_rgba(20,184,166,0.03)]">
-                      <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider mb-1">Promedio</span>
-                      <span className="font-mono font-black text-teal-300 text-sm drop-shadow-[0_0_8px_rgba(20,184,166,0.25)]">{reportStats.isAvg !== null ? reportStats.isAvg.toFixed(4) : "—"}</span>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="bg-navy-950/40 border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(14,165,233,0.02)]">
-                  <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
-                    <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest block">Índice Is(50) — Corregido a 50 mm</span>
-                    <span className="text-[9px] bg-sky-500/10 border border-sky-500/30 text-sky-400 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Is(50) (MPa)</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-rose-500/[0.02] border border-rose-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
-                      <span className="text-[10px] text-rose-400/70 font-bold uppercase tracking-wider mb-1">Mínimo</span>
-                      <span className="font-mono font-bold text-rose-300 text-sm">{reportStats.is50Min !== null ? reportStats.is50Min.toFixed(4) : "—"}</span>
+                    <div className="bg-navy-950/40 border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(14,165,233,0.02)]">
+                      <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
+                        <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest block">Índice Is(50) — Corregido a 50 mm</span>
+                        <span className="text-[9px] bg-sky-500/10 border border-sky-500/30 text-sky-400 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Is(50) (MPa)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-rose-500/[0.02] border border-rose-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
+                          <span className="text-[10px] text-rose-400/70 font-bold uppercase tracking-wider mb-1">Mínimo</span>
+                          <span className="font-mono font-bold text-rose-300 text-sm">{reportStats.is50Min !== null ? reportStats.is50Min.toFixed(4) : "—"}</span>
+                        </div>
+                        <div className="bg-emerald-500/[0.02] border border-emerald-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
+                          <span className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-1">Máximo</span>
+                          <span className="font-mono font-bold text-emerald-300 text-sm">{reportStats.is50Max !== null ? reportStats.is50Max.toFixed(4) : "—"}</span>
+                        </div>
+                        <div className="bg-sky-500/5 border border-sky-500/20 p-3 rounded-lg flex flex-col justify-center items-center text-center shadow-[0_0_15px_rgba(14,165,233,0.03)]">
+                          <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider mb-1">Promedio</span>
+                          <span className="font-mono font-black text-sky-300 text-sm drop-shadow-[0_0_8px_rgba(14,165,233,0.25)]">{reportStats.is50Avg !== null ? reportStats.is50Avg.toFixed(4) : "—"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-emerald-500/[0.02] border border-emerald-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
-                      <span className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-1">Máximo</span>
-                      <span className="font-mono font-bold text-emerald-300 text-sm">{reportStats.is50Max !== null ? reportStats.is50Max.toFixed(4) : "—"}</span>
-                    </div>
-                    <div className="bg-sky-500/5 border border-sky-500/20 p-3 rounded-lg flex flex-col justify-center items-center text-center shadow-[0_0_15px_rgba(14,165,233,0.03)]">
-                      <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider mb-1">Promedio</span>
-                      <span className="font-mono font-black text-sky-300 text-sm drop-shadow-[0_0_8px_rgba(14,165,233,0.25)]">{reportStats.is50Avg !== null ? reportStats.is50Avg.toFixed(4) : "—"}</span>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="bg-navy-950/40 border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(245,158,11,0.02)]">
-                  <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
-                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block">Resistencia UCS Estimada</span>
-                    <span className="text-[9px] bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">UCS (MPa)</span>
+                    <div className="bg-navy-950/40 border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-transparent p-4 rounded-xl space-y-3 shadow-[0_4px_20px_rgba(245,158,11,0.02)]">
+                      <div className="flex items-center justify-between border-b border-navy-800/80 pb-2">
+                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block">Resistencia UCS Estimada</span>
+                        <span className="text-[9px] bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">UCS (MPa)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-rose-500/[0.02] border border-rose-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
+                          <span className="text-[10px] text-rose-400/70 font-bold uppercase tracking-wider mb-1">Mínimo</span>
+                          <span className="font-mono font-bold text-rose-300 text-sm">{reportStats.ucsMin !== null ? reportStats.ucsMin.toFixed(2) : "—"}</span>
+                        </div>
+                        <div className="bg-emerald-500/[0.02] border border-emerald-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
+                          <span className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-1">Máximo</span>
+                          <span className="font-mono font-bold text-emerald-300 text-sm">{reportStats.ucsMax !== null ? reportStats.ucsMax.toFixed(2) : "—"}</span>
+                        </div>
+                        <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-lg flex flex-col justify-center items-center text-center shadow-[0_0_15px_rgba(245,158,11,0.03)]">
+                          <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1">Promedio</span>
+                          <span className="font-mono font-black text-amber-300 text-sm drop-shadow-[0_0_8px_rgba(245,158,11,0.25)]">{reportStats.ucsAvg !== null ? reportStats.ucsAvg.toFixed(2) : "—"}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-rose-500/[0.02] border border-rose-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
-                      <span className="text-[10px] text-rose-400/70 font-bold uppercase tracking-wider mb-1">Mínimo</span>
-                      <span className="font-mono font-bold text-rose-300 text-sm">{reportStats.ucsMin !== null ? reportStats.ucsMin.toFixed(2) : "—"}</span>
-                    </div>
-                    <div className="bg-emerald-500/[0.02] border border-emerald-500/10 p-3 rounded-lg flex flex-col justify-center items-center text-center">
-                      <span className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-1">Máximo</span>
-                      <span className="font-mono font-bold text-emerald-300 text-sm">{reportStats.ucsMax !== null ? reportStats.ucsMax.toFixed(2) : "—"}</span>
-                    </div>
-                    <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-lg flex flex-col justify-center items-center text-center shadow-[0_0_15px_rgba(245,158,11,0.03)]">
-                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1">Promedio</span>
-                      <span className="font-mono font-black text-amber-300 text-sm drop-shadow-[0_0_8px_rgba(245,158,11,0.25)]">{reportStats.ucsAvg !== null ? reportStats.ucsAvg.toFixed(2) : "—"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-navy-950/40 border border-navy-800 p-4 rounded-xl space-y-3">
-                  <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2">Clasificación ISRM</h4>
-                  <div className="space-y-2">
-                    {(() => {
-                      const isrmColors: Record<string, string> = {
-                        R0: "bg-rose-500/60 shadow-[0_0_8px_rgba(239,68,68,0.25)]",
-                        R1: "bg-orange-500/60 shadow-[0_0_8px_rgba(249,115,22,0.25)]",
-                        R2: "bg-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]",
-                        R3: "bg-yellow-500/60 shadow-[0_0_8px_rgba(234,179,8,0.25)]",
-                        R4: "bg-emerald-500/60 shadow-[0_0_8_rgba(16,185,129,0.25)]",
-                        R5: "bg-cyan-500/60 shadow-[0_0_8_rgba(6,182,212,0.25)]",
-                        R6: "bg-blue-500/60 shadow-[0_0_8_rgba(59,130,246,0.25)]"
-                      };
-                      return ISRM_TABLE.map(row => {
-                        const count = reportStats.isrmCnt[row.indice] || 0;
-                        const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
-                        return (
-                          <div key={row.indice} className="space-y-1">
-                            <div className="flex justify-between text-[11px] font-bold text-slate-400">
-                              <span>{row.indice} ({row.denominacion})</span>
-                              <span>{count} ({pct.toFixed(1)}%)</span>
-                            </div>
-                            <div className="w-full bg-navy-950 border border-navy-900 rounded-full h-2.5 overflow-hidden">
-                              <div className={`h-full rounded-full ${isrmColors[row.indice] || "bg-slate-500"}`} style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
+                  {/* Distribuciones ISRM y Litología */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-navy-950/40 border border-navy-800 p-4 rounded-xl space-y-3">
+                      <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2">Clasificación ISRM</h4>
+                      <div className="space-y-2">
+                        {(() => {
+                          const isrmColors: Record<string, string> = {
+                            R0: "bg-rose-500/60 shadow-[0_0_8px_rgba(239,68,68,0.25)]",
+                            R1: "bg-orange-500/60 shadow-[0_0_8px_rgba(249,115,22,0.25)]",
+                            R2: "bg-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]",
+                            R3: "bg-yellow-500/60 shadow-[0_0_8px_rgba(234,179,8,0.25)]",
+                            R4: "bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]",
+                            R5: "bg-cyan-500/60 shadow-[0_0_8px_rgba(6,182,212,0.25)]",
+                            R6: "bg-blue-500/60 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
+                          };
+                          return ISRM_TABLE.map(row => {
+                            const count = reportStats.isrmCnt[row.indice] || 0;
+                            const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
+                            return (
+                              <div key={row.indice} className="space-y-1">
+                                <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                                  <span>{row.indice} ({row.denominacion})</span>
+                                  <span>{count} ({pct.toFixed(1)}%)</span>
+                                </div>
+                                <div className="w-full bg-navy-950 border border-navy-900 rounded-full h-2.5 overflow-hidden">
+                                  <div className={`h-full rounded-full ${isrmColors[row.indice] || "bg-slate-500"}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="bg-navy-950/40 border border-navy-800 p-4 rounded-xl space-y-3">
+                      <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-navy-800 pb-2">Distribución por Tipo Litológico</h4>
+                      <div className="space-y-2">
+                        {(() => {
+                          const litoPalette = [
+                            "bg-violet-500/60 shadow-[0_0_8px_rgba(139,92,246,0.25)]",
+                            "bg-teal-500/60 shadow-[0_0_8px_rgba(20,184,166,0.25)]",
+                            "bg-fuchsia-500/60 shadow-[0_0_8px_rgba(217,70,239,0.25)]",
+                            "bg-sky-500/60 shadow-[0_0_8px_rgba(14,165,233,0.25)]",
+                            "bg-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]",
+                            "bg-rose-500/60 shadow-[0_0_8px_rgba(239,68,68,0.25)]",
+                            "bg-indigo-500/60 shadow-[0_0_8px_rgba(99,102,241,0.25)]",
+                            "bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+                          ];
+                          const entries = Object.entries(reportStats.tipoCnt).sort((a, b) => b[1] - a[1]);
+                          if (entries.length === 0) {
+                            return <p className="text-xs text-slate-500 italic">Sin tipos litológicos registrados.</p>;
+                          }
+                          return entries.map(([tipo, count], idx) => {
+                            const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
+                            return (
+                              <div key={tipo} className="space-y-1">
+                                <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                                  <span className="font-mono">{tipo}</span>
+                                  <span>{count} ({pct.toFixed(1)}%)</span>
+                                </div>
+                                <div className="w-full bg-navy-950 border border-navy-900 rounded-full h-2.5 overflow-hidden">
+                                  <div className={`h-full rounded-full ${litoPalette[idx % litoPalette.length]}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+
+                  {/* Footer */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-lg bg-navy-950/40 border border-navy-800 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5">
+                      <Activity size={11} className="text-violet-400" />
+                      {reportStats.total} ensayos en la grilla actual
+                    </span>
+                    <span>Valores calculados con las fórmulas estándar ISRM</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
