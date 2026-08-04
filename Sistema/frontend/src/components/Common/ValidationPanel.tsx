@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { AlertOctagon, AlertTriangle, CircleSlash, CheckCircle, Minimize2, MapPin, Tag } from 'lucide-react';
-import type { QaQcAlert } from '../utils/qaQcRules';
-import { PLT_FIELD_LABELS } from '../utils/mandatoryRules';
+import type { QaQcAlert } from '../../utils/qaQcRules';
+import { PLT_FIELD_LABELS } from '../../utils/mandatoryRules';
 
 interface ValidationPanelProps {
   alerts: QaQcAlert[];

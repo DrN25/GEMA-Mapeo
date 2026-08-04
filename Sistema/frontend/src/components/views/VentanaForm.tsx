@@ -1,10 +1,10 @@
 import React from 'react';
-import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
-import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../utils/catalogData';
+import type { WindowHeader, CalculatorResult } from '../../utils/rmrCalculator';
+import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../../utils/catalogData';
 import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Pencil, Info } from 'lucide-react';
-import MapeadorCombobox from './MapeadorCombobox';
-import { markFieldTouched } from '../utils/qaQcTouch';
-import { CAMPANAS_HARDCODED } from '../utils/campaniasCatalog';
+import MapeadorCombobox from '../Common/MapeadorCombobox';
+import { markFieldTouched } from '../../utils/qaQcTouch';
+import { CAMPANAS_HARDCODED } from '../../utils/campaniasCatalog';
 
 // Helper: marca el campo como tocado (blur) para habilitar su evaluación QA/QC
 const touchField = (fieldId: string) => () => markFieldTouched(fieldId);

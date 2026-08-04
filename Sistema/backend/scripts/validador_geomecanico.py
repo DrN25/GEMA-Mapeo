@@ -4,7 +4,7 @@ import sys
 import os
 
 # Asegurar la visibilidad de la carpeta app en el path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.utils.validator import validate_bulk_excel
 

@@ -1,17 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import type { JointRow } from '../utils/rmrCalculator';
-import GeomecTable from './Common/GeomecTable';
-import { DISCON_COLUMNS, COLUMN_LABELS } from '../utils/geomecColumns';
+import type { JointRow } from '../../utils/rmrCalculator';
+import GeomecTable from '../Common/GeomecTable';
+import { DISCON_COLUMNS, COLUMN_LABELS } from '../../utils/geomecColumns';
 import {
   ALTERACION_CATALOG,
   RELLENO_CATALOG,
   RUGOSIDAD_CATALOG
-} from '../utils/catalogData';
+} from '../../utils/catalogData';
 import {
   getContinuidadRating,
   getAberturaRating,
   getFillingRatingSingle
-} from '../utils/rmrCalculator';
+} from '../../utils/rmrCalculator';
 import { Layers, Plus, Trash2 } from 'lucide-react';
 
 interface DisconTableProps {

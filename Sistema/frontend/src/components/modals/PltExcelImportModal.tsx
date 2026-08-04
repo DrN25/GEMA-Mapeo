@@ -1,13 +1,13 @@
 import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { X, FileSpreadsheet, Upload, Check, ArrowRight, Filter } from 'lucide-react';
-import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../utils/catalogData';
+import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../../utils/catalogData';
 import {
     PLT_COLUMN_DEFS as EXPECTED_FIELDS,
     getPltConstraints,
     normalizeTipoLitologico,
     normalizeCeldaCode
-} from '../utils/geomecColumns';
+} from '../../utils/geomecColumns';
 
 interface PltExcelImportModalProps {
     isOpen: boolean;

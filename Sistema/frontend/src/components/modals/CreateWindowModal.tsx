@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
-import MapeadorCombobox from './MapeadorCombobox';
-import { handleNumberInputLimit } from '../utils/inputLimits';
+import MapeadorCombobox from '../Common/MapeadorCombobox';
+import { handleNumberInputLimit } from '../../utils/inputLimits';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 

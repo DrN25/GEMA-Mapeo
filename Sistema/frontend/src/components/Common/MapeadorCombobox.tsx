@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { User, Check, Plus, ChevronDown } from 'lucide-react';
-import { markFieldTouched } from '../utils/qaQcTouch';
+import { markFieldTouched } from '../../utils/qaQcTouch';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 

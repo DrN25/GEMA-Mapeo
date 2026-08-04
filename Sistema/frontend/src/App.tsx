@@ -4,21 +4,21 @@ import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Men
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
 import type { WindowSummary } from './components/Dashboard/Dashboard';
-import VentanaForm from './components/VentanaForm';
-import DisconTable from './components/DisconTable';
-import RmrAnalysis from './components/RmrAnalysis';
-import StructurePlot from './components/StructurePlot';
-import ValidationPanel from './components/ValidationPanel';
-import ExcelImportModal from './components/ExcelImportModal';
+import VentanaForm from './components/views/VentanaForm';
+import DisconTable from './components/views/DisconTable';
+import RmrAnalysis from './components/views/RmrAnalysis';
+import StructurePlot from './components/views/StructurePlot';
+import ValidationPanel from './components/Common/ValidationPanel';
+import ExcelImportModal from './components/modals/ExcelImportModal';
 
-import CatalogsView from './components/CatalogsView';
-import CommentsPhotos from './components/CommentsPhotos';
-import PltEnsayosView from './components/PltEnsayosView';
+import CatalogsView from './components/views/CatalogsView';
+import CommentsPhotos from './components/views/CommentsPhotos';
+import PltEnsayosView from './components/views/PltEnsayosView';
 
-import SaveConfirmModal from './components/Common/SaveConfirmModal';
-import DiscardModal from './components/Common/DiscardModal';
-import SaveResultModal from './components/Common/SaveResultModal';
-import RenameCellModal from './components/RenameCellModal';
+import SaveConfirmModal from './components/modals/SaveConfirmModal';
+import DiscardModal from './components/modals/DiscardModal';
+import SaveResultModal from './components/modals/SaveResultModal';
+import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject } from './utils/hashUtils';
 import {
@@ -31,7 +31,7 @@ import {
 
 // --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
-import CongruenceAuditor from './components/CongruenceAuditor/CongruenceAuditor';
+import CongruenceAuditor from './features/auditor/CongruenceAuditor';
 import { initCatalogs } from './utils/catalogData';
 
 import {

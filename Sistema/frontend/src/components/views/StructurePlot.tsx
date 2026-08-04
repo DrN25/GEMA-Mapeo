@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import type { CalculatedJoint, WindowHeader } from '../utils/rmrCalculator';
+import type { CalculatedJoint, WindowHeader } from '../../utils/rmrCalculator';
 import { Download, ZoomIn, ZoomOut, RefreshCw, Layers, Compass } from 'lucide-react';
-import { STRUCTURE_CATALOG } from '../utils/catalogData';
-import { FormulaTooltipTrigger } from './FormulaTooltip';
+import { STRUCTURE_CATALOG } from '../../utils/catalogData';
+import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 
 interface StructurePlotProps {
   header: WindowHeader;

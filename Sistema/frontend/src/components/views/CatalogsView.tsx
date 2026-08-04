@@ -11,8 +11,8 @@ import {
   ratingDiscretoResistencia,
   ratingContinuoResistencia,
   ratingPromedioResistencia
-} from '../utils/rmrInterpolation';
-import tablaLitologiasImg from '../images/catalogs/tabla_litologias.png';
+} from '../../utils/rmrInterpolation';
+import tablaLitologiasImg from '../../images/catalogs/tabla_litologias.png';
 
 const getGroupBadge = (grupo: string) => {
   const g = String(grupo).toUpperCase();

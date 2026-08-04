@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight, Filter, X, ChevronDown } from 'lucide-react';
-import CreateWindowModal from '../CreateWindowModal';
+import CreateWindowModal from '../modals/CreateWindowModal';
 import { limitNumberWithMax } from '../../utils/inputLimits';
 
 export interface WindowSummary {

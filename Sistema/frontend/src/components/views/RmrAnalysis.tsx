@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import type { WindowHeader, CalculatorResult } from '../utils/rmrCalculator';
+import type { WindowHeader, CalculatorResult } from '../../utils/rmrCalculator';
 import { Compass } from 'lucide-react';
-import { FormulaTooltipTrigger } from './FormulaTooltip';
-import { COLUMN_LABELS, ISRM_TABLE } from '../utils/geomecColumns';
+import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
+import { COLUMN_LABELS, ISRM_TABLE } from '../../utils/geomecColumns';
 import {
   ratingDiscretoRqd,
   ratingContinuoRqd,
   ratingDiscretoResistencia,
   ratingContinuoResistencia
-} from '../utils/rmrInterpolation';
-import { markFieldTouched } from '../utils/qaQcTouch';
+} from '../../utils/rmrInterpolation';
+import { markFieldTouched } from '../../utils/qaQcTouch';
 
 interface RmrAnalysisProps {
   header: WindowHeader;

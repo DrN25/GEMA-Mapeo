@@ -9,9 +9,9 @@ import {
   BarChart3,
   X
 } from 'lucide-react';
-import { FormulaTooltipTrigger } from './FormulaTooltip';
-import PltExcelImportModal from './PltExcelImportModal';
-import { LITHOLOGY_CLASSIFICATION } from '../utils/catalogData';
+import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
+import PltExcelImportModal from '../modals/PltExcelImportModal';
+import { LITHOLOGY_CLASSIFICATION } from '../../utils/catalogData';
 import {
   PLT_COLUMN_DEFS as COLS,
   CAT_DIRECCION_ROTURA,
@@ -28,7 +28,7 @@ import {
   formatCellValue,
   getLito2Options,
   getLito3Options
-} from '../utils/geomecColumns';
+} from '../../utils/geomecColumns';
 
 interface PltEnsayosViewProps {
   pltEnsayos: any[];

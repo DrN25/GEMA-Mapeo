@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { ColumnConfig } from '../../utils/geomecColumns';
-import { FormulaTooltipTrigger } from '../FormulaTooltip';
+import { FormulaTooltipTrigger } from './FormulaTooltip';
 import { markFieldTouched } from '../../utils/qaQcTouch';
 
 interface GeomecTableProps<T> {
