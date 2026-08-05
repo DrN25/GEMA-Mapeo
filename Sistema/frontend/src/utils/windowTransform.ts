@@ -9,6 +9,7 @@
 import type { WindowHeader, JointRow } from './rmrCalculator';
 import type { WindowData } from './diffUtils';
 import { normalizeNumeric } from './numericPrecision';
+import { getCampaniaIdFromYear } from './campaniasCatalog';
 
 export function normalizeJoints(loadedJoints: JointRow[], defaultAlt: string = 'd'): JointRow[] {
   const mappedJoints = (loadedJoints || []).map((j, i) => {
@@ -205,7 +206,8 @@ export function excelDataToWindowData(codigoFinal: string, excelData: any, estru
     condicion_agua: str(excelData.condicion_agua_rmr76) || str(excelData.condicion_agua_rmr89),
     resistencia_ucs: str(excelData.dureza_rmr76) || str(excelData.dureza_rmr89),
     comentario: str(excelData.comentarios),
-    campania: campaniaMatch ? parseInt(campaniaMatch[0], 10) : 2026,
+    // El sistema trabaja con ID de campaña (Campaña 2026 = id 7), no con el año
+    campania: campaniaMatch ? (getCampaniaIdFromYear(campaniaMatch[0]) ?? 7) : 7,
     gsi_superficie: str(excelData.gsi_superficie),
     gsi_estructura: str(excelData.gsi_estructura),
     gsi_visual: num(excelData.gsi_visual_rmr76, 'gsi_visual') ?? 0,

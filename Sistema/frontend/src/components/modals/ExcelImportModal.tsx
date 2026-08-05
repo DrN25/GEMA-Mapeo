@@ -4,6 +4,16 @@ import {
   Settings, Table, CheckCircle, Search, ChevronDown, ChevronUp,
   Layers, Eye, AlertCircle, Info, RefreshCw
 } from 'lucide-react';
+import { getFieldPrecision } from '../../utils/numericPrecision';
+
+// Formatea un valor con la precisión de display del SSOT (los decimales del
+// Excel no deben verse crudos en el preview: generan desconfianza).
+const fmtPrec = (key: string, val: any): string => {
+  const n = Number(val);
+  if (val === null || val === undefined || isNaN(n)) return '—';
+  const dec = getFieldPrecision(key)?.display ?? 1;
+  return n.toFixed(dec);
+};
 
 const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
@@ -165,6 +175,31 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
     const finalName = (editedNames[c.codigo] || c.codigo).trim().toUpperCase();
     return existingDbCodes.has(finalName);
   };
+
+  // Códigos que existen en BD (los devuelve el preview del backend).
+  const bdCodes = useMemo(
+    () => new Set((existingCodes || []).map(c => c.trim().toUpperCase())),
+    [existingCodes]
+  );
+
+  // Duplicados seleccionados agrupados por el origen de la colisión:
+  //  - enBd: el nombre final ya existe en la base de datos (se actualizará al guardar)
+  //  - soloLocal: el nombre final solo existe como borrador local (se reemplazará y el
+  //    borrador manual se pierde)
+  const selectedDuplicates = celdas.filter(c => selectedCodes.has(c.codigo) && isDuplicateFinal(c));
+  const duplicateGroups = useMemo(() => {
+    const enBd: string[] = [];
+    const soloLocal: string[] = [];
+    for (const c of selectedDuplicates) {
+      const finalName = (editedNames[c.codigo] || c.codigo).trim().toUpperCase();
+      if (bdCodes.has(finalName)) {
+        enBd.push(finalName);
+      } else {
+        soloLocal.push(finalName);
+      }
+    }
+    return { enBd, soloLocal };
+  }, [selectedDuplicates, editedNames, bdCodes]);
 
   if (!isOpen) return null;
 
@@ -333,8 +368,6 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
       (c.excel_data.sector || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.excel_data.mapeador || '').toLowerCase().includes(searchQuery.toLowerCase());
   });
-
-  const selectedDuplicates = celdas.filter(c => selectedCodes.has(c.codigo) && isDuplicateFinal(c));
 
   const toggleSelectAll = () => {
     if (selectedCodes.size === filteredCeldas.length) {
@@ -721,7 +754,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
                         <td className="py-2.5 px-3 text-slate-400 font-semibold">{c.excel_data.sector}</td>
 
                         <td className="py-2.5 px-3 text-right font-mono text-xs text-slate-400">
-                          {c.excel_data.este_ini.toFixed(1)} / {c.excel_data.norte_ini.toFixed(1)} / {c.excel_data.cota_ini.toFixed(1)}
+                          {fmtPrec('este_from', c.excel_data.este_ini)} / {fmtPrec('norte_from', c.excel_data.norte_ini)} / {fmtPrec('cota_from', c.excel_data.cota_ini)}
                         </td>
 
                         <td className="py-2.5 px-3 text-center">
@@ -818,23 +851,54 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
               </div>
             </div>
 
-            {/* Badges de celdas duplicadas */}
-            <div className="p-3 bg-navy-950/80 border border-navy-800 rounded-xl space-y-1.5">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Celdas Coincidentes Afectadas:</span>
-              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                {selectedDuplicates.map(d => (
-                  <span key={d.codigo} className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono font-bold text-xs border border-amber-500/30">
-                    {editedNames[d.codigo] || d.codigo}
-                  </span>
-                ))}
+            {/* Celdas que colisionan con la BD */}
+            {duplicateGroups.enBd.length > 0 && (
+              <div className="p-3 bg-navy-950/80 border border-indigo-500/30 rounded-xl space-y-1.5">
+                <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider block">
+                  Ya existen en la base de datos ({duplicateGroups.enBd.length})
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                  {duplicateGroups.enBd.map(n => (
+                    <span key={n} className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-mono font-bold text-[11px] border border-indigo-500/30">
+                      {n}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Estas celdas ya existen en el sistema (en la base de datos o como borrador
-              local pendiente). Al importarlas y presionar <strong>GUARDAR CAMBIOS</strong>,
-              los datos existentes se actualizarán con los del archivo Excel.
-            </p>
+            {/* Celdas que colisionan con un borrador local */}
+            {duplicateGroups.soloLocal.length > 0 && (
+              <div className="p-3 bg-navy-950/80 border border-amber-500/30 rounded-xl space-y-1.5">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">
+                  Ya existen como borrador local (aún no están en la base de datos) ({duplicateGroups.soloLocal.length})
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                  {duplicateGroups.soloLocal.map(n => (
+                    <span key={n} className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono font-bold text-[11px] border border-amber-500/30">
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Explicación clara de lo que pasará */}
+            {duplicateGroups.enBd.length > 0 && (
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Al importar y presionar <strong>GUARDAR CAMBIOS</strong>, los datos actuales de
+                estas celdas <strong>en la base de datos se reemplazarán</strong> con los del
+                archivo Excel.
+              </p>
+            )}
+            {duplicateGroups.soloLocal.length > 0 && (
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                Estas celdas solo existen como <strong>borrador local</strong> (aún no están en la
+                base de datos). Al importar, el borrador <strong>se reemplazará</strong> con los
+                datos del Excel y <strong>los cambios que tenías en el borrador se perderán</strong>.
+                Si quieres conservarlos, renombra la celda del Excel antes de importar.
+              </p>
+            )}
 
             {/* Opciones de Acción */}
             <div className="grid grid-cols-1 gap-3">
@@ -847,11 +911,11 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
                 <RefreshCw size={18} className="text-amber-400 shrink-0 mt-0.5 group-hover:rotate-180 transition-transform duration-500" />
                 <div>
                   <span className="text-xs font-black text-amber-300 block uppercase tracking-wider">
-                    Sí, importar como borradores
+                    Sí, importar con los datos del Excel
                   </span>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Las celdas se añaden al espacio de trabajo con la etiqueta BORRADOR.
-                    Al guardar, se actualizarán los registros existentes en la base de datos.
+                    Las celdas se añaden como BORRADOR con los datos del archivo. Al presionar
+                    GUARDAR CAMBIOS se actualizarán (la base de datos o el borrador local existente).
                   </p>
                 </div>
               </button>
@@ -912,11 +976,11 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
                     </div>
                     <div className="flex justify-between py-1 border-b border-navy-900">
                       <span className="text-slate-500">Coordenadas Iniciales:</span>
-                      <span className="font-mono">{comparingCelda.existing_data.este_ini.toFixed(1)} / {comparingCelda.existing_data.norte_ini.toFixed(1)} / {comparingCelda.existing_data.cota_ini.toFixed(1)}</span>
+                      <span className="font-mono">{fmtPrec('este_from', comparingCelda.existing_data.este_ini)} / {fmtPrec('norte_from', comparingCelda.existing_data.norte_ini)} / {fmtPrec('cota_from', comparingCelda.existing_data.cota_ini)}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-navy-900">
                       <span className="text-slate-500">Largo / Altura:</span>
-                      <span className="font-bold">{comparingCelda.existing_data.largo_m} m / {comparingCelda.existing_data.altura_m} m</span>
+                      <span className="font-bold">{fmtPrec('largo', comparingCelda.existing_data.largo_m)} m / {fmtPrec('altura', comparingCelda.existing_data.altura_m)} m</span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-navy-900">
                       <span className="text-slate-500">Litologías (1/2/3):</span>
@@ -954,11 +1018,11 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
                   </div>
                   <div className="flex justify-between py-1 border-b border-navy-900">
                     <span className="text-slate-500">Coordenadas Iniciales:</span>
-                    <span className="font-mono">{comparingCelda.excel_data.este_ini.toFixed(1)} / {comparingCelda.excel_data.norte_ini.toFixed(1)} / {comparingCelda.excel_data.cota_ini.toFixed(1)}</span>
+                    <span className="font-mono">{fmtPrec('este_from', comparingCelda.excel_data.este_ini)} / {fmtPrec('norte_from', comparingCelda.excel_data.norte_ini)} / {fmtPrec('cota_from', comparingCelda.excel_data.cota_ini)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-navy-900">
                     <span className="text-slate-500">Largo / Altura:</span>
-                    <span className="font-bold">{comparingCelda.excel_data.largo_m} m / {comparingCelda.excel_data.altura_m} m</span>
+                    <span className="font-bold">{fmtPrec('largo', comparingCelda.excel_data.largo_m)} m / {fmtPrec('altura', comparingCelda.excel_data.altura_m)} m</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-navy-900">
                     <span className="text-slate-500">Litologías (1/2/3):</span>

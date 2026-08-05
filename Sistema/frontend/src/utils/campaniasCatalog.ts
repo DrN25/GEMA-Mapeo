@@ -30,3 +30,11 @@ export function getCampaniaYear(campaniaId: number | string): number | null {
   const match = item.label.match(/(\d{4})/);
   return match ? parseInt(match[1], 10) : null;
 }
+
+/** Devuelve el ID de campaña dado su año (ej. 2026 → 7), o null si no se conoce. */
+export function getCampaniaIdFromYear(year: number | string): number | null {
+  const y = String(year).trim();
+  if (!/^\d{4}$/.test(y)) return null;
+  const item = CAMPANAS_HARDCODED.find(c => c.label.includes(y));
+  return item ? item.id : null;
+}

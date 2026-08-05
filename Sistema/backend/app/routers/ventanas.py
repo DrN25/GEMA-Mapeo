@@ -411,7 +411,14 @@ def calculate_and_persist_subratings(db: Session, v: models.Ventana):
         "largo_m": _safe_distancia_celda(v.distancia_celda),
     }
     rows_data = []
-    for e in v.discontinuidades:
+    # Consultar las discontinuidades por ventana_id (NO por la relationship
+    # v.discontinuidades): esta puede quedar cacheada vacía cuando los objetos
+    # se insertan después de haberla accedido (celdas nuevas) y el cálculo
+    # RMR/RQD/espaciamiento terminaría en 0 silenciosamente.
+    estructuras = db.query(models.EstructuraGeologica).filter(
+        models.EstructuraGeologica.ventana_id == v.ventana_id
+    ).all()
+    for e in estructuras:
         tipo_codigo = None
         if e.tipo_estructura_id:
             tipo_obj = db.query(models.TipoEstructura).filter_by(tipo_estructura_id=e.tipo_estructura_id).first()
@@ -466,7 +473,7 @@ def calculate_and_persist_subratings(db: Session, v: models.Ventana):
         if safe_largo is not None:
             v.distancia_celda = safe_largo
 
-    for r_calc, e in zip(res["rows"], v.discontinuidades):
+    for r_calc, e in zip(res["rows"], estructuras):
         e.valor_alteracion_cd76 = r_calc["alt_r76"]
         e.valor_alteracion_cd89 = r_calc["alt_r89"]
         e.valor_relleno_cd76 = r_calc["relleno_r76"]

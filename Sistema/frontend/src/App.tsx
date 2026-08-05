@@ -42,7 +42,7 @@ import {
   type AllWindowsDiffSummary
 } from './utils/diffUtils';
 
-// --- MIGRACIÃ“N AL NUEVO BULK AUDITOR MODULAR ---
+// --- MIGRACI?“N AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
 import CongruenceAuditor from './features/auditor/CongruenceAuditor';
 import { initCatalogs } from './utils/catalogData';
@@ -66,7 +66,7 @@ const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.loc
 
 import { normalizeJoints, windowFromServerResponse, excelDataToWindowData } from './utils/windowTransform';
 export default function App() {
-  // Inicializar vista y paginaciÃ³n desde localStorage de forma sÃ­ncrona para resiliencia ante F5
+  // Inicializar vista y paginación desde localStorage de forma síncrona para resiliencia ante F5
   const [currentView, setCurrentView] = useState<string>(() => {
     try {
       const savedView = localStorage.getItem('geolog_window_current_view');
@@ -77,7 +77,7 @@ export default function App() {
 
   const [windows, setWindows] = useState<WindowSummary[]>([]);
 
-  // InicializaciÃ³n sÃ­ncrona desde localStorage para resiliencia ante recargas (F5)
+  // Inicialización síncrona desde localStorage para resiliencia ante recargas (F5)
   const [activeWindow, setActiveWindow] = useState<WindowData | null>(() => {
     try {
       const activeCelda = localStorage.getItem('geolog_active_window_celda');
@@ -131,7 +131,7 @@ export default function App() {
     totalJoints: 0
   });
 
-  // PaginaciÃ³n y filtros del Dashboard con inicializaciÃ³n desde localStorage
+  // Paginación y filtros del Dashboard con inicialización desde localStorage
   const [loading, setLoading] = useState<boolean>(false);
   const [kpis, setKpis] = useState<any>(null);
   const [page, setPage] = useState<number>(() => {
@@ -162,7 +162,7 @@ export default function App() {
     } catch (e) { }
   }, [currentView]);
 
-  // Persistir paginaciÃ³n en localStorage
+  // Persistir paginación en localStorage
   useEffect(() => {
     try {
       localStorage.setItem('geolog_window_dashboard_page', String(page));
@@ -213,8 +213,11 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
   // Backend Sync Status
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'unsaved' | 'saving' | 'offline'>('synced');
-  const [syncMessage, setSyncMessage] = useState<string>('Conectado al servidor de base de datos SQL Server.');
+const [syncStatus, setSyncStatus] = useState<'synced' | 'unsaved' | 'saving' | 'offline'>('synced');
+const [syncMessage, setSyncMessage] = useState<string>('Conectado al servidor de base de datos SQL Server.');
+// Indicador de conexión: SOLO refleja si la BD responde (verde/rojo).
+// Independiente del estado de cambios pendientes (syncStatus).
+const [dbOnline, setDbOnline] = useState(true);
 
   // Real-time calculated results & alerts
   const [calculated, setCalculated] = useState<CalculatorResult | null>(null);
@@ -242,7 +245,7 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Evitar de forma global que el scroll del mouse modifique los valores de inputs numÃ©ricos y desplegables
+  // Evitar de forma global que el scroll del mouse modifique los valores de inputs numéricos y desplegables
   useEffect(() => {
     const handleGlobalWheel = (e: WheelEvent) => {
       const activeEl = document.activeElement;
@@ -272,19 +275,21 @@ export default function App() {
       .then(data => {
         initCatalogs(data);
         setCatalogsLoaded(true);
+        setDbOnline(true);
         fetchWindows();
       })
       .catch(err => {
         console.error("Error loading geomechanical catalogs:", err);
         setSyncStatus('offline');
-        setSyncMessage('Error al conectar con el servidor de catÃ¡logos.');
+        setDbOnline(false);
+        setSyncMessage('Error al conectar con el servidor de catálogos.');
       });
   }, []);
 
-  // 3. AuditorÃ­a reactiva de diferencias y rastreo de celda activa
+  // 3. Auditoría reactiva de diferencias y rastreo de celda activa
   const workspaceDiff = computeAllWindowsDiff(activeWindow, dbSnapshotData);
 
-  // 3b. AuditorÃ­a reactiva de cambios en Ensayos PLT
+  // 3b. Auditoría reactiva de cambios en Ensayos PLT
   const pltDiffSummary = useMemo(() => {
     const snap = pltSnapshotRef.current;
     const curr = pltEnsayos;
@@ -316,7 +321,7 @@ export default function App() {
 
   const unsavedCount = workspaceDiff.totalWindowsWithChanges;
 
-  // ResÃºmenes de los borradores locales para el Dashboard (se recalcula con el diff)
+  // Resúmenes de los borradores locales para el Dashboard (se recalcula con el diff)
   const pendingCellSummaries = useMemo(
     () => getPendingCellSummaries(),
     [workspaceDiff, pendingImports]
@@ -346,7 +351,7 @@ export default function App() {
     }
   }, [activeWindow?.header?.celda]);
 
-  // ActualizaciÃ³n reactiva del estado de sincronizaciÃ³n (amarillo / verde)
+  // Actualización reactiva del estado de sincronización (amarillo / verde)
   useEffect(() => {
     const hasWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
     const hasPltChanges = pltDiffSummary.totalChanges > 0;
@@ -355,7 +360,7 @@ export default function App() {
       setSyncMessage('Cambios pendientes por sincronizar en SQL Server.');
     } else {
       setSyncStatus('synced');
-      setSyncMessage('SQL Server Conectado. Todos los datos estÃ¡n sincronizados.');
+      setSyncMessage('SQL Server Conectado. Todos los datos están sincronizados.');
     }
   }, [workspaceDiff.totalWindowsWithChanges, pltDiffSummary.totalChanges]);
 
@@ -379,7 +384,7 @@ export default function App() {
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
       const allAlerts = [...errs, ...vacios, ...pltVacios];
       setAlerts(allAlerts);
-      // Estado persistido de validaciÃ³n de la celda activa (lo consume el bloqueo del guardado)
+      // Estado persistido de validación de la celda activa (lo consume el bloqueo del guardado)
       setCellValidation(activeWindow.header.celda, allAlerts.map(a => a.message || JSON.stringify(a)));
     } else {
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
@@ -393,7 +398,7 @@ export default function App() {
     resetTouchedFields();
   }, [activeWindow?.header?.celda]);
 
-  // ReevaluaciÃ³n en cascada de distancias (m) al largo mÃ¡ximo de la celda
+  // Reevaluación en cascada de distancias (m) al largo máximo de la celda
   useEffect(() => {
     if (!activeWindow) return;
 
@@ -489,7 +494,7 @@ export default function App() {
       if (af.rqd89 !== '') params.set('rqd89', String(Number(af.rqd89)));
       if (af.gsi !== '') params.set('gsi', String(Number(af.gsi)));
 
-      // Calcular fecha_desde/fecha_hasta segÃºn dateRange
+      // Calcular fecha_desde/fecha_hasta según dateRange
       const drActive = dr || activeDateRange;
       const now = new Date();
       if (drActive === 'hoy') {
@@ -542,8 +547,9 @@ export default function App() {
         setTotalFiltered(data.total_filtered);
         setTotalPages(data.total_pages);
         setPage(data.page);
+        setDbOnline(true);
         setSyncStatus('synced');
-        setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} pÃ¡ginas.`);
+        setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} páginas.`);
         return data;
       } else {
         throw new Error();
@@ -551,6 +557,7 @@ export default function App() {
     } catch (e) {
       console.warn("Backend offline, loading from local cache.", e);
       setSyncStatus('offline');
+      setDbOnline(false);
       setSyncMessage("Servidor backend desconectado.");
     } finally {
       setLoading(false);
@@ -580,9 +587,11 @@ export default function App() {
         setPltEnsayos(computed);
         pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
         loadedPltCeldaRef.current = targetCelda;
+        setDbOnline(true);
       }
     } catch (e) {
       console.warn("Failed to fetch PLT trials from database, checking localStorage.", e);
+      setDbOnline(false);
       const cached = localStorage.getItem(`plt_ensayos_${targetCelda}`);
       if (cached) {
         try {
@@ -606,14 +615,39 @@ export default function App() {
 
   const handleSelectWindow = async (name: string) => {
     setSyncStatus('saving');
+    // Carga desde el caché local (borrador). Devuelve true si se cargó.
+    const loadCachedLocal = (): boolean => {
+      const cached = getCachedCellRaw(name);
+      if (!cached) return false;
+      try {
+        const parsed = JSON.parse(cached);
+        parsed.joints = normalizeJoints(parsed.joints || []);
+        setActiveWindow(parsed);
+        const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${name}`);
+        if (snapshotRaw) {
+          const snapParsed = JSON.parse(snapshotRaw);
+          setDbSnapshotData(snapParsed);
+          setDbSnapshotHash(fastHashObject(snapParsed));
+        } else {
+          // Celda sin respaldo en BD (borrador local): mantenerla como NUEVA
+          // pendiente (snapshot nulo) para que el diff la siga detectando.
+          setDbSnapshotData(null);
+          setDbSnapshotHash(null);
+        }
+        return true;
+      } catch {
+        return false; // caché corrupto
+      }
+    };
+
     try {
       const res = await fetch(`${API_BASE}/api/ventanas/${name}`);
       if (res.ok) {
         const v = await res.json();
         const loadedWindow = windowFromServerResponse(v);
 
-        // Si la celda tiene una versiÃ³n local con cambios sin guardar (borrador),
-        // esa versiÃ³n es el estado activo y la BD solo es el baseline del diff.
+        // Si la celda tiene una versión local con cambios sin guardar (borrador),
+        // esa versión es el estado activo y la BD solo es el baseline del diff.
         const cachedLocalRaw = getCachedCellRaw(name);
         const hasLocalPending = isCellPending(name) && !!cachedLocalRaw;
         let activeToUse = loadedWindow;
@@ -623,7 +657,7 @@ export default function App() {
             localParsed.joints = normalizeJoints(localParsed.joints || [], localParsed.header?.intemperia);
             activeToUse = localParsed;
           } catch {
-            activeToUse = loadedWindow; // cachÃ© corrupto: usar la versiÃ³n de BD
+            activeToUse = loadedWindow; // caché corrupto: usar la versión de BD
           }
         }
         const snapshotHash = fastHashObject(loadedWindow);
@@ -638,38 +672,37 @@ export default function App() {
         safeSetItem(`geolog_window_snapshot_${name}`, JSON.stringify(loadedWindow), ctx);
         safeSetItem(`geolog_window_snapshot_hash_${name}`, snapshotHash, ctx);
 
-        // Regla 1 (OpciÃ³n A): al cambiar de celda, eliminar el cachÃ© de todas
-        // las celdas no protegidas (activa, pendientes, reciÃ©n importadas).
+        // Regla 1 (Opción A): al cambiar de celda, eliminar el caché de todas
+        // las celdas no protegidas (activa, pendientes, recién importadas).
         evictSincronizadas(ctx);
 
         fetchPltEnsayos(name);
+        setDbOnline(true);
         setSyncStatus('synced');
         setCurrentView('mapeo');
         setSelectedRowIndex(0);
-      } else {
-        throw new Error();
+        return;
       }
+
+      if (res.status === 404) {
+        // La celda no existe en BD (borrador local): NO es una desconexión.
+        // El estado de sincronización lo recalcula el efecto reactivo.
+        const loaded = loadCachedLocal();
+        if (!loaded) {
+          setSyncStatus('synced');
+          setSyncMessage('SQL Server Conectado.');
+        }
+        setCurrentView('mapeo');
+        return;
+      }
+
+      throw new Error(`HTTP ${res.status}`);
     } catch (e) {
       console.warn("Loading cached local window: ", name, e);
-      const cached = getCachedCellRaw(name);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        parsed.joints = normalizeJoints(parsed.joints || []);
-        setActiveWindow(parsed);
-
-        const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${name}`);
-        if (snapshotRaw) {
-          const snapParsed = JSON.parse(snapshotRaw);
-          setDbSnapshotData(snapParsed);
-          setDbSnapshotHash(fastHashObject(snapParsed));
-        } else {
-          // Celda sin respaldo en BD (borrador local): mantenerla como NUEVA
-          // pendiente (snapshot nulo) para que el diff la siga detectando.
-          setDbSnapshotData(null);
-          setDbSnapshotHash(null);
-        }
-      }
+      loadCachedLocal();
       setSyncStatus('offline');
+      setDbOnline(false);
+      setSyncMessage('SQL Server Desconectado.');
       setCurrentView('mapeo');
     }
   };
@@ -718,8 +751,8 @@ export default function App() {
     setDbSnapshotData(null);
     setDbSnapshotHash(null);
     safeSetItem('geolog_active_window_celda', formatted.header.celda, { activeCelda: formatted.header.celda, pendingImports });
-    // NO escribir geolog_window_* aquÃ­: el useEffect de rastreo lo harÃ¡ en el siguiente ciclo
-    // de render, despuÃ©s de que computeWindowDiff detecte correctamente la celda como nueva.
+    // NO escribir geolog_window_* aquí: el useEffect de rastreo lo hará en el siguiente ciclo
+    // de render, después de que computeWindowDiff detecte correctamente la celda como nueva.
     setCurrentView('mapeo');
     setSyncStatus('unsaved');
   };
@@ -729,7 +762,7 @@ export default function App() {
     // significa descartarlo del workspace, sin tocar SQL Server.
     const isLocalOnly = isCellPending(name) && !localStorage.getItem(`geolog_window_snapshot_${name}`);
     if (isLocalOnly) {
-      if (!confirm(`El borrador local '${name}' aÃºn no estÃ¡ en la base de datos. Al eliminarlo se perderÃ¡ definitivamente. Â¿Continuar?`)) {
+      if (!confirm(`El borrador local '${name}' aún no está en la base de datos. Al eliminarlo se perderá definitivamente. ¿Continuar?`)) {
         return;
       }
       discardLocalCell(name);
@@ -740,15 +773,16 @@ export default function App() {
       return;
     }
 
-    if (!confirm(`Â¿EstÃ¡ seguro de que desea eliminar permanentemente la celda ${name}? Se borrarÃ¡ de SQL Server.`)) {
+    if (!confirm(`¿Está seguro de que desea eliminar permanentemente la celda ${name}? Se borrará de SQL Server.`)) {
       return;
     }
 
     try {
       const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { method: 'DELETE' });
       if (res.ok) {
+        setDbOnline(true);
         setSyncStatus('synced');
-        setSyncMessage(`Celda ${name} eliminada con Ã©xito.`);
+        setSyncMessage(`Celda ${name} eliminada con éxito.`);
         fetchWindows();
       } else {
         throw new Error();
@@ -758,9 +792,10 @@ export default function App() {
       const updated = windows.filter(w => w.name !== name);
       setWindows(updated);
       setSyncStatus('offline');
+      setDbOnline(false);
     }
 
-    // Limpiar cualquier resto local de la celda (pendientes + cachÃ©) en ambos caminos
+    // Limpiar cualquier resto local de la celda (pendientes + caché) en ambos caminos
     discardLocalCell(name);
 
     if (activeWindow?.header.celda === name) {
@@ -777,19 +812,21 @@ export default function App() {
   const handleImportToPending = async (items: ImportedCellItem[]) => {
     if (!Array.isArray(items) || items.length === 0) return;
 
-    // Regla 3 â€” middleware de espacio: no importar si el navegador no tiene lugar
+    // Regla 3 ”” middleware de espacio: no importar si el navegador no tiene lugar
     const space = canImport(items.length);
     if (!space.ok) {
       alert(
         space.code === 'IMPORT_LIMITED'
           ? `Solo hay espacio en el navegador para ${space.maxCells} celda(s). Guarde sus cambios pendientes o importe menos celdas.`
-          : 'El almacenamiento del navegador estÃ¡ lleno. Guarde sus cambios pendientes para liberar espacio e intente de nuevo.'
+          : 'El almacenamiento del navegador está lleno. Guarde sus cambios pendientes para liberar espacio e intente de nuevo.'
       );
       return;
     }
 
     let imported = 0;
-    for (const item of items) {
+    const firstCelda = items[0]?.codigo_final;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       const windowData = excelDataToWindowData(item.codigo_final, item.excel_data, item.estructuras);
       if (!windowData) continue;
       const celda = windowData.header.celda;
@@ -797,9 +834,11 @@ export default function App() {
       safeSetItem(`geolog_window_${celda}`, JSON.stringify(windowData), ctx);
 
       // Baseline: si la celda ya existe en BD, traer su estado para que el
-      // guardado la ACTUALICE en lugar de bloquear por colisiÃ³n de nombre.
+      // guardado la ACTUALICE en lugar de bloquear por colisión de nombre.
+      // La PRIMERA celda se salta: handleSelectWindow la abrirá y hará ese
+      // fetch con su propia lógica (evita el GET duplicado en los logs).
       const hasSnapshot = !!localStorage.getItem(`geolog_window_snapshot_${celda}`);
-      if (!hasSnapshot) {
+      if (!hasSnapshot && celda !== firstCelda) {
         try {
           const res = await fetch(`${API_BASE}/api/ventanas/${encodeURIComponent(celda)}`);
           if (res.ok) {
@@ -809,12 +848,12 @@ export default function App() {
             safeSetItem(`geolog_window_snapshot_hash_${celda}`, fastHashObject(baseline), ctx);
           }
         } catch {
-          // offline: quedarÃ¡ como borrador nuevo; el guardado avisarÃ¡ si colisiona
+          // offline: quedará como borrador nuevo; el guardado avisará si colisiona
         }
       }
 
       addPendingCell(celda);
-      // Estado de validaciÃ³n desde el primer momento (bloquea el guardado si estÃ¡ incompleta)
+      // Estado de validación desde el primer momento (bloquea el guardado si está incompleta)
       setCellValidation(celda, validateMapeoWindow(windowData).map(i => i.message));
       imported++;
     }
@@ -857,11 +896,13 @@ export default function App() {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Error al renombrar la celda en el servidor.");
       }
+      setDbOnline(true);
       setSyncStatus('synced');
       setSyncMessage(`Celda renombrada a '${cleanNewName}' en SQL Server.`);
     } catch (err) {
       console.warn("Backend rename offline or failed, applying local snapshot migration:", err);
       setSyncStatus('offline');
+      setDbOnline(false);
       setSyncMessage(`Celda renombrada localmente a '${cleanNewName}'.`);
     }
 
@@ -917,7 +958,7 @@ export default function App() {
     fetchWindows();
   };
 
-  // PaginaciÃ³n y filtros del Dashboard
+  // Paginación y filtros del Dashboard
   const handleSearchSubmit = (term: string, globalSearch: boolean) => {
     setSearchTerm(term);
     setIsGlobalSearch(globalSearch);
@@ -989,7 +1030,7 @@ export default function App() {
     if (!activeWindow) return;
 
     if (famId <= 3) {
-      alert("No se pueden eliminar las familias bÃ¡sicas obligatorias (F1, F2, F3).");
+      alert("No se pueden eliminar las familias básicas obligatorias (F1, F2, F3).");
       return;
     }
 
@@ -1017,9 +1058,9 @@ export default function App() {
     );
 
     if (hasData) {
-      const confirm1 = window.confirm(`Â¿EstÃ¡ seguro de que desea eliminar la Familia F${famId}? Contiene datos registrados.`);
+      const confirm1 = window.confirm(`¿Está seguro de que desea eliminar la Familia F${famId}? Contiene datos registrados.`);
       if (!confirm1) return;
-      const confirm2 = window.confirm(`ATENCIÃ“N: Se perderÃ¡n definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serÃ¡n reindexadas automÃ¡ticamente. Â¿Confirmar eliminaciÃ³n?`);
+      const confirm2 = window.confirm(`ATENCI?“N: Se perderán definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serán reindexadas automáticamente. ¿Confirmar eliminación?`);
       if (!confirm2) return;
     }
 
@@ -1069,8 +1110,8 @@ export default function App() {
     let successCount = 0;
     let totalJointsSaved = 0;
 
-    // VerificaciÃ³n de colisiones: las celdas NUEVAS (sin snapshot) pudieron ser
-    // creadas en BD por otra persona despuÃ©s de crear el borrador local. Ante
+    // Verificación de colisiones: las celdas NUEVAS (sin snapshot) pudieron ser
+    // creadas en BD por otra persona después de crear el borrador local. Ante
     // cualquier duda (celda existente o error de red) se bloquea el guardado.
     const newCellNames = windowsToSave
       .filter(w => !localStorage.getItem(`geolog_window_snapshot_${w.header.celda}`))
@@ -1080,18 +1121,18 @@ export default function App() {
       if (!check.ok) {
         setIsLoadingWindow(false);
         setSyncStatus('unsaved');
-        setSyncMessage('No se guardÃ³: hay celdas cuyo cÃ³digo ya existe en la base de datos.');
+        setSyncMessage('No se guardó: hay celdas cuyo código ya existe en la base de datos.');
         alert(
-          `El cÃ³digo ${check.collisions.join(', ')} ya existe en la base de datos ` +
-          '(fue creado despuÃ©s de su borrador). Renombre su celda o descarte el borrador antes de guardar.'
+          `El código ${check.collisions.join(', ')} ya existe en la base de datos ` +
+          '(fue creado después de su borrador). Renombre su celda o descarte el borrador antes de guardar.'
         );
         return;
       }
     }
 
-    // Bloqueo por QA/QC (F1/F2): se consulta el estado de validaciÃ³n PERSISTIDO
-    // de cada celda pendiente (actualizado en cada evaluaciÃ³n). Si una celda no
-    // tiene registro (p.ej. importada sin abrir), se evalÃºa aquÃ­ mismo (fallback).
+    // Bloqueo por QA/QC (F1/F2): se consulta el estado de validación PERSISTIDO
+    // de cada celda pendiente (actualizado en cada evaluación). Si una celda no
+    // tiene registro (p.ej. importada sin abrir), se evalúa aquí mismo (fallback).
     for (const w of windowsToSave) {
       if (!hasCellValidation(w.header.celda)) {
         setCellValidation(w.header.celda, validateMapeoWindow(w).map(i => i.message));
@@ -1102,11 +1143,11 @@ export default function App() {
     if (invalidCells.length > 0) {
       setIsLoadingWindow(false);
       setSyncStatus('unsaved');
-      setSyncMessage('No se guardÃ³: hay celdas con campos pendientes o inconsistencias QA/QC.');
+      setSyncMessage('No se guardó: hay celdas con campos pendientes o inconsistencias QA/QC.');
       alert(
         `No se puede guardar: ${invalidCells
           .map(v => `${v.celda} (${v.count} problema(s))`)
-          .join(', ')}. Abra cada celda y corrija los campos seÃ±alados en el panel QA/QC.`
+          .join(', ')}. Abra cada celda y corrija los campos señalados en el panel QA/QC.`
       );
       return;
     }
@@ -1212,6 +1253,7 @@ export default function App() {
         if (res.ok) {
           successCount++;
           totalJointsSaved += nonVacantJoints.length;
+          setDbOnline(true);
           const hash = fastHashObject(winData);
           const ctx = { activeCelda: winData.header.celda, pendingImports };
           safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
@@ -1230,6 +1272,7 @@ export default function App() {
         }
       } catch (err) {
         console.warn("Save DB failed, persisting locally in localStorage:", winData.header.celda, err);
+        setDbOnline(false);
         const hash = fastHashObject(winData);
         const ctx = { activeCelda: winData.header.celda, pendingImports };
         safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
@@ -1262,9 +1305,11 @@ export default function App() {
           if (activeCelda) {
             loadedPltCeldaRef.current = activeCelda.trim().toUpperCase();
           }
+          setDbOnline(true);
         }
       } catch (e) {
         console.error("Error saving PLT trials to SQL Server:", e);
+        setDbOnline(false);
       }
     }
 
@@ -1287,7 +1332,7 @@ export default function App() {
       const celda = activeWindow.header.celda;
       const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
       if (snapshotRaw) {
-        // Celda con respaldo en BD: restaurar al Ãºltimo estado persistido
+        // Celda con respaldo en BD: restaurar al último estado persistido
         const ctx = { activeCelda: celda, pendingImports };
         const parsed = JSON.parse(snapshotRaw);
         setActiveWindow(parsed);
@@ -1312,7 +1357,7 @@ export default function App() {
               setActiveWindow(parsed);
             }
           } else {
-            // Borrador local puro: no tiene respaldo en BD â†’ eliminar definitivamente
+            // Borrador local puro: no tiene respaldo en BD → eliminar definitivamente
             discardLocalCell(celda);
             if (activeWindow && activeWindow.header.celda === celda) {
               setActiveWindow(null);
@@ -1348,7 +1393,7 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-navy-950 text-slate-100 gap-4">
         <div className="w-12 h-12 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"></div>
-        <p className="text-sm font-semibold tracking-wide text-slate-400">Cargando interfaz de ventanas geomecÃ¡nicas...</p>
+        <p className="text-sm font-semibold tracking-wide text-slate-400">Cargando interfaz de ventanas geomecánicas...</p>
       </div>
     );
   }
@@ -1371,11 +1416,11 @@ export default function App() {
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
 
-            {/* BOTÃ“N INTERACTIVO DE COLAPSO */}
+            {/* BOT?“N INTERACTIVO DE COLAPSO */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
-              title={sidebarCollapsed ? "Mostrar menÃº lateral" : "Ocultar menÃº lateral"}
+              title={sidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
             >
               <Menu size={16} />
             </button>
@@ -1394,12 +1439,12 @@ export default function App() {
           <div className="flex items-center gap-4">
             {/* Server Connectivity Indicator */}
             <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
-              <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'offline'
-                ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
-                : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
+              <span className={`w-2.5 h-2.5 rounded-full ${dbOnline
+                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
+                : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
                 }`} />
-              <span className="text-xs text-slate-400 font-semibold hidden md:inline" title={syncMessage}>
-                {syncStatus === 'offline' ? 'SQL Server Desconectado' : 'SQL Server Conectado'}
+              <span className="text-xs text-slate-400 font-semibold hidden md:inline" title={dbOnline ? 'Conectado al servidor de base de datos SQL Server.' : 'SQL Server Desconectado'}>
+                {dbOnline ? 'SQL Server Conectado' : 'SQL Server Desconectado'}
               </span>
             </div>
 
@@ -1412,28 +1457,28 @@ export default function App() {
                   ? 'bg-violet-500/10 border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.12)]'
                   : 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200'
                   }`}
-                title="Activar/Desactivar visualizaciÃ³n de fÃ³rmulas al pasar el mouse"
+                title="Activar/Desactivar visualización de fórmulas al pasar el mouse"
               >
                 <Calculator size={14} className={showFormulas ? 'text-violet-400 animate-pulse' : 'text-slate-400'} />
-                <span>{showFormulas ? 'FÃ³rmulas Activas' : 'Ocultar FÃ³rmulas'}</span>
+                <span>{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
               </button>
 
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
                 className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95"
-                title="Ver CatÃ¡logos de Referencia GeomecÃ¡nica de Ventanas"
+                title="Ver Catálogos de Referencia Geomecánica de Ventanas"
               >
                 <BookOpen size={14} className="text-sky-400" />
-                <span>CatÃ¡logo de Ventanas</span>
+                <span>Catálogo de Ventanas</span>
               </button>
 
               <button
                 onClick={() => setIsPltCatalogModalOpen(true)}
                 className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95"
-                title="Ver CatÃ¡logos de Referencia de Ensayos PLT"
+                title="Ver Catálogos de Referencia de Ensayos PLT"
               >
                 <Activity size={14} className="text-cyan-400" />
-                <span>CatÃ¡logo de Ensayos PLT</span>
+                <span>Catálogo de Ensayos PLT</span>
               </button>
 
               {activeWindow && (
@@ -1447,7 +1492,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* BotÃ³n Descartar Cambios */}
+              {/* Botón Descartar Cambios */}
               {unsavedCount > 0 && (
                 <button
                   onClick={() => setShowDiscardModal(true)}
@@ -1460,7 +1505,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* BotÃ³n Guardar Cambios */}
+              {/* Botón Guardar Cambios */}
               <button
                 onClick={() => setShowSaveConfirmModal(true)}
                 disabled={isLoadingWindow || (unsavedCount === 0 && syncStatus !== 'unsaved')}
@@ -1545,7 +1590,7 @@ export default function App() {
                 showFormulas={showFormulas} // Nueva Prop
               />
 
-              {/* CENTRO DE MÃ‰TRICAS GEOMECÃNICA */}
+              {/* CENTRO DE M?‰TRICAS GEOMEC?NICA */}
               {(() => {
                 const getFamilyStyle = (fam: number) => {
                   const styles: Record<number, { dot: string; container: string; badge: string }> = {
@@ -1589,7 +1634,7 @@ export default function App() {
                           </span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Promedio aritmÃ©tico simple de los registros por familia: <code className="text-slate-400/80">Î£(esp) / N</code>
+                          Promedio aritmético simple de los registros por familia: <code className="text-slate-400/80">Î£(esp) / N</code>
                         </p>
                       </div>
 
@@ -1617,29 +1662,29 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Card 2: ÃNDICE VOLUMÃ‰TRICO */}
+                    {/* Card 2: ?NDICE VOLUM?‰TRICO */}
                     <div className="lg:col-span-2 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
                           <Layers size={16} className="text-yellow-500/80" />
-                          <span>ÃNDICE VOLUMÃ‰TRICO</span>
+                          <span>?NDICE VOLUM?‰TRICO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Conteo de discontinuidades volumÃ©tricas (Jv).
+                          Conteo de discontinuidades volumétricas (Jv).
                         </p>
                       </div>
 
                       <div className="my-4 border border-yellow-500/30 bg-yellow-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
                         <span className="text-3xl font-black font-mono tracking-tight text-yellow-500">
-                          {calculated ? calculated.jv.toFixed(4) : 'â€”'}
+                          {calculated ? calculated.jv.toFixed(4) : '””'}
                         </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">JTS / MÂ³</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">JTS / M³</span>
                         <Layers size={24} className="text-yellow-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
                       </div>
 
                       <div className="mt-auto border border-yellow-500/20 bg-yellow-500/5 rounded-lg py-2 px-3 text-center">
                         <span className="text-xs font-extrabold text-yellow-500 uppercase tracking-widest">
-                          {calculated ? getJvClassification(calculated.jv) : 'â€”'}
+                          {calculated ? getJvClassification(calculated.jv) : '””'}
                         </span>
                       </div>
                     </div>
@@ -1652,13 +1697,13 @@ export default function App() {
                           <span>RQD ESTIMADO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          CÃ¡lculo empÃ­rico segÃºn fÃ³rmula de PalmstrÃ¶m: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 Â· Jv</code>
+                          Cálculo empírico según fórmula de Palmstr?¶m: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
                         </p>
                       </div>
 
                       <div className="my-4 border border-sky-500/30 bg-sky-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
                         <span className="text-3xl font-black font-mono tracking-tight text-sky-400">
-                          {calculated ? calculated.rqd_est.toFixed(2) : 'â€”'}
+                          {calculated ? calculated.rqd_est.toFixed(2) : '””'}
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">RQD ESTIMADO</span>
                         <Gauge size={24} className="text-sky-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
@@ -1683,7 +1728,7 @@ export default function App() {
                 );
               })()}
 
-              {/* Comentarios y FotografÃ­as Colapsable */}
+              {/* Comentarios y Fotografías Colapsable */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between bg-navy-950/45 p-4 rounded-xl border border-navy-800/80">
                   <div className="flex items-center gap-2.5">
@@ -1692,7 +1737,7 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">
-                        Comentarios y FotografÃ­as
+                        Comentarios y Fotografías
                       </h4>
                       <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                         Registro de observaciones visuales y fotos de la celda
@@ -1728,7 +1773,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* ANÃLISIS GEOMECÃNICO RMR SIEMPRE EXPANDIDO */}
+              {/* AN?LISIS GEOMEC?NICO RMR SIEMPRE EXPANDIDO */}
               <RmrAnalysis
                 header={activeWindow.header}
                 onChange={(header) => setActiveWindow({ ...activeWindow, header })}
@@ -1787,9 +1832,9 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
-                    CatÃ¡logo de Referencia de Ventanas (RMR)
+                    Catálogo de Referencia de Ventanas (RMR)
                   </h3>
-                  <p className="text-xs text-slate-400">GuÃ­a de parÃ¡metros y ratings para clasificaciones RMR (Bieniawski)</p>
+                  <p className="text-xs text-slate-400">Guía de parámetros y ratings para clasificaciones RMR (Bieniawski)</p>
                 </div>
               </div>
               <button
@@ -1819,9 +1864,9 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
-                    CatÃ¡logo de Ensayos PLT y LitologÃ­as
+                    Catálogo de Ensayos PLT y Litologías
                   </h3>
-                  <p className="text-xs text-slate-400">ParÃ¡metros de resistencia de roca intacta y factores de correlaciÃ³n K</p>
+                  <p className="text-xs text-slate-400">Parámetros de resistencia de roca intacta y factores de correlación K</p>
                 </div>
               </div>
               <button
@@ -1839,7 +1884,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modales de ConfirmaciÃ³n, Descarte y Resultados */}
+      {/* Modales de Confirmación, Descarte y Resultados */}
       <SaveConfirmModal
         isOpen={showSaveConfirmModal}
         onClose={() => setShowSaveConfirmModal(false)}
@@ -1883,7 +1928,7 @@ export default function App() {
           <div className="p-6 bg-navy-900 border border-violet-500/30 rounded-2xl shadow-2xl flex flex-col items-center gap-3">
             <Loader2 size={40} className="text-violet-400 animate-spin" />
             <p className="text-xs font-black uppercase tracking-wider text-slate-100">Sincronizando ventanas con SQL Server...</p>
-            <p className="text-[11px] text-slate-400 font-medium">Por favor espere a que finalice la transacciÃ³n en la base de datos.</p>
+            <p className="text-[11px] text-slate-400 font-medium">Por favor espere a que finalice la transacción en la base de datos.</p>
           </div>
         </div>
       )}
