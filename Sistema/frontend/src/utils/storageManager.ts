@@ -101,11 +101,67 @@ function getUnsavedList(): string[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Lista de celdas pendientes (geolog_unsaved_windows)
+// ---------------------------------------------------------------------------
+
+/** Códigos de todas las celdas con cambios pendientes por sincronizar. */
+export function getUnsavedCeldas(): string[] {
+  return getUnsavedList();
+}
+
+/** Registra una celda como pendiente (idempotente). */
+export function addPendingCell(celda: string): void {
+  const list = getUnsavedList();
+  if (!list.includes(celda)) {
+    try {
+      localStorage.setItem(KEY_UNSAVED, JSON.stringify([...list, celda]));
+    } catch {
+      // ignorar: la lista de pendientes nunca debe romper el flujo principal
+    }
+  }
+}
+
+/** Quita una celda de la lista de pendientes (idempotente). */
+export function removePendingCell(celda: string): void {
+  const list = getUnsavedList();
+  if (list.includes(celda)) {
+    try {
+      localStorage.setItem(KEY_UNSAVED, JSON.stringify(list.filter(c => c !== celda)));
+    } catch {
+      // ignorar
+    }
+  }
+}
+
 /** ¿La celda está protegida de evicción? */
 export function isCeldaProtegida(celda: string, ctx: EvictionContext = {}): boolean {
   if (celda === ctx.activeCelda) return true;
   if (ctx.pendingImports && ctx.pendingImports.includes(celda)) return true;
   return getUnsavedList().includes(celda);
+}
+
+// ---------------------------------------------------------------------------
+// Caché de celdas (acceso único a geolog_window_*)
+// ---------------------------------------------------------------------------
+
+/** Lee el caché crudo de una celda (geolog_window_*) o null. */
+export function getCachedCellRaw(celda: string): string | null {
+  try {
+    return localStorage.getItem(KEY_WINDOW(celda));
+  } catch {
+    return null;
+  }
+}
+
+/** ¿Existe caché de la celda? */
+export function hasCachedCell(celda: string): boolean {
+  return getCachedCellRaw(celda) !== null;
+}
+
+/** Escribe el caché de una celda de forma segura (protege la activa). */
+export function setCachedCellRaw(celda: string, value: string): StorageResult {
+  return safeSetItem(KEY_WINDOW(celda), value, { activeCelda: celda });
 }
 
 // ---------------------------------------------------------------------------

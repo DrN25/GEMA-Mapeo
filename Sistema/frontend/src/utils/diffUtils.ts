@@ -1,4 +1,5 @@
 import type { WindowHeader, JointRow } from './rmrCalculator';
+import { getUnsavedCeldas } from './storageManager';
 
 export interface WindowData {
   header: WindowHeader;
@@ -241,8 +242,7 @@ export function computeAllWindowsDiff(
 
   // Cargar lista de celdas pendientes rastreadas en localStorage
   try {
-    const unsavedListRaw = localStorage.getItem('geolog_unsaved_windows');
-    const unsavedCeldaNames: string[] = unsavedListRaw ? JSON.parse(unsavedListRaw) : [];
+    const unsavedCeldaNames = getUnsavedCeldas();
 
     for (const celdaName of unsavedCeldaNames) {
       if (activeWindow && activeWindow.header.celda === celdaName) continue; // Ya procesada arriba

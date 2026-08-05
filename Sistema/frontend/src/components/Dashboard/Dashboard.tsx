@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight, Filter, X, ChevronDown } from 'lucide-react';
 import CreateWindowModal from '../modals/CreateWindowModal';
 import { limitNumberWithMax } from '../../utils/inputLimits';
+import type { PendingCellSummary } from '../../utils/cellRegistry';
+import { CELL_SOURCE_LABELS, getAllKnownCellNames } from '../../utils/cellRegistry';
 
 export interface WindowSummary {
   name: string;
@@ -40,6 +42,7 @@ interface DashboardProps {
   totalPages: number;
   loading: boolean;
   pendingImports: string[];
+  pendingCells: PendingCellSummary[];
   searchTerm: string;
   isGlobalSearch: boolean;
   onSearchSubmit: (term: string, isGlobal: boolean) => void;
@@ -82,6 +85,7 @@ export default function Dashboard({
   totalPages,
   loading,
   pendingImports,
+  pendingCells,
   searchTerm,
   isGlobalSearch,
   onSearchSubmit,
@@ -515,6 +519,51 @@ export default function Dashboard({
                     ))}
                   </tr>
                 ))}
+                {!loading && pendingCells.length > 0 && pendingCells.map(pc => (
+                  <tr
+                    key={`pend-${pc.name}`}
+                    onClick={() => onSelectWindow(pc.name)}
+                    className="hover:bg-navy-900/20 cursor-pointer transition-colors h-11 bg-amber-500/[0.04]"
+                  >
+                    <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
+                      <div className="flex items-center gap-2">
+                        <span>{pc.name}</span>
+                        {CELL_SOURCE_LABELS.local && (
+                          <span
+                            className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
+                            title="Esta celda aún no se ha guardado en la base de datos. Usa GUARDAR CAMBIOS para subirla."
+                          >
+                            {CELL_SOURCE_LABELS.local}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-400 text-[10px]">{pc.fecha_mapeo || '—'}</td>
+                    <td className="py-2.5 px-4 text-slate-400">{pc.sector_geotecnico || '—'}</td>
+                    <td className="py-2.5 px-4 text-center text-slate-600">—</td>
+                    <td className="py-2.5 px-4 text-center text-slate-600">—</td>
+                    <td className="py-2.5 px-4 text-center text-slate-600">—</td>
+                    <td className="py-2.5 px-4 text-center text-slate-600">—</td>
+                    <td className="py-2.5 px-4 text-center text-slate-600">—</td>
+                    <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => onSelectWindow(pc.name)}
+                          className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs"
+                        >
+                          Mapear
+                        </button>
+                        <button
+                          onClick={() => onDeleteWindow(pc.name)}
+                          className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-90"
+                          title="Descartar borrador"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
                 {!loading && filteredWindows.map(w => (
                   <tr
                     key={w.name}
@@ -644,7 +693,7 @@ export default function Dashboard({
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           onCreate={onCreateWindow}
-          existingCeldas={windows.map(w => w.name)}
+          existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
         />
       </div>
     </>

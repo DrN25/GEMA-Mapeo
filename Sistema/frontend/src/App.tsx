@@ -21,7 +21,14 @@ import SaveResultModal from './components/modals/SaveResultModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject } from './utils/hashUtils';
-import { evictCelda, evictSincronizadas, safeSetItem } from './utils/storageManager';
+import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw } from './utils/storageManager';
+import {
+  discardLocalCell,
+  getAllKnownCellNames,
+  getPendingCellSummaries,
+  isCellPending,
+  verifyNameCollisions,
+} from './utils/cellRegistry';
 import {
   computeWindowDiff,
   computeAllWindowsDiff,
@@ -353,6 +360,12 @@ export default function App() {
 
   const unsavedCount = workspaceDiff.totalWindowsWithChanges;
 
+  // Resúmenes de los borradores locales para el Dashboard (se recalcula con el diff)
+  const pendingCellSummaries = useMemo(
+    () => getPendingCellSummaries(),
+    [workspaceDiff, pendingImports]
+  );
+
   useEffect(() => {
     if (!activeWindow) return;
     const celda = activeWindow.header.celda;
@@ -363,17 +376,11 @@ export default function App() {
     const activeHash = fastHashObject(activeWindow);
     const savedHash = dbSnapshotHash || localStorage.getItem(`geolog_window_snapshot_hash_${celda}`);
 
-    try {
-      const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
-      const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
-      const hasChanged = activeHash !== savedHash;
-
-      if (hasChanged && !unsavedList.includes(celda)) {
-        safeSetItem('geolog_unsaved_windows', JSON.stringify([...unsavedList, celda]), ctx);
-      } else if (!hasChanged && unsavedList.includes(celda)) {
-        safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)), ctx);
-      }
-    } catch (e) { }
+    if (activeHash !== savedHash) {
+      addPendingCell(celda);
+    } else {
+      removePendingCell(celda);
+    }
   }, [activeWindow, dbSnapshotHash, pendingImports]);
 
   useEffect(() => {
@@ -744,23 +751,32 @@ export default function App() {
         });
 
         const loadedWindow: WindowData = { header, joints: normalizeJoints(joints, header.intemperia) };
+
+        // Si la celda tiene una versión local con cambios sin guardar (borrador),
+        // esa versión es el estado activo y la BD solo es el baseline del diff.
+        const cachedLocalRaw = getCachedCellRaw(name);
+        const hasLocalPending = isCellPending(name) && !!cachedLocalRaw;
+        let activeToUse = loadedWindow;
+        if (hasLocalPending && cachedLocalRaw) {
+          try {
+            const localParsed = JSON.parse(cachedLocalRaw);
+            localParsed.joints = normalizeJoints(localParsed.joints || [], localParsed.header?.intemperia);
+            activeToUse = localParsed;
+          } catch {
+            activeToUse = loadedWindow; // caché corrupto: usar la versión de BD
+          }
+        }
         const snapshotHash = fastHashObject(loadedWindow);
 
-        setActiveWindow(loadedWindow);
+        setActiveWindow(activeToUse);
         setDbSnapshotData(loadedWindow);
         setDbSnapshotHash(snapshotHash);
 
         const ctx = { activeCelda: name, pendingImports };
         safeSetItem('geolog_active_window_celda', name, ctx);
-        safeSetItem(`geolog_window_${name}`, JSON.stringify(loadedWindow), ctx);
+        safeSetItem(`geolog_window_${name}`, JSON.stringify(activeToUse), ctx);
         safeSetItem(`geolog_window_snapshot_${name}`, JSON.stringify(loadedWindow), ctx);
         safeSetItem(`geolog_window_snapshot_hash_${name}`, snapshotHash, ctx);
-
-        try {
-          const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
-          const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
-          safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== name)), ctx);
-        } catch (e) { }
 
         // Regla 1 (Opción A): al cambiar de celda, eliminar el caché de todas
         // las celdas no protegidas (activa, pendientes, recién importadas).
@@ -775,7 +791,7 @@ export default function App() {
       }
     } catch (e) {
       console.warn("Loading cached local window: ", name, e);
-      const cached = localStorage.getItem(`geolog_window_${name}`);
+      const cached = getCachedCellRaw(name);
       if (cached) {
         const parsed = JSON.parse(cached);
         parsed.joints = normalizeJoints(parsed.joints || []);
@@ -787,8 +803,10 @@ export default function App() {
           setDbSnapshotData(snapParsed);
           setDbSnapshotHash(fastHashObject(snapParsed));
         } else {
-          setDbSnapshotData(parsed);
-          setDbSnapshotHash(fastHashObject(parsed));
+          // Celda sin respaldo en BD (borrador local): mantenerla como NUEVA
+          // pendiente (snapshot nulo) para que el diff la siga detectando.
+          setDbSnapshotData(null);
+          setDbSnapshotHash(null);
         }
       }
       setSyncStatus('offline');
@@ -847,6 +865,21 @@ export default function App() {
   };
 
   const handleDeleteWindow = async (name: string) => {
+    // Borrador local puro: no existe en BD (no tiene snapshot). Eliminarlo
+    // significa descartarlo del workspace, sin tocar SQL Server.
+    const isLocalOnly = isCellPending(name) && !localStorage.getItem(`geolog_window_snapshot_${name}`);
+    if (isLocalOnly) {
+      if (!confirm(`El borrador local '${name}' aún no está en la base de datos. Al eliminarlo se perderá definitivamente. ¿Continuar?`)) {
+        return;
+      }
+      discardLocalCell(name);
+      if (activeWindow?.header.celda === name) {
+        setActiveWindow(null);
+      }
+      setCurrentView('dashboard');
+      return;
+    }
+
     if (!confirm(`¿Está seguro de que desea eliminar permanentemente la celda ${name}? Se borrará de SQL Server.`)) {
       return;
     }
@@ -864,10 +897,11 @@ export default function App() {
       console.warn("Failed to delete from DB, deleting locally.", e);
       const updated = windows.filter(w => w.name !== name);
       setWindows(updated);
-      // Eliminar todo el caché local de la celda (window, snapshot, hash y PLT)
-      evictCelda(name);
       setSyncStatus('offline');
     }
+
+    // Limpiar cualquier resto local de la celda (pendientes + caché) en ambos caminos
+    discardLocalCell(name);
 
     if (activeWindow?.header.celda === name) {
       setActiveWindow(null);
@@ -1115,6 +1149,26 @@ export default function App() {
 
     let successCount = 0;
     let totalJointsSaved = 0;
+
+    // Verificación de colisiones: las celdas NUEVAS (sin snapshot) pudieron ser
+    // creadas en BD por otra persona después de crear el borrador local. Ante
+    // cualquier duda (celda existente o error de red) se bloquea el guardado.
+    const newCellNames = windowsToSave
+      .filter(w => !localStorage.getItem(`geolog_window_snapshot_${w.header.celda}`))
+      .map(w => w.header.celda);
+    if (newCellNames.length > 0) {
+      const check = await verifyNameCollisions(newCellNames, API_BASE, windows.map(w => w.name));
+      if (!check.ok) {
+        setIsLoadingWindow(false);
+        setSyncStatus('unsaved');
+        setSyncMessage('No se guardó: hay celdas cuyo código ya existe en la base de datos.');
+        alert(
+          `El código ${check.collisions.join(', ')} ya existe en la base de datos ` +
+          '(fue creado después de su borrador). Renombre su celda o descarte el borrador antes de guardar.'
+        );
+        return;
+      }
+    }
 
     for (const winData of windowsToSave) {
       const nonVacantJoints = (winData.joints || []).filter(j => !(j.distancia === -1 && j.dip === -1 && j.espaciamiento === -1));
@@ -1491,6 +1545,7 @@ export default function App() {
               totalPages={totalPages}
               loading={loading}
               pendingImports={pendingImports}
+              pendingCells={pendingCellSummaries}
               searchTerm={searchTerm}
               isGlobalSearch={isGlobalSearch}
               onSearchSubmit={handleSearchSubmit}
@@ -1875,7 +1930,7 @@ export default function App() {
         isOpen={isRenameModalOpen}
         onClose={() => setIsRenameModalOpen(false)}
         currentCelda={activeWindow?.header?.celda || ''}
-        existingCeldas={windows.map(w => w.name)}
+        existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
         onRename={handleRenameActiveCelda}
       />
 
