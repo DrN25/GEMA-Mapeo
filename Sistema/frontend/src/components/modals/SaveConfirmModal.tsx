@@ -3,6 +3,7 @@ import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle, 
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
 import { validateMapeoWindow, validatePltEnsayosList } from '../../utils/mandatoryRules';
 import { validateWindowQAQC } from '../../utils/qaqcValidator';
+import type { PendingValidation } from '../../utils/cellRegistry';
 
 export interface PltDiffSummary {
   added: number;
@@ -21,6 +22,8 @@ interface SaveConfirmModalProps {
   pltDiff?: PltDiffSummary;
   pltEnsayos?: any[];
   onOpenCatalogs?: () => void;
+  /** Celdas pendientes con estado de validación inválido (persistido). */
+  invalidPendingCells?: PendingValidation[];
 }
 
 export default function SaveConfirmModal({
@@ -31,7 +34,8 @@ export default function SaveConfirmModal({
   workspaceDiff,
   pltDiff,
   pltEnsayos = [],
-  onOpenCatalogs
+  onOpenCatalogs,
+  invalidPendingCells = []
 }: SaveConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -70,7 +74,15 @@ export default function SaveConfirmModal({
   // CRITICAS y VACIOS bloquean el guardado; ADVERTENCIAS no.
   const qaqcCriticas = qaqcAlerts.filter(a => a.type === 'CRITICA');
   const qaqcAdvertencias = qaqcAlerts.filter(a => a.type === 'ADVERTENCIA');
-  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcCriticas.length;
+
+  // Celdas pendientes inválidas DISTINTAS de la activa (la activa ya se cubre
+  // con mapeoIssues + qaqcCriticas + pltIssues).
+  const otherInvalidCells = invalidPendingCells.filter(
+    v => v.celda !== activeWindow?.header.celda
+  );
+  const otherInvalidCount = otherInvalidCells.reduce((acc, v) => acc + v.count, 0);
+
+  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcCriticas.length + otherInvalidCount;
   const hasBlockingErrors = totalBlockingIssuesCount > 0;
 
   // Si la celda activa tiene cambios, por defecto seleccionamos 'active'; de lo contrario 'all'
@@ -315,6 +327,26 @@ export default function SaveConfirmModal({
                       <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-violet-500/30 text-violet-200 uppercase shrink-0 ml-2 border border-violet-500/40 tracking-wider">
                         Ensayos PLT
                       </span>
+                    </div>
+                  ))}
+
+                  {/* Otras celdas pendientes con errores QA/QC (estado persistido) */}
+                  {otherInvalidCells.map((v) => (
+                    <div key={`other-${v.celda}`} className="text-xs bg-violet-900/60 border border-violet-500/40 rounded-xl p-3 text-violet-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="font-black uppercase tracking-wider">{v.celda}</span>
+                        <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-violet-500/30 text-violet-200 uppercase shrink-0 ml-2 border border-violet-500/40 tracking-wider">
+                          {v.count} problema(s)
+                        </span>
+                      </div>
+                      <div className="mt-1.5 space-y-1">
+                        {v.issues.slice(0, 5).map((msg, i) => (
+                          <p key={i} className="text-[11px] leading-snug">• {msg}</p>
+                        ))}
+                        {v.issues.length > 5 && (
+                          <p className="text-[10px] text-violet-300/70">y {v.issues.length - 5} más…</p>
+                        )}
+                      </div>
                     </div>
                   ))}
 

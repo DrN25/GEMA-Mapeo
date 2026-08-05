@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity, RotateCcw, Loader2 } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
@@ -9,7 +9,7 @@ import DisconTable from './components/views/DisconTable';
 import RmrAnalysis from './components/views/RmrAnalysis';
 import StructurePlot from './components/views/StructurePlot';
 import ValidationPanel from './components/Common/ValidationPanel';
-import ExcelImportModal from './components/modals/ExcelImportModal';
+import ExcelImportModal, { type ImportedCellItem } from './components/modals/ExcelImportModal';
 
 import CatalogsView from './components/views/CatalogsView';
 import CommentsPhotos from './components/views/CommentsPhotos';
@@ -21,12 +21,17 @@ import SaveResultModal from './components/modals/SaveResultModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject } from './utils/hashUtils';
-import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw } from './utils/storageManager';
+import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport } from './utils/storageManager';
 import {
   discardLocalCell,
   getAllKnownCellNames,
+  getInvalidPendingCells,
+  getLocalOnlyPendingCells,
   getPendingCellSummaries,
+  hasCellValidation,
   isCellPending,
+  setCellValidation,
+  clearCellValidation,
   verifyNameCollisions,
 } from './utils/cellRegistry';
 import {
@@ -37,7 +42,7 @@ import {
   type AllWindowsDiffSummary
 } from './utils/diffUtils';
 
-// --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
+// --- MIGRACIÃ“N AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
 import CongruenceAuditor from './features/auditor/CongruenceAuditor';
 import { initCatalogs } from './utils/catalogData';
@@ -59,58 +64,9 @@ import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
-const normalizeJoints = (loadedJoints: JointRow[], defaultAlt: string = 'd'): JointRow[] => {
-  const mappedJoints = (loadedJoints || []).map((j, i) => {
-    const expectedFam = Math.ceil((i + 1) / 3.0);
-    const maxFamAllowed = Math.ceil((loadedJoints.length || 1) / 3.0);
-    const useFam = (j.familia && j.familia <= maxFamAllowed) ? j.familia : expectedFam;
-    return {
-      ...j,
-      familia: useFam,
-      tipo_estructura: (j.tipo_estructura && j.tipo_estructura.toUpperCase() === 'J') ? 'JN' : (j.tipo_estructura || 'JN'),
-      alteracion: (j.alteracion && j.alteracion !== '-1') ? j.alteracion : defaultAlt
-    };
-  });
-  const result: JointRow[] = [...mappedJoints];
-
-  // Obtener familias existentes en los datos + asegurar 1-3
-  const fams = new Set(mappedJoints.map(j => j.familia));
-  for (let f = 1; f <= 3; f++) fams.add(f);
-  const sortedFams = [...fams].sort((a, b) => a - b);
-
-  for (const fam of sortedFams) {
-    const count = result.filter(j => j.familia === fam).length;
-    for (let i = count; i < 3; i++) {
-      result.push({
-        id: result.length + 1,
-        familia: fam,
-        distancia: -1,
-        tipo_estructura: '-1',
-        dip: -1,
-        dip_dir: -1,
-        n_estructuras: -1,
-        abertura: -1,
-        espesor: -1,
-        continuidad: -1,
-        espaciamiento: -1,
-        extremos_visibles: -1,
-        terminacion: -1,
-        relleno1: '-1',
-        relleno2: undefined,
-        jrc: -1,
-        rugosidad: -1,
-        forma: '-1',
-        alteracion: '-1'
-      });
-    }
-  }
-  return result
-    .sort((a, b) => a.familia - b.familia)
-    .map((j, idx) => ({ ...j, id: idx + 1 }));
-};
-
+import { normalizeJoints, windowFromServerResponse, excelDataToWindowData } from './utils/windowTransform';
 export default function App() {
-  // Inicializar vista y paginación desde localStorage de forma síncrona para resiliencia ante F5
+  // Inicializar vista y paginaciÃ³n desde localStorage de forma sÃ­ncrona para resiliencia ante F5
   const [currentView, setCurrentView] = useState<string>(() => {
     try {
       const savedView = localStorage.getItem('geolog_window_current_view');
@@ -121,7 +77,7 @@ export default function App() {
 
   const [windows, setWindows] = useState<WindowSummary[]>([]);
 
-  // Inicialización síncrona desde localStorage para resiliencia ante recargas (F5)
+  // InicializaciÃ³n sÃ­ncrona desde localStorage para resiliencia ante recargas (F5)
   const [activeWindow, setActiveWindow] = useState<WindowData | null>(() => {
     try {
       const activeCelda = localStorage.getItem('geolog_active_window_celda');
@@ -175,7 +131,7 @@ export default function App() {
     totalJoints: 0
   });
 
-  // Paginación y filtros del Dashboard con inicialización desde localStorage
+  // PaginaciÃ³n y filtros del Dashboard con inicializaciÃ³n desde localStorage
   const [loading, setLoading] = useState<boolean>(false);
   const [kpis, setKpis] = useState<any>(null);
   const [page, setPage] = useState<number>(() => {
@@ -206,7 +162,7 @@ export default function App() {
     } catch (e) { }
   }, [currentView]);
 
-  // Persistir paginación en localStorage
+  // Persistir paginaciÃ³n en localStorage
   useEffect(() => {
     try {
       localStorage.setItem('geolog_window_dashboard_page', String(page));
@@ -286,7 +242,7 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Evitar de forma global que el scroll del mouse modifique los valores de inputs numéricos y desplegables
+  // Evitar de forma global que el scroll del mouse modifique los valores de inputs numÃ©ricos y desplegables
   useEffect(() => {
     const handleGlobalWheel = (e: WheelEvent) => {
       const activeEl = document.activeElement;
@@ -321,14 +277,14 @@ export default function App() {
       .catch(err => {
         console.error("Error loading geomechanical catalogs:", err);
         setSyncStatus('offline');
-        setSyncMessage('Error al conectar con el servidor de catálogos.');
+        setSyncMessage('Error al conectar con el servidor de catÃ¡logos.');
       });
   }, []);
 
-  // 3. Auditoría reactiva de diferencias y rastreo de celda activa
+  // 3. AuditorÃ­a reactiva de diferencias y rastreo de celda activa
   const workspaceDiff = computeAllWindowsDiff(activeWindow, dbSnapshotData);
 
-  // 3b. Auditoría reactiva de cambios en Ensayos PLT
+  // 3b. AuditorÃ­a reactiva de cambios en Ensayos PLT
   const pltDiffSummary = useMemo(() => {
     const snap = pltSnapshotRef.current;
     const curr = pltEnsayos;
@@ -360,7 +316,7 @@ export default function App() {
 
   const unsavedCount = workspaceDiff.totalWindowsWithChanges;
 
-  // Resúmenes de los borradores locales para el Dashboard (se recalcula con el diff)
+  // ResÃºmenes de los borradores locales para el Dashboard (se recalcula con el diff)
   const pendingCellSummaries = useMemo(
     () => getPendingCellSummaries(),
     [workspaceDiff, pendingImports]
@@ -390,7 +346,7 @@ export default function App() {
     }
   }, [activeWindow?.header?.celda]);
 
-  // Actualización reactiva del estado de sincronización (amarillo / verde)
+  // ActualizaciÃ³n reactiva del estado de sincronizaciÃ³n (amarillo / verde)
   useEffect(() => {
     const hasWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
     const hasPltChanges = pltDiffSummary.totalChanges > 0;
@@ -399,7 +355,7 @@ export default function App() {
       setSyncMessage('Cambios pendientes por sincronizar en SQL Server.');
     } else {
       setSyncStatus('synced');
-      setSyncMessage('SQL Server Conectado. Todos los datos están sincronizados.');
+      setSyncMessage('SQL Server Conectado. Todos los datos estÃ¡n sincronizados.');
     }
   }, [workspaceDiff.totalWindowsWithChanges, pltDiffSummary.totalChanges]);
 
@@ -421,7 +377,10 @@ export default function App() {
       const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap(), true);
       const vacios = toVacioAlerts(validateMapeoWindow(activeWindow));
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
-      setAlerts([...errs, ...vacios, ...pltVacios]);
+      const allAlerts = [...errs, ...vacios, ...pltVacios];
+      setAlerts(allAlerts);
+      // Estado persistido de validaciÃ³n de la celda activa (lo consume el bloqueo del guardado)
+      setCellValidation(activeWindow.header.celda, allAlerts.map(a => a.message || JSON.stringify(a)));
     } else {
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
       setCalculated(null);
@@ -434,7 +393,7 @@ export default function App() {
     resetTouchedFields();
   }, [activeWindow?.header?.celda]);
 
-  // Reevaluación en cascada de distancias (m) al largo máximo de la celda
+  // ReevaluaciÃ³n en cascada de distancias (m) al largo mÃ¡ximo de la celda
   useEffect(() => {
     if (!activeWindow) return;
 
@@ -530,7 +489,7 @@ export default function App() {
       if (af.rqd89 !== '') params.set('rqd89', String(Number(af.rqd89)));
       if (af.gsi !== '') params.set('gsi', String(Number(af.gsi)));
 
-      // Calcular fecha_desde/fecha_hasta según dateRange
+      // Calcular fecha_desde/fecha_hasta segÃºn dateRange
       const drActive = dr || activeDateRange;
       const now = new Date();
       if (drActive === 'hoy') {
@@ -584,7 +543,7 @@ export default function App() {
         setTotalPages(data.total_pages);
         setPage(data.page);
         setSyncStatus('synced');
-        setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} páginas.`);
+        setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} pÃ¡ginas.`);
         return data;
       } else {
         throw new Error();
@@ -651,109 +610,10 @@ export default function App() {
       const res = await fetch(`${API_BASE}/api/ventanas/${name}`);
       if (res.ok) {
         const v = await res.json();
-        const roundDec = (val: any, decs: number): number => {
-          if (val === null || val === undefined) return 0;
-          const num = parseFloat(val);
-          if (isNaN(num)) return 0;
-          const factor = Math.pow(10, decs);
-          return Math.round(num * factor) / factor;
-        };
+        const loadedWindow = windowFromServerResponse(v);
 
-        const getFieldVal = (d: any, aliasKey: string, snakeKey: string, fallback: any = -1) => {
-          const val = d[aliasKey] !== undefined && d[aliasKey] !== null ? d[aliasKey] : d[snakeKey];
-          return val !== undefined && val !== null ? val : fallback;
-        };
-
-        const header: WindowHeader = {
-          celda: v.codigo,
-          este_from: v.este_ini !== null && v.este_ini !== undefined ? roundDec(v.este_ini, 4) : undefined,
-          norte_from: v.norte_ini !== null && v.norte_ini !== undefined ? roundDec(v.norte_ini, 3) : undefined,
-          cota_from: v.cota_ini !== null && v.cota_ini !== undefined ? roundDec(v.cota_ini, 2) : undefined,
-          este_to: v.este_fin !== null && v.este_fin !== undefined ? roundDec(v.este_fin, 4) : undefined,
-          norte_to: v.norte_fin !== null && v.norte_fin !== undefined ? roundDec(v.norte_fin, 3) : undefined,
-          cota_to: v.cota_fin !== null && v.cota_fin !== undefined ? roundDec(v.cota_fin, 2) : undefined,
-          altura: (v.altura !== null && v.altura !== undefined) ? roundDec(v.altura, 1) : undefined,
-          dip_talud: v.dip_talud !== null && v.dip_talud !== undefined ? roundDec(v.dip_talud, 2) : undefined,
-          dipdir_talud: v.dipdir_talud !== null && v.dipdir_talud !== undefined ? roundDec(v.dipdir_talud, 2) : undefined,
-          dip_hw: v.dip !== null && v.dip !== undefined ? roundDec(v.dip, 2) : undefined,
-          az_hw: v.azimut_hole !== null && v.azimut_hole !== undefined ? roundDec(v.azimut_hole, 2) : undefined,
-          largo: v.largo_m !== null && v.largo_m !== undefined
-            ? v.largo_m
-            : (v.distancia_celda !== null && v.distancia_celda !== undefined ? v.distancia_celda : undefined),
-          unidad_litologica: v.unidad_litologica || '',
-          lito_1: v.lito_1 || '',
-          lito_2: v.lito_2 || '',
-          lito_3: v.lito_3 || '',
-          mapeador: v.mapeador || 'AS-HM',
-          sector: v.sector_geotecnico || '',
-          fase: String(v.fase || ''),
-          nivel: String(v.nivel || ''),
-          sect_geot: v.sector_geotecnico || '',
-          intemperia: v.intemperismo || '',
-          alteracion: v.alteracion || v.altura_mapeo || '',
-          alt_mapeo: v.alteracion || v.altura_mapeo || '',
-          fecha: v.fecha_mapeo || new Date().toISOString().split('T')[0],
-          condicion_agua: v.rmr_input?.agua_codigo || '',
-          resistencia_ucs: v.rmr_input?.resistencia_codigo || '',
-          comentario: v.rmr_input?.comentario || '',
-          campania: v.campania !== null && v.campania !== undefined ? v.campania : 2026,
-          gsi_estructura: v.rmr_input?.gsi_estructura || '',
-          gsi_superficie: v.rmr_input?.gsi_superficie || '',
-          gsi_visual: v.rmr_input?.gsi_visual !== null && v.rmr_input?.gsi_visual !== undefined ? v.rmr_input.gsi_visual : 0,
-          control_estructural: v.rmr_input?.control_estructural !== null && v.rmr_input?.control_estructural !== undefined ? v.rmr_input.control_estructural : 0,
-          efectos_voladura: v.rmr_input?.efectos_voladura !== null && v.rmr_input?.efectos_voladura !== undefined ? v.rmr_input.efectos_voladura : 0,
-          ucs_mpa: v.rmr_input?.ucs_mpa !== null && v.rmr_input?.ucs_mpa !== undefined ? parseFloat(v.rmr_input.ucs_mpa) : 0,
-          is50_mpa: v.rmr_input?.is50_mpa !== null && v.rmr_input?.is50_mpa !== undefined ? parseFloat(v.rmr_input.is50_mpa) : 0
-        };
-
-        const joints: JointRow[] = (v.discontinuidades || []).map((d: any, idx: number) => {
-          const dist = getFieldVal(d, 'dist', 'distancia_m', -1);
-          const nstr = getFieldVal(d, 'nstr', 'n_estructuras', -1);
-          const aber = getFieldVal(d, 'aber', 'abertura_mm', -1);
-          const esp = getFieldVal(d, 'esp', 'espesor_mm', -1);
-          const cont = getFieldVal(d, 'cont', 'continuidad_m', -1);
-          const espac = getFieldVal(d, 'espac', 'espaciamiento_m', -1);
-
-          const dip_val = d.dip !== undefined && d.dip !== null ? d.dip : -1;
-          const dip_dir_val = getFieldVal(d, 'dipdir', 'dip_dir', -1);
-
-          const rug_val = getFieldVal(d, 'rug', 'rugosidad_codigo', -1);
-          const ext_val = getFieldVal(d, 'next', 'n_extremos_visibles', -1);
-          const term_val = getFieldVal(d, 'term', 'terminacion', -1);
-          const r1_raw = getFieldVal(d, 'r1', 'relleno_1_codigo', '-1');
-          const r2_raw = getFieldVal(d, 'r2', 'relleno_2_codigo', undefined);
-
-          const r1_val = (!r1_raw || r1_raw === '-1') ? '-1' : (r1_raw === 'cwf' ? 'c' : r1_raw);
-          const r2_val = (!r2_raw || r2_raw === '-1') ? undefined : (r2_raw === 'cwf' ? 'c' : r2_raw);
-
-          return {
-            id: idx + 1,
-            estructura_id: d.estructura_id ?? null,
-            familia: d.fam || d.familia_id || 1,
-            distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1,
-            tipo_estructura: (d.tipo && d.tipo !== '-1') ? d.tipo : (d.tipo_estructura && d.tipo_estructura !== '-1' ? d.tipo_estructura : '-1'),
-            dip: dip_val !== -1 ? roundDec(dip_val, 2) : -1,
-            dip_dir: dip_dir_val !== -1 ? roundDec(dip_dir_val, 2) : -1,
-            n_estructuras: nstr !== -1 ? (Math.round(nstr) > 0 ? Math.round(nstr) : -1) : -1,
-            abertura: aber !== -1 ? roundDec(aber, 1) : -1,
-            espesor: esp !== -1 ? roundDec(esp, 1) : -1,
-            continuidad: cont !== -1 ? roundDec(cont, 2) : -1,
-            espaciamiento: espac !== -1 ? roundDec(espac, 2) : -1,
-            extremos_visibles: ext_val !== undefined && ext_val !== null && ext_val !== -1 ? Math.min(2, Math.max(0, ext_val)) : -1,
-            terminacion: term_val !== undefined && term_val !== null && term_val !== -1 ? Math.min(3, Math.max(0, term_val)) : -1,
-            relleno1: r1_val,
-            relleno2: r2_val,
-            jrc: d.jrc !== null && d.jrc !== undefined ? Math.min(20, Math.max(0, d.jrc)) : -1,
-            rugosidad: rug_val !== -1 ? Math.min(9, Math.max(0, rug_val)) : -1,
-            forma: (d.forma && d.forma !== '-1') ? d.forma : (d.forma_estructura && d.forma_estructura !== '-1' ? d.forma_estructura : '-1'),
-            alteracion: (d.alt && d.alt !== '-1') ? d.alt : (d.alteracion_codigo && d.alteracion_codigo !== '-1' ? d.alteracion_codigo : '-1')
-          };
-        });
-
-        const loadedWindow: WindowData = { header, joints: normalizeJoints(joints, header.intemperia) };
-
-        // Si la celda tiene una versión local con cambios sin guardar (borrador),
-        // esa versión es el estado activo y la BD solo es el baseline del diff.
+        // Si la celda tiene una versiÃ³n local con cambios sin guardar (borrador),
+        // esa versiÃ³n es el estado activo y la BD solo es el baseline del diff.
         const cachedLocalRaw = getCachedCellRaw(name);
         const hasLocalPending = isCellPending(name) && !!cachedLocalRaw;
         let activeToUse = loadedWindow;
@@ -763,7 +623,7 @@ export default function App() {
             localParsed.joints = normalizeJoints(localParsed.joints || [], localParsed.header?.intemperia);
             activeToUse = localParsed;
           } catch {
-            activeToUse = loadedWindow; // caché corrupto: usar la versión de BD
+            activeToUse = loadedWindow; // cachÃ© corrupto: usar la versiÃ³n de BD
           }
         }
         const snapshotHash = fastHashObject(loadedWindow);
@@ -778,8 +638,8 @@ export default function App() {
         safeSetItem(`geolog_window_snapshot_${name}`, JSON.stringify(loadedWindow), ctx);
         safeSetItem(`geolog_window_snapshot_hash_${name}`, snapshotHash, ctx);
 
-        // Regla 1 (Opción A): al cambiar de celda, eliminar el caché de todas
-        // las celdas no protegidas (activa, pendientes, recién importadas).
+        // Regla 1 (OpciÃ³n A): al cambiar de celda, eliminar el cachÃ© de todas
+        // las celdas no protegidas (activa, pendientes, reciÃ©n importadas).
         evictSincronizadas(ctx);
 
         fetchPltEnsayos(name);
@@ -858,8 +718,8 @@ export default function App() {
     setDbSnapshotData(null);
     setDbSnapshotHash(null);
     safeSetItem('geolog_active_window_celda', formatted.header.celda, { activeCelda: formatted.header.celda, pendingImports });
-    // NO escribir geolog_window_* aquí: el useEffect de rastreo lo hará en el siguiente ciclo
-    // de render, después de que computeWindowDiff detecte correctamente la celda como nueva.
+    // NO escribir geolog_window_* aquÃ­: el useEffect de rastreo lo harÃ¡ en el siguiente ciclo
+    // de render, despuÃ©s de que computeWindowDiff detecte correctamente la celda como nueva.
     setCurrentView('mapeo');
     setSyncStatus('unsaved');
   };
@@ -869,7 +729,7 @@ export default function App() {
     // significa descartarlo del workspace, sin tocar SQL Server.
     const isLocalOnly = isCellPending(name) && !localStorage.getItem(`geolog_window_snapshot_${name}`);
     if (isLocalOnly) {
-      if (!confirm(`El borrador local '${name}' aún no está en la base de datos. Al eliminarlo se perderá definitivamente. ¿Continuar?`)) {
+      if (!confirm(`El borrador local '${name}' aÃºn no estÃ¡ en la base de datos. Al eliminarlo se perderÃ¡ definitivamente. Â¿Continuar?`)) {
         return;
       }
       discardLocalCell(name);
@@ -880,7 +740,7 @@ export default function App() {
       return;
     }
 
-    if (!confirm(`¿Está seguro de que desea eliminar permanentemente la celda ${name}? Se borrará de SQL Server.`)) {
+    if (!confirm(`Â¿EstÃ¡ seguro de que desea eliminar permanentemente la celda ${name}? Se borrarÃ¡ de SQL Server.`)) {
       return;
     }
 
@@ -888,7 +748,7 @@ export default function App() {
       const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { method: 'DELETE' });
       if (res.ok) {
         setSyncStatus('synced');
-        setSyncMessage(`Celda ${name} eliminada con éxito.`);
+        setSyncMessage(`Celda ${name} eliminada con Ã©xito.`);
         fetchWindows();
       } else {
         throw new Error();
@@ -900,13 +760,72 @@ export default function App() {
       setSyncStatus('offline');
     }
 
-    // Limpiar cualquier resto local de la celda (pendientes + caché) en ambos caminos
+    // Limpiar cualquier resto local de la celda (pendientes + cachÃ©) en ambos caminos
     discardLocalCell(name);
 
     if (activeWindow?.header.celda === name) {
       setActiveWindow(null);
     }
     setCurrentView('dashboard');
+  };
+
+  /**
+   * Fase 2 del import: las celdas del Excel NO se escriben directo en BD.
+   * Se convierten en borradores pendientes (localStorage) con su estado de
+   * validación, y se suben recién con GUARDAR CAMBIOS (QA/QC + colisiones).
+   */
+  const handleImportToPending = async (items: ImportedCellItem[]) => {
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    // Regla 3 â€” middleware de espacio: no importar si el navegador no tiene lugar
+    const space = canImport(items.length);
+    if (!space.ok) {
+      alert(
+        space.code === 'IMPORT_LIMITED'
+          ? `Solo hay espacio en el navegador para ${space.maxCells} celda(s). Guarde sus cambios pendientes o importe menos celdas.`
+          : 'El almacenamiento del navegador estÃ¡ lleno. Guarde sus cambios pendientes para liberar espacio e intente de nuevo.'
+      );
+      return;
+    }
+
+    let imported = 0;
+    for (const item of items) {
+      const windowData = excelDataToWindowData(item.codigo_final, item.excel_data, item.estructuras);
+      if (!windowData) continue;
+      const celda = windowData.header.celda;
+      const ctx = { activeCelda: celda };
+      safeSetItem(`geolog_window_${celda}`, JSON.stringify(windowData), ctx);
+
+      // Baseline: si la celda ya existe en BD, traer su estado para que el
+      // guardado la ACTUALICE en lugar de bloquear por colisiÃ³n de nombre.
+      const hasSnapshot = !!localStorage.getItem(`geolog_window_snapshot_${celda}`);
+      if (!hasSnapshot) {
+        try {
+          const res = await fetch(`${API_BASE}/api/ventanas/${encodeURIComponent(celda)}`);
+          if (res.ok) {
+            const v = await res.json();
+            const baseline = windowFromServerResponse(v);
+            safeSetItem(`geolog_window_snapshot_${celda}`, JSON.stringify(baseline), ctx);
+            safeSetItem(`geolog_window_snapshot_hash_${celda}`, fastHashObject(baseline), ctx);
+          }
+        } catch {
+          // offline: quedarÃ¡ como borrador nuevo; el guardado avisarÃ¡ si colisiona
+        }
+      }
+
+      addPendingCell(celda);
+      // Estado de validaciÃ³n desde el primer momento (bloquea el guardado si estÃ¡ incompleta)
+      setCellValidation(celda, validateMapeoWindow(windowData).map(i => i.message));
+      imported++;
+    }
+
+    if (imported === 0) return;
+
+    const codes = items.map(i => i.codigo_final);
+    setPendingImports(prev => [...new Set([...prev, ...codes])]);
+    setSyncStatus('unsaved');
+    setSyncMessage(`${imported} celda(s) importadas como borradores. Revise los datos y use GUARDAR CAMBIOS para subirlas a la base de datos.`);
+    handleSelectWindow(items[0].codigo_final);
   };
 
   const handleRenameActiveCelda = async (newCeldaName: string) => {
@@ -998,7 +917,7 @@ export default function App() {
     fetchWindows();
   };
 
-  // Paginación y filtros del Dashboard
+  // PaginaciÃ³n y filtros del Dashboard
   const handleSearchSubmit = (term: string, globalSearch: boolean) => {
     setSearchTerm(term);
     setIsGlobalSearch(globalSearch);
@@ -1070,7 +989,7 @@ export default function App() {
     if (!activeWindow) return;
 
     if (famId <= 3) {
-      alert("No se pueden eliminar las familias básicas obligatorias (F1, F2, F3).");
+      alert("No se pueden eliminar las familias bÃ¡sicas obligatorias (F1, F2, F3).");
       return;
     }
 
@@ -1098,9 +1017,9 @@ export default function App() {
     );
 
     if (hasData) {
-      const confirm1 = window.confirm(`¿Está seguro de que desea eliminar la Familia F${famId}? Contiene datos registrados.`);
+      const confirm1 = window.confirm(`Â¿EstÃ¡ seguro de que desea eliminar la Familia F${famId}? Contiene datos registrados.`);
       if (!confirm1) return;
-      const confirm2 = window.confirm(`ATENCIÓN: Se perderán definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serán reindexadas automáticamente. ¿Confirmar eliminación?`);
+      const confirm2 = window.confirm(`ATENCIÃ“N: Se perderÃ¡n definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serÃ¡n reindexadas automÃ¡ticamente. Â¿Confirmar eliminaciÃ³n?`);
       if (!confirm2) return;
     }
 
@@ -1150,8 +1069,8 @@ export default function App() {
     let successCount = 0;
     let totalJointsSaved = 0;
 
-    // Verificación de colisiones: las celdas NUEVAS (sin snapshot) pudieron ser
-    // creadas en BD por otra persona después de crear el borrador local. Ante
+    // VerificaciÃ³n de colisiones: las celdas NUEVAS (sin snapshot) pudieron ser
+    // creadas en BD por otra persona despuÃ©s de crear el borrador local. Ante
     // cualquier duda (celda existente o error de red) se bloquea el guardado.
     const newCellNames = windowsToSave
       .filter(w => !localStorage.getItem(`geolog_window_snapshot_${w.header.celda}`))
@@ -1161,13 +1080,35 @@ export default function App() {
       if (!check.ok) {
         setIsLoadingWindow(false);
         setSyncStatus('unsaved');
-        setSyncMessage('No se guardó: hay celdas cuyo código ya existe en la base de datos.');
+        setSyncMessage('No se guardÃ³: hay celdas cuyo cÃ³digo ya existe en la base de datos.');
         alert(
-          `El código ${check.collisions.join(', ')} ya existe en la base de datos ` +
-          '(fue creado después de su borrador). Renombre su celda o descarte el borrador antes de guardar.'
+          `El cÃ³digo ${check.collisions.join(', ')} ya existe en la base de datos ` +
+          '(fue creado despuÃ©s de su borrador). Renombre su celda o descarte el borrador antes de guardar.'
         );
         return;
       }
+    }
+
+    // Bloqueo por QA/QC (F1/F2): se consulta el estado de validaciÃ³n PERSISTIDO
+    // de cada celda pendiente (actualizado en cada evaluaciÃ³n). Si una celda no
+    // tiene registro (p.ej. importada sin abrir), se evalÃºa aquÃ­ mismo (fallback).
+    for (const w of windowsToSave) {
+      if (!hasCellValidation(w.header.celda)) {
+        setCellValidation(w.header.celda, validateMapeoWindow(w).map(i => i.message));
+      }
+    }
+    const invalidCells = getInvalidPendingCells()
+      .filter(v => windowsToSave.some(w => w.header.celda === v.celda));
+    if (invalidCells.length > 0) {
+      setIsLoadingWindow(false);
+      setSyncStatus('unsaved');
+      setSyncMessage('No se guardÃ³: hay celdas con campos pendientes o inconsistencias QA/QC.');
+      alert(
+        `No se puede guardar: ${invalidCells
+          .map(v => `${v.celda} (${v.count} problema(s))`)
+          .join(', ')}. Abra cada celda y corrija los campos seÃ±alados en el panel QA/QC.`
+      );
+      return;
     }
 
     for (const winData of windowsToSave) {
@@ -1276,6 +1217,7 @@ export default function App() {
           safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
           safeSetItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData), ctx);
           safeSetItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash, ctx);
+          clearCellValidation(winData.header.celda);
 
           if (activeWindow && activeWindow.header.celda === winData.header.celda) {
             setDbSnapshotData(winData);
@@ -1343,34 +1285,41 @@ export default function App() {
     setShowDiscardModal(false);
     if (scope === 'active' && activeWindow) {
       const celda = activeWindow.header.celda;
-      const ctx = { activeCelda: celda, pendingImports };
       const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
       if (snapshotRaw) {
+        // Celda con respaldo en BD: restaurar al Ãºltimo estado persistido
+        const ctx = { activeCelda: celda, pendingImports };
         const parsed = JSON.parse(snapshotRaw);
         setActiveWindow(parsed);
         safeSetItem(`geolog_window_${celda}`, JSON.stringify(parsed), ctx);
+        removePendingCell(celda);
+      } else {
+        // Borrador local puro: se elimina definitivamente
+        discardLocalCell(celda);
+        setActiveWindow(null);
       }
-      try {
-        const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
-        const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
-        safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)), ctx);
-      } catch (e) { }
     } else {
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
         const unsavedNames: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
         for (const celda of unsavedNames) {
-          const ctx = { activeCelda: celda, pendingImports };
           const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
           if (snapshotRaw) {
+            const ctx = { activeCelda: celda, pendingImports };
             const parsed = JSON.parse(snapshotRaw);
             safeSetItem(`geolog_window_${celda}`, JSON.stringify(parsed), ctx);
             if (activeWindow && activeWindow.header.celda === celda) {
               setActiveWindow(parsed);
             }
+          } else {
+            // Borrador local puro: no tiene respaldo en BD â†’ eliminar definitivamente
+            discardLocalCell(celda);
+            if (activeWindow && activeWindow.header.celda === celda) {
+              setActiveWindow(null);
+            }
           }
         }
-        safeSetItem('geolog_unsaved_windows', JSON.stringify([]), { pendingImports });
+        localStorage.setItem('geolog_unsaved_windows', JSON.stringify([]));
       } catch (e) { }
     }
   };
@@ -1399,7 +1348,7 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-navy-950 text-slate-100 gap-4">
         <div className="w-12 h-12 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"></div>
-        <p className="text-sm font-semibold tracking-wide text-slate-400">Cargando interfaz de ventanas geomecánicas...</p>
+        <p className="text-sm font-semibold tracking-wide text-slate-400">Cargando interfaz de ventanas geomecÃ¡nicas...</p>
       </div>
     );
   }
@@ -1422,11 +1371,11 @@ export default function App() {
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
 
-            {/* BOTÓN INTERACTIVO DE COLAPSO */}
+            {/* BOTÃ“N INTERACTIVO DE COLAPSO */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
-              title={sidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
+              title={sidebarCollapsed ? "Mostrar menÃº lateral" : "Ocultar menÃº lateral"}
             >
               <Menu size={16} />
             </button>
@@ -1463,28 +1412,28 @@ export default function App() {
                   ? 'bg-violet-500/10 border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.12)]'
                   : 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200'
                   }`}
-                title="Activar/Desactivar visualización de fórmulas al pasar el mouse"
+                title="Activar/Desactivar visualizaciÃ³n de fÃ³rmulas al pasar el mouse"
               >
                 <Calculator size={14} className={showFormulas ? 'text-violet-400 animate-pulse' : 'text-slate-400'} />
-                <span>{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
+                <span>{showFormulas ? 'FÃ³rmulas Activas' : 'Ocultar FÃ³rmulas'}</span>
               </button>
 
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
                 className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95"
-                title="Ver Catálogos de Referencia Geomecánica de Ventanas"
+                title="Ver CatÃ¡logos de Referencia GeomecÃ¡nica de Ventanas"
               >
                 <BookOpen size={14} className="text-sky-400" />
-                <span>Catálogo de Ventanas</span>
+                <span>CatÃ¡logo de Ventanas</span>
               </button>
 
               <button
                 onClick={() => setIsPltCatalogModalOpen(true)}
                 className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95"
-                title="Ver Catálogos de Referencia de Ensayos PLT"
+                title="Ver CatÃ¡logos de Referencia de Ensayos PLT"
               >
                 <Activity size={14} className="text-cyan-400" />
-                <span>Catálogo de Ensayos PLT</span>
+                <span>CatÃ¡logo de Ensayos PLT</span>
               </button>
 
               {activeWindow && (
@@ -1498,7 +1447,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Botón Descartar Cambios */}
+              {/* BotÃ³n Descartar Cambios */}
               {unsavedCount > 0 && (
                 <button
                   onClick={() => setShowDiscardModal(true)}
@@ -1511,7 +1460,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Botón Guardar Cambios */}
+              {/* BotÃ³n Guardar Cambios */}
               <button
                 onClick={() => setShowSaveConfirmModal(true)}
                 disabled={isLoadingWindow || (unsavedCount === 0 && syncStatus !== 'unsaved')}
@@ -1596,7 +1545,7 @@ export default function App() {
                 showFormulas={showFormulas} // Nueva Prop
               />
 
-              {/* CENTRO DE MÉTRICAS GEOMECÁNICA */}
+              {/* CENTRO DE MÃ‰TRICAS GEOMECÃNICA */}
               {(() => {
                 const getFamilyStyle = (fam: number) => {
                   const styles: Record<number, { dot: string; container: string; badge: string }> = {
@@ -1640,7 +1589,7 @@ export default function App() {
                           </span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Promedio aritmético simple de los registros por familia: <code className="text-slate-400/80">Σ(esp) / N</code>
+                          Promedio aritmÃ©tico simple de los registros por familia: <code className="text-slate-400/80">Î£(esp) / N</code>
                         </p>
                       </div>
 
@@ -1668,29 +1617,29 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Card 2: ÍNDICE VOLUMÉTRICO */}
+                    {/* Card 2: ÃNDICE VOLUMÃ‰TRICO */}
                     <div className="lg:col-span-2 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
                           <Layers size={16} className="text-yellow-500/80" />
-                          <span>ÍNDICE VOLUMÉTRICO</span>
+                          <span>ÃNDICE VOLUMÃ‰TRICO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Conteo de discontinuidades volumétricas (Jv).
+                          Conteo de discontinuidades volumÃ©tricas (Jv).
                         </p>
                       </div>
 
                       <div className="my-4 border border-yellow-500/30 bg-yellow-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
                         <span className="text-3xl font-black font-mono tracking-tight text-yellow-500">
-                          {calculated ? calculated.jv.toFixed(4) : '—'}
+                          {calculated ? calculated.jv.toFixed(4) : 'â€”'}
                         </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">JTS / M³</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">JTS / MÂ³</span>
                         <Layers size={24} className="text-yellow-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
                       </div>
 
                       <div className="mt-auto border border-yellow-500/20 bg-yellow-500/5 rounded-lg py-2 px-3 text-center">
                         <span className="text-xs font-extrabold text-yellow-500 uppercase tracking-widest">
-                          {calculated ? getJvClassification(calculated.jv) : '—'}
+                          {calculated ? getJvClassification(calculated.jv) : 'â€”'}
                         </span>
                       </div>
                     </div>
@@ -1703,13 +1652,13 @@ export default function App() {
                           <span>RQD ESTIMADO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Cálculo empírico según fórmula de Palmström: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                          CÃ¡lculo empÃ­rico segÃºn fÃ³rmula de PalmstrÃ¶m: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 Â· Jv</code>
                         </p>
                       </div>
 
                       <div className="my-4 border border-sky-500/30 bg-sky-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
                         <span className="text-3xl font-black font-mono tracking-tight text-sky-400">
-                          {calculated ? calculated.rqd_est.toFixed(2) : '—'}
+                          {calculated ? calculated.rqd_est.toFixed(2) : 'â€”'}
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">RQD ESTIMADO</span>
                         <Gauge size={24} className="text-sky-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
@@ -1734,7 +1683,7 @@ export default function App() {
                 );
               })()}
 
-              {/* Comentarios y Fotografías Colapsable */}
+              {/* Comentarios y FotografÃ­as Colapsable */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between bg-navy-950/45 p-4 rounded-xl border border-navy-800/80">
                   <div className="flex items-center gap-2.5">
@@ -1743,7 +1692,7 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest">
-                        Comentarios y Fotografías
+                        Comentarios y FotografÃ­as
                       </h4>
                       <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                         Registro de observaciones visuales y fotos de la celda
@@ -1779,7 +1728,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* ANÁLISIS GEOMECÁNICO RMR SIEMPRE EXPANDIDO */}
+              {/* ANÃLISIS GEOMECÃNICO RMR SIEMPRE EXPANDIDO */}
               <RmrAnalysis
                 header={activeWindow.header}
                 onChange={(header) => setActiveWindow({ ...activeWindow, header })}
@@ -1823,16 +1772,7 @@ export default function App() {
         isOpen={isImportModalOpen}
         apiBase={RESOLVED_API_BASE}
         onClose={() => setIsImportModalOpen(false)}
-        onImport={(cellCodes) => {
-          setPendingImports(prev => [...new Set([...prev, ...cellCodes])]);
-          fetchWindows();
-          setSyncStatus('synced');
-          setSyncMessage(`${cellCodes.length} celda(s) importadas correctamente.`);
-          const firstCell = cellCodes?.[0];
-          if (firstCell) {
-            handleSelectWindow(firstCell);
-          }
-        }}
+        onImport={handleImportToPending}
       />
       {isCatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
@@ -1846,9 +1786,9 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
-                    Catálogo de Referencia de Ventanas (RMR)
+                    CatÃ¡logo de Referencia de Ventanas (RMR)
                   </h3>
-                  <p className="text-xs text-slate-400">Guía de parámetros y ratings para clasificaciones RMR (Bieniawski)</p>
+                  <p className="text-xs text-slate-400">GuÃ­a de parÃ¡metros y ratings para clasificaciones RMR (Bieniawski)</p>
                 </div>
               </div>
               <button
@@ -1878,9 +1818,9 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
-                    Catálogo de Ensayos PLT y Litologías
+                    CatÃ¡logo de Ensayos PLT y LitologÃ­as
                   </h3>
-                  <p className="text-xs text-slate-400">Parámetros de resistencia de roca intacta y factores de correlación K</p>
+                  <p className="text-xs text-slate-400">ParÃ¡metros de resistencia de roca intacta y factores de correlaciÃ³n K</p>
                 </div>
               </div>
               <button
@@ -1898,7 +1838,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modales de Confirmación, Descarte y Resultados */}
+      {/* Modales de ConfirmaciÃ³n, Descarte y Resultados */}
       <SaveConfirmModal
         isOpen={showSaveConfirmModal}
         onClose={() => setShowSaveConfirmModal(false)}
@@ -1908,6 +1848,7 @@ export default function App() {
         pltDiff={pltDiffSummary}
         pltEnsayos={pltEnsayos}
         onOpenCatalogs={() => setIsCatalogModalOpen(true)}
+        invalidPendingCells={getInvalidPendingCells()}
       />
 
       <DiscardModal
@@ -1916,6 +1857,7 @@ export default function App() {
         onConfirmDiscard={handleConfirmDiscard}
         activeWindow={activeWindow}
         workspaceDiff={workspaceDiff}
+        localOnlyCells={getLocalOnlyPendingCells()}
       />
 
       <SaveResultModal
@@ -1940,7 +1882,7 @@ export default function App() {
           <div className="p-6 bg-navy-900 border border-violet-500/30 rounded-2xl shadow-2xl flex flex-col items-center gap-3">
             <Loader2 size={40} className="text-violet-400 animate-spin" />
             <p className="text-xs font-black uppercase tracking-wider text-slate-100">Sincronizando ventanas con SQL Server...</p>
-            <p className="text-[11px] text-slate-400 font-medium">Por favor espere a que finalice la transacción en la base de datos.</p>
+            <p className="text-[11px] text-slate-400 font-medium">Por favor espere a que finalice la transacciÃ³n en la base de datos.</p>
           </div>
         </div>
       )}

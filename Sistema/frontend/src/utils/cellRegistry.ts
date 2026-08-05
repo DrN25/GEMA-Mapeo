@@ -19,8 +19,12 @@ import {
   evictCelda,
   getCachedCellRaw,
   getCachedCeldas,
+  getCellValidationMap,
   getUnsavedCeldas,
   removePendingCell as removeFromPendingList,
+  setCellValidation as persistValidation,
+  clearCellValidation as clearValidation,
+  type CellValidationRecord,
 } from './storageManager';
 import type { WindowHeader } from './rmrCalculator';
 
@@ -135,12 +139,69 @@ export function getPendingCellSummaries(): PendingCellSummary[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Descarta un borrador local por completo: lo quita de la lista de pendientes
- * y elimina su caché (window, snapshot, hash y PLT). No toca la BD.
+ * Descarta un borrador local por completo: lo quita de la lista de pendientes,
+ * elimina su caché (window, snapshot, hash y PLT) y su registro de validación.
+ * No toca la BD.
  */
 export function discardLocalCell(name: string): void {
   removeFromPendingList(name);
   evictCelda(name);
+  clearValidation(name);
+}
+
+// ---------------------------------------------------------------------------
+// Estado de validación QA/QC por celda (persistido, actualizado en cada evaluación)
+// ---------------------------------------------------------------------------
+
+export interface PendingValidation {
+  celda: string;
+  ok: boolean;
+  count: number;
+  issues: string[];
+}
+
+/** Persiste el resultado de validación de una celda. */
+export function setCellValidation(celda: string, issueMessages: string[]): void {
+  const clean = issueMessages.filter(Boolean);
+  persistValidation(celda, {
+    ok: clean.length === 0,
+    count: clean.length,
+    issues: clean,
+  });
+}
+
+/** Registro de validación de una celda (o null si nunca se evaluó). */
+export function getCellValidation(celda: string): CellValidationRecord | null {
+  const map = getCellValidationMap();
+  return map[celda] ?? null;
+}
+
+/** ¿La celda tiene un registro de validación persistido? */
+export function hasCellValidation(celda: string): boolean {
+  return getCellValidation(celda) !== null;
+}
+
+/** Celdas pendientes cuyo estado persistido es INVÁLIDO (bloquean el guardado). */
+export function getInvalidPendingCells(): PendingValidation[] {
+  const pending = new Set(getUnsavedCeldas().map(n => n.trim().toUpperCase()));
+  const map = getCellValidationMap();
+  const result: PendingValidation[] = [];
+  for (const [celda, record] of Object.entries(map)) {
+    if (!record.ok && pending.has(celda.trim().toUpperCase())) {
+      result.push({ celda, ok: false, count: record.count, issues: record.issues });
+    }
+  }
+  return result;
+}
+
+/** Celdas pendientes que solo existen localmente (sin snapshot en BD). */
+export function getLocalOnlyPendingCells(): string[] {
+  return getUnsavedCeldas().filter(celda => !localStorage.getItem(`geolog_window_snapshot_${celda}`));
+}
+
+/** Limpia el registro de validación de una celda (al guardar exitosamente). */
+export function clearCellValidation(celda: string): void {
+  clearValidation(celda);
 }
 
 // ---------------------------------------------------------------------------

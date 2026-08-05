@@ -134,6 +134,62 @@ export function removePendingCell(celda: string): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Índice de validación por celda (geolog_cell_validation)
+// ---------------------------------------------------------------------------
+
+export interface CellValidationRecord {
+  ok: boolean;
+  count: number;
+  issues: string[];
+}
+
+const KEY_VALIDATION = 'geolog_cell_validation';
+
+/** Mapa completo de validaciones persistidas por celda. */
+export function getCellValidationMap(): Record<string, CellValidationRecord> {
+  try {
+    const raw = localStorage.getItem(KEY_VALIDATION);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Persiste el resultado de validación de una celda (se actualiza en cada evaluación). */
+export function setCellValidation(celda: string, record: CellValidationRecord): void {
+  try {
+    const map = getCellValidationMap();
+    map[celda] = record;
+    localStorage.setItem(KEY_VALIDATION, JSON.stringify(map));
+  } catch {
+    // ignorar: el índice nunca debe romper el flujo principal
+  }
+}
+
+/** Elimina el registro de validación de una celda (al guardar o descartar). */
+export function clearCellValidation(celda: string): void {
+  try {
+    const map = getCellValidationMap();
+    if (celda in map) {
+      delete map[celda];
+      localStorage.setItem(KEY_VALIDATION, JSON.stringify(map));
+    }
+  } catch {
+    // ignorar
+  }
+}
+
+/** Elimina el índice completo (limpieza general). */
+export function clearAllCellValidations(): void {
+  try {
+    localStorage.removeItem(KEY_VALIDATION);
+  } catch {
+    // ignorar
+  }
+}
+
 /** ¿La celda está protegida de evicción? */
 export function isCeldaProtegida(celda: string, ctx: EvictionContext = {}): boolean {
   if (celda === ctx.activeCelda) return true;

@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   X, FileSpreadsheet, Upload, Check, AlertTriangle, Loader,
   Settings, Table, CheckCircle, Search, ChevronDown, ChevronUp,
-  Layers, Eye, AlertCircle, Info, RefreshCw, PlusCircle
+  Layers, Eye, AlertCircle, Info, RefreshCw
 } from 'lucide-react';
 
 const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
@@ -13,10 +13,18 @@ const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || `${window.location.pro
 const MAX_FILE_SIZE_MB = 100;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+/** Item listo para importar como borrador pendiente (ya no se escribe directo en BD). */
+export interface ImportedCellItem {
+  codigo_original: string;
+  codigo_final: string;
+  excel_data: CellComparisonData;
+  estructuras: EstructuraPreview[];
+}
+
 interface ExcelImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (cellCodes: string[]) => void;
+  onImport: (items: ImportedCellItem[]) => void;
   apiBase?: string;
 }
 
@@ -249,7 +257,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
     }
   };
 
-  // Botón Principal Importar -> Revisa si hay duplicados antes de guardar
+  // Botón Principal Importar -> Revisa si hay duplicados antes de aceptar
   const handleInitiateImport = () => {
     if (selectedCodes.size === 0) return;
 
@@ -258,20 +266,23 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
     if (duplicatesSelected.length > 0) {
       setShowDoubleConfirmModal(true);
     } else {
-      executeImport(true);
+      executeImport();
     }
   };
 
-  const executeImport = async (overwriteDuplicates: boolean) => {
+  /**
+   * Fase 2: ya NO se escribe directo en la BD. Las celdas se entregan a la app
+   * como borradores pendientes; el guardado (GUARDAR CAMBIOS) las sube después
+   * de QA/QC y verificación de colisiones.
+   */
+  const executeImport = () => {
     if (selectedCodes.size === 0) return;
     setImporting(true);
     setError(null);
     setShowDoubleConfirmModal(false);
 
-    const targetUrl = `${apiBaseUrl}/api/importar-excel/ejecutar`;
-
     try {
-      const itemsToImport = celdas
+      const itemsToImport: ImportedCellItem[] = celdas
         .filter(c => selectedCodes.has(c.codigo))
         .map(c => ({
           codigo_original: c.codigo,
@@ -280,37 +291,14 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
           estructuras: c.estructuras
         }));
 
-      const payload = {
-        celdas: itemsToImport,
-        column_mapping: columnMapping,
-        overwrite_duplicates: overwriteDuplicates
-      };
-
-      const res = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      onImport(itemsToImport);
+      setImportResult({
+        ventanas: itemsToImport.length,
+        estructuras: itemsToImport.reduce((acc, i) => acc + (i.estructuras?.length || 0), 0)
       });
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data && data.status === 'success') {
-        setImportResult({
-          ventanas: data.ventanas_importadas,
-          estructuras: data.estructuras_importadas
-        });
-        setStep('done');
-        onImport(itemsToImport.map(i => i.codigo_final));
-      } else {
-        const detailMsg = data?.detail;
-        const errorMsg = typeof detailMsg === 'string'
-          ? detailMsg
-          : (Array.isArray(detailMsg)
-            ? detailMsg.map((e: any) => e.msg || JSON.stringify(e)).join(', ')
-            : (detailMsg ? JSON.stringify(detailMsg) : `Error HTTP ${res.status}: Fallo al persistir celdas.`));
-        setError(errorMsg);
-      }
+      setStep('done');
     } catch (err: any) {
-      setError(`Error de conexión con la base de datos SQL Server: ${err?.message || err}`);
+      setError(`Error al preparar la importación: ${err?.message || err}`);
     } finally {
       setImporting(false);
     }
@@ -360,9 +348,9 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
           <CheckCircle size={52} className="mx-auto text-emerald-400 mb-4" />
           <h3 className="text-xl font-black text-slate-100 uppercase tracking-wider">Importación Completada</h3>
           <p className="text-xs text-slate-300 mt-2 font-medium">
-            Se registraron <strong className="text-emerald-400">{importResult?.ventanas || 0} celdas</strong> y <strong className="text-indigo-400">{importResult?.estructuras || 0} estructuras</strong> en la base de datos SQL Server.
+            Se añadieron <strong className="text-emerald-400">{importResult?.ventanas || 0} celdas</strong> y <strong className="text-indigo-400">{importResult?.estructuras || 0} estructuras</strong> como borradores pendientes.
           </p>
-          <p className="text-xs text-slate-500 mt-1">Registros consolidados y catálogos traducidos con éxito.</p>
+          <p className="text-xs text-slate-500 mt-1">Revise los datos y use el botón <strong>GUARDAR CAMBIOS</strong> para subirlos a la base de datos SQL Server.</p>
           <div className="flex gap-3 justify-center mt-6">
             <button onClick={resetAndStartOver}
               className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
@@ -836,41 +824,27 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Por favor, elija cómo desea proceder con las celdas duplicadas antes de efectuar el guardado en la base de datos:
+              Estas celdas ya existen en la base de datos. Al importarlas como borradores y
+              presionar <strong>GUARDAR CAMBIOS</strong>, los datos actuales de la BD se
+              actualizarán con los del archivo Excel.
             </p>
 
             {/* Opciones de Acción */}
             <div className="grid grid-cols-1 gap-3">
-              {/* Opción 1: Sobreescribir */}
+              {/* Opción 1: Importar como borradores (actualizar al guardar) */}
               <button
                 type="button"
-                onClick={() => executeImport(true)}
-                className="p-3.5 rounded-xl border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-left transition-all group flex items-start gap-3"
+                onClick={() => executeImport()}
+                className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-left transition-all group flex items-start gap-3"
               >
-                <RefreshCw size={18} className="text-red-400 shrink-0 mt-0.5 group-hover:rotate-180 transition-transform duration-500" />
+                <RefreshCw size={18} className="text-amber-400 shrink-0 mt-0.5 group-hover:rotate-180 transition-transform duration-500" />
                 <div>
-                  <span className="text-xs font-black text-red-300 block uppercase tracking-wider">
-                    Option A: Sobreescribir Celdas Existentes
+                  <span className="text-xs font-black text-amber-300 block uppercase tracking-wider">
+                    Sí, importar como borradores
                   </span>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Reemplaza completamente los datos de cabecera y discontinuidades de las celdas coincidentes en la base de datos.
-                  </p>
-                </div>
-              </button>
-
-              {/* Opción 2: Importar como Nuevas Celdas */}
-              <button
-                type="button"
-                onClick={() => executeImport(false)}
-                className="p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all group flex items-start gap-3"
-              >
-                <PlusCircle size={18} className="text-emerald-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                <div>
-                  <span className="text-xs font-black text-emerald-300 block uppercase tracking-wider">
-                    Option B: Importar como Nuevas Celdas (Conservar ambas)
-                  </span>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Conserva las celdas originales en la BD e inserta las nuevas asignando un sufijo único automático (ej. <strong className="text-emerald-300 font-mono">AZ1_NUEVO</strong>).
+                    Las celdas se añaden al espacio de trabajo con la etiqueta BORRADOR.
+                    Al guardar, se actualizarán los registros existentes en la base de datos.
                   </p>
                 </div>
               </button>

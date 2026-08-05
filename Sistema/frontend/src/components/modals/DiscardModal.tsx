@@ -8,6 +8,8 @@ interface DiscardModalProps {
   onConfirmDiscard: (scope: 'active' | 'all') => void;
   activeWindow: WindowData | null;
   workspaceDiff: AllWindowsDiffSummary;
+  /** Borradores locales puros (sin respaldo en BD): se ELIMINARÁN, no se restaurarán. */
+  localOnlyCells: string[];
 }
 
 export default function DiscardModal({
@@ -15,7 +17,8 @@ export default function DiscardModal({
   onClose,
   onConfirmDiscard,
   activeWindow,
-  workspaceDiff
+  workspaceDiff,
+  localOnlyCells = []
 }: DiscardModalProps) {
   if (!isOpen) return null;
 
@@ -128,6 +131,27 @@ export default function DiscardModal({
             <AlertOctagon size={20} className="shrink-0 text-rose-400" />
             <span>ATENCIÓN: Esta acción es irreversible. Se perderán las modificaciones no guardadas.</span>
           </div>
+
+          {/* Aviso de borradores locales que se ELIMINARÁN definitivamente */}
+          {localOnlyCells.length > 0 && (
+            <div className="p-3.5 bg-rose-950/70 border-2 border-rose-500/60 rounded-xl text-rose-200 text-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertOctagon size={18} className="shrink-0 text-rose-400" />
+                <span className="font-black uppercase tracking-wider">Borradores que se eliminarán definitivamente</span>
+              </div>
+              <p className="leading-relaxed">
+                Estas celdas <strong>aún no existen en la base de datos</strong>. Al descartarlas se borrarán
+                sin posibilidad de recuperación:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {localOnlyCells.map(c => (
+                  <span key={c} className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-mono font-bold text-[11px] border border-rose-500/40">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
 
