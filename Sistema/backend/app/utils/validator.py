@@ -19,6 +19,9 @@ from app.core.catalogs import (
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
 from app.utils.interpolation import rating_promedio_rqd, rating_promedio_r1, rating_continuo_rqd, rating_continuo_r1
 
+class AuditCancelledError(Exception):
+    """Se lanza cuando el usuario cancela una auditoría en curso (flag de cancelación presente)."""
+
 # --- Constantes pre-computadas a nivel de módulo para máximo rendimiento ---
 _MAPEO_ESTRUCTURAL_COLS = {
     "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP DIR_TALUD", "INTEMPERISMO",
@@ -658,7 +661,7 @@ def format_raw_value_for_report(raw_val):
             
     return str(raw_val)
 
-def validate_bulk_excel(file_path, output_json_path):
+def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = None):
     t_start = time.time()
     print(f"    [*] [QA/QC] Iniciando lectura de archivo: {os.path.basename(file_path)}")
     
@@ -738,6 +741,9 @@ def validate_bulk_excel(file_path, output_json_path):
     active_block_key = None
 
     for idx, row_dict in enumerate(records):
+        # Cancelación cooperativa: revisar el flag cada 2000 filas para abortar rápido
+        if cancel_flag_path and idx % 2000 == 0 and os.path.exists(cancel_flag_path):
+            raise AuditCancelledError(f"Auditoría cancelada por el usuario en la fila {idx + 2}.")
         fila_excel = idx + 2 
         celda_padre = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
         if not celda_padre:

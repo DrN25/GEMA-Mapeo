@@ -64,6 +64,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const [processingAuditId, setProcessingAuditId] = useState<string>(() => {
         return localStorage.getItem('geomec_bulk_auditor_processing_id') || '';
     });
+    const [processingFileName, setProcessingFileName] = useState<string>(() => {
+        return localStorage.getItem('geomec_bulk_auditor_processing_file') || '';
+    });
     const [showProgressToast, setShowProgressToast] = useState<string>('');
     const [loadingTable, setLoadingTable] = useState<boolean>(false);
 
@@ -104,6 +107,19 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     }, [processingAuditId]);
 
     useEffect(() => {
+        if (processingFileName) {
+            localStorage.setItem('geomec_bulk_auditor_processing_file', processingFileName);
+        } else {
+            localStorage.removeItem('geomec_bulk_auditor_processing_file');
+        }
+    }, [processingFileName]);
+
+    // Cuando ya no hay procesamiento activo, limpiar el nombre del archivo
+    useEffect(() => {
+        if (!processingAuditId) setProcessingFileName('');
+    }, [processingAuditId]);
+
+    useEffect(() => {
         fetchHistory();
     }, []);
 
@@ -127,6 +143,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             stopStatusPolling();
         }
     }, [processingAuditId]);
+
+    // Al desmontar (cambiar de vista en la app) detener el poller: el estado se
+    // conserva en localStorage y la verificación al volver decide si continúa.
+    useEffect(() => () => { stopStatusPolling(); }, []);
 
     // KPIs: el backend solo los afecta por auditoría y años seleccionados — los demás
     // filtros NO cambian el compact, así que no debe re-descargarse (~1.1 MB por interacción ahorrado).
@@ -182,11 +202,13 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 stopStatusPolling();
                 setProcessingAuditId('');
                 setAuditVerified(true);
-                setStatus('loaded');
                 fetchHistory();
+                // Solo saltar al dashboard si esta auditoría es la que se está viendo;
+                // si quedó en segundo plano (banner), no se cambia la vista actual.
                 if (selectedAuditIdRef.current === auditId) {
-                    setShowProgressToast(`Auditoría finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
+                    setStatus('loaded');
                 }
+                setShowProgressToast(`Auditoría finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
             } catch (e) {
                 fails += 1;
                 if (fails >= MAX_CONSECUTIVE_FAILURES) {
@@ -354,6 +376,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 const data = await res.json();
                 setSelectedAuditId(data.audit_id);
                 setProcessingAuditId(data.audit_id);
+                setProcessingFileName(data.filename || payload.file.name);
             } else {
                 const err = await res.json();
                 setStatus('error');
@@ -365,12 +388,13 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         }
     };
 
-    const handleCancelProcess = async () => {
+    // Cierra la vista actual (dashboard/error) y vuelve al inicio, pero CONSERVA
+    // processingAuditId: si hay una auditoría procesando en segundo plano, el banner
+    // de progreso sigue visible desde la vista de inicio y el poller continúa.
+    const handleCloseView = () => {
         stopStatusPolling();
-
         setStatus('idle');
         setSelectedAuditId('');
-        setProcessingAuditId('');
         setKpis(null);
         setIncidencias([]);
         setMessage('');
@@ -381,8 +405,27 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         localStorage.removeItem('geomec_bulk_auditor_status');
         localStorage.removeItem('geomec_bulk_auditor_message');
         localStorage.removeItem('geomec_bulk_auditor_audit_id');
-        localStorage.removeItem('geomec_bulk_auditor_processing_id');
         localStorage.removeItem('geomec_bulk_auditor_error_kind');
+    };
+
+    // Cancela de verdad la auditoría en curso: avisa al backend (flag de cancelación)
+    // y limpia TODO el estado, incluido el procesamiento en segundo plano.
+    const handleCancelProcessing = async () => {
+        const target = processingAuditId;
+        if (target && !window.confirm('¿Cancelar la auditoría en curso? Se detendrá el procesamiento en el servidor y se eliminarán sus archivos parciales.')) return;
+        try {
+            if (target) {
+                await fetch(`${apiBase}/api/geomecanica/cancelar?audit_id=${target}`, { method: 'POST' });
+            }
+        } catch (e) {
+            console.warn("No se pudo notificar la cancelación al servidor:", e);
+        }
+        handleCloseView();
+        setProcessingAuditId('');
+        setProcessingFileName('');
+        localStorage.removeItem('geomec_bulk_auditor_processing_id');
+        localStorage.removeItem('geomec_bulk_auditor_processing_file');
+        if (target) setShowProgressToast('Auditoría cancelada.');
     };
 
     const clearAllFilters = () => {
@@ -467,11 +510,11 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 </div>
             )}
 
-            {processingAuditId && status === 'loaded' && (
+            {processingAuditId && (status === 'loaded' || status === 'idle') && (
                 <div className="bg-cyan-950/40 border border-cyan-500/20 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-400 font-semibold shadow-md animate-fade-in">
                     <div className="flex items-center gap-2">
                         <Loader2 size={14} className="animate-spin text-cyan-400" />
-                        <span>Generando otra revisión en segundo plano...</span>
+                        <span>Generando otra revisión en segundo plano{processingFileName ? `: ${processingFileName}` : ''}...</span>
                     </div>
                     <div className="flex gap-2">
                         <button
@@ -484,7 +527,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             Ver Progreso
                         </button>
                         <button
-                            onClick={handleCancelProcess}
+                            onClick={handleCancelProcessing}
                             className="bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded text-xs font-bold hover:bg-red-500/20 transition-all"
                         >
                             Cancelar
@@ -548,7 +591,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                 </button>
                             )}
                             <button
-                                onClick={handleCancelProcess}
+                                onClick={handleCloseView}
                                 className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-black transition-all active:scale-95"
                             >
                                 Volver al inicio
@@ -567,7 +610,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     <div className="space-y-2">
                         <p className="text-xs font-black uppercase tracking-widest text-cyan-400 flex items-center justify-center gap-1.5">
                             <RefreshCw size={14} className="animate-spin" />
-                            <span>{status === 'uploading' ? 'Transmitiendo datos...' : 'Procesando Reglas de Consistencia'}</span>
+                            <span>{status === 'uploading' ? 'Transmitiendo datos...' : (processingFileName ? `Procesando: ${processingFileName}` : 'Procesando Reglas de Consistencia')}</span>
                         </p>
                         <p className="text-xs text-slate-350 leading-relaxed font-semibold">
                             Calculando RQD polinómico, espaciamiento R76/R89, saturando variables de rugosidad, forma y JRC, y cruzando correlaciones litológicas.
@@ -575,7 +618,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     </div>
                     <div className="pt-2">
                         <button
-                            onClick={handleCancelProcess}
+                            onClick={handleCancelProcessing}
                             className="w-full flex items-center justify-center gap-2 bg-red-500/15 hover:bg-red-650 border border-red-500/30 text-red-400 px-4 py-2.5 rounded-lg text-xs font-black transition-all active:scale-95"
                         >
                             <Trash2 size={14} />
@@ -631,7 +674,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
                         <div className="flex gap-2.5 w-full sm:w-auto shrink-0 justify-end">
                             <button
-                                onClick={handleCancelProcess}
+                                onClick={handleCloseView}
                                 className="flex items-center gap-1.5 bg-[#0f172a]/80 hover:bg-slate-900 border border-slate-800 text-slate-350 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95"
                             >
                                 <Trash2 size={14} className="text-red-400" />

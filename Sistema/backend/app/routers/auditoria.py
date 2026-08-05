@@ -15,7 +15,7 @@ from openpyxl.chart import BarChart, Reference
 from openpyxl.utils import get_column_letter
 
 from app.database import get_db
-from app.utils.validator import validate_bulk_excel
+from app.utils.validator import validate_bulk_excel, AuditCancelledError
 from app.core.catalogs import MANDATORY_COLS_COUNT
 
 router = APIRouter()
@@ -755,6 +755,58 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     return wb
 
+# --- Helpers de cancelación cooperativa y lock de concurrencia ---
+# El pipeline valida en loop con pandas; para poder abortarlo desde la UI se usa un
+# flag de cancelación por audit_id que el validator revisa periódicamente, y un lock
+# global que impide lanzar dos auditorías pesadas simultáneas en la misma instancia.
+
+def _cancel_flag_path(audit_id: str) -> str:
+    return os.path.join(uploads_dir, "history", f"{audit_id}.cancel")
+
+def _lock_file_path() -> str:
+    return os.path.join(uploads_dir, "history", "processing.lock")
+
+def _is_cancelled(audit_id: str) -> bool:
+    return os.path.exists(_cancel_flag_path(audit_id))
+
+def _cleanup_audit_files(audit_id: str) -> None:
+    history_dir = os.path.join(uploads_dir, "history")
+    for suffix in [".xlsx", "_diagnostico.json", "_compact.json", "_reporte_completo.xlsx", ".cancel"]:
+        try:
+            os.remove(os.path.join(history_dir, f"{audit_id}{suffix}"))
+        except OSError:
+            pass
+
+def _acquire_lock(audit_id: str) -> bool:
+    lock_path = _lock_file_path()
+    if os.path.exists(lock_path):
+        try:
+            with open(lock_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            age = time.time() - data.get("started_at", 0)
+            if age < 3 * 3600:  # 3 horas: cubre validaciones de archivos muy grandes
+                return False
+        except Exception:
+            pass
+        try:
+            os.remove(lock_path)
+        except OSError:
+            pass
+    with open(lock_path, "w", encoding="utf-8") as f:
+        json.dump({"audit_id": audit_id, "started_at": time.time()}, f)
+    return True
+
+def _release_lock(audit_id: str) -> None:
+    lock_path = _lock_file_path()
+    try:
+        if os.path.exists(lock_path):
+            with open(lock_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("audit_id") == audit_id:
+                os.remove(lock_path)
+    except Exception:
+        pass
+
 def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: str = None):
     t_start = time.time()
     print(f"\n======================================================================")
@@ -771,22 +823,38 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
     try:
         # Paso 1: Ejecutar la validación masiva en validator.py
         print(f"[*] [AUDITORÍA {audit_id}] Paso 1/5: Ejecutando motor de validación QA/QC geomecánica...")
-        validate_bulk_excel(file_path, raw_json_out)
-        
+        validate_bulk_excel(file_path, raw_json_out, cancel_flag_path=_cancel_flag_path(audit_id))
+        if _is_cancelled(audit_id):
+            _cleanup_audit_files(audit_id)
+            print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario tras la validación.")
+            return
+
         # Paso 2: Copiar al diagnóstico público estático
         print(f"[*] [AUDITORÍA {audit_id}] Paso 2/5: Publicando diagnóstico en caché pública...")
+        if _is_cancelled(audit_id):
+            _cleanup_audit_files(audit_id)
+            print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario antes de publicar el diagnóstico.")
+            return
         shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
-        
+
         # Paso 3: Cargar resultados y compactar métricas para la UI mediante la función unificada
         print(f"[*] [AUDITORÍA {audit_id}] Paso 3/5: Compilando métricas compactas para Dashboard...")
+        if _is_cancelled(audit_id):
+            _cleanup_audit_files(audit_id)
+            print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario antes de compilar métricas.")
+            return
         with open(raw_json_out, "r", encoding="utf-8") as f:
             diag = json.load(f)
-            
+
         diag["nombre_archivo"] = original_filename or os.path.basename(file_path)
         compact = aggregate_audit_metrics(diag)
         compact["audit_id"] = audit_id
-        
+
         print(f"[*] [AUDITORÍA {audit_id}] Paso 4/5: Escribiendo JSON de resumen ligero...")
+        if _is_cancelled(audit_id):
+            _cleanup_audit_files(audit_id)
+            print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario antes de publicar el resumen.")
+            return
         compact_json_tmp = compact_json_out + ".tmp"
         with open(compact_json_tmp, "w", encoding="utf-8") as f:
             json.dump(compact, f, ensure_ascii=False)
@@ -802,6 +870,10 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
         # para que el GC pueda liberar el dict grande mientras openpyxl construye el workbook,
         # evitando el MemoryError por tener dos copias gigantes en RAM simultáneamente.
         print(f"[*] [AUDITORÍA {audit_id}] Paso 5/5: Pre-generando reporte de Excel (.xlsx) en segundo plano...")
+        if _is_cancelled(audit_id):
+            _cleanup_audit_files(audit_id)
+            print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario antes de generar el reporte Excel.")
+            return
         incidencias_list = diag.pop("incidencias", [])
         wb = generar_excel_reporte_core(diag, compact, incidencias_list)
         del incidencias_list  # liberar RAM antes de guardar el .xlsx
@@ -820,6 +892,11 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
         print(f"[+] [AUDITORÍA {audit_id}] PIPELINE COMPLETADO EXITOSAMENTE")
         print(f"[*] Tiempo total: {elapsed:.2f} segundos")
         print(f"======================================================================\n")
+
+    except AuditCancelledError as e:
+        print(f"\n[x] [AUDITORÍA {audit_id}] AUDITORÍA CANCELADA POR EL USUARIO: {e}")
+        _cleanup_audit_files(audit_id)
+        print(f"[x] [AUDITORÍA {audit_id}] Archivos parciales eliminados.")
 
     except Exception as e:
         elapsed = time.time() - t_start
@@ -845,6 +922,22 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
             shutil.copyfile(compact_json_out, os.path.join(uploads_dir, "resumen_geomecanico_ligero.json"))
         except Exception as write_err:
             print(f"[-] Error al guardar JSON de contingencia para error de auditoría: {write_err}")
+    finally:
+        _release_lock(audit_id)
+
+@router.post("/geomecanica/cancelar")
+def cancelar_auditoria(audit_id: str = None):
+    """
+    Cancela cooperativamente una auditoría en curso: crea un flag que el pipeline
+    revisa periódicamente (en el loop de validación y entre pasos) para abortar
+    y limpiar los archivos parciales.
+    """
+    if not audit_id:
+        raise HTTPException(status_code=400, detail="Parámetro 'audit_id' requerido.")
+    with open(_cancel_flag_path(audit_id), "w", encoding="utf-8") as f:
+        f.write("1")
+    _release_lock(audit_id)
+    return {"status": "cancelado", "audit_id": audit_id}
 
 @router.post("/geomecanica/importar-excel-bulk")
 async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -853,6 +946,15 @@ async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFil
     audit_id = f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     history_dir = os.path.join(uploads_dir, "history")
     os.makedirs(history_dir, exist_ok=True)
+
+    # Guard de concurrencia: una sola auditoría pesada a la vez (evita OOM por
+    # dos pipelines simultáneos de archivos grandes en instancias pequeñas).
+    if not _acquire_lock(audit_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Ya hay una auditoría en proceso en el servidor. Espera a que termine o cancélala antes de subir otro archivo."
+        )
+
     file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
     
     with open(file_path, "wb") as buffer:
@@ -874,12 +976,14 @@ async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFil
                 detail="El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
             )
     except HTTPException:
+        _release_lock(audit_id)
         raise
     except Exception as e:
         try:
             os.remove(file_path)
         except:
             pass
+        _release_lock(audit_id)
         raise HTTPException(
             status_code=400,
             detail=f"No se pudo leer el archivo Excel. Verifique que no esté corrupto o posea un formato inválido. Detalle: {str(e)}"
