@@ -7,6 +7,7 @@ import {
     LITHOLOGY_CLASSIFICATION,
     resolveLithologyCascade
 } from '../utils/catalogData';
+import { getFieldPrecision, roundTo } from './numericPrecision';
 
 // 1. DICCIONARIO MAESTRO DE ETIQUETAS (SSOT ABSOLUTO)
 export const COLUMN_LABELS: Record<string, string> = {
@@ -385,7 +386,7 @@ export function applyPltFormulas(row: any) {
 
     const w1 = num(r.ancho_w1);
     const w2 = num(r.ancho_w2);
-    r.ancho_w = (w1 !== null && w2 !== null) ? Math.round((w1 + w2) / 2 * 100) / 100 : null;
+    r.ancho_w = (w1 !== null && w2 !== null) ? roundTo((w1 + w2) / 2, 2) : null;
 
     const L = num(r.longitud_l);
     const D = num(r.espesor_d);
@@ -393,17 +394,17 @@ export function applyPltFormulas(row: any) {
 
     r.muestra_valida_longitud = (L !== null && D !== null) ? (L >= D ? "SÍ" : "NO") : null;
     r.muestra_valida_ancho = (D !== null && W !== null) ? (D > 0.3 * W && D < W ? "SÍ" : "NO") : null;
-    r.diametro_equivalente = (D !== null && W !== null) ? Math.round(Math.sqrt(4 * D * W / Math.PI) * 1000000) / 1000000 : null;
-    r.f = (r.diametro_equivalente !== null) ? Math.round(Math.pow((r.diametro_equivalente * 10) / 50, 0.45) * 1000000) / 1000000 : null;
+    r.diametro_equivalente = (D !== null && W !== null) ? roundTo(Math.sqrt(4 * D * W / Math.PI), 4) : null;
+    r.f = (r.diametro_equivalente !== null) ? roundTo(Math.pow((r.diametro_equivalente * 10) / 50, 0.45), 4) : null;
 
     const P = num(r.fuerza_p);
     r.is_mpa = (P !== null && r.diametro_equivalente !== null && r.diametro_equivalente > 0)
-        ? Math.round((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2) * 1000000) / 1000000
+        ? roundTo((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2), 4)
         : null;
 
     // Conforme a temp.md: SI (Muestra válida - ancho == "SI") ENTONCES (F * Is) SINO NULL
     r.is_50 = (r.muestra_valida_ancho === "SÍ" && r.is_mpa !== null && r.f !== null)
-        ? Math.round(r.is_mpa * r.f * 1000000) / 1000000
+        ? roundTo(r.is_mpa * r.f, 4)
         : null;
 
     const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, null);
@@ -411,7 +412,7 @@ export function applyPltFormulas(row: any) {
     r.tipo_litologico = res.clase;
 
     const K = num(r.factor_conversion_k);
-    r.ucs = (r.is_50 !== null && K !== null) ? Math.round(r.is_50 * K * 100) / 100 : null;
+    r.ucs = (r.is_50 !== null && K !== null) ? roundTo(r.is_50 * K, 3) : null;
 
     const cls = getIsrmClass(r.ucs);
     r.resistencia_isrm = cls ? cls.indice : null;
@@ -520,17 +521,9 @@ export function normalizeCeldaCode(celda: string): string {
 }
 
 export function getPltConstraints(key: string): { intDigits: number; decDigits: number } | null {
-    if (key === "este") return { intDigits: 6, decDigits: 4 };
-    if (key === "norte") return { intDigits: 7, decDigits: 3 };
-    if (key === "elevacion") return { intDigits: 4, decDigits: 2 };
-    if (key === "espesor_d") return { intDigits: 4, decDigits: 1 };
-    if (key === "nivel") return { intDigits: 4, decDigits: 2 };
-
-    const decCols = ["longitud_l", "ancho_w1", "ancho_w2", "fuerza_p", "factor_conversion_k", "campana"];
-    if (decCols.includes(key)) {
-        return { intDigits: 5, decDigits: 2 };
-    }
-    return null;
+    const prec = getFieldPrecision(key);
+    if (!prec) return null;
+    return { intDigits: prec.intDigits ?? 5, decDigits: prec.display };
 }
 
 export const handlePltNumberLimit = (value: string, intDigits: number, decDigits: number): string => {

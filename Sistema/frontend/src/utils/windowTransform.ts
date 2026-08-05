@@ -8,6 +8,7 @@
 
 import type { WindowHeader, JointRow } from './rmrCalculator';
 import type { WindowData } from './diffUtils';
+import { normalizeNumeric } from './numericPrecision';
 
 export function normalizeJoints(loadedJoints: JointRow[], defaultAlt: string = 'd'): JointRow[] {
   const mappedJoints = (loadedJoints || []).map((j, i) => {
@@ -80,10 +81,10 @@ export function windowFromServerResponse(v: any): WindowData {
 
   const header: WindowHeader = {
     celda: v.codigo,
-    este_from: v.este_ini !== null && v.este_ini !== undefined ? roundDec(v.este_ini, 4) : undefined,
+    este_from: normalizeNumeric('este_from', v.este_ini) ?? undefined,
     norte_from: v.norte_ini !== null && v.norte_ini !== undefined ? roundDec(v.norte_ini, 3) : undefined,
     cota_from: v.cota_ini !== null && v.cota_ini !== undefined ? roundDec(v.cota_ini, 2) : undefined,
-    este_to: v.este_fin !== null && v.este_fin !== undefined ? roundDec(v.este_fin, 4) : undefined,
+    este_to: normalizeNumeric('este_to', v.este_fin) ?? undefined,
     norte_to: v.norte_fin !== null && v.norte_fin !== undefined ? roundDec(v.norte_fin, 3) : undefined,
     cota_to: v.cota_fin !== null && v.cota_fin !== undefined ? roundDec(v.cota_fin, 2) : undefined,
     altura: (v.altura !== null && v.altura !== undefined) ? roundDec(v.altura, 1) : undefined,
@@ -170,34 +171,31 @@ export function windowFromServerResponse(v: any): WindowData {
  */
 export function excelDataToWindowData(codigoFinal: string, excelData: any, estructuras: any[]): WindowData | null {
   if (!codigoFinal || !excelData) return null;
-  const num = (v: any): number | undefined => {
-    if (v === null || v === undefined || v === '') return undefined;
-    const n = parseFloat(String(v));
-    return isNaN(n) ? undefined : n;
-  };
+  const num = (v: any, key: string): number | undefined => normalizeNumeric(key, v) ?? undefined;
   const str = (v: any): string => (v === null || v === undefined ? '' : String(v).trim());
 
   const campaniaMatch = String(excelData.campania || '').match(/20\d{2}/);
   const header: WindowHeader = {
     celda: codigoFinal,
-    este_from: num(excelData.este_ini),
-    norte_from: num(excelData.norte_ini),
-    cota_from: num(excelData.cota_ini),
-    este_to: num(excelData.este_fin),
-    norte_to: num(excelData.norte_fin),
-    cota_to: num(excelData.cota_fin),
-    largo: num(excelData.largo_m),
-    altura: num(excelData.altura_m),
-    dip_talud: num(excelData.dip_talud),
-    dipdir_talud: num(excelData.dipdir_talud),
-    dip_hw: num(excelData.dip),
-    az_hw: num(excelData.azimut_hole),
+    este_from: num(excelData.este_ini, 'este_from'),
+    norte_from: num(excelData.norte_ini, 'norte_from'),
+    cota_from: num(excelData.cota_ini, 'cota_from'),
+    este_to: num(excelData.este_fin, 'este_to'),
+    norte_to: num(excelData.norte_fin, 'norte_to'),
+    cota_to: num(excelData.cota_fin, 'cota_to'),
+    largo: num(excelData.largo_m, 'largo'),
+    altura: num(excelData.altura_m, 'altura'),
+    dip_talud: num(excelData.dip_talud, 'dip_talud'),
+    dipdir_talud: num(excelData.dipdir_talud, 'dipdir_talud'),
+    dip_hw: num(excelData.dip, 'dip_hw'),
+    az_hw: num(excelData.azimut_hole, 'az_hw'),
     unidad_litologica: str(excelData.unidad_litologica),
     lito_1: str(excelData.lito_1),
     lito_2: str(excelData.lito_2),
     lito_3: str(excelData.lito_3),
     mapeador: str(excelData.mapeador) || 'AS-HM',
     sector: str(excelData.sector),
+    fase: str(excelData.fase),
     nivel: str(excelData.nivel),
     sect_geot: str(excelData.sector),
     intemperia: str(excelData.intemperismo),
@@ -208,37 +206,39 @@ export function excelDataToWindowData(codigoFinal: string, excelData: any, estru
     resistencia_ucs: str(excelData.dureza_rmr76) || str(excelData.dureza_rmr89),
     comentario: str(excelData.comentarios),
     campania: campaniaMatch ? parseInt(campaniaMatch[0], 10) : 2026,
-    gsi_visual: num(excelData.gsi_visual_rmr76) ?? 0,
-    control_estructural: num(excelData.control_estructural_rmr76) ?? 0,
-    efectos_voladura: num(excelData.efectos_voladura_rmr76) ?? 0,
-    ucs_mpa: num(excelData.ucs_mpa) ?? 0,
-    is50_mpa: num(excelData.is50_mpa) ?? 0,
+    gsi_superficie: str(excelData.gsi_superficie),
+    gsi_estructura: str(excelData.gsi_estructura),
+    gsi_visual: num(excelData.gsi_visual_rmr76, 'gsi_visual') ?? 0,
+    control_estructural: num(excelData.control_estructural_rmr76, 'control_estructural') ?? 0,
+    efectos_voladura: num(excelData.efectos_voladura_rmr76, 'efectos_voladura') ?? 0,
+    ucs_mpa: num(excelData.ucs_mpa, 'ucs_mpa') ?? 0,
+    is50_mpa: num(excelData.is50_mpa, 'is50_mpa') ?? 0,
   };
 
   const joints: JointRow[] = (estructuras || []).map((s: any, idx: number) => {
-    const toNum = (v: any): number => {
-      const n = num(v);
-      return n === undefined ? -1 : n;
+    const toNum = (v: any, key: string): number => {
+      const n = normalizeNumeric(key, v);
+      return n === null ? -1 : n;
     };
     return {
       id: idx + 1,
       estructura_id: null,
       familia: s.familia_id || Math.ceil((idx + 1) / 3),
-      distancia: toNum(s.distancia_m),
+      distancia: toNum(s.distancia_m, 'distancia'),
       tipo_estructura: str(s.tipo_estructura) || 'JN',
-      dip: toNum(s.dip),
-      dip_dir: toNum(s.dip_dir),
-      n_estructuras: toNum(s.n_estructuras),
-      abertura: toNum(s.abertura_mm),
-      espesor: toNum(s.espesor_mm),
-      continuidad: toNum(s.continuidad_m),
-      espaciamiento: toNum(s.espaciamiento_m),
-      extremos_visibles: toNum(s.n_extremos_visibles),
-      terminacion: toNum(s.terminacion),
+      dip: toNum(s.dip, 'dip'),
+      dip_dir: toNum(s.dip_dir, 'dip_dir'),
+      n_estructuras: toNum(s.n_estructuras, 'n_estructuras'),
+      abertura: toNum(s.abertura_mm, 'abertura'),
+      espesor: toNum(s.espesor_mm, 'espesor'),
+      continuidad: toNum(s.continuidad_m, 'continuidad'),
+      espaciamiento: toNum(s.espaciamiento_m, 'espaciamiento'),
+      extremos_visibles: toNum(s.n_extremos_visibles, 'n_extremos_visibles'),
+      terminacion: toNum(s.terminacion, 'terminacion'),
       relleno1: str(s.relleno_1_codigo) || '-1',
       relleno2: str(s.relleno_2_codigo) || undefined,
-      jrc: toNum(s.jrc),
-      rugosidad: toNum(s.rugosidad_codigo),
+      jrc: toNum(s.jrc, 'jrc'),
+      rugosidad: toNum(s.rugosidad_codigo, 'rugosidad'),
       forma: str(s.forma_estructura) || '-1',
       alteracion: str(s.alteracion_codigo) || '-1',
     };

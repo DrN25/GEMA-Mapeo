@@ -5,6 +5,7 @@ import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Penc
 import MapeadorCombobox from '../Common/MapeadorCombobox';
 import { markFieldTouched } from '../../utils/qaQcTouch';
 import { CAMPANAS_HARDCODED } from '../../utils/campaniasCatalog';
+import { getFieldPrecision } from '../../utils/numericPrecision';
 
 // Helper: marca el campo como tocado (blur) para habilitar su evaluación QA/QC
 const touchField = (fieldId: string) => () => markFieldTouched(fieldId);
@@ -42,6 +43,12 @@ const handleNumberInputLimit = (value: string, intDigits: number, decDigits: num
 const sanitizeDecimalInput = (val: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
   const sanitized = val.replace(',', '.');
   return handleNumberInputLimit(sanitized, intDigits, decDigits, allowNegative);
+};
+
+// Precisión de coordenadas desde el SSOT (numericPrecision) — un solo lugar para ajustar
+const coordPrecision = (key: string) => {
+  const p = getFieldPrecision(key);
+  return { intDigits: p?.intDigits ?? 6, decDigits: p?.display ?? 3 };
 };
 
 export default function VentanaForm({
@@ -334,7 +341,7 @@ export default function VentanaForm({
                     placeholder="Este (X)"
                     value={getInputValue('este_from', header.este_from)}
                     id="header-este_from"
-                    onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, 6, 4)}
+                    onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, coordPrecision('este_from').intDigits, coordPrecision('este_from').decDigits)}
                     onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
                     className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
@@ -345,7 +352,7 @@ export default function VentanaForm({
                     placeholder="Norte (Y)"
                     value={getInputValue('norte_from', header.norte_from)}
                     id="header-norte_from"
-                    onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, 7, 3)}
+                    onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, coordPrecision('norte_from').intDigits, coordPrecision('norte_from').decDigits)}
                     onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
                     className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
@@ -356,7 +363,7 @@ export default function VentanaForm({
                     placeholder="Cota (C)"
                     value={getInputValue('cota_from', header.cota_from)}
                     id="header-cota_from"
-                    onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, 4, 2)}
+                    onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, coordPrecision('cota_from').intDigits, coordPrecision('cota_from').decDigits)}
                     onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
                     className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
@@ -378,7 +385,7 @@ export default function VentanaForm({
                     placeholder="Este (X)"
                     value={getInputValue('este_to', header.este_to)}
                     id="header-este_to"
-                    onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, 6, 4)}
+                    onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, coordPrecision('este_to').intDigits, coordPrecision('este_to').decDigits)}
                     onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
                     className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
@@ -389,7 +396,7 @@ export default function VentanaForm({
                     placeholder="Norte (Y)"
                     value={getInputValue('norte_to', header.norte_to)}
                     id="header-norte_to"
-                    onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, 7, 3)}
+                    onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, coordPrecision('norte_to').intDigits, coordPrecision('norte_to').decDigits)}
                     onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
                     className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />
@@ -400,7 +407,7 @@ export default function VentanaForm({
                     placeholder="Cota (C)"
                     value={getInputValue('cota_to', header.cota_to)}
                     id="header-cota_to"
-                    onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, 4, 2)}
+                    onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, coordPrecision('cota_to').intDigits, coordPrecision('cota_to').decDigits)}
                     onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
                     className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
                   />

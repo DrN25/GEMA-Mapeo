@@ -26,6 +26,8 @@ interface ExcelImportModalProps {
   onClose: () => void;
   onImport: (items: ImportedCellItem[]) => void;
   apiBase?: string;
+  /** Nombres de celdas existentes: BD del listado + borradores locales pendientes. */
+  existingCeldas?: string[];
 }
 
 interface EstructuraPreview {
@@ -95,7 +97,7 @@ const formatCampania = (val: any) => {
   return str;
 };
 
-export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }: ExcelImportModalProps) {
+export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, existingCeldas = [] }: ExcelImportModalProps) {
   const apiBaseUrl = apiBase || DEFAULT_API_BASE;
 
   const [step, setStep] = useState<Step>('select');
@@ -139,8 +141,10 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Códigos que YA EXISTEN en BD (todos los que devolvió el preview,
-  // más los marcados como duplicados con el nombre original del Excel).
+  // Códigos que YA EXISTEN en el sistema (los devolvió el preview = BD,
+  // más los marcados como duplicados del Excel, más los borradores locales
+  // pendientes que aporta la app): sirven para detectar si un nombre RENOMBRADO
+  // colisiona con otra celda (de BD o borrador local).
   const existingDbCodes = useMemo(() => {
     const set = new Set<string>(
       (existingCodes || []).map(c => c.trim().toUpperCase())
@@ -148,8 +152,11 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
     celdas.filter(c => c.is_duplicate).forEach(c => {
       set.add(c.codigo.trim().toUpperCase());
     });
+    (existingCeldas || []).forEach(c => {
+      set.add(c.trim().toUpperCase());
+    });
     return set;
-  }, [existingCodes, celdas]);
+  }, [existingCodes, celdas, existingCeldas]);
 
   // Una celda es duplicada si su NOMBRE FINAL (con renombrado aplicado)
   // coincide con algún código existente en BD. Si el usuario renombró la
@@ -824,9 +831,9 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase }:
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Estas celdas ya existen en la base de datos. Al importarlas como borradores y
-              presionar <strong>GUARDAR CAMBIOS</strong>, los datos actuales de la BD se
-              actualizarán con los del archivo Excel.
+              Estas celdas ya existen en el sistema (en la base de datos o como borrador
+              local pendiente). Al importarlas y presionar <strong>GUARDAR CAMBIOS</strong>,
+              los datos existentes se actualizarán con los del archivo Excel.
             </p>
 
             {/* Opciones de Acción */}

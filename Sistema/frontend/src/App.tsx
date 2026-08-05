@@ -1773,6 +1773,7 @@ export default function App() {
         apiBase={RESOLVED_API_BASE}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportToPending}
+        existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
       />
       {isCatalogModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
