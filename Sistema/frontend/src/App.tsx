@@ -21,6 +21,7 @@ import SaveResultModal from './components/modals/SaveResultModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject } from './utils/hashUtils';
+import { evictCelda, evictSincronizadas, safeSetItem } from './utils/storageManager';
 import {
   computeWindowDiff,
   computeAllWindowsDiff,
@@ -355,8 +356,9 @@ export default function App() {
   useEffect(() => {
     if (!activeWindow) return;
     const celda = activeWindow.header.celda;
-    localStorage.setItem('geolog_active_window_celda', celda);
-    localStorage.setItem(`geolog_window_${celda}`, JSON.stringify(activeWindow));
+    const ctx = { activeCelda: celda, pendingImports };
+    safeSetItem('geolog_active_window_celda', celda, ctx);
+    safeSetItem(`geolog_window_${celda}`, JSON.stringify(activeWindow), ctx);
 
     const activeHash = fastHashObject(activeWindow);
     const savedHash = dbSnapshotHash || localStorage.getItem(`geolog_window_snapshot_hash_${celda}`);
@@ -367,12 +369,12 @@ export default function App() {
       const hasChanged = activeHash !== savedHash;
 
       if (hasChanged && !unsavedList.includes(celda)) {
-        localStorage.setItem('geolog_unsaved_windows', JSON.stringify([...unsavedList, celda]));
+        safeSetItem('geolog_unsaved_windows', JSON.stringify([...unsavedList, celda]), ctx);
       } else if (!hasChanged && unsavedList.includes(celda)) {
-        localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)));
+        safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)), ctx);
       }
     } catch (e) { }
-  }, [activeWindow, dbSnapshotHash]);
+  }, [activeWindow, dbSnapshotHash, pendingImports]);
 
   useEffect(() => {
     const targetCelda = activeWindow?.header?.celda?.trim()?.toUpperCase();
@@ -748,16 +750,21 @@ export default function App() {
         setDbSnapshotData(loadedWindow);
         setDbSnapshotHash(snapshotHash);
 
-        localStorage.setItem('geolog_active_window_celda', name);
-        localStorage.setItem(`geolog_window_${name}`, JSON.stringify(loadedWindow));
-        localStorage.setItem(`geolog_window_snapshot_${name}`, JSON.stringify(loadedWindow));
-        localStorage.setItem(`geolog_window_snapshot_hash_${name}`, snapshotHash);
+        const ctx = { activeCelda: name, pendingImports };
+        safeSetItem('geolog_active_window_celda', name, ctx);
+        safeSetItem(`geolog_window_${name}`, JSON.stringify(loadedWindow), ctx);
+        safeSetItem(`geolog_window_snapshot_${name}`, JSON.stringify(loadedWindow), ctx);
+        safeSetItem(`geolog_window_snapshot_hash_${name}`, snapshotHash, ctx);
 
         try {
           const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
           const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
-          localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== name)));
+          safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== name)), ctx);
         } catch (e) { }
+
+        // Regla 1 (Opción A): al cambiar de celda, eliminar el caché de todas
+        // las celdas no protegidas (activa, pendientes, recién importadas).
+        evictSincronizadas(ctx);
 
         fetchPltEnsayos(name);
         setSyncStatus('synced');
@@ -832,7 +839,7 @@ export default function App() {
     setActiveWindow(formatted);
     setDbSnapshotData(null);
     setDbSnapshotHash(null);
-    localStorage.setItem('geolog_active_window_celda', formatted.header.celda);
+    safeSetItem('geolog_active_window_celda', formatted.header.celda, { activeCelda: formatted.header.celda, pendingImports });
     // NO escribir geolog_window_* aquí: el useEffect de rastreo lo hará en el siguiente ciclo
     // de render, después de que computeWindowDiff detecte correctamente la celda como nueva.
     setCurrentView('mapeo');
@@ -857,8 +864,8 @@ export default function App() {
       console.warn("Failed to delete from DB, deleting locally.", e);
       const updated = windows.filter(w => w.name !== name);
       setWindows(updated);
-      localStorage.setItem('geolog_windows_summaries', JSON.stringify(updated));
-      localStorage.removeItem(`geolog_window_${name}`);
+      // Eliminar todo el caché local de la celda (window, snapshot, hash y PLT)
+      evictCelda(name);
       setSyncStatus('offline');
     }
 
@@ -907,37 +914,38 @@ export default function App() {
 
     // 3. Migrar llaves de LocalStorage y snapshot tree
     try {
+      const ctx = { activeCelda: cleanNewName, pendingImports };
       const windowCache = localStorage.getItem(`geolog_window_${oldCeldaName}`);
       if (windowCache) {
         const parsed = JSON.parse(windowCache);
         parsed.header.celda = cleanNewName;
-        localStorage.setItem(`geolog_window_${cleanNewName}`, JSON.stringify(parsed));
+        safeSetItem(`geolog_window_${cleanNewName}`, JSON.stringify(parsed), ctx);
         localStorage.removeItem(`geolog_window_${oldCeldaName}`);
       } else {
-        localStorage.setItem(`geolog_window_${cleanNewName}`, JSON.stringify(updatedWindow));
+        safeSetItem(`geolog_window_${cleanNewName}`, JSON.stringify(updatedWindow), ctx);
       }
 
       const snapshotCache = localStorage.getItem(`geolog_window_snapshot_${oldCeldaName}`);
       if (snapshotCache) {
         const parsedSnap = JSON.parse(snapshotCache);
         parsedSnap.header.celda = cleanNewName;
-        localStorage.setItem(`geolog_window_snapshot_${cleanNewName}`, JSON.stringify(parsedSnap));
+        safeSetItem(`geolog_window_snapshot_${cleanNewName}`, JSON.stringify(parsedSnap), ctx);
         localStorage.removeItem(`geolog_window_snapshot_${oldCeldaName}`);
       }
 
       const hashCache = localStorage.getItem(`geolog_window_snapshot_hash_${oldCeldaName}`);
       if (hashCache) {
-        localStorage.setItem(`geolog_window_snapshot_hash_${cleanNewName}`, hashCache);
+        safeSetItem(`geolog_window_snapshot_hash_${cleanNewName}`, hashCache, ctx);
         localStorage.removeItem(`geolog_window_snapshot_hash_${oldCeldaName}`);
       }
 
       const pltCache = localStorage.getItem(`plt_ensayos_${oldCeldaName}`);
       if (pltCache) {
-        localStorage.setItem(`plt_ensayos_${cleanNewName}`, pltCache);
+        safeSetItem(`plt_ensayos_${cleanNewName}`, pltCache, ctx);
         localStorage.removeItem(`plt_ensayos_${oldCeldaName}`);
       }
 
-      localStorage.setItem('geolog_active_window_celda', cleanNewName);
+      safeSetItem('geolog_active_window_celda', cleanNewName, ctx);
     } catch (e) {
       console.error("Error al migrar claves de LocalStorage:", e);
     }
@@ -1210,9 +1218,10 @@ export default function App() {
           successCount++;
           totalJointsSaved += nonVacantJoints.length;
           const hash = fastHashObject(winData);
-          localStorage.setItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData));
-          localStorage.setItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData));
-          localStorage.setItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash);
+          const ctx = { activeCelda: winData.header.celda, pendingImports };
+          safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
+          safeSetItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData), ctx);
+          safeSetItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash, ctx);
 
           if (activeWindow && activeWindow.header.celda === winData.header.celda) {
             setDbSnapshotData(winData);
@@ -1221,14 +1230,15 @@ export default function App() {
 
           const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
           const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
-          localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== winData.header.celda)));
+          safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== winData.header.celda)), ctx);
         }
       } catch (err) {
         console.warn("Save DB failed, persisting locally in localStorage:", winData.header.celda, err);
         const hash = fastHashObject(winData);
-        localStorage.setItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData));
-        localStorage.setItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData));
-        localStorage.setItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash);
+        const ctx = { activeCelda: winData.header.celda, pendingImports };
+        safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
+        safeSetItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData), ctx);
+        safeSetItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash, ctx);
         if (activeWindow && activeWindow.header.celda === winData.header.celda) {
           setDbSnapshotData(winData);
           setDbSnapshotHash(hash);
@@ -1279,32 +1289,34 @@ export default function App() {
     setShowDiscardModal(false);
     if (scope === 'active' && activeWindow) {
       const celda = activeWindow.header.celda;
+      const ctx = { activeCelda: celda, pendingImports };
       const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
       if (snapshotRaw) {
         const parsed = JSON.parse(snapshotRaw);
         setActiveWindow(parsed);
-        localStorage.setItem(`geolog_window_${celda}`, JSON.stringify(parsed));
+        safeSetItem(`geolog_window_${celda}`, JSON.stringify(parsed), ctx);
       }
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
         const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
-        localStorage.setItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)));
+        safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== celda)), ctx);
       } catch (e) { }
     } else {
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
         const unsavedNames: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
         for (const celda of unsavedNames) {
+          const ctx = { activeCelda: celda, pendingImports };
           const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${celda}`);
           if (snapshotRaw) {
             const parsed = JSON.parse(snapshotRaw);
-            localStorage.setItem(`geolog_window_${celda}`, JSON.stringify(parsed));
+            safeSetItem(`geolog_window_${celda}`, JSON.stringify(parsed), ctx);
             if (activeWindow && activeWindow.header.celda === celda) {
               setActiveWindow(parsed);
             }
           }
         }
-        localStorage.setItem('geolog_unsaved_windows', JSON.stringify([]));
+        safeSetItem('geolog_unsaved_windows', JSON.stringify([]), { pendingImports });
       } catch (e) { }
     }
   };

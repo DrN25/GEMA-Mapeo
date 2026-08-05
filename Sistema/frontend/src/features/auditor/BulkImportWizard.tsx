@@ -9,11 +9,13 @@ interface BulkImportWizardProps {
 
 export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImportWizardProps) {
     const [file, setFile] = useState<File | null>(null);
+    const [errorMsg, setErrorMsg] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!isOpen) {
             setFile(null);
+            setErrorMsg('');
         }
     }, [isOpen]);
 
@@ -22,6 +24,12 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (selectedFile) {
+            if (!selectedFile.name.toLowerCase().endsWith('.xlsx')) {
+                setFile(null);
+                setErrorMsg('Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).');
+                return;
+            }
+            setErrorMsg('');
             setFile(selectedFile);
         }
     };
@@ -64,12 +72,12 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                         <input
                             type="file"
                             className="hidden"
-                            accept=".xlsx, .xls"
+                            accept=".xlsx"
                             ref={inputRef}
                             onChange={handleFileChange}
                         />
                         <FileSpreadsheet size={36} className={file ? 'text-emerald-400 mb-3' : 'text-cyan-500 mb-3'} />
-                        <h3 className="text-sm font-bold text-slate-200">Archivo Excel de Celdas (.xlsx, .xls)</h3>
+                        <h3 className="text-sm font-bold text-slate-200">Archivo Excel de Celdas (.xlsx)</h3>
                         <p className="text-xs text-slate-400 mt-1">
                             {file ? file.name : 'Haz clic aquí para explorar tu computadora'}
                         </p>
@@ -79,6 +87,12 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                             </span>
                         )}
                     </div>
+
+                    {errorMsg && (
+                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold animate-fade-in">
+                            {errorMsg}
+                        </div>
+                    )}
 
                     {file && (
                         <div className="flex gap-2.5 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">

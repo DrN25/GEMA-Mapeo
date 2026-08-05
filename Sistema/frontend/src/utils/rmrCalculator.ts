@@ -9,6 +9,8 @@ import { ratingDiscretoRqd, ratingContinuoRqd, ratingDiscretoResistencia, rating
 
 export interface JointRow {
   id: number;
+  /** EstructuraID real en BD (null/undefined = fila nueva local sin persistir). */
+  estructura_id?: number | null;
   familia: number; // 1 to 9
   distancia?: number;
   tipo_estructura: string;

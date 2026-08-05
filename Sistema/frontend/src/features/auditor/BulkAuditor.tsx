@@ -128,6 +128,13 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     // perdió (p.ej. el servidor se reinició), se muestra un error claro — nunca una
     // pantalla en blanco.
     useEffect(() => {
+        // Estados obsoletos de localStorage (sesiones previas): 'uploading' no puede
+        // sobrevivir a una recarga (no hay subida en vuelo), y 'processing' sin
+        // processingAuditId no tiene poller → volver al inicio en lugar de cargar infinito.
+        if (status === 'uploading' || (status === 'processing' && !processingAuditId)) {
+            setStatus('idle');
+            return;
+        }
         if (status === 'loaded' && selectedAuditId) {
             verifyAuditExists(selectedAuditId);
         }
@@ -194,14 +201,21 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     return;
                 }
 
-                // "listo": el compact ya existe. El .xlsx del paso 5 puede tardar unos
-                // segundos más, por eso seguimos polleando (liviano) hasta reporte_listo.
+                // "listo": el compact ya existe → mostrar el dashboard de inmediato.
+                // El .xlsx del paso 5 puede tardar unos segundos más (o morir si el
+                // servidor cae): NO bloqueamos la vista por eso, solo seguimos
+                // polleando liviano hasta que reporte_listo habilite la descarga.
                 setExcelReady(Boolean(data.reporte_listo));
-                if (!data.reporte_listo) return;
+                setAuditVerified(true);
+                if (!data.reporte_listo) {
+                    if (selectedAuditIdRef.current === auditId) {
+                        setStatus('loaded');
+                    }
+                    return;
+                }
 
                 stopStatusPolling();
                 setProcessingAuditId('');
-                setAuditVerified(true);
                 fetchHistory();
                 // Solo saltar al dashboard si esta auditoría es la que se está viendo;
                 // si quedó en segundo plano (banner), no se cambia la vista actual.
@@ -290,6 +304,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             setStatus('processing');
             startStatusPolling(processingAuditId);
         } else if (selectedAuditId) {
+            // Restaurar 'loaded' antes de verificar: si la verificación tiene éxito,
+            // los efectos de carga del dashboard deben poder dispararse.
+            setStatus('loaded');
             verifyAuditExists(selectedAuditId);
         }
     };
@@ -390,9 +407,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
     // Cierra la vista actual (dashboard/error) y vuelve al inicio, pero CONSERVA
     // processingAuditId: si hay una auditoría procesando en segundo plano, el banner
-    // de progreso sigue visible desde la vista de inicio y el poller continúa.
+    // de progreso sigue visible desde la vista de inicio y el poller continúa
+    // (por eso NO se detiene aquí: se detiene solo cuando processingAuditId se limpia).
     const handleCloseView = () => {
-        stopStatusPolling();
         setStatus('idle');
         setSelectedAuditId('');
         setKpis(null);

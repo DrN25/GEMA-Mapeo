@@ -772,10 +772,15 @@ def _is_cancelled(audit_id: str) -> bool:
 def _cleanup_audit_files(audit_id: str) -> None:
     history_dir = os.path.join(uploads_dir, "history")
     for suffix in [".xlsx", "_diagnostico.json", "_compact.json", "_reporte_completo.xlsx", ".cancel"]:
-        try:
-            os.remove(os.path.join(history_dir, f"{audit_id}{suffix}"))
-        except OSError:
-            pass
+        p = os.path.join(history_dir, f"{audit_id}{suffix}")
+        for attempt in range(3):
+            try:
+                os.remove(p)
+                break
+            except OSError:
+                if attempt == 2:
+                    break
+                time.sleep(0.3)  # reintentar: en Windows puede estar momentáneamente bloqueado
 
 def _acquire_lock(audit_id: str) -> bool:
     lock_path = _lock_file_path()
@@ -849,6 +854,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
         diag["nombre_archivo"] = original_filename or os.path.basename(file_path)
         compact = aggregate_audit_metrics(diag)
         compact["audit_id"] = audit_id
+        compact["nombre_archivo"] = diag["nombre_archivo"]
 
         print(f"[*] [AUDITORÍA {audit_id}] Paso 4/5: Escribiendo JSON de resumen ligero...")
         if _is_cancelled(audit_id):
@@ -936,13 +942,14 @@ def cancelar_auditoria(audit_id: str = None):
         raise HTTPException(status_code=400, detail="Parámetro 'audit_id' requerido.")
     with open(_cancel_flag_path(audit_id), "w", encoding="utf-8") as f:
         f.write("1")
-    _release_lock(audit_id)
+    # NO se libera el lock aquí: se libera cuando el pipeline viejo realmente salga
+    # (finally), evitando que una auditoría nueva se solape con la que aún termina.
     return {"status": "cancelado", "audit_id": audit_id}
 
 @router.post("/geomecanica/importar-excel-bulk")
 async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="Formato no soportado.")
+    if not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).")
     audit_id = f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     history_dir = os.path.join(uploads_dir, "history")
     os.makedirs(history_dir, exist_ok=True)
@@ -955,42 +962,46 @@ async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFil
             detail="Ya hay una auditoría en proceso en el servidor. Espera a que termine o cancélala antes de subir otro archivo."
         )
 
-    file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    # Validar de forma síncrona si es un reporte generado por el sistema
     try:
-        import pandas as pd
-        xls = pd.ExcelFile(file_path, engine='openpyxl')
-        sheet_names = xls.sheet_names
-        is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
-        if is_report:
+        file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Validar de forma síncrona si es un reporte generado por el sistema
+        try:
+            import pandas as pd
+            xls = pd.ExcelFile(file_path, engine='openpyxl')
+            sheet_names = xls.sheet_names
+            is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
+            if is_report:
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+                raise HTTPException(
+                    status_code=400,
+                    detail="El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
             try:
                 os.remove(file_path)
             except:
                 pass
             raise HTTPException(
                 status_code=400,
-                detail="El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
+                detail=f"No se pudo leer el archivo Excel. Verifique que no esté corrupto o posea un formato inválido. Detalle: {str(e)}"
             )
-    except HTTPException:
+
+        background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id, file.filename)
+        return {"status": "procesando", "audit_id": audit_id, "filename": file.filename}
+    except BaseException:
+        # Cualquier fallo (desconexión del cliente, error de disco, fallo al agendar)
+        # debe liberar el lock para no bloquear futuras auditorías hasta el timeout.
         _release_lock(audit_id)
         raise
-    except Exception as e:
-        try:
-            os.remove(file_path)
-        except:
-            pass
-        _release_lock(audit_id)
-        raise HTTPException(
-            status_code=400,
-            detail=f"No se pudo leer el archivo Excel. Verifique que no esté corrupto o posea un formato inválido. Detalle: {str(e)}"
-        )
-
-    background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id, file.filename)
-    return {"status": "procesando", "audit_id": audit_id, "filename": file.filename}
 
 @router.get("/geomecanica/auditorias")
 def listar_auditorias():

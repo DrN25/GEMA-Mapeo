@@ -87,22 +87,13 @@ export function computeWindowDiff(
     }
   }
 
-  // Si sigue sin haber snapshot 'before', verificar si la celda existe en BD o en caché local
+  // Si sigue sin haber snapshot 'before', verificar si hay snapshot de referencia guardado
   if (!effectiveBefore) {
-    let existsInDbSummaries = false;
-    try {
-      const summariesStr = localStorage.getItem('geolog_windows_summaries');
-      if (summariesStr && after?.header?.celda) {
-        const summaries = JSON.parse(summariesStr);
-        existsInDbSummaries = Array.isArray(summaries) && summaries.some((s: any) => s.name === after.header.celda);
-      }
-    } catch (e) {}
-
     // Solo considerar "existente" si hay un snapshot de referencia guardado,
     // NO solo un caché de datos activos (que puede existir por escritura prematura en handleCreateWindow).
     const hasPersistedSnapshot = !!localStorage.getItem(`geolog_window_snapshot_${after?.header?.celda}`);
 
-    if (existsInDbSummaries || hasPersistedSnapshot) {
+    if (hasPersistedSnapshot) {
       // Usar 'after' como baseline para evitar falsos positivos en celdas existentes sin snapshot previo
       effectiveBefore = JSON.parse(JSON.stringify(after));
     } else {

@@ -675,6 +675,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
             raise ValueError("El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
             
         df = pd.read_excel(xls, sheet_name=sheet_names[0])
+        xls.close()  # liberar el handle del archivo (en Windows impide borrar/limpiar el .xlsx)
         print(f"    [+] [QA/QC] Archivo cargado con éxito. Filas físicas leídas: {len(df)}")
     except ValueError as ve:
         raise ve
