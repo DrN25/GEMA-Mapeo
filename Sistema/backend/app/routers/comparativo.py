@@ -988,8 +988,8 @@ async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: U
     Puede tardar varios minutos dependiendo del tamano de los archivos.
     """
     for f in [file_a, file_b]:
-        if not f.filename.endswith((".xlsx", ".xls")):
-            raise HTTPException(status_code=400, detail=f"Formato no soportado: {f.filename}")
+        if not f.filename.lower().endswith(".xlsx"):
+            raise HTTPException(status_code=400, detail=f"Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+): {f.filename}")
     ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
     tmp_dir = tempfile.mkdtemp(dir=uploads_dir)
     try:

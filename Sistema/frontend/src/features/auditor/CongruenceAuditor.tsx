@@ -163,10 +163,16 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
               <div className="border-2 border-dashed border-navy-800 hover:border-indigo-500/50 rounded-xl p-6 transition-all bg-navy-950/40 relative flex flex-col items-center justify-center text-center cursor-pointer group">
                 <input 
                   type="file" 
-                  accept=".xlsx, .xls"
+                  accept=".xlsx"
                   onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      setFileAudit(e.target.files[0]);
+                    const f = e.target.files && e.target.files[0];
+                    if (f) {
+                      if (!f.name.toLowerCase().endsWith('.xlsx')) {
+                        setFileAudit(null);
+                        setAuditError('Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).');
+                        return;
+                      }
+                      setFileAudit(f);
                       setAuditSuccess(false);
                       setAuditError(null);
                     }
@@ -177,7 +183,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
                 <span className="text-xs font-bold text-slate-300 block max-w-[280px] truncate">
                   {fileAudit ? fileAudit.name : "Selecciona o arrastra el archivo Excel"}
                 </span>
-                <span className="text-[10px] text-slate-500 block mt-1">Soporta formatos .xlsx y .xls</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Soporta formato .xlsx (Excel 2007+)</span>
               </div>
 
               {auditError && (
@@ -236,10 +242,16 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
                 <div className="border border-dashed border-navy-800 hover:border-cyan-500/40 rounded-xl p-4 transition-all bg-navy-950/30 relative flex flex-col items-center justify-center text-center cursor-pointer group h-36">
                   <input 
                     type="file" 
-                    accept=".xlsx, .xls"
+                    accept=".xlsx"
                     onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        setFileAntes(e.target.files[0]);
+                      const f = e.target.files && e.target.files[0];
+                      if (f) {
+                        if (!f.name.toLowerCase().endsWith('.xlsx')) {
+                          setFileAntes(null);
+                          setCompareError('Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).');
+                          return;
+                        }
+                        setFileAntes(f);
                         setCompareSuccess(false);
                         setCompareError(null);
                       }
@@ -259,10 +271,16 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
                 <div className="border border-dashed border-navy-800 hover:border-cyan-500/40 rounded-xl p-4 transition-all bg-navy-950/30 relative flex flex-col items-center justify-center text-center cursor-pointer group h-36">
                   <input 
                     type="file" 
-                    accept=".xlsx, .xls"
+                    accept=".xlsx"
                     onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        setFileDespues(e.target.files[0]);
+                      const f = e.target.files && e.target.files[0];
+                      if (f) {
+                        if (!f.name.toLowerCase().endsWith('.xlsx')) {
+                          setFileDespues(null);
+                          setCompareError('Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).');
+                          return;
+                        }
+                        setFileDespues(f);
                         setCompareSuccess(false);
                         setCompareError(null);
                       }

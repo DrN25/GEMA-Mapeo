@@ -235,7 +235,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                     ) : (
                         <form onSubmit={handleCompareFiles} className="space-y-4">
                             <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                                Suba directamente dos planillas Excel (.xlsx, .xls) sin procesar. El sistema las auditará de manera secuencial en el servidor y le entregará el reporte de comparación.
+                                Suba directamente dos planillas Excel (.xlsx) sin procesar. El sistema las auditará de manera secuencial en el servidor y le entregará el reporte de comparación.
                             </p>
 
                             <div className="space-y-3">
@@ -248,8 +248,16 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                         <Upload size={14} className="text-cyan-400 shrink-0" />
                                         <input
                                             type="file"
-                                            accept=".xlsx,.xls"
-                                            onChange={(e) => setFileA(e.target.files?.[0] || null)}
+                                            accept=".xlsx"
+                                            onChange={(e) => {
+                                                const f = e.target.files?.[0] || null;
+                                                if (f && !f.name.toLowerCase().endsWith('.xlsx')) {
+                                                    setFileA(null);
+                                                    setError('Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).');
+                                                    return;
+                                                }
+                                                setFileA(f);
+                                            }}
                                             disabled={loading}
                                             className="text-xs text-slate-200 focus:outline-none file:hidden w-full cursor-pointer"
                                         />
@@ -270,8 +278,16 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                         <Upload size={14} className="text-cyan-400 shrink-0" />
                                         <input
                                             type="file"
-                                            accept=".xlsx,.xls"
-                                            onChange={(e) => setFileB(e.target.files?.[0] || null)}
+                                            accept=".xlsx"
+                                            onChange={(e) => {
+                                                const f = e.target.files?.[0] || null;
+                                                if (f && !f.name.toLowerCase().endsWith('.xlsx')) {
+                                                    setFileB(null);
+                                                    setError('Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).');
+                                                    return;
+                                                }
+                                                setFileB(f);
+                                            }}
                                             disabled={loading}
                                             className="text-xs text-slate-200 focus:outline-none file:hidden w-full cursor-pointer"
                                         />

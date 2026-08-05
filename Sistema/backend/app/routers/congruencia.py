@@ -236,6 +236,9 @@ def evaluate_rqd_89(row_dict, camp):
 
 @router.post("/congruencia/auditar")
 async def auditar_congruencia(file: UploadFile = File(...)):
+    # 0. Gate de formato: solo .xlsx (openpyxl no lee .xls)
+    if not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail=f"Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+): {file.filename}")
     # 1. Leer el archivo Excel
     contents = await file.read()
     try:
@@ -483,6 +486,10 @@ def _get_parent_cells_map(contents) -> dict:
 
 @router.post("/congruencia/comparar")
 async def comparar_congruencia(antes: UploadFile = File(...), despues: UploadFile = File(...)):
+    # 0. Gate de formato: solo .xlsx (openpyxl no lee .xls)
+    for f in [antes, despues]:
+        if not f.filename.lower().endswith(".xlsx"):
+            raise HTTPException(status_code=400, detail=f"Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+): {f.filename}")
     contents_antes = await antes.read()
     contents_despues = await despues.read()
     
