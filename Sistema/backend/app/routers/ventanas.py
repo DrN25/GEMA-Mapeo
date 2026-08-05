@@ -256,6 +256,7 @@ def serialize_ventana(v: models.Ventana, db: Session) -> schemas.VentanaResponse
         if tipo_codigo == "J" or tipo_codigo == "JS":
             tipo_codigo = "JN"
         discs.append(schemas.DiscontinuidadResponse(
+            estructura_id=e.estructura_id,
             fam=fam_computed,
             dist=float(e.distancia_estructura) if e.distancia_estructura is not None else None,
             tipo=tipo_codigo or "JN",
@@ -785,8 +786,6 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.alteracion = raw_alt_zona.lower().strip() if raw_alt_zona else None
         v.fase = data.fase
         v.geotecnico_id = geotecnico_id
-        for e in list(v.discontinuidades):
-            db.delete(e)
         db.flush()
     else:
         raw_alt_zona = data.alteracion or data.altura_mapeo or data.alteracion_codigo
@@ -836,31 +835,54 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             return "c"
         return v_clean
 
+    # Upsert de discontinuidades: las que vienen con EstructuraID real se
+    # ACTUALIZAN en su mismo registro (no se recrean, preservando cualquier
+    # columna futura); si no viene id pero coincide el NumeroEstructura, se
+    # actualiza por posición (clave natural, evita colisión con el UNIQUE
+    # UQ_EstructurasGeo_VentanaNumero); las nuevas se insertan; las existentes
+    # que ya no vienen en la lista se eliminan (el usuario las borró localmente).
+    existing_map = {e.estructura_id: e for e in v.discontinuidades}
+    existing_by_num = {e.numero_estructura: e for e in v.discontinuidades}
+    incoming_ids = set()
+
     for idx, d in enumerate(data.discontinuidades, start=1):
         tipo_id = resolver.tipo_estructura_id(d.tipo) if d.tipo and str(d.tipo) not in ("-1", "-1.0") else None
         if d.tipo and str(d.tipo) not in ("-1", "-1.0") and tipo_id is None:
             raise HTTPException(status_code=400, detail=f"Tipo estructura '{d.tipo}' no encontrado en GEMA")
         fam_computed = math.ceil(idx / 3.0)
-        e = models.EstructuraGeologica(
-            ventana_id=v.ventana_id,
-            numero_estructura=idx,
-            familia_id=fam_computed,
-            tipo_estructura_id=tipo_id,
-            dip=clean(d.dip), dip_dir=clean(d.dipdir),
-            distancia_estructura=clean(d.dist),
-            abertura_mm=clean(d.aber), espesor_mm=clean(d.esp),
-            continuidad_m=clean(d.cont), espaciamiento_m=clean(d.espac),
-            numero_estructuras=clean(d.nstr),
-            numero_extremos_visibles=clean(d.next),
-            terminacion=clean(d.term),
-            tipo_relleno_1=clean_relleno(d.r1),
-            tipo_relleno_2=clean_relleno(d.r2),
-            jrc=clean(d.jrc),
-            rugosidad_estructura=str(d.rug) if d.rug is not None and str(d.rug) not in ("-1", "-1.0") else None,
-            forma_estructura=d.forma if d.forma and str(d.forma) not in ("-1", "-1.0") else None,
-            alteracion=d.alt if d.alt and str(d.alt) not in ("-1", "-1.0") else None,
-        )
-        db.add(e)
+
+        e = None
+        if d.estructura_id and d.estructura_id in existing_map:
+            e = existing_map[d.estructura_id]
+        elif idx in existing_by_num:
+            e = existing_by_num[idx]
+        if e is None:
+            e = models.EstructuraGeologica(ventana_id=v.ventana_id)
+            db.add(e)
+        if e.estructura_id:
+            incoming_ids.add(e.estructura_id)
+
+        e.numero_estructura = idx
+        e.familia_id = fam_computed
+        e.tipo_estructura_id = tipo_id
+        e.dip = clean(d.dip); e.dip_dir = clean(d.dipdir)
+        e.distancia_estructura = clean(d.dist)
+        e.abertura_mm = clean(d.aber); e.espesor_mm = clean(d.esp)
+        e.continuidad_m = clean(d.cont); e.espaciamiento_m = clean(d.espac)
+        e.numero_estructuras = clean(d.nstr)
+        e.numero_extremos_visibles = clean(d.next)
+        e.terminacion = clean(d.term)
+        e.tipo_relleno_1 = clean_relleno(d.r1)
+        e.tipo_relleno_2 = clean_relleno(d.r2)
+        e.jrc = clean(d.jrc)
+        e.rugosidad_estructura = str(d.rug) if d.rug is not None and str(d.rug) not in ("-1", "-1.0") else None
+        e.forma_estructura = d.forma if d.forma and str(d.forma) not in ("-1", "-1.0") else None
+        e.alteracion = d.alt if d.alt and str(d.alt) not in ("-1", "-1.0") else None
+
+    for old_id, e in existing_map.items():
+        if old_id not in incoming_ids:
+            db.delete(e)
+
     db.flush()
 
     calculate_and_persist_subratings(db, v)

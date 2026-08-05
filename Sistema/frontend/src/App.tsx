@@ -719,6 +719,7 @@ export default function App() {
 
           return {
             id: idx + 1,
+            estructura_id: d.estructura_id ?? null,
             familia: d.fam || d.familia_id || 1,
             distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1,
             tipo_estructura: (d.tipo && d.tipo !== '-1') ? d.tipo : (d.tipo_estructura && d.tipo_estructura !== '-1' ? d.tipo_estructura : '-1'),
@@ -1147,6 +1148,7 @@ export default function App() {
         discontinuidades: nonVacantJoints.map(j => {
           const cj = winCalc.joints.find(c => c.row.id === j.id) || winCalc.joints.find(c => c.row.familia === j.familia && c.row.distancia === j.distancia && c.row.dip === j.dip);
           return {
+            estructura_id: j.estructura_id ?? null,
             fam: j.familia,
             dist: j.distancia === -1 ? null : j.distancia,
             tipo: (j.tipo_estructura && j.tipo_estructura !== '-1') ? j.tipo_estructura : null,

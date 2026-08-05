@@ -911,6 +911,50 @@ def listar_auditorias():
             except: pass
     return sorted(audits, key=lambda x: x["fecha"], reverse=True)
 
+@router.get("/geomecanica/status")
+def obtener_status_auditoria(audit_id: str = None):
+    """
+    Estado canónico y liviano (~200 bytes) de una auditoría para el polling del frontend.
+    Reemplaza el uso de /resumen-ligero como chequeo de estado: no carga JSONs grandes.
+
+    Respuestas:
+      {"status": "procesando"}   -> el pipeline aún corre (existe el .xlsx subido o el diagnóstico)
+      {"status": "listo", "reporte_listo": bool, "nombre_archivo": ..., "fecha_auditoria": ...}
+      {"status": "error", "detail": ...}  -> fallo persistido por el pipeline en el compact
+      404                             -> el audit_id ya no existe (archivos perdidos por reinicio/redeploy)
+    """
+    if not audit_id:
+        raise HTTPException(status_code=400, detail="Parámetro 'audit_id' requerido.")
+
+    history_dir = os.path.join(uploads_dir, "history")
+    excel_file = os.path.join(history_dir, f"{audit_id}.xlsx")
+    raw_file = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
+    compact_file = os.path.join(history_dir, f"{audit_id}_compact.json")
+    reporte_file = os.path.join(history_dir, f"{audit_id}_reporte_completo.xlsx")
+
+    if os.path.exists(compact_file):
+        try:
+            with open(compact_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception:
+            meta = {}
+        if meta.get("status") == "error":
+            return {"status": "error", "detail": meta.get("error_message", "El procesamiento falló en el servidor.")}
+        return {
+            "status": "listo",
+            "reporte_listo": os.path.exists(reporte_file),
+            "nombre_archivo": meta.get("nombre_archivo"),
+            "fecha_auditoria": meta.get("fecha_auditoria"),
+        }
+
+    if os.path.exists(excel_file) or os.path.exists(raw_file):
+        return {"status": "procesando"}
+
+    raise HTTPException(
+        status_code=404,
+        detail="La auditoría solicitada ya no existe en el servidor (sus archivos se perdieron, probablemente por un reinicio o redeploy).",
+    )
+
 @router.get("/geomecanica/resumen-ligero")
 def obtener_resumen_ligero(audit_id: str = None, years: str = None):
     # 1. Resolver rutas de archivos correspondientes

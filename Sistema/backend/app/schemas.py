@@ -20,6 +20,7 @@ from datetime import date, datetime
 
 class DiscontinuidadBase(BaseModel):
     # Identificación
+    estructura_id: Optional[int] = None  # EstructuraID de BD (None = fila nueva local)
     fam: Optional[int] = Field(1, alias="familia_id")
     dist: Optional[float] = Field(None, alias="distancia_m")
     tipo: Optional[str] = Field("JN", alias="tipo_estructura")  # código: "JN", "BED", etc.

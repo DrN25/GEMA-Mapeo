@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
-    Loader2, RefreshCw, Trash2, X
+    Loader2, RefreshCw, Trash2, X, WifiOff
 } from 'lucide-react';
 import BulkImportWizard from './BulkImportWizard';
 
@@ -33,6 +33,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     });
 
     const [excelReady, setExcelReady] = useState<boolean>(false);
+    const [errorKind, setErrorKind] = useState<string | null>(() => {
+        return localStorage.getItem('geomec_bulk_auditor_error_kind') || null;
+    });
+    const [auditVerified, setAuditVerified] = useState<boolean>(false);
     const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
     const [isCompareOpen, setIsCompareOpen] = useState<boolean>(false);
 
@@ -64,7 +68,11 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const [loadingTable, setLoadingTable] = useState<boolean>(false);
 
     const pollingRef = useRef<any>(null);
-    const excelPollingRef = useRef<any>(null);
+    const selectedAuditIdRef = useRef(selectedAuditId);
+
+    useEffect(() => {
+        selectedAuditIdRef.current = selectedAuditId;
+    }, [selectedAuditId]);
 
     // Sincronización del estado con el almacenamiento local
     useEffect(() => {
@@ -74,6 +82,14 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     useEffect(() => {
         localStorage.setItem('geomec_bulk_auditor_message', message);
     }, [message]);
+
+    useEffect(() => {
+        if (errorKind) {
+            localStorage.setItem('geomec_bulk_auditor_error_kind', errorKind);
+        } else {
+            localStorage.removeItem('geomec_bulk_auditor_error_kind');
+        }
+    }, [errorKind]);
 
     useEffect(() => {
         localStorage.setItem('geomec_bulk_auditor_audit_id', selectedAuditId);
@@ -91,105 +107,168 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         fetchHistory();
     }, []);
 
+    // Al montar con un dashboard persistido (recarga / reapertura del navegador):
+    // verificar contra el backend que la auditoría sigue existiendo. Si la data se
+    // perdió (p.ej. el servidor se reinició), se muestra un error claro — nunca una
+    // pantalla en blanco.
+    useEffect(() => {
+        if (status === 'loaded' && selectedAuditId) {
+            verifyAuditExists(selectedAuditId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Poller único de estado: corre solo mientras haya una auditoría procesando.
+    // El primer poll decide la verdad: si el backend ya no procesa (o murió), sale del estado de carga.
     useEffect(() => {
         if (processingAuditId) {
-            startProcessingPolling(processingAuditId);
+            startStatusPolling(processingAuditId);
         } else {
-            stopProcessingPolling();
+            stopStatusPolling();
         }
     }, [processingAuditId]);
 
+    // KPIs: el backend solo los afecta por auditoría y años seleccionados — los demás
+    // filtros NO cambian el compact, así que no debe re-descargarse (~1.1 MB por interacción ahorrado).
     useEffect(() => {
-        if (selectedAuditId && (status === 'loaded' || status === 'processing')) {
-            checkExcelStatus(selectedAuditId);
-        } else {
-            stopExcelPolling();
+        if (status === 'loaded' && selectedAuditId && auditVerified) {
+            fetchKpis(selectedAuditId);
         }
-    }, [selectedAuditId, status]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status, selectedAuditId, selectedYears, auditVerified]);
 
+    // Incidencias paginadas: el filtrado es server-side, dependen de todos los filtros.
     useEffect(() => {
-        if (status === 'loaded' && selectedAuditId) {
-            fetchKpisAndIncidencias();
+        if (status === 'loaded' && selectedAuditId && auditVerified) {
+            fetchPaginatedIncidencias(1);
         }
-    }, [selectedAuditId, filterTipo, filterCelda, filterCampania, filterGeotecnico, filterSearch, selectedYears, status]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status, selectedAuditId, selectedYears, filterTipo, filterCelda, filterCampania, filterGeotecnico, filterSearch, auditVerified]);
 
-    const startProcessingPolling = (auditId: string) => {
-        stopProcessingPolling();
-        pollResumen(auditId);
-        pollingRef.current = setInterval(() => {
-            pollResumen(auditId);
-        }, 4000);
+    // --- POLLER ÚNICO DE ESTADO (GET /status) ---
+    // Mientras procesa: respuestas de ~200 bytes. El resumen completo (1.1 MB) solo se
+    // descarga cuando el backend reporta "listo".
+    const MAX_CONSECUTIVE_FAILURES = 4;
+    const POLL_INTERVAL_MS = 5000;
+
+    const startStatusPolling = (auditId: string) => {
+        stopStatusPolling();
+        let fails = 0;
+
+        const tick = async () => {
+            try {
+                const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`);
+                if (res.status === 404) {
+                    failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos). Vuelve a cargar tu planilla.', auditId);
+                    return;
+                }
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                fails = 0;
+
+                if (data.status === 'procesando') return; // sigue polleando
+
+                if (data.status === 'error') {
+                    failAudit('processing', data.detail || 'El procesamiento falló en el servidor.', auditId);
+                    return;
+                }
+
+                // "listo": el compact ya existe. El .xlsx del paso 5 puede tardar unos
+                // segundos más, por eso seguimos polleando (liviano) hasta reporte_listo.
+                setExcelReady(Boolean(data.reporte_listo));
+                if (!data.reporte_listo) return;
+
+                stopStatusPolling();
+                setProcessingAuditId('');
+                setAuditVerified(true);
+                setStatus('loaded');
+                fetchHistory();
+                if (selectedAuditIdRef.current === auditId) {
+                    setShowProgressToast(`Auditoría finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
+                }
+            } catch (e) {
+                fails += 1;
+                if (fails >= MAX_CONSECUTIVE_FAILURES) {
+                    failAudit('network', 'No se pudo contactar al servidor. Verifica tu conexión o el estado del servicio.', auditId);
+                }
+            }
+        };
+
+        tick();
+        pollingRef.current = setInterval(tick, POLL_INTERVAL_MS);
     };
 
-    const stopProcessingPolling = () => {
+    const stopStatusPolling = () => {
         if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
         }
     };
 
-    const pollResumen = async (auditId: string) => {
-        try {
-            const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
-            const res = await fetch(`${apiBase}/api/geomecanica/resumen-ligero?audit_id=${auditId}&years=${yearParam}`);
-            if (res.status === 400 || res.status === 500) {
-                const data = await res.json();
-                setStatus('error');
-                setMessage(data.detail || 'Fallo de procesamiento en el servidor.');
-                setProcessingAuditId('');
-                stopProcessingPolling();
-                return;
-            }
-            if (res.ok) {
-                if (res.status === 202) return;
-                const data = await res.json();
+    // Maneja cualquier fallo del poller/verificación según el tipo:
+    // - 'network': el servidor no responde (se conserva processingAuditId para reintentar)
+    // - 'not_found': los archivos de la auditoría ya no existen en el backend
+    // - 'processing': el pipeline persistió un error en el compact
+    const failAudit = (kind: 'network' | 'not_found' | 'processing', msg: string, auditId: string) => {
+        stopStatusPolling();
+        setErrorKind(kind);
+        setMessage(msg);
+        setAuditVerified(false);
 
-                setProcessingAuditId('');
-                stopProcessingPolling();
-                fetchHistory();
+        // Si la auditoría que falló no es la que el usuario está viendo (proceso en
+        // segundo plano), no rompemos la vista actual: solo lo notificamos con un toast.
+        if (selectedAuditIdRef.current !== auditId) {
+            setProcessingAuditId('');
+            setShowProgressToast(msg);
+            return;
+        }
 
-                if (status === 'processing' && selectedAuditId === auditId) {
-                    setKpis(data);
-                    setStatus('loaded');
-                } else {
-                    setShowProgressToast(`Auditoría finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
-                }
-            }
-        } catch (e) {
-            console.warn("Error en el polling de consulta de resumen:", e);
+        setStatus('error');
+        setKpis(null);
+        setIncidencias([]);
+        if (kind !== 'network') {
+            setSelectedAuditId('');
+            setProcessingAuditId('');
         }
     };
 
-    const checkExcelStatus = async (auditId: string) => {
-        stopExcelPolling();
-        setExcelReady(false);
-
-        const check = async () => {
-            try {
-                const res = await fetch(`${apiBase}/api/geomecanica/resumen-ligero?audit_id=${auditId}`);
-                if (res.ok) {
-                    setExcelReady(true);
-                    stopExcelPolling();
-                    return true;
-                }
-            } catch (e) {
-                console.warn("Error evaluando estatus de reporte:", e);
+    // Verificación única (montaje / selección de auditoría previa / reintento):
+    // confirma que la data del reporte sigue existiendo antes de renderizar el dashboard.
+    const verifyAuditExists = async (auditId: string) => {
+        try {
+            const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`);
+            if (res.status === 404) {
+                failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
+                return;
             }
-            return false;
-        };
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const isReady = await check();
-        if (isReady) return;
+            const data = await res.json();
+            if (data.status === 'error') {
+                failAudit('processing', data.detail || 'El procesamiento falló en el servidor.', auditId);
+                return;
+            }
+            if (data.status !== 'listo') {
+                failAudit('not_found', 'La auditoría solicitada no está completa en el servidor.', auditId);
+                return;
+            }
 
-        excelPollingRef.current = setInterval(async () => {
-            await check();
-        }, 5000);
+            setExcelReady(Boolean(data.reporte_listo));
+            setAuditVerified(true);
+        } catch (e) {
+            failAudit('network', 'No se pudo contactar al servidor. Verifica tu conexión o el estado del servicio.', auditId);
+        }
     };
 
-    const stopExcelPolling = () => {
-        if (excelPollingRef.current) {
-            clearInterval(excelPollingRef.current);
-            excelPollingRef.current = null;
+    const handleRetry = () => {
+        setErrorKind(null);
+        setMessage('');
+        if (processingAuditId) {
+            setStatus('processing');
+            startStatusPolling(processingAuditId);
+        } else if (selectedAuditId) {
+            verifyAuditExists(selectedAuditId);
         }
     };
 
@@ -205,22 +284,21 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         }
     };
 
-    const fetchKpisAndIncidencias = async () => {
-        setLoadingTable(true);
+    const fetchKpis = async (auditId: string) => {
         try {
             const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
-            const kpiUrl = `${apiBase}/api/geomecanica/resumen-ligero?audit_id=${selectedAuditId}&years=${yearParam}`;
-
-            const resKpi = await fetch(kpiUrl);
-            if (resKpi.ok) {
-                const data = await resKpi.json();
+            const res = await fetch(`${apiBase}/api/geomecanica/resumen-ligero?audit_id=${auditId}&years=${yearParam}`);
+            if (res.ok) {
+                const data = await res.json();
                 setKpis(data);
+            } else if (res.status === 404) {
+                failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
+            } else if (res.status === 400) {
+                const data = await res.json().catch(() => null);
+                failAudit('processing', data?.detail || 'El procesamiento falló en el servidor.', auditId);
             }
-            await fetchPaginatedIncidencias(1);
         } catch (e) {
-            console.error("Error cargando estadísticas cruzadas:", e);
-        } finally {
-            setLoadingTable(false);
+            failAudit('network', 'No se pudo contactar al servidor. Verifica tu conexión o el estado del servicio.', auditId);
         }
     };
 
@@ -261,6 +339,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const handleWizardConfirm = async (payload: any) => {
         setIsWizardOpen(false);
         setStatus('processing');
+        setErrorKind(null);
         setMessage('Ejecutando cálculos de celdas y auditoría geomecánica masiva...');
 
         const formData = new FormData();
@@ -287,8 +366,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     };
 
     const handleCancelProcess = async () => {
-        stopProcessingPolling();
-        stopExcelPolling();
+        stopStatusPolling();
 
         setStatus('idle');
         setSelectedAuditId('');
@@ -297,11 +375,14 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         setIncidencias([]);
         setMessage('');
         setExcelReady(false);
+        setErrorKind(null);
+        setAuditVerified(false);
 
         localStorage.removeItem('geomec_bulk_auditor_status');
         localStorage.removeItem('geomec_bulk_auditor_message');
         localStorage.removeItem('geomec_bulk_auditor_audit_id');
         localStorage.removeItem('geomec_bulk_auditor_processing_id');
+        localStorage.removeItem('geomec_bulk_auditor_error_kind');
     };
 
     const clearAllFilters = () => {
@@ -318,6 +399,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         setSelectedAuditId(auditId);
         clearAllFilters();
         setStatus('loaded');
+        setAuditVerified(false);
+        verifyAuditExists(auditId);
     };
 
     const handleExportExcel = () => {
@@ -410,7 +493,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 </div>
             )}
 
-            {status !== 'loaded' && !selectedAuditId && status !== 'uploading' && status !== 'processing' && (
+            {status !== 'loaded' && !selectedAuditId && status !== 'uploading' && status !== 'processing' && status !== 'error' && (
                 <div className="rounded-2xl border border-cyan-500/15 p-10 space-y-8 max-w-xl mx-auto bg-gradient-to-b from-[#0e172a]/60 to-[#090f1d]/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md">
                     <div className="text-center space-y-3 relative z-10">
                         <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-md">
@@ -438,13 +521,40 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </span>
                         </div>
                     </button>
+                </div>
+            )}
 
-                    {status === 'error' && (
-                        <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs text-center font-bold flex items-center justify-center gap-2">
-                            <AlertTriangle size={14} className="shrink-0" />
-                            <span>{message}</span>
+            {status === 'error' && (
+                <div className="rounded-2xl border border-red-500/25 p-8 max-w-xl mx-auto bg-[#170d12]/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md">
+                    <div className="text-center space-y-4">
+                        <div className={`p-3 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-md ${errorKind === 'network' ? 'bg-amber-500/10 border border-amber-500/25 text-amber-400' : 'bg-red-500/10 border border-red-500/25 text-red-400'}`}>
+                            {errorKind === 'network' ? <WifiOff size={24} /> : <AlertTriangle size={24} />}
                         </div>
-                    )}
+                        <div className="space-y-2">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
+                                {errorKind === 'network' ? 'Conexión con el servidor perdida'
+                                    : errorKind === 'not_found' ? 'Auditoría no encontrada'
+                                    : 'Error de procesamiento'}
+                            </h3>
+                            <p className="text-xs text-slate-400 leading-relaxed font-semibold max-w-md mx-auto">{message}</p>
+                        </div>
+                        <div className="flex gap-2 justify-center pt-2">
+                            {(errorKind === 'network' && (processingAuditId || selectedAuditId)) && (
+                                <button
+                                    onClick={handleRetry}
+                                    className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 px-4 py-2 rounded-lg text-xs font-black transition-all active:scale-95"
+                                >
+                                    Reintentar
+                                </button>
+                            )}
+                            <button
+                                onClick={handleCancelProcess}
+                                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-black transition-all active:scale-95"
+                            >
+                                Volver al inicio
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -475,7 +585,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 </div>
             )}
 
-            {(status === 'loaded' || selectedAuditId) && kpis && status !== 'uploading' && status !== 'processing' && (
+            {(status === 'loaded' || selectedAuditId) && kpis && status !== 'uploading' && status !== 'processing' && status !== 'error' && (
                 <div className="space-y-6 animate-fade-in">
 
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#090f1d]/60 p-4 border border-cyan-500/10 rounded-xl gap-4 shadow-md backdrop-blur-sm">
