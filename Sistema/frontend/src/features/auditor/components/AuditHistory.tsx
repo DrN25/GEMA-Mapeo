@@ -28,7 +28,7 @@ export default function AuditHistory({
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
                     <Folder size={14} className="text-cyan-400" />
-                    <span>Historial de Importaciones Logueadas y Revisadas</span>
+                    <span>Historial de Importaciones Mapeadas y Revisadas</span>
                 </h3>
                 {history.length >= 1 && (
                     <button
