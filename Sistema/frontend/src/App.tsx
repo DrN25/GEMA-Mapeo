@@ -702,6 +702,22 @@ const [dbOnline, setDbOnline] = useState(true);
     }
   };
 
+  const handlePltChange = (newRows: any[]) => {
+    setPltEnsayos(newRows);
+    const celda = activeWindow?.header?.celda?.trim()?.toUpperCase();
+    if (celda) {
+      savePltDelta(celda, newRows);
+      const snap = pltSnapshotRef.current;
+      const isDirty = JSON.stringify(newRows) !== JSON.stringify(snap);
+      if (isDirty) {
+        addPendingPltCell(celda);
+      } else {
+        clearPltDelta(celda);
+        removePendingPltCell(celda);
+      }
+    }
+  };
+
   /**
    * Importación PLT (una sola vía, mismo modelo que el import de Mapeo):
    * agrega los registros al estado de la celda destino, los PERSISTE como
@@ -1438,32 +1454,41 @@ const [dbOnline, setDbOnline] = useState(true);
       }
     }
 
-    // Save PLT ensayos if present and changed
-    const pltHasChanges = JSON.stringify(pltEnsayos) !== JSON.stringify(pltSnapshotRef.current);
-    if (pltHasChanges) {
+    // Guardado de Ensayos PLT para TODAS las celdas pendientes
+    const pendingPltList = getPendingPltCells();
+    const activeCeldaNorm = activeWindow?.header?.celda?.trim()?.toUpperCase();
+
+    if (activeCeldaNorm && JSON.stringify(pltEnsayos) !== JSON.stringify(pltSnapshotRef.current)) {
+      if (!pendingPltList.includes(activeCeldaNorm)) {
+        pendingPltList.push(activeCeldaNorm);
+      }
+    }
+
+    for (const celdaName of pendingPltList) {
+      const isCurrentActive = activeCeldaNorm === celdaName;
+      const rowsToSave = isCurrentActive ? pltEnsayos : getPltDelta(celdaName);
+
       try {
-        const activeCelda = activeWindow?.header.celda;
-        const targetUrl = activeCelda ? `${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(activeCelda)}` : `${API_BASE}/api/ensayos-plt`;
+        const targetUrl = `${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(celdaName)}`;
         const res = await fetch(targetUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pltEnsayos)
+          body: JSON.stringify(rowsToSave)
         });
         if (res.ok) {
           const savedData = await res.json();
           const computed = (savedData || []).map((r: any) => applyPltFormulas(r));
-          setPltEnsayos(computed);
-          pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
-          if (activeCelda) {
-            loadedPltCeldaRef.current = activeCelda.trim().toUpperCase();
-            // Limpiar el delta local: los registros importados ya están en BD
-            clearPltDelta(activeCelda.trim().toUpperCase());
-            removePendingPltCell(activeCelda.trim().toUpperCase());
+          if (isCurrentActive) {
+            setPltEnsayos(computed);
+            pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
+            loadedPltCeldaRef.current = celdaName;
           }
+          clearPltDelta(celdaName);
+          removePendingPltCell(celdaName);
           setDbOnline(true);
         }
       } catch (e) {
-        console.error("Error saving PLT trials to SQL Server:", e);
+        console.error("Error saving PLT trials to SQL Server for cell", celdaName, e);
         setDbOnline(false);
       }
     }
@@ -1540,6 +1565,16 @@ const [dbOnline, setDbOnline] = useState(true);
           clearPendingImport(celda);
         }
         localStorage.setItem('geolog_unsaved_windows', JSON.stringify([]));
+
+        // Limpiar deltas PLT de todas las celdas pendientes
+        const pendingPlt = getPendingPltCells();
+        for (const c of pendingPlt) {
+          clearPltDelta(c);
+          removePendingPltCell(c);
+        }
+        if (activeWindow?.header?.celda) {
+          fetchPltEnsayos(activeWindow.header.celda, true);
+        }
       } catch (e) { }
     }
   };
@@ -2000,7 +2035,7 @@ const [dbOnline, setDbOnline] = useState(true);
           {currentView === 'plt_ensayos' && (
             <PltEnsayosView
               pltEnsayos={pltEnsayos}
-              onChange={(newRows) => setPltEnsayos(newRows)}
+              onChange={handlePltChange}
               activeWindowCelda={activeWindow?.header.celda || null}
               showFormulas={showFormulas}
               knownCells={knownCells}

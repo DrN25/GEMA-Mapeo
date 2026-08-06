@@ -21,6 +21,7 @@ import {
   getCachedCeldas,
   getCellValidationMap,
   getUnsavedCeldas,
+  getPendingPltCells,
   removePendingCell as removeFromPendingList,
   setCellValidation as persistValidation,
   clearCellValidation as clearValidation,
@@ -101,9 +102,9 @@ export function getAllKnownCellNames(knownFromDb: string[]): string[] {
   return getAllKnownCells(knownFromDb).map(c => c.name);
 }
 
-/** Nombres de TODAS las celdas pendientes (para marcar sus filas en el Dashboard). */
+/** Nombres de TODAS las celdas pendientes (Mapeo + PLT) para marcar sus filas en el Dashboard. */
 export function getPendingCellNames(): string[] {
-  return getUnsavedCeldas();
+  return [...new Set([...getUnsavedCeldas(), ...getPendingPltCells()])];
 }
 
 /**
