@@ -1,10 +1,9 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { X, FileSpreadsheet, Upload, Check, ArrowRight, Filter, AlertTriangle, Search, RefreshCw } from 'lucide-react';
+import { X, FileSpreadsheet, Upload, Check, ArrowRight, AlertTriangle, Search, RefreshCw, Layers, CheckCircle2, Info } from 'lucide-react';
 import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../../utils/catalogData';
 import {
     PLT_COLUMN_DEFS as EXPECTED_FIELDS,
-    getPltConstraints,
     normalizeTipoLitologico,
     normalizeCeldaCode
 } from '../../utils/geomecColumns';
@@ -28,8 +27,7 @@ export default function PltExcelImportModal({
     activeWindowCelda,
     knownCells
 }: PltExcelImportModalProps) {
-    // HOOKS SIEMPRE antes del early return (Rules of Hooks — el modal monta
-    // siempre y solo renderiza cuando isOpen; alternar el orden crashea React).
+    // HOOKS SIEMPRE antes del early return (Rules of Hooks)
     const [file, setFile] = useState<File | null>(null);
     const [sheets, setSheets] = useState<string[]>([]);
     const [selectedSheet, setSelectedSheet] = useState<string>('');
@@ -42,14 +40,12 @@ export default function PltExcelImportModal({
 
     const [importedRowsState, setImportedRowsState] = useState<any[]>([]);
 
-    // Selección estilo Mapeo: checkbox por CELDA (grupo). La celda activa viene
-    // preseleccionada; al importar, TODAS las seleccionadas van a UNA celda de
-    // destino (renombrando o eligiendo otra celda en la confirmación).
+    const [groupSearch, setGroupSearch] = useState('');
     const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
-    // Sub-modal de confirmación (estilo ExcelImportModal de Mapeo)
     const [showConfirm, setShowConfirm] = useState(false);
     const [showPicker, setShowPicker] = useState(false);
     const [pickerQuery, setPickerQuery] = useState('');
+    const [successData, setSuccessData] = useState<{ celda: string; count: number } | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +63,8 @@ export default function PltExcelImportModal({
         setShowConfirm(false);
         setShowPicker(false);
         setPickerQuery('');
+        setGroupSearch('');
+        setSuccessData(null);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,34 +280,34 @@ export default function PltExcelImportModal({
         setImportedRowsState(list);
     };
 
-    const handleMappingChange = (fieldKey: string, colIdx: number) => {
-        if (!rawGrid) return;
-        const updated = { ...mappings };
-        if (colIdx !== -1) {
-            Object.keys(updated).forEach(k => {
-                if (updated[k] === colIdx && k !== fieldKey) {
-                    delete updated[k];
-                }
-            });
-            updated[fieldKey] = colIdx;
-        } else {
-            delete updated[fieldKey];
-        }
-        setMappings(updated);
-        runGrouping(rawGrid, headerRowIdx, updated);
-    };
-
-    // ============ Modelo de grupos (celdas reconocidas en el Excel) ============
+    // Modelo de grupos
     const groups = useMemo(() => groupPltRowsByCelda(importedRowsState, knownCells), [importedRowsState, knownCells]);
     const activeNorm = normalizeCeldaCode(activeWindowCelda || '');
     const activeGroup = groups.find(g => g.name === activeNorm) || null;
     const otherGroups = groups.filter(g => g.name !== activeNorm);
 
-    // Por defecto: preseleccionada la celda actual (estilo Mapeo)
+    const filteredOtherGroups = useMemo(() => {
+        const q = groupSearch.trim().toLowerCase();
+        if (!q) return otherGroups;
+        return otherGroups.filter(g => g.originalName.toLowerCase().includes(q) || g.name.includes(q));
+    }, [otherGroups, groupSearch]);
+
+    const toggleSelectAllOther = () => {
+        setSelectedGroups(prev => {
+            const next = new Set(prev);
+            const allSelected = filteredOtherGroups.every(g => next.has(g.name));
+            if (allSelected) {
+                filteredOtherGroups.forEach(g => next.delete(g.name));
+            } else {
+                filteredOtherGroups.forEach(g => next.add(g.name));
+            }
+            return next;
+        });
+    };
+
     useEffect(() => {
         if (!activeGroup) return;
         setSelectedGroups(prev => new Set([...prev, activeGroup.name]));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [importedRowsState, activeWindowCelda]);
 
     const selectedRows = useMemo(() => {
@@ -329,12 +327,9 @@ export default function PltExcelImportModal({
         });
     };
 
-    // Celdas destino del picker: SOLO las que existen en el sistema (excluye la
-    // activa). Se listan con su CÓDIGO REAL (p.ej. "RTF_001"); la normalización
-    // solo se usa para comparar/buscar.
     const pickerTargets = useMemo(() => {
         const q = normalizeCeldaCode(pickerQuery) || '';
-        const uniq = new Map<string, string>(); // normalized → código real
+        const uniq = new Map<string, string>();
         for (const c of knownCells) {
             const n = normalizeCeldaCode(c);
             if (!n || n === activeNorm) continue;
@@ -344,8 +339,6 @@ export default function PltExcelImportModal({
         return [...uniq.values()].sort();
     }, [knownCells, activeWindowCelda, pickerQuery]);
 
-    // Importar a la celda destino con TODOS los registros seleccionados
-    // (los de otras celdas se re-etiquetan al destino — decisión única).
     const importAllTo = (target: string) => {
         const rows = selectedRows.length > 0 ? retagPltRows(selectedRows, target) : selectedRows;
         if (rows.length === 0) {
@@ -353,8 +346,9 @@ export default function PltExcelImportModal({
             return;
         }
         onImportToCell(target, rows);
-        onClose();
-        resetState();
+        setShowConfirm(false);
+        setShowPicker(false);
+        setSuccessData({ celda: target, count: rows.length });
     };
 
     const handleImportClick = () => {
@@ -375,8 +369,6 @@ export default function PltExcelImportModal({
             if (!confirmBigImport) return;
         }
 
-        // Todo pertenece a la celda actual → importar directo.
-        // Hay celdas de OTROS nombres seleccionadas → confirmación única.
         if (selectedOtherGroups.length === 0) {
             importAllTo(activeWindowCelda);
         } else {
@@ -387,277 +379,294 @@ export default function PltExcelImportModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
-            <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95 text-xs text-slate-100">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in text-left">
+            <div className="glass-panel w-full max-w-4xl max-h-[92vh] flex flex-col border border-navy-800/80 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.6)] relative overflow-hidden bg-navy-950/95 text-xs text-slate-100">
+                {/* Top accent bar */}
                 <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 w-full" />
 
-                <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
+                {/* Header */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-navy-850 shrink-0 bg-navy-900/50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
-                            <FileSpreadsheet size={20} />
+                        <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                            <FileSpreadsheet size={22} />
                         </div>
                         <div>
-                            <h3 className="text-base font-black text-slate-100 uppercase tracking-wider">Importación de Ensayos PLT</h3>
-                            <p className="text-xs text-slate-400">Procesamiento y normalización estricta de decimales y litologías offline</p>
+                            <h3 className="text-base font-black text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                                <span>Importación de Ensayos PLT</span>
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Carga de planillas Excel con normalización estricta ISRM y redondeos de ley</p>
                         </div>
                     </div>
-                    <button onClick={() => { onClose(); resetState(); }} className="p-1.5 rounded-lg hover:bg-navy-800 text-slate-400 hover:text-slate-200 transition-colors">
+                    <button
+                        onClick={() => { onClose(); resetState(); }}
+                        className="p-2 rounded-xl hover:bg-navy-800 text-slate-400 hover:text-slate-100 transition-all border border-transparent hover:border-navy-700"
+                    >
                         <X size={18} />
                     </button>
                 </div>
 
+                {/* Body Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {!file ? (
                         <div className="space-y-4">
                             <div
                                 onClick={() => fileInputRef.current?.click()}
-                                className="border-2 border-dashed border-navy-800 hover:border-emerald-500/40 bg-navy-950/45 hover:bg-navy-950/70 rounded-xl p-10 text-center cursor-pointer transition-all space-y-4 group"
+                                className="border-2 border-dashed border-navy-800 hover:border-emerald-500/50 bg-navy-950/60 hover:bg-navy-900/50 rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 space-y-4 group shadow-xl"
                             >
-                                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls" className="hidden" />
-                                <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                                    <Upload size={22} />
+                                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx" className="hidden" />
+                                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto group-hover:scale-110 group-hover:bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)] transition-all">
+                                    <Upload size={28} />
                                 </div>
-                                <p className="text-sm font-bold text-slate-200">Arrastra tu planilla de Ensayos PLT aquí o haz clic para explorar</p>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-black text-slate-100 uppercase tracking-wide">Arrastra tu planilla de Ensayos PLT aquí</p>
+                                    <p className="text-xs text-slate-400 font-medium">o haz clic para explorar archivos en formato <span className="text-emerald-400 font-mono font-bold">.xlsx</span></p>
+                                </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-6">
-                            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-navy-950/60 border border-navy-850 rounded-xl">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-200 truncate max-w-xs">{file.name}</p>
-                                    <p className="text-[10px] text-slate-500">{(file.size / 1024).toFixed(1)} KB | Hoja seleccionada: {selectedSheet}</p>
+                        <div className="space-y-5">
+                            {/* Metadata del archivo cargado */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-navy-900/80 border border-navy-800 rounded-xl shadow-lg">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
+                                        <FileSpreadsheet size={18} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black text-slate-100 truncate max-w-xs">{file.name}</p>
+                                        <p className="text-[11px] text-slate-400">
+                                            {(file.size / 1024).toFixed(1)} KB | Hoja activa: <span className="text-emerald-400 font-bold">{selectedSheet}</span>
+                                        </p>
+                                    </div>
                                 </div>
+
                                 {sheets.length > 1 && (
-                                    <select
-                                        value={selectedSheet}
-                                        onChange={(e) => {
-                                            setSelectedSheet(e.target.value);
-                                            if (workbook) processSheet(workbook, e.target.value);
-                                        }}
-                                        className="bg-navy-900 border border-navy-800 rounded-lg px-3 py-1.5 text-slate-200 font-bold outline-none cursor-pointer"
-                                    >
-                                        {sheets.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-400 font-semibold">Cambiar Hoja:</span>
+                                        <select
+                                            value={selectedSheet}
+                                            onChange={(e) => {
+                                                setSelectedSheet(e.target.value);
+                                                if (workbook) processSheet(workbook, e.target.value);
+                                            }}
+                                            className="bg-navy-950 border border-navy-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-bold outline-none cursor-pointer focus:border-emerald-500"
+                                        >
+                                            {sheets.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-1 gap-6">
-                                {/* MAPEO DE COLUMNAS — COMENTADO DE MOMENTO (el mapeo es automático por sinónimos)
-                                <div className="lg:col-span-1 glass-panel p-4 rounded-xl border border-navy-800 space-y-4 max-h-[40vh] overflow-y-auto bg-navy-950/40">
-                                    <div className="flex items-center gap-2 text-emerald-400 border-b border-navy-800 pb-2">
-                                        <Filter size={16} />
-                                        <h4 className="text-xs font-black uppercase tracking-wider">Mapear Columnas PLT</h4>
-                                    </div>
-                                    <div className="space-y-3.5">
-                                        {EXPECTED_FIELDS.map(f => {
-                                            const isMapped = mappings[f.key] !== undefined;
-                                            return (
-                                                <div key={f.key} className="space-y-1">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-semibold text-slate-300">{f.label} {f.required && <span className="text-red-400">*</span>}</span>
-                                                        {isMapped ? (
-                                                            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Mapeado</span>
-                                                        ) : (
-                                                            f.required && <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Requerido</span>
-                                                        )}
-                                                    </div>
-                                                    <select
-                                                        value={mappings[f.key] ?? -1}
-                                                        onChange={(e) => handleMappingChange(f.key, parseInt(e.target.value))}
-                                                        className={`w-full bg-navy-900 border text-xs rounded-lg px-2 py-1.5 focus:outline-none transition-all ${isMapped ? 'border-emerald-500/30 text-emerald-300' : 'border-navy-800 text-slate-400 hover:border-navy-700'}`}
-                                                    >
-                                                        <option value={-1}>— No Asignado —</option>
-                                                        {excelHeaders.map((eh, idx) => (
-                                                            <option key={idx} value={idx}>{eh}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                            {/* Info de Guía / Proceso */}
+                            <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-200/90 text-xs leading-relaxed space-y-1 shadow-md">
+                                <div className="flex items-center gap-2 text-sky-400 font-extrabold uppercase tracking-wider text-xs">
+                                    <Info size={14} className="text-sky-400" />
+                                    <span>¿Cómo funciona la importación de celdas PLT?</span>
                                 </div>
-                                */}
+                                <p className="text-xs text-slate-300">
+                                    Por defecto vienen preseleccionados los ensayos pertenecientes a la celda activa:{' '}
+                                    <strong className="text-emerald-400 font-bold">{activeWindowCelda || '—'}</strong>. Si seleccionas datos de otras celdas contenidas en la planilla, podrás{' '}
+                                    <strong className="text-slate-100">renombrarlos a la celda actual</strong> o{' '}
+                                    <strong className="text-slate-100">elegir otra celda de destino</strong> existente.
+                                </p>
+                            </div>
 
-                                <div className="space-y-4">
-                                    {importedRowsState.length > 0 && (
-                                        <div className="space-y-4">
-                                            {/* Info del proceso */}
-                                            <div className="p-3.5 rounded-xl border border-sky-500/25 bg-sky-500/5 text-sky-200/90 text-[11px] leading-relaxed space-y-1">
-                                                <span className="font-black uppercase tracking-wider text-sky-400 text-[10px] block">¿Cómo funciona la importación?</span>
-                                                <p>
-                                                    Por defecto están seleccionados los registros con el nombre de la celda actual:{' '}
-                                                    <strong className="text-white">{activeWindowCelda || '—'}</strong>. También puedes importar
-                                                    registros que tengan otro código de celda en el archivo, pero deberás{' '}
-                                                    <strong className="text-white">renombrarlos a la celda actual</strong> o{' '}
-                                                    <strong className="text-white">elegir otra celda de destino</strong> (la vista cambiará
-                                                    automáticamente a esa celda).
-                                                </p>
+                            {/* Grupo: Celda Activa (Preseleccionada) */}
+                            {activeGroup && (
+                                <label className="flex items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15 p-4 cursor-pointer transition-all shadow-md">
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedGroups.has(activeGroup.name)}
+                                            onChange={() => toggleGroup(activeGroup.name)}
+                                            className="accent-emerald-500 w-4 h-4 shrink-0 rounded cursor-pointer"
+                                        />
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 size={15} className="text-emerald-400" />
+                                                <span className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                                                    Celda Actual: {activeGroup.originalName}
+                                                </span>
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold">
+                                                    Destino Principal
+                                                </span>
                                             </div>
+                                            <p className="text-xs text-slate-400 mt-0.5 font-medium">Los ensayos se asignarán e integrarán directamente en la celda abierta.</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 rounded-full shrink-0">
+                                        {activeGroup.rows.length} registros
+                                    </span>
+                                </label>
+                            )}
 
-                                            {/* Grupo: celda activa */}
-                                            {activeGroup && (
-                                                <label className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 px-3.5 py-3 cursor-pointer transition-all">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedGroups.has(activeGroup.name)}
-                                                        onChange={() => toggleGroup(activeGroup.name)}
-                                                        className="accent-emerald-500 w-4 h-4 shrink-0"
-                                                    />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <Check size={14} className="text-emerald-400 shrink-0" />
-                                                            <span className="text-xs font-black uppercase tracking-wider text-emerald-400 truncate">
-                                                                Celda actual: {activeGroup.originalName}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-slate-400 shrink-0">({activeGroup.rows.length} registros)</span>
-                                                        </div>
-                                                        <p className="text-[10px] text-slate-500 mt-0.5">Se importará directamente a la celda actual.</p>
-                                                    </div>
-                                                    <span className="text-[10px] font-black font-mono text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full shrink-0">
-                                                        {activeGroup.rows.length}
-                                                    </span>
-                                                </label>
-                                            )}
+                            {/* Celdas Adicionales Detectadas en la Planilla */}
+                            {otherGroups.length > 0 && (
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-navy-850">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                                            <Layers size={14} className="text-violet-400" />
+                                            <span>Otras Celdas detectadas en la Planilla ({otherGroups.length})</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Filtrar celda..."
+                                                    value={groupSearch}
+                                                    onChange={e => setGroupSearch(e.target.value)}
+                                                    className="bg-navy-950 border border-navy-800 focus:border-violet-500 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 transition-all outline-none"
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={toggleSelectAllOther}
+                                                className="px-2.5 py-1 rounded-lg border border-navy-700 bg-navy-900 text-slate-300 hover:text-white hover:border-slate-600 transition-all text-xs font-semibold"
+                                            >
+                                                {filteredOtherGroups.length > 0 && filteredOtherGroups.every(g => selectedGroups.has(g.name)) ? 'Desmarcar todas' : 'Marcar todas'}
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                            {/* Otras celdas del Excel (checkbox estilo Mapeo) */}
-                                            {otherGroups.map(g => {
+                                    {/* Lista compacta ultra limpia */}
+                                    <div className="max-h-[380px] overflow-y-auto space-y-1.5 p-1.5 bg-navy-950/70 border border-navy-850 rounded-xl shadow-inner">
+                                        {filteredOtherGroups.length === 0 ? (
+                                            <p className="text-xs text-slate-500 text-center py-4">No se encontraron celdas con ese filtro.</p>
+                                        ) : (
+                                            filteredOtherGroups.map(g => {
                                                 const isSel = selectedGroups.has(g.name);
                                                 return (
-                                                    <label key={g.name} className={`flex items-start gap-3 rounded-xl border px-3.5 py-3 cursor-pointer transition-all ${isSel ? 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10' : 'border-navy-800 bg-navy-950/40 hover:bg-navy-900/40'}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSel}
-                                                            onChange={() => toggleGroup(g.name)}
-                                                            className="accent-amber-500 w-4 h-4 shrink-0 mt-0.5"
-                                                        />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className={`w-2 h-2 rounded-full shrink-0 ${g.exists ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                                                                <span className="text-xs font-black uppercase tracking-wider text-slate-200 truncate">{g.originalName}</span>
-                                                                <span className="text-[10px] font-bold text-slate-400">({g.rows.length} registros)</span>
-                                                                {g.exists ? (
-                                                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">Existe</span>
-                                                                ) : (
-                                                                    <span className="text-[9px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 px-1.5 py-0.5 rounded">No existe</span>
-                                                                )}
-                                                            </div>
-                                                            {isSel && (
-                                                                <p className="text-[10px] text-amber-300/80 mt-1">
-                                                                    Al importar se te pedirá renombrar estos registros a la celda actual o elegir otra celda de destino.
-                                                                </p>
-                                                            )}
-                                                            {!g.exists && (
-                                                                <p className="text-[10px] text-rose-300/80 mt-1">
-                                                                    ⚠️ La celda {g.originalName} no tiene registro disponible en el sistema. Solo podrás renombrar sus registros a una celda existente.
-                                                                </p>
-                                                            )}
+                                                    <label
+                                                        key={g.name}
+                                                        className={`flex items-center justify-between px-3.5 py-2 rounded-lg border transition-all cursor-pointer select-none ${isSel
+                                                            ? 'border-violet-500/40 bg-violet-500/10 text-slate-100'
+                                                            : 'border-navy-800/80 bg-navy-900/40 hover:bg-navy-850/80 text-slate-300'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSel}
+                                                                onChange={() => toggleGroup(g.name)}
+                                                                className="accent-violet-500 w-4 h-4 shrink-0 rounded cursor-pointer"
+                                                            />
+                                                            <span className={`w-2 h-2 rounded-full shrink-0 ${g.exists ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                            <span className="text-xs font-mono font-bold uppercase tracking-wide text-slate-200 truncate">{g.originalName}</span>
+                                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${g.exists ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}`}>
+                                                                {g.exists ? 'En Sistema' : 'Sin Registro Previo'}
+                                                            </span>
                                                         </div>
-                                                        <span className="text-[10px] font-black font-mono text-slate-300 bg-navy-900 border border-navy-800 px-2 py-0.5 rounded-full shrink-0">
-                                                            {g.rows.length}
+
+                                                        <span className="text-xs font-mono font-bold text-slate-300 bg-navy-950 border border-navy-800 px-2.5 py-0.5 rounded-md shrink-0">
+                                                            {g.rows.length} reg.
                                                         </span>
                                                     </label>
                                                 );
-                                            })}
-
-                                            {/* Vista previa de lo que se importará */}
-                                            {selectedRows.length > 0 && (
-                                                <div className="space-y-2">
-                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                                                        Vista previa — {selectedRows.length} registros seleccionados
-                                                    </h4>
-                                                    <div className="overflow-x-auto border border-navy-850 rounded-lg max-h-64 overflow-y-auto">
-                                                        <table className="w-full text-xs text-left border-collapse text-slate-300">
-                                                            <thead className="bg-navy-950 text-slate-400 font-semibold border-b border-navy-850 text-[10px] uppercase sticky top-0">
-                                                                <tr>
-                                                                    <th className="py-2 px-3 border-r border-navy-850">Código Muestra</th>
-                                                                    <th className="py-2 px-3 text-center border-r border-navy-850">Celda</th>
-                                                                    <th className="py-2 px-3 text-center border-r border-navy-850">Nivel</th>
-                                                                    <th className="py-2 px-3 text-center border-r border-navy-850">Fuerza P (kN)</th>
-                                                                    <th className="py-2 px-3 text-center">Espesor D (cm)</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {selectedRows.map((row, i) => (
-                                                                    <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
-                                                                        <td className="py-1.5 px-3 font-semibold text-slate-200 border-r border-navy-900/20">{row.codigo_muestra || '—'}</td>
-                                                                        <td className="py-1.5 px-3 text-center border-r border-navy-900/20 font-bold text-orange-400">{row.celda_mapeo}</td>
-                                                                        <td className="py-1.5 px-3 text-center border-r border-navy-900/20">{row.nivel}</td>
-                                                                        <td className="py-1.5 px-3 text-center border-r border-navy-900/20">{row.fuerza_p}</td>
-                                                                        <td className="py-1.5 px-3 text-center">{row.espesor_d}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                            })
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Tabla de Vista Previa */}
+                            {selectedRows.length > 0 && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                                            Vista Previa — <span className="text-emerald-400 font-mono">{selectedRows.length}</span> registros listos para importar
+                                        </h4>
+                                    </div>
+                                    <div className="overflow-x-auto border border-navy-800 rounded-xl max-h-56 overflow-y-auto shadow-inner bg-navy-950/60">
+                                        <table className="w-full text-xs text-left border-collapse text-slate-300">
+                                            <thead className="bg-navy-900 text-slate-400 font-bold border-b border-navy-800 text-xs uppercase sticky top-0">
+                                                <tr>
+                                                    <th className="py-2.5 px-3 border-r border-navy-800">Código Muestra</th>
+                                                    <th className="py-2.5 px-3 text-center border-r border-navy-800">Celda Mapeo</th>
+                                                    <th className="py-2.5 px-3 text-center border-r border-navy-800">Nivel</th>
+                                                    <th className="py-2.5 px-3 text-center border-r border-navy-800">Fuerza P (kN)</th>
+                                                    <th className="py-2.5 px-3 text-center border-r border-navy-800">Espesor D (cm)</th>
+                                                    <th className="py-2.5 px-3 text-center">Unidad Litológica</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {selectedRows.map((row, i) => (
+                                                    <tr key={i} className="border-b border-navy-900/60 hover:bg-navy-900/40 transition-colors">
+                                                        <td className="py-2 px-3 font-semibold text-slate-200 border-r border-navy-900/40">{row.codigo_muestra || '—'}</td>
+                                                        <td className="py-2 px-3 text-center border-r border-navy-900/40 font-bold text-emerald-400 font-mono">{row.celda_mapeo}</td>
+                                                        <td className="py-2 px-3 text-center border-r border-navy-900/40 font-mono">{row.nivel}</td>
+                                                        <td className="py-2 px-3 text-center border-r border-navy-900/40 font-mono">{row.fuerza_p}</td>
+                                                        <td className="py-2 px-3 text-center border-r border-navy-900/40 font-mono">{row.espesor_d}</td>
+                                                        <td className="py-2 px-3 text-center font-medium text-slate-300">{row.tipo_litologico}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
 
-                {/* SUB-MODAL: confirmación única (estilo ExcelImportModal de Mapeo) */}
+                {/* MODAL CONFIRMACIÓN REDISEÑADO (Sombra glassmorphism con botones de tarjeta) */}
                 {showConfirm && !showPicker && (
                     <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
-                        <div className="glass-panel w-full max-w-xl p-5 rounded-2xl border border-amber-500/40 shadow-2xl bg-navy-900/95 space-y-4">
-                            <div className="flex items-start gap-3 border-b border-navy-800 pb-3">
-                                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
-                                    <AlertTriangle size={22} />
+                        <div className="glass-panel w-full max-w-xl p-6 rounded-2xl border border-amber-500/40 shadow-2xl bg-navy-900/95 space-y-5">
+                            <div className="flex items-start gap-3.5 border-b border-navy-800 pb-4">
+                                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+                                    <AlertTriangle size={24} />
                                 </div>
-                                <div>
+                                <div className="space-y-1">
                                     <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">Celdas con otro código seleccionadas</h4>
-                                    <p className="text-xs text-slate-400 mt-0.5">
-                                        Seleccionaste <strong className="text-amber-400">{selectedRows.length}</strong> registro(s) de{' '}
-                                        <strong className="text-amber-400">{selectedOtherGroups.length}</strong> celda(s) que no es la actual:{' '}
-                                        <span className="text-slate-200 font-bold">{selectedOtherGroups.map(g => g.originalName).join(', ')}</span>.
-                                        La importación va a UNA sola celda: elige cómo proceder.
+                                    <p className="text-xs text-slate-300 leading-relaxed">
+                                        Seleccionaste <strong className="text-amber-400">{selectedRows.length}</strong> registro(s) provenientes de{' '}
+                                        <strong className="text-amber-400">{selectedOtherGroups.length}</strong> celda(s) diferente(s):{' '}
+                                        <span className="text-slate-100 font-bold">{selectedOtherGroups.map(g => g.originalName).join(', ')}</span>.
                                     </p>
-                                    {selectedOtherGroups.some(g => !g.exists) && (
-                                        <p className="text-[11px] text-rose-300 mt-1">
-                                            ⚠️ Algunas celdas no existen en el sistema: sus registros solo podrán renombrarse a una celda existente.
-                                        </p>
-                                    )}
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-1 gap-3">
                                 <button
                                     type="button"
                                     onClick={() => { setShowConfirm(false); importAllTo(activeWindowCelda || ''); }}
                                     disabled={!activeWindowCelda}
-                                    className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-left transition-all flex items-start gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all flex items-start gap-3.5 group cursor-pointer disabled:opacity-40"
                                 >
-                                    <RefreshCw size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                                    <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400 group-hover:scale-110 transition-transform">
+                                        <RefreshCw size={18} />
+                                    </div>
                                     <div>
-                                        <span className="text-xs font-black text-amber-300 block uppercase tracking-wider">
+                                        <span className="text-xs font-black text-emerald-300 block uppercase tracking-wider">
                                             Renombrar TODAS las celdas seleccionadas a la celda actual ({activeWindowCelda || '—'})
                                         </span>
-                                        <p className="text-xs text-slate-400 mt-0.5">
-                                            Los {selectedRows.length} registros se importarán como si pertenecieran a la celda actual.
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Los {selectedRows.length} registros se re-etiquetarán e importarán como si pertenecieran a la celda actual.
                                         </p>
                                     </div>
                                 </button>
+
                                 <button
                                     type="button"
                                     onClick={() => setShowPicker(true)}
-                                    className="p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all flex items-start gap-3"
+                                    className="p-4 rounded-xl border border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/20 text-left transition-all flex items-start gap-3.5 group cursor-pointer"
                                 >
-                                    <Search size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                                    <div className="p-2 bg-sky-500/20 rounded-lg text-sky-400 group-hover:scale-110 transition-transform">
+                                        <Search size={18} />
+                                    </div>
                                     <div>
-                                        <span className="text-xs font-black text-emerald-300 block uppercase tracking-wider">Elegir otra celda de destino</span>
-                                        <p className="text-xs text-slate-400 mt-0.5">
-                                            Todos los registros seleccionados se importarán a UNA celda; la vista cambiará automáticamente a esa celda.
+                                        <span className="text-xs font-black text-sky-300 block uppercase tracking-wider">Elegir otra celda de destino</span>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Todos los registros seleccionados se importarán a la celda existente que elijas.
                                         </p>
                                     </div>
                                 </button>
                             </div>
+
                             <div className="flex justify-end border-t border-navy-800 pt-3">
                                 <button
                                     type="button"
                                     onClick={() => setShowConfirm(false)}
-                                    className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+                                    className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition-all"
                                 >
                                     Volver
                                 </button>
@@ -666,45 +675,50 @@ export default function PltExcelImportModal({
                     </div>
                 )}
 
-                {/* SUB-MODAL: elegir celda de destino (solo celdas existentes) */}
+                {/* MODAL PICKER DESTINO REDISEÑADO */}
                 {showPicker && showConfirm && (
                     <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
-                        <div className="glass-panel w-full max-w-md p-5 rounded-2xl border border-emerald-500/40 shadow-2xl bg-navy-900/95 space-y-4">
+                        <div className="glass-panel w-full max-w-md p-6 rounded-2xl border border-sky-500/40 shadow-2xl bg-navy-900/95 space-y-4">
                             <div>
-                                <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">Elegir celda de destino</h4>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    Los {selectedRows.length} registros seleccionados se importarán a la celda que elijas.
+                                <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">Elegir Celda de Destino</h4>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    Los <strong className="text-sky-400">{selectedRows.length}</strong> registros seleccionados se importarán a la celda elegida.
                                 </p>
                             </div>
+
                             <div className="relative">
                                 <input
                                     type="text"
-                                    placeholder="Buscar celda..."
+                                    placeholder="Buscar celda por código..."
                                     value={pickerQuery}
                                     onChange={(e) => setPickerQuery(e.target.value)}
-                                    className="w-full bg-navy-950 border border-navy-700 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                                    className="w-full bg-navy-950 border border-navy-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                                 />
+                                <Search size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                             </div>
-                            <div className="space-y-1 max-h-52 overflow-y-auto">
+
+                            <div className="space-y-1 max-h-56 overflow-y-auto border border-navy-800 rounded-xl p-1 bg-navy-950/40">
                                 {pickerTargets.length === 0 && (
-                                    <p className="text-[11px] text-slate-500 text-center py-4">No hay celdas disponibles en el sistema.</p>
+                                    <p className="text-xs text-slate-500 text-center py-6">No hay celdas disponibles en el sistema.</p>
                                 )}
                                 {pickerTargets.map(t => (
                                     <button
                                         key={t}
                                         type="button"
                                         onClick={() => importAllTo(t)}
-                                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/30 text-xs font-bold font-mono text-slate-200"
+                                        className="w-full text-left px-3.5 py-2 rounded-lg hover:bg-sky-500/10 border border-transparent hover:border-sky-500/30 text-xs font-bold font-mono text-slate-200 transition-all flex items-center justify-between group"
                                     >
-                                        {t}
+                                        <span>{t}</span>
+                                        <ArrowRight size={14} className="text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
                             </div>
+
                             <div className="flex justify-end gap-2 border-t border-navy-800 pt-3">
                                 <button
                                     type="button"
                                     onClick={() => setShowPicker(false)}
-                                    className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+                                    className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition-all"
                                 >
                                     Volver
                                 </button>
@@ -713,14 +727,79 @@ export default function PltExcelImportModal({
                     </div>
                 )}
 
-                <div className="flex gap-2 justify-end px-6 py-4 border-t border-navy-800/80 shrink-0 bg-navy-950/40">
-                    <button type="button" onClick={() => { onClose(); resetState(); }} className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-400 px-4 py-2 rounded-lg text-xs font-semibold">
+                {/* SUB-MODAL RESULTADO DE IMPORTACIÓN EXITOSA (Estilo SaveResultModal) */}
+                {successData && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in text-left">
+                        <div className="glass-panel w-full max-w-md flex flex-col border border-emerald-500/40 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95 text-slate-100">
+                            <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 w-full shrink-0" />
+
+                            <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800/80 shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                                        <CheckCircle2 size={22} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
+                                            Importación Exitosa Completada
+                                        </h3>
+                                        <p className="text-xs text-slate-400">Registros PLT integrados correctamente</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => { setSuccessData(null); onClose(); resetState(); }}
+                                    className="p-1.5 rounded-lg hover:bg-navy-800 text-slate-400 hover:text-slate-200 transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-navy-950/80 border border-emerald-500/30 p-3.5 rounded-xl text-center flex flex-col items-center">
+                                        <FileSpreadsheet size={18} className="text-emerald-400 mb-1" />
+                                        <span className="text-xl font-black font-mono text-emerald-400">{successData.count}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registros PLT</span>
+                                    </div>
+
+                                    <div className="bg-navy-950/80 border border-emerald-500/30 p-3.5 rounded-xl text-center flex flex-col items-center">
+                                        <Layers size={18} className="text-teal-400 mb-1" />
+                                        <span className="text-sm font-black font-mono text-teal-300 truncate max-w-[120px]">{successData.celda}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Celda Destino</span>
+                                    </div>
+                                </div>
+
+                                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs text-center font-medium leading-relaxed">
+                                    Se han añadido <strong className="text-white font-bold">{successData.count} registros</strong> a los Ensayos PLT de la celda <strong className="text-white font-bold">{successData.celda}</strong>.
+                                </div>
+                            </div>
+
+                            <div className="px-6 py-4 border-t border-navy-800/80 bg-navy-950/40 flex justify-center shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => { setSuccessData(null); onClose(); resetState(); }}
+                                    className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-navy-950 text-xs font-black tracking-wide transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                    <CheckCircle2 size={16} />
+                                    <span>Entendido, Continuar</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Footer Buttons */}
+                <div className="flex gap-2 justify-end px-6 py-4 border-t border-navy-850 shrink-0 bg-navy-900/60">
+                    <button
+                        type="button"
+                        onClick={() => { onClose(); resetState(); }}
+                        className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-400 hover:text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                    >
                         Cancelar
                     </button>
                     <button
                         onClick={handleImportClick}
                         disabled={selectedRows.length === 0 || !activeWindowCelda}
-                        className="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 px-4.5 py-2 rounded-lg text-xs font-black flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="bg-emerald-500 hover:bg-emerald-400 text-navy-950 px-5 py-2 rounded-xl text-xs font-black flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                         <span>Importar Ensayos</span>
                         <ArrowRight size={14} />

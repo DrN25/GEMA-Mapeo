@@ -720,7 +720,6 @@ const [dbOnline, setDbOnline] = useState(true);
     setPltEnsayos(prev => [...prev, ...rows]);
     savePltDelta(celda, [...getPltDelta(celda), ...rows]);
     addPendingPltCell(celda);
-    alert(`Importación exitosa: se han añadido ${rows.length} registros a Ensayos PLT de ${celda}.`);
   };
 
   const handleSelectWindow = async (name: string) => {
