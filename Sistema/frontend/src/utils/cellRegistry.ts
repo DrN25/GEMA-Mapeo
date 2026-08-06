@@ -101,6 +101,21 @@ export function getAllKnownCellNames(knownFromDb: string[]): string[] {
   return getAllKnownCells(knownFromDb).map(c => c.name);
 }
 
+/** Nombres de TODAS las celdas pendientes (para marcar sus filas en el Dashboard). */
+export function getPendingCellNames(): string[] {
+  return getUnsavedCeldas();
+}
+
+/**
+ * Resúmenes de los borradores locales que NO existen en BD.
+ * Las celdas pendientes que YA existen en la base (p.ej. importadas con nombre
+ * duplicado) se muestran sobre su fila normal, NO como una fila BORRADOR aparte.
+ */
+export function getLocalOnlyPendingSummaries(knownFromDb: string[]): PendingCellSummary[] {
+  const dbSet = new Set((knownFromDb || []).map(n => n.trim().toUpperCase()));
+  return getPendingCellSummaries().filter(pc => !dbSet.has(pc.name.trim().toUpperCase()));
+}
+
 /** Resúmenes de los borradores locales para el Dashboard. */
 export function getPendingCellSummaries(): PendingCellSummary[] {
   const summaries: PendingCellSummary[] = [];

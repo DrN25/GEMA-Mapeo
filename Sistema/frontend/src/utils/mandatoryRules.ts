@@ -3,6 +3,14 @@
  * Estructura tipo "switch" booleana (true = obligatorio, false = opcional).
  */
 
+/**
+ * ¿La alerta BLOQUEA el guardado? Solo CRITICA y VACIO.
+ * Las ADVERTENCIAS se muestran en el panel QA/QC pero nunca impiden guardar.
+ */
+export function isBlockingValidationAlert(type: string | undefined): boolean {
+  return type === 'CRITICA' || type === 'VACIO';
+}
+
 export interface MandatoryFieldRules {
   header: Record<string, boolean>;
   discontinuities: Record<string, boolean>;

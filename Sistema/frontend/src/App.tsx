@@ -27,6 +27,8 @@ import {
   getAllKnownCellNames,
   getInvalidPendingCells,
   getLocalOnlyPendingCells,
+  getLocalOnlyPendingSummaries,
+  getPendingCellNames,
   getPendingCellSummaries,
   hasCellValidation,
   isCellPending,
@@ -58,7 +60,7 @@ import { validateWindowQAQC } from './utils/qaqcValidator';
 import type { QaQcAlert } from './utils/qaQcRules';
 import { buildCampaniaYearMap } from './utils/qaQcRules';
 import { resetTouchedFields, subscribeTouched } from './utils/qaQcTouch';
-import { validateMapeoWindow, validatePltEnsayosList, toVacioAlerts, type MissingFieldIssue } from './utils/mandatoryRules';
+import { validateMapeoWindow, validatePltEnsayosList, toVacioAlerts, isBlockingValidationAlert, type MissingFieldIssue } from './utils/mandatoryRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -205,6 +207,12 @@ export default function App() {
   });
   const [pendingImports, setPendingImports] = useState<string[]>([]);
 
+  // Quita una celda de la marca "recién importada" (al guardarla, descartarla
+  // o eliminarla). Evita badges IMPORTADO fantasma sobre celdas ya procesadas.
+  const clearPendingImport = (celda: string) => {
+    setPendingImports(prev => (prev.includes(celda) ? prev.filter(c => c !== celda) : prev));
+  };
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   // UI & Theme
@@ -321,9 +329,17 @@ const [dbOnline, setDbOnline] = useState(true);
 
   const unsavedCount = workspaceDiff.totalWindowsWithChanges;
 
-  // Resúmenes de los borradores locales para el Dashboard (se recalcula con el diff)
+  // Resúmenes de los borradores locales para el Dashboard (se recalcula con el diff).
+  // Solo los que NO existen en BD: los pendientes que ya existen en BD (p.ej. importados
+  // con nombre duplicado) se muestran sobre su fila normal, no como fila BORRADOR aparte.
   const pendingCellSummaries = useMemo(
-    () => getPendingCellSummaries(),
+    () => getLocalOnlyPendingSummaries(windows.map(w => w.name)),
+    [workspaceDiff, pendingImports, windows]
+  );
+
+  // Nombres de TODAS las celdas pendientes: marcar con badge "PENDIENTE" su fila normal.
+  const pendingCellNames = useMemo(
+    () => getPendingCellNames(),
     [workspaceDiff, pendingImports]
   );
 
@@ -384,8 +400,11 @@ const [dbOnline, setDbOnline] = useState(true);
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
       const allAlerts = [...errs, ...vacios, ...pltVacios];
       setAlerts(allAlerts);
-      // Estado persistido de validación de la celda activa (lo consume el bloqueo del guardado)
-      setCellValidation(activeWindow.header.celda, allAlerts.map(a => a.message || JSON.stringify(a)));
+      // Estado persistido de validación de la celda activa (lo consume el bloqueo del guardado).
+      // Solo persisten CRITICAS y VACIOS: las ADVERTENCIAS se muestran en el panel QA/QC
+      // pero NO deben impedir guardar en la base de datos.
+      const blockingAlerts = allAlerts.filter(a => isBlockingValidationAlert(a.type));
+      setCellValidation(activeWindow.header.celda, blockingAlerts.map(a => a.message || JSON.stringify(a)));
     } else {
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
       setCalculated(null);
@@ -766,6 +785,7 @@ const [dbOnline, setDbOnline] = useState(true);
         return;
       }
       discardLocalCell(name);
+      clearPendingImport(name);
       if (activeWindow?.header.celda === name) {
         setActiveWindow(null);
       }
@@ -797,6 +817,7 @@ const [dbOnline, setDbOnline] = useState(true);
 
     // Limpiar cualquier resto local de la celda (pendientes + caché) en ambos caminos
     discardLocalCell(name);
+    clearPendingImport(name);
 
     if (activeWindow?.header.celda === name) {
       setActiveWindow(null);
@@ -1254,6 +1275,7 @@ const [dbOnline, setDbOnline] = useState(true);
           successCount++;
           totalJointsSaved += nonVacantJoints.length;
           setDbOnline(true);
+          clearPendingImport(winData.header.celda);
           const hash = fastHashObject(winData);
           const ctx = { activeCelda: winData.header.celda, pendingImports };
           safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
@@ -1343,6 +1365,7 @@ const [dbOnline, setDbOnline] = useState(true);
         discardLocalCell(celda);
         setActiveWindow(null);
       }
+      clearPendingImport(celda);
     } else {
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
@@ -1363,6 +1386,7 @@ const [dbOnline, setDbOnline] = useState(true);
               setActiveWindow(null);
             }
           }
+          clearPendingImport(celda);
         }
         localStorage.setItem('geolog_unsaved_windows', JSON.stringify([]));
       } catch (e) { }
@@ -1538,8 +1562,8 @@ const [dbOnline, setDbOnline] = useState(true);
               totalFiltered={totalFiltered}
               totalPages={totalPages}
               loading={loading}
-              pendingImports={pendingImports}
               pendingCells={pendingCellSummaries}
+              pendingCellNames={pendingCellNames}
               searchTerm={searchTerm}
               isGlobalSearch={isGlobalSearch}
               onSearchSubmit={handleSearchSubmit}

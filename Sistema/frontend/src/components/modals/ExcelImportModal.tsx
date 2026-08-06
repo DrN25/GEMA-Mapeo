@@ -843,10 +843,12 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
               </div>
               <div>
                 <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">
-                  Confirmación de Celdas Coincidentes
+                  Celdas con el mismo nombre encontradas
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Se detectaron <strong className="text-amber-400">{selectedDuplicates.length} celdas seleccionadas</strong> que ya existen en SQL Server.
+                  Importarás <strong className="text-amber-400">{selectedDuplicates.length} celda(s)</strong> que ya
+                  tienen una celda con el mismo nombre. Al guardar, su contenido
+                  <strong> será reemplazado</strong> por el del archivo Excel.
                 </p>
               </div>
             </div>
@@ -902,7 +904,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
 
             {/* Opciones de Acción */}
             <div className="grid grid-cols-1 gap-3">
-              {/* Opción 1: Importar como borradores (actualizar al guardar) */}
+              {/* Opción 1: Importar y reemplazar las existentes */}
               <button
                 type="button"
                 onClick={() => executeImport()}
@@ -911,11 +913,12 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
                 <RefreshCw size={18} className="text-amber-400 shrink-0 mt-0.5 group-hover:rotate-180 transition-transform duration-500" />
                 <div>
                   <span className="text-xs font-black text-amber-300 block uppercase tracking-wider">
-                    Sí, importar con los datos del Excel
+                    Importar y reemplazar {selectedDuplicates.length > 0 ? `(${selectedDuplicates.length} celda(s))` : ''}
                   </span>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Las celdas se añaden como BORRADOR con los datos del archivo. Al presionar
-                    GUARDAR CAMBIOS se actualizarán (la base de datos o el borrador local existente).
+                    GUARDAR CAMBIOS, el contenido actual de cada celda con el mismo nombre
+                    (en la base de datos o como borrador local) será reemplazado por el del Excel.
                   </p>
                 </div>
               </button>

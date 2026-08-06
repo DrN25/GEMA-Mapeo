@@ -41,8 +41,9 @@ interface DashboardProps {
   totalFiltered: number;
   totalPages: number;
   loading: boolean;
-  pendingImports: string[];
   pendingCells: PendingCellSummary[];
+  /** Todas las celdas con cambios sin guardar (existan o no en BD): marcar su fila normal. */
+  pendingCellNames: string[];
   searchTerm: string;
   isGlobalSearch: boolean;
   onSearchSubmit: (term: string, isGlobal: boolean) => void;
@@ -84,8 +85,8 @@ export default function Dashboard({
   totalFiltered,
   totalPages,
   loading,
-  pendingImports,
   pendingCells,
+  pendingCellNames,
   searchTerm,
   isGlobalSearch,
   onSearchSubmit,
@@ -573,11 +574,12 @@ export default function Dashboard({
                     <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
                       <div className="flex items-center gap-2">
                         <span>{w.name}</span>
-                        {/* TEMPORALMENTE DESACTIVADO: Etiqueta IMPORTADO para celdas importadas.
-                      {pendingImports.includes(w.name) && (
-                        <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">IMPORTADO</span>
-                      )}
-                      */}
+                        {/* Estado único: cualquier celda con cambios locales sin guardar es un BORRADOR */}
+                        {pendingCellNames.includes(w.name) && (
+                          <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider" title="Celda con cambios sin guardar. Ábrela para editarla y usa GUARDAR CAMBIOS.">
+                            BORRADOR
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-2.5 px-4 text-slate-400 text-[10px]">{w.fecha_mapeo}</td>
