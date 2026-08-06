@@ -13,6 +13,7 @@ import {
   ratingPromedioResistencia
 } from '../../utils/rmrInterpolation';
 import tablaLitologiasImg from '../../images/catalogs/tabla_litologias.png';
+import gsiImg from '../../images/catalogs/gsi.png';
 
 const getGroupBadge = (grupo: string) => {
   const g = String(grupo).toUpperCase();
@@ -321,8 +322,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
               <span>GSI — Condición de la Superficie (Eje X de Hoek-Brown)</span>
             </h3>
             <p className="text-[11px] text-slate-500 font-medium max-w-3xl">
-              45 unidades repartidas en 5 columnas (9 unidades por columna). El rango define el aporte del eje X al
-              rango permitido del GSI visual.
+              45 unidades repartidas en 5 columnas (9 unidades por columna).
             </p>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
               <table className="w-full text-left text-xs border-collapse">
@@ -330,7 +330,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                     <th className="py-2.5 px-4">Código</th>
                     <th className="py-2.5 px-4">Término</th>
-                    <th className="py-2.5 px-4 text-center text-violet-400">Rango</th>
                     <th className="py-2.5 px-4">Descripción</th>
                   </tr>
                 </thead>
@@ -339,7 +338,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-black text-violet-400">{item.codigo}</td>
                       <td className="py-2.5 px-4">{item.termino}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-violet-300">[{item.min} – {item.max}]</td>
                       <td className="py-2.5 px-4 text-slate-300">{item.desc}</td>
                     </tr>
                   ))}
@@ -357,8 +355,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
               <span>GSI — Estructura (Eje Y de Hoek-Brown)</span>
             </h3>
             <p className="text-[11px] text-slate-500 font-medium max-w-3xl">
-              40 unidades repartidas en 4 filas (10 unidades por fila). El rango define el aporte del eje Y al
-              rango permitido del GSI visual.
+              40 unidades repartidas en 4 filas (10 unidades por fila).
             </p>
             <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
               <table className="w-full text-left text-xs border-collapse">
@@ -366,7 +363,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                     <th className="py-2.5 px-4">Código</th>
                     <th className="py-2.5 px-4">Término</th>
-                    <th className="py-2.5 px-4 text-center text-violet-400">Rango</th>
                     <th className="py-2.5 px-4">Descripción</th>
                   </tr>
                 </thead>
@@ -375,7 +371,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     <tr key={idx} className="hover:bg-navy-900/20">
                       <td className="py-2.5 px-4 font-black text-violet-400">{item.codigo}</td>
                       <td className="py-2.5 px-4">{item.termino}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-violet-300">[{item.min} – {item.max}]</td>
                       <td className="py-2.5 px-4 text-slate-300">{item.desc}</td>
                     </tr>
                   ))}
@@ -427,6 +422,13 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="rounded-lg border border-navy-900 overflow-hidden bg-navy-950/40 max-w-4xl">
+              <img
+                src={gsiImg}
+                alt="Gráfica de referencia GSI (Hoek-Brown)"
+                className="w-full h-auto object-contain"
+              />
             </div>
           </div>
         )}
