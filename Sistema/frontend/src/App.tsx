@@ -44,7 +44,7 @@ import {
   type AllWindowsDiffSummary
 } from './utils/diffUtils';
 
-// --- MIGRACI?“N AL NUEVO BULK AUDITOR MODULAR ---
+// --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
 import BulkAuditor from './features/auditor/BulkAuditor';
 import CongruenceAuditor from './features/auditor/CongruenceAuditor';
 import { initCatalogs } from './utils/catalogData';
@@ -849,7 +849,7 @@ const [dbOnline, setDbOnline] = useState(true);
   const handleImportToPending = async (items: ImportedCellItem[]) => {
     if (!Array.isArray(items) || items.length === 0) return;
 
-    // Regla 3 ”” middleware de espacio: no importar si el navegador no tiene lugar
+    // Regla 3 — middleware de espacio: no importar si el navegador no tiene lugar
     const space = canImport(items.length);
     if (!space.ok) {
       alert(
@@ -1104,7 +1104,7 @@ const [dbOnline, setDbOnline] = useState(true);
     if (hasData) {
       const confirm1 = window.confirm(`¿Está seguro de que desea eliminar la Familia F${famId}? Contiene datos registrados.`);
       if (!confirm1) return;
-      const confirm2 = window.confirm(`ATENCI?“N: Se perderán definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serán reindexadas automáticamente. ¿Confirmar eliminación?`);
+      const confirm2 = window.confirm(`ATENCIÓN: Se perderán definitivamente todos los datos de la Familia F${famId}. Las familias posteriores serán reindexadas automáticamente. ¿Confirmar eliminación?`);
       if (!confirm2) return;
     }
 
@@ -1475,7 +1475,7 @@ const [dbOnline, setDbOnline] = useState(true);
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
 
-            {/* BOT?“N INTERACTIVO DE COLAPSO */}
+            {/* BOTÓN INTERACTIVO DE COLAPSO */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
@@ -1650,7 +1650,7 @@ const [dbOnline, setDbOnline] = useState(true);
                 showFormulas={showFormulas} // Nueva Prop
               />
 
-              {/* CENTRO DE M?‰TRICAS GEOMEC?NICA */}
+              {/* CENTRO DE MÉTRICAS GEOMECÁNICA */}
               {(() => {
                 const getFamilyStyle = (fam: number) => {
                   const styles: Record<number, { dot: string; container: string; badge: string }> = {
@@ -1722,12 +1722,12 @@ const [dbOnline, setDbOnline] = useState(true);
                       </div>
                     </div>
 
-                    {/* Card 2: ?NDICE VOLUM?‰TRICO */}
+                    {/* Card 2: ÍNDICE VOLUMÉTRICO */}
                     <div className="lg:col-span-2 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 flex flex-col justify-between">
                       <div>
                         <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest border-b border-navy-900 pb-2.5 flex items-center gap-2">
                           <Layers size={16} className="text-yellow-500/80" />
-                          <span>?NDICE VOLUM?‰TRICO</span>
+                          <span>ÍNDICE VOLUMÉTRICO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
                           Conteo de discontinuidades volumétricas (Jv).
@@ -1736,7 +1736,7 @@ const [dbOnline, setDbOnline] = useState(true);
 
                       <div className="my-4 border border-yellow-500/30 bg-yellow-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
                         <span className="text-3xl font-black font-mono tracking-tight text-yellow-500">
-                          {calculated ? calculated.jv.toFixed(4) : '””'}
+                          {calculated ? calculated.jv.toFixed(4) : '—'}
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">JTS / M³</span>
                         <Layers size={24} className="text-yellow-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
@@ -1744,7 +1744,7 @@ const [dbOnline, setDbOnline] = useState(true);
 
                       <div className="mt-auto border border-yellow-500/20 bg-yellow-500/5 rounded-lg py-2 px-3 text-center">
                         <span className="text-xs font-extrabold text-yellow-500 uppercase tracking-widest">
-                          {calculated ? getJvClassification(calculated.jv) : '””'}
+                          {calculated ? getJvClassification(calculated.jv) : '—'}
                         </span>
                       </div>
                     </div>
@@ -1757,13 +1757,13 @@ const [dbOnline, setDbOnline] = useState(true);
                           <span>RQD ESTIMADO</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-2 font-semibold">
-                          Cálculo empírico según fórmula de Palmstr?¶m: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
+                          Cálculo empírico según fórmula de Palmström: <code className="text-sky-400 font-bold bg-navy-900/60 px-1 py-0.5 rounded">115 - 3.3 · Jv</code>
                         </p>
                       </div>
 
                       <div className="my-4 border border-sky-500/30 bg-sky-500/5 rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[110px]">
                         <span className="text-3xl font-black font-mono tracking-tight text-sky-400">
-                          {calculated ? calculated.rqd_est.toFixed(2) : '””'}
+                          {calculated ? calculated.rqd_est.toFixed(2) : '—'}
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-400">RQD ESTIMADO</span>
                         <Gauge size={24} className="text-sky-500/10 absolute right-4 top-1/2 -translate-y-1/2 shrink-0 stroke-[1.5]" />
@@ -1833,7 +1833,7 @@ const [dbOnline, setDbOnline] = useState(true);
                 )}
               </div>
 
-              {/* AN?LISIS GEOMEC?NICO RMR SIEMPRE EXPANDIDO */}
+              {/* ANÁLISIS GEOMECÁNICO RMR SIEMPRE EXPANDIDO */}
               <RmrAnalysis
                 header={activeWindow.header}
                 onChange={(header) => setActiveWindow({ ...activeWindow, header })}
