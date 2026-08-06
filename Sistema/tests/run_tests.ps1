@@ -19,4 +19,8 @@ Write-Host "`n=== 3/3 Test de estados de celda (celdas duplicadas BD vs BORRADOR
 & node (Join-Path $root "test_cell_registry.mjs")
 if ($LASTEXITCODE -ne 0) { Write-Host "FALLO en test_cell_registry.mjs" -ForegroundColor Red; exit 1 }
 
+Write-Host "`n=== 4/4 Test de catálogos GSI, autocompletado, QA/QC y geometría ===" -ForegroundColor Cyan
+& node (Join-Path $root "test_gsi.mjs")
+if ($LASTEXITCODE -ne 0) { Write-Host "FALLO en test_gsi.mjs" -ForegroundColor Red; exit 1 }
+
 Write-Host "`nTodos los tests pasaron OK" -ForegroundColor Green

@@ -21,6 +21,7 @@ import SaveResultModal from './components/modals/SaveResultModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
+import { apiFetch, pingBackend } from './utils/apiClient';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport } from './utils/storageManager';
 import {
   discardLocalCell,
@@ -67,6 +68,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
 import { normalizeJoints, windowFromServerResponse, excelDataToWindowData, applyDistanceCascade } from './utils/windowTransform';
+import { HOLE_AUTO } from './utils/rmrCalculator';
 export default function App() {
   // Inicializar vista y paginación desde localStorage de forma síncrona para resiliencia ante F5
   const [currentView, setCurrentView] = useState<string>(() => {
@@ -229,6 +231,11 @@ const [syncMessage, setSyncMessage] = useState<string>('Conectado al servidor de
 // Independiente del estado de cambios pendientes (syncStatus).
 const [dbOnline, setDbOnline] = useState(true);
 
+  // Boot resiliente: reintentos automáticos mientras el backend despierta (cold start)
+  const [bootAttempt, setBootAttempt] = useState<number>(0);
+  const [bootFailed, setBootFailed] = useState<boolean>(false);
+  const bootLoaderRef = useRef<() => void>(() => {});
+
   // Real-time calculated results & alerts
   const [calculated, setCalculated] = useState<CalculatorResult | null>(null);
   const [alerts, setAlerts] = useState<QaQcAlert[]>([]);
@@ -276,24 +283,79 @@ const [dbOnline, setDbOnline] = useState(true);
   }, []);
 
   // 2. Fetch catalogs first, then summaries and PLT trials on mount
+  // Boot resiliente: si el backend está dormido (Render free) el primer intento
+  // dispara el cold start (~1 min). apiFetch reintenta con backoff internamente;
+  // si aún así falla, se muestra error con botón Reintentar y se sigue intentando
+  // en segundo plano cada 10s hasta que el servidor responda (sin recargar la página).
   useEffect(() => {
-    fetch(`${API_BASE}/api/catalogs/all`)
-      .then(res => {
-        if (!res.ok) throw new Error("Server error");
-        return res.json();
-      })
-      .then(data => {
+    const loadCatalogs = async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/api/catalogs/all`, { retries: 4, timeoutMs: 60000 });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
         initCatalogs(data);
         setCatalogsLoaded(true);
         setDbOnline(true);
+        setBootAttempt(0);
+        setBootFailed(false);
+        setSyncStatus('synced');
+        setSyncMessage('Conectado al servidor de base de datos SQL Server.');
         fetchWindows();
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Error loading geomechanical catalogs:", err);
+        setBootAttempt(a => a + 1);
         setSyncStatus('offline');
         setDbOnline(false);
-        setSyncMessage('Error al conectar con el servidor de catálogos.');
-      });
+        setSyncMessage('No se pudo conectar con el servidor. Puede estar despertando o fuera de línea.');
+        setBootFailed(true);
+        // Reintento automático en segundo plano: el servidor puede tardar en despertar
+        setTimeout(() => {
+          if (!catalogsLoadedRef.current) bootLoaderRef.current();
+        }, 10_000);
+      }
+    };
+    bootLoaderRef.current = loadCatalogs;
+    loadCatalogs();
+  }, []);
+
+  // Heartbeat + detección de visibilidad:
+  // - Pestaña visible: ping cada 5 min (Render free duerme a los 15 min de inactividad)
+  //   -> el backend nunca duerme mientras la app está abierta.
+  // - Volver a la pestaña (visibilitychange): ping inmediato que despierta el backend
+  //   y actualiza el indicador de conexión (banner de reconexión).
+  // - Pestaña oculta: se detienen los pings (no se queman horas de instancia gratis).
+  const catalogsLoadedRef = useRef(false);
+  useEffect(() => {
+    catalogsLoadedRef.current = catalogsLoaded;
+  }, [catalogsLoaded]);
+
+  useEffect(() => {
+    let disposed = false;
+    let timer: number | undefined;
+
+    const heartbeat = async () => {
+      if (disposed) return;
+      const ok = await pingBackend(API_BASE);
+      if (!disposed) setDbOnline(ok);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        heartbeat();
+        if (!timer) timer = window.setInterval(heartbeat, 5 * 60 * 1000);
+      } else if (timer) {
+        window.clearInterval(timer);
+        timer = undefined;
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    onVisibility();
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (timer) window.clearInterval(timer);
+    };
   }, []);
 
   // 3. Auditoría reactiva de diferencias y rastreo de celda activa
@@ -1214,12 +1276,12 @@ const [dbOnline, setDbOnline] = useState(true);
         largo_m: winCalc.largo,
         altura: winData.header.altura !== undefined && winData.header.altura !== null ? winData.header.altura : null,
         altura_m: winData.header.altura !== undefined && winData.header.altura !== null ? winData.header.altura : null,
-        dip: winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null,
-        dip_hw: winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null,
-        azimut_hole: winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null,
-        az_hw: winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null,
+        dip: HOLE_AUTO ? winCalc.dip_hole : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
+        dip_hw: HOLE_AUTO ? winCalc.dip_hole : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
+        azimut_hole: HOLE_AUTO ? winCalc.az_hole : (winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null),
+        az_hw: HOLE_AUTO ? winCalc.az_hole : (winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null),
         dip_talud: winData.header.dip_talud !== undefined && winData.header.dip_talud !== null ? winData.header.dip_talud : null,
-        dipdir_talud: winData.header.dipdir_talud !== undefined && winData.header.dipdir_talud !== null ? winData.header.dipdir_talud : null,
+        dipdir_talud: HOLE_AUTO ? winCalc.dip_dir_talud : (winData.header.dipdir_talud !== undefined && winData.header.dipdir_talud !== null ? winData.header.dipdir_talud : null),
         alteracion: (winData.header.alteracion || winData.header.alt_mapeo) && (winData.header.alteracion || winData.header.alt_mapeo) !== '-1' ? (winData.header.alteracion || winData.header.alt_mapeo)!.toLowerCase().trim() : null,
         altura_mapeo: (winData.header.alteracion || winData.header.alt_mapeo) && (winData.header.alteracion || winData.header.alt_mapeo) !== '-1' ? (winData.header.alteracion || winData.header.alt_mapeo)!.toLowerCase().trim() : null,
         alteracion_codigo: (winData.header.alteracion || winData.header.alt_mapeo) && (winData.header.alteracion || winData.header.alt_mapeo) !== '-1' ? (winData.header.alteracion || winData.header.alt_mapeo)!.toLowerCase().trim() : null,
@@ -1452,7 +1514,28 @@ const [dbOnline, setDbOnline] = useState(true);
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-navy-950 text-slate-100 gap-4">
         <div className="w-12 h-12 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"></div>
-        <p className="text-sm font-semibold tracking-wide text-slate-400">Cargando interfaz de ventanas geomecánicas...</p>
+        <p className="text-sm font-semibold tracking-wide text-slate-400">
+          {bootFailed
+            ? `No se pudo conectar con el servidor. Puede estar despertando o fuera de línea. (intento ${bootAttempt})`
+            : bootAttempt > 0
+              ? `Despertando servidor... (intento ${bootAttempt + 1})`
+              : 'Cargando interfaz de ventanas geomecánicas...'}
+        </p>
+        {bootFailed && (
+          <div className="flex flex-col items-center gap-3">
+            <button
+              onClick={() => {
+                setBootFailed(false);
+                setBootAttempt(0);
+                bootLoaderRef.current();
+              }}
+              className="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 shadow-md"
+            >
+              Reintentar
+            </button>
+            <p className="text-xs text-slate-500 font-semibold">Se reintenta automáticamente cada 10 segundos...</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -1471,6 +1554,13 @@ const [dbOnline, setDbOnline] = useState(true);
 
       {/* 2. MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {/* Banner global de reconexión (backend dormido / fuera de línea) */}
+        {!dbOnline && (
+          <div className="bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs font-bold px-6 py-2 flex items-center gap-2 z-20">
+            <Loader2 size={14} className="animate-spin shrink-0" />
+            <span>Perdiste conexión con el servidor. Puede estar despertando... Reconectando automáticamente.</span>
+          </div>
+        )}
         {/* Sync Status Header */}
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
@@ -1637,6 +1727,7 @@ const [dbOnline, setDbOnline] = useState(true);
                 onOpenImportModal={() => setIsImportModalOpen(true)}
                 onOpenCatalogs={() => setIsCatalogModalOpen(true)}
                 onOpenRenameModal={() => setIsRenameModalOpen(true)}
+                showFormulas={showFormulas}
               />
 
               <DisconTable

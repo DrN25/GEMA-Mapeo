@@ -49,6 +49,8 @@ export const COLUMN_NAMES = {
     spacing_rating_r76: "Espac. Val (R76)",
     condicion_rating_r89: "Val ConDisc (R89)",
     condicion_rating_r76: "Val ConDisc (R76)",
+    az_hole: "Azimut Hoyo (AZ_Hole)",
+    dip_hole: "Dip Hoyo (DipHole)",
     rmr_89: "RMR FINAL (89)",
     rmr_76: "RMR FINAL (76)",
     ucs_mpa: "UCS (MPa)",
@@ -490,6 +492,74 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
             const dx = (este_to ?? 0) - (este_from ?? 0);
             const dz = (cota_to ?? 0) - (cota_from ?? 0);
             return `α = acot((${este_to?.toFixed(2)} - ${este_from?.toFixed(2)}) / (${cota_to?.toFixed(2)} - ${cota_from?.toFixed(2)})) = acot(${dx.toFixed(2)} / ${dz.toFixed(2)}) = ${val?.toFixed(6)}°`;
+        }
+    },
+    largo: {
+        title: "Distancia de Celda (L)",
+        equation: "L = √(ΔE² + ΔN² + ΔZ²)",
+        description: "Longitud 3D de la ventana calculada desde las coordenadas FROM→TO, donde ΔE = este_fin − este_ini, ΔN = norte_fin − norte_ini y ΔZ = cota_ini − cota_fin.",
+        inputs: ["Este (FROM/TO)", "Norte (FROM/TO)", "Cota (FROM/TO)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { este_from, norte_from, cota_from, este_to, norte_to, cota_to, val } = params;
+            const de = (este_to ?? 0) - (este_from ?? 0);
+            const dn = (norte_to ?? 0) - (norte_from ?? 0);
+            const dz = (cota_from ?? 0) - (cota_to ?? 0);
+            const dist = Math.sqrt(de * de + dn * dn + dz * dz);
+            return `ΔE: ${de.toFixed(2)} | ΔN: ${dn.toFixed(2)} | ΔZ: ${dz.toFixed(2)} ➔ √(ΔE² + ΔN² + ΔZ²) = ${(typeof val === 'number' ? val : dist).toFixed(2)} m`;
+        }
+    },
+    dip_hole: {
+        title: "Dip del Hoyo (DipHole)",
+        equation: "DipHole = asin(ΔZ / L) × 180/π",
+        description: "Inclinación del hoyo/scanline calculada desde el desnivel vertical (ΔZ = cota_ini − cota_fin) y la distancia de celda L.",
+        inputs: ["Cota (FROM/TO)", COLUMN_NAMES.rqd_est],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { cota_from, cota_to, largo, val } = params;
+            const dz = (cota_from ?? 0) - (cota_to ?? 0);
+            const l = largo && largo > 0 ? largo : 1;
+            return `asin(${dz.toFixed(2)} / ${l.toFixed(2)}) × 180/π = ${typeof val === 'number' ? val.toFixed(2) : '—'}°`;
+        }
+    },
+    az_hole: {
+        title: "Azimut del Hoyo (AZ_Hole)",
+        equation: "AZ_Hole = (atan2(ΔE, ΔN) × 180/π + 360) mod 360",
+        description: "Azimut del hoyo/scanline calculado desde las diferencias de coordenadas horizontales (ΔE = este_fin − este_ini, ΔN = norte_fin − norte_ini).",
+        inputs: ["Este (FROM/TO)", "Norte (FROM/TO)"],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { este_from, norte_from, este_to, norte_to, val } = params;
+            const de = (este_to ?? 0) - (este_from ?? 0);
+            const dn = (norte_to ?? 0) - (norte_from ?? 0);
+            return `atan2(${de.toFixed(2)}, ${dn.toFixed(2)}) × 180/π = ${typeof val === 'number' ? val.toFixed(2) : '—'}°`;
+        }
+    },
+    dip_dir_talud: {
+        title: "Dirección de Buzamiento (DipDir)",
+        equation: "DipDir = (AZ_Hole + 90) mod 360",
+        description: "Dirección de buzamiento derivada del azimut del hoyo: perpendicular al azimut, normalizada al rango 0–359°.",
+        inputs: [COLUMN_NAMES.az_hole],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { az_hole, val } = params;
+            if (az_hole === undefined || az_hole === null) return 'AZ_Hole no disponible ➔ —';
+            return `(${az_hole.toFixed(2)} + 90) mod 360 = ${typeof val === 'number' ? val.toFixed(2) : '—'}°`;
+        }
+    },
+    gsi_visual: {
+        title: "GSI Visual (Autocompletado Sugerido)",
+        equation: "GSI = min(85, round(1.5 × JCond89 + RQD / 2))",
+        description: "Valor sugerido a partir del puntaje promedio de condición de discontinuidades (JCond89) y del RQD estimado (Palmström). El usuario puede conservarlo o modificarlo manualmente; el QA/QC valida el rango según la combinación Estructura × Superficie seleccionada.",
+        inputs: [COLUMN_NAMES.condicion_rating_r89, COLUMN_NAMES.rqd_est],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { rqd, jcond, suggested, val } = params;
+            const r = typeof rqd === 'number' ? rqd : null;
+            const j = typeof jcond === 'number' ? jcond : null;
+            if (r === null || j === null) return 'Requiere RQD y JCond89 para sugerir.';
+            const s = typeof suggested === 'number' ? suggested : Math.min(85, Math.round(1.5 * j + r / 2));
+            return `1.5 × ${j.toFixed(2)} + ${r.toFixed(2)} / 2 = ${(1.5 * j + r / 2).toFixed(2)} ➔ sugerido: ${s}${typeof val === 'number' && val !== s ? ` | actual: ${val}` : ''}`;
         }
     }
 };

@@ -129,6 +129,14 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
         { id: 'forma', label: 'Forma', icon: Compass },
         { id: 'jrc', label: 'JRC vs Rugosidad', icon: Table }
       ]
+    },
+    {
+      title: 'GSI (Hoek-Brown)',
+      items: [
+        { id: 'gsi_superficie', label: 'Condición Superficie', icon: Layers },
+        { id: 'gsi_estructura', label: 'Estructura', icon: Layers },
+        { id: 'gsi_rangos', label: 'Rango GSI Visual', icon: Table }
+      ]
     }
   ];
 
@@ -297,6 +305,124 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                       <td className="py-2.5 px-4 text-center font-black text-orange-400">{item.codigo}</td>
                       <td className="py-2.5 px-4 text-center font-bold text-amber-300">{item.r76}</td>
                       <td className="py-2.5 px-4 text-center font-bold text-pink-300">{item.r89}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* GSI — CONDICIÓN DE LA SUPERFICIE */}
+        {activeTab === 'gsi_superficie' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Layers size={14} className="text-violet-500" />
+              <span>GSI — Condición de la Superficie (Eje X de Hoek-Brown)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium max-w-3xl">
+              45 unidades repartidas en 5 columnas (9 unidades por columna). El rango define el aporte del eje X al
+              rango permitido del GSI visual.
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-navy-950 border-b border-navy-900">
+                  <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4">Código</th>
+                    <th className="py-2.5 px-4">Término</th>
+                    <th className="py-2.5 px-4 text-center text-violet-400">Rango</th>
+                    <th className="py-2.5 px-4">Descripción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {(catalogs.gsi_superficie || []).map((item: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-black text-violet-400">{item.codigo}</td>
+                      <td className="py-2.5 px-4">{item.termino}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-violet-300">[{item.min} – {item.max}]</td>
+                      <td className="py-2.5 px-4 text-slate-300">{item.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* GSI — ESTRUCTURA */}
+        {activeTab === 'gsi_estructura' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Layers size={14} className="text-violet-500" />
+              <span>GSI — Estructura (Eje Y de Hoek-Brown)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium max-w-3xl">
+              40 unidades repartidas en 4 filas (10 unidades por fila). El rango define el aporte del eje Y al
+              rango permitido del GSI visual.
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-3xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-navy-950 border-b border-navy-900">
+                  <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4">Código</th>
+                    <th className="py-2.5 px-4">Término</th>
+                    <th className="py-2.5 px-4 text-center text-violet-400">Rango</th>
+                    <th className="py-2.5 px-4">Descripción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {(catalogs.gsi_estructura || []).map((item: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-black text-violet-400">{item.codigo}</td>
+                      <td className="py-2.5 px-4">{item.termino}</td>
+                      <td className="py-2.5 px-4 text-center font-bold text-violet-300">[{item.min} – {item.max}]</td>
+                      <td className="py-2.5 px-4 text-slate-300">{item.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* GSI — RANGO PERMITIDO DEL GSI VISUAL (tabla derivada por suma) */}
+        {activeTab === 'gsi_rangos' && (
+          <div className="space-y-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
+              <Table size={14} className="text-violet-500" />
+              <span>GSI Visual — Rango Permitido (Estructura × Superficie)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium max-w-3xl">
+              Rango = [Estructura.min + Superficie.min, min(85, Estructura.max + Superficie.max)]. El QA/QC marca
+              CRÍTICA si el GSI visual sale de este rango.
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-4xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-navy-950 border-b border-navy-900">
+                  <tr className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-4">Estructura \ Superficie</th>
+                    {(catalogs.gsi_superficie || []).map((s: any, idx: number) => (
+                      <th key={idx} className="py-2.5 px-4 text-center text-violet-400">
+                        {s.codigo}<br /><span className="text-[9px] font-semibold text-slate-500">[{s.min}–{s.max}]</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
+                  {(catalogs.gsi_estructura || []).map((e: any, ei: number) => (
+                    <tr key={ei} className="hover:bg-navy-900/20">
+                      <td className="py-2.5 px-4 font-black text-violet-400">
+                        {e.codigo}<span className="text-[9px] font-semibold text-slate-500 ml-1">[{e.min}–{e.max}]</span>
+                      </td>
+                      {(catalogs.gsi_superficie || []).map((s: any, si: number) => {
+                        const min = e.min + s.min;
+                        const max = Math.min(85, e.max + s.max);
+                        return (
+                          <td key={si} className="py-2.5 px-4 text-center font-bold text-violet-300">
+                            [{min}–{max}]
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

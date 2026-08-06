@@ -17,6 +17,7 @@ import type { JointRow, WindowHeader } from './rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION } from './catalogData';
 import { isFieldTouched, markFieldTouched } from './qaQcTouch';
 import { getCampaniaYear } from './campaniasCatalog';
+import { gsiVisualRange } from './rmrCalculator';
 
 export type QaQcSeverity = 'CRITICA' | 'ADVERTENCIA';
 
@@ -693,6 +694,28 @@ const RULES: QaQcRuleDef[] = [
       !isBlankVal(header.gsi_visual) && !isIntegerVal(header.gsi_visual)
         ? 'El GSI visual debe ser un número entero.'
         : null,
+  },
+  {
+    id: 'GSI_VISUAL_RANGO',
+    severity: 'CRITICA',
+    enabled: true,
+    global: true,
+    fieldId: 'header-gsi_visual',
+    section: 'ANÁLISIS RMR & GSI',
+    evalua: ({ header }) => {
+      const est = String(header.gsi_estructura || '').trim().toUpperCase();
+      const sup = String(header.gsi_superficie || '').trim().toUpperCase();
+      const n = num(header.gsi_visual);
+      if (n === null) return null;
+      // La regla solo aplica si ambas condiciones (estructura y superficie)
+      // tienen valor y corresponden al catálogo GSI.
+      const rango = gsiVisualRange(est, sup);
+      if (!rango) return null;
+      if (n < rango.min || n > rango.max) {
+        return `El GSI visual (${n}) no corresponde a la combinación seleccionada (${est} / ${sup}). Rango permitido: ${rango.min} a ${rango.max}.`;
+      }
+      return null;
+    },
   },
 ];
 

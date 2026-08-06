@@ -752,7 +752,12 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
     code_up = data.codigo.strip().upper()
     resolver = GEMACatalogResolver(db)
 
-    sector_id = resolver.sector_id(data.sector_geotecnico)
+    # Celdas sin sector: usar el sector "PENDIENTE" (misma convención que el
+    # importador de Excel). Si se enviara None, la columna SectorGeotecnicoID
+    # (NOT NULL) viola la integridad → 500 → la celda queda pendiente para
+    # siempre aunque el guardado de los demás campos haya sido exitoso.
+    sector_geotecnico = data.sector_geotecnico or "PENDIENTE"
+    sector_id = resolver.sector_id(sector_geotecnico)
     if data.sector_geotecnico and sector_id is None:
         raise HTTPException(status_code=400, detail=f"Sector '{data.sector_geotecnico}' no encontrado en GEMA")
     

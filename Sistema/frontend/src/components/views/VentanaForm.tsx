@@ -1,11 +1,13 @@
 import React from 'react';
 import type { WindowHeader, CalculatorResult } from '../../utils/rmrCalculator';
+import { HOLE_AUTO } from '../../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../../utils/catalogData';
 import { AlignLeft, FileSpreadsheet, AlertTriangle, CheckCircle2, BookOpen, Pencil, Info } from 'lucide-react';
 import MapeadorCombobox from '../Common/MapeadorCombobox';
 import { markFieldTouched } from '../../utils/qaQcTouch';
 import { CAMPANAS_HARDCODED } from '../../utils/campaniasCatalog';
 import { getFieldPrecision } from '../../utils/numericPrecision';
+import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 
 // Helper: marca el campo como tocado (blur) para habilitar su evaluación QA/QC
 const touchField = (fieldId: string) => () => markFieldTouched(fieldId);
@@ -17,6 +19,7 @@ interface VentanaFormProps {
   onOpenImportModal: () => void;
   onOpenCatalogs?: () => void;
   onOpenRenameModal?: () => void;
+  showFormulas?: boolean;
 }
 
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
@@ -54,13 +57,18 @@ const coordPrecision = (key: string) => {
 export default function VentanaForm({
   header,
   onChange,
-  calculated: _calculated,
+  calculated,
   onOpenImportModal,
   onOpenCatalogs,
-  onOpenRenameModal
+  onOpenRenameModal,
+  showFormulas = true
 }: VentanaFormProps) {
 
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
+
+  // Formateo de valores autocalculados (read-only) a 2 decimales
+  const fmtAuto = (val: number | undefined | null): string =>
+    val === undefined || val === null || isNaN(val) ? '—' : val.toFixed(2);
 
   const handleChange = (field: keyof WindowHeader, val: any) => {
     onChange({
@@ -345,13 +353,28 @@ export default function VentanaForm({
                     AUTO
                   </span>
                 </label>
-                <div
-                  id="header-largo"
-                  title="Calculado automáticamente desde coordenadas FROM→TO"
-                  className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                <FormulaTooltipTrigger
+                  formulaId="largo"
+                  params={{
+                    este_from: header.este_from,
+                    norte_from: header.norte_from,
+                    cota_from: header.cota_from,
+                    este_to: header.este_to,
+                    norte_to: header.norte_to,
+                    cota_to: header.cota_to,
+                    val: calculated?.largo
+                  }}
+                  position="bottom"
+                  enabled={showFormulas}
                 >
-                  {displayLargo !== null ? `${displayLargo} m` : '—'}
-                </div>
+                  <div
+                    id="header-largo"
+                    title="Calculado automáticamente desde coordenadas FROM→TO"
+                    className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                  >
+                    {displayLargo !== null ? `${displayLargo} m` : '—'}
+                  </div>
+                </FormulaTooltipTrigger>
               </div>
             </div>
 
@@ -496,78 +519,155 @@ export default function VentanaForm({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">DipDir Talud°</label>
-                <input
-                  type="text"
-                  id="header-dipdir_talud"
-                  placeholder="0-359"
-                  value={getInputValue('dipdir_talud', header.dipdir_talud)}
-                  onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 2, false);
-                    handleChange('dipdir_talud', limited);
-                  }}
-                  onBlur={(e) => {
-                    touchField('header-dipdir_talud')();
-                    const val = e.target.value.trim();
-                    if (val === '') {
-                      handleChange('dipdir_talud', undefined);
-                      return;
-                    }
-                    const num = parseFloat(val);
-                    handleChange('dipdir_talud', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
-                  }}
-                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-                />
+                <label className="text-xs font-bold text-slate-500 uppercase block flex items-center justify-between">
+                  <span>DipDir Talud°</span>
+                  {HOLE_AUTO && (
+                    <span className="text-[9px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1 py-0.5 rounded select-none">AUTO</span>
+                  )}
+                </label>
+                {HOLE_AUTO ? (
+                  <FormulaTooltipTrigger
+                    formulaId="dip_dir_talud"
+                    params={{ az_hole: calculated?.az_hole, val: calculated?.dip_dir_talud }}
+                    position="bottom"
+                    enabled={showFormulas}
+                  >
+                    <div
+                      id="header-dipdir_talud"
+                      title="Autocalculado: (AZ_Hole + 90) mod 360"
+                      className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                    >
+                      {fmtAuto(calculated?.dip_dir_talud)}
+                    </div>
+                  </FormulaTooltipTrigger>
+                ) : (
+                  <input
+                    type="text"
+                    id="header-dipdir_talud"
+                    placeholder="0-359"
+                    value={getInputValue('dipdir_talud', header.dipdir_talud)}
+                    onChange={(e) => {
+                      const limited = sanitizeDecimalInput(e.target.value, 3, 2, false);
+                      handleChange('dipdir_talud', limited);
+                    }}
+                    onBlur={(e) => {
+                      touchField('header-dipdir_talud')();
+                      const val = e.target.value.trim();
+                      if (val === '') {
+                        handleChange('dipdir_talud', undefined);
+                        return;
+                      }
+                      const num = parseFloat(val);
+                      handleChange('dipdir_talud', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
+                    }}
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                  />
+                )}
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">DIP°</label>
-                <input
-                  type="text"
-                  id="header-dip_hw"
-                  placeholder="-90-90"
-                  value={getInputValue('dip_hw', header.dip_hw)}
-                  onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 2, true);
-                    handleChange('dip_hw', limited);
-                  }}
-                  onBlur={(e) => {
-                    touchField('header-dip_hw')();
-                    const val = e.target.value.trim();
-                    if (val === '') {
-                      handleChange('dip_hw', undefined);
-                      return;
-                    }
-                    const num = parseFloat(val);
-                    handleChange('dip_hw', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
-                  }}
-                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-                />
+                <label className="text-xs font-bold text-slate-500 uppercase block flex items-center justify-between">
+                  <span>DIP°</span>
+                  {HOLE_AUTO && (
+                    <span className="text-[9px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1 py-0.5 rounded select-none">AUTO</span>
+                  )}
+                </label>
+                {HOLE_AUTO ? (
+                  <FormulaTooltipTrigger
+                    formulaId="dip_hole"
+                    params={{
+                      cota_from: header.cota_from,
+                      cota_to: header.cota_to,
+                      largo: calculated?.largo,
+                      val: calculated?.dip_hole
+                    }}
+                    position="bottom"
+                    enabled={showFormulas}
+                  >
+                    <div
+                      id="header-dip_hw"
+                      title="Autocalculado: asin(ΔZ / L) × 180/π"
+                      className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                    >
+                      {fmtAuto(calculated?.dip_hole)}
+                    </div>
+                  </FormulaTooltipTrigger>
+                ) : (
+                  <input
+                    type="text"
+                    id="header-dip_hw"
+                    placeholder="-90-90"
+                    value={getInputValue('dip_hw', header.dip_hw)}
+                    onChange={(e) => {
+                      const limited = sanitizeDecimalInput(e.target.value, 3, 2, true);
+                      handleChange('dip_hw', limited);
+                    }}
+                    onBlur={(e) => {
+                      touchField('header-dip_hw')();
+                      const val = e.target.value.trim();
+                      if (val === '') {
+                        handleChange('dip_hw', undefined);
+                        return;
+                      }
+                      const num = parseFloat(val);
+                      handleChange('dip_hw', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
+                    }}
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                  />
+                )}
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block">AZ_HOLE°</label>
-                <input
-                  type="text"
-                  id="header-az_hw"
-                  placeholder="0-359"
-                  value={getInputValue('az_hw', header.az_hw)}
-                  onChange={(e) => {
-                    const limited = sanitizeDecimalInput(e.target.value, 3, 2, false);
-                    handleChange('az_hw', limited);
-                  }}
-                  onBlur={(e) => {
-                    touchField('header-az_hw')();
-                    const val = e.target.value.trim();
-                    if (val === '') {
-                      handleChange('az_hw', undefined);
-                      return;
-                    }
-                    const num = parseFloat(val);
-                    handleChange('az_hw', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
-                  }}
-                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-                />
+                <label className="text-xs font-bold text-slate-500 uppercase block flex items-center justify-between">
+                  <span>AZ_HOLE°</span>
+                  {HOLE_AUTO && (
+                    <span className="text-[9px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1 py-0.5 rounded select-none">AUTO</span>
+                  )}
+                </label>
+                {HOLE_AUTO ? (
+                  <FormulaTooltipTrigger
+                    formulaId="az_hole"
+                    params={{
+                      este_from: header.este_from,
+                      norte_from: header.norte_from,
+                      este_to: header.este_to,
+                      norte_to: header.norte_to,
+                      val: calculated?.az_hole
+                    }}
+                    position="bottom"
+                    enabled={showFormulas}
+                  >
+                    <div
+                      id="header-az_hw"
+                      title="Autocalculado: (atan2(ΔE, ΔN) × 180/π + 360) mod 360"
+                      className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                    >
+                      {fmtAuto(calculated?.az_hole)}
+                    </div>
+                  </FormulaTooltipTrigger>
+                ) : (
+                  <input
+                    type="text"
+                    id="header-az_hw"
+                    placeholder="0-359"
+                    value={getInputValue('az_hw', header.az_hw)}
+                    onChange={(e) => {
+                      const limited = sanitizeDecimalInput(e.target.value, 3, 2, false);
+                      handleChange('az_hw', limited);
+                    }}
+                    onBlur={(e) => {
+                      touchField('header-az_hw')();
+                      const val = e.target.value.trim();
+                      if (val === '') {
+                        handleChange('az_hw', undefined);
+                        return;
+                      }
+                      const num = parseFloat(val);
+                      handleChange('az_hw', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
+                    }}
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                  />
+                )}
               </div>
             </div>
 

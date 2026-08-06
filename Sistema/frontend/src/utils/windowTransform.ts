@@ -10,6 +10,21 @@ import type { WindowHeader, JointRow } from './rmrCalculator';
 import type { WindowData } from './diffUtils';
 import { normalizeNumeric } from './numericPrecision';
 import { getCampaniaIdFromYear } from './campaniasCatalog';
+import { GSI_SUPERFICIE_CATALOG, GSI_ESTRUCTURA_CATALOG } from './catalogData';
+
+/**
+ * Normaliza un código GSI recuperado de BD/Excel: trim + mayúsculas.
+ * Si tras normalizar no está en el catálogo (y el catálogo está cargado),
+ * devuelve '' (vacío) para que el select solo ofrezca opciones válidas.
+ * Si el catálogo no se cargó (offline), conserva el valor normalizado para
+ * no perder datos.
+ */
+export function toGsiCode(v: any, catalog: Record<string, unknown>): string {
+  const s = String(v ?? '').trim().toUpperCase();
+  if (!s || s === '-1') return '';
+  if (Object.keys(catalog).length > 0 && !(s in catalog)) return '';
+  return s;
+}
 
 export function normalizeJoints(loadedJoints: JointRow[], defaultAlt: string = 'd'): JointRow[] {
   const mappedJoints = (loadedJoints || []).map((j, i) => {
@@ -166,8 +181,8 @@ export function windowFromServerResponse(v: any): WindowData {
     resistencia_ucs: v.rmr_input?.resistencia_codigo || '',
     comentario: v.rmr_input?.comentario || '',
     campania: v.campania !== null && v.campania !== undefined ? v.campania : 2026,
-    gsi_estructura: v.rmr_input?.gsi_estructura || '',
-    gsi_superficie: v.rmr_input?.gsi_superficie || '',
+    gsi_estructura: toGsiCode(v.rmr_input?.gsi_estructura, GSI_ESTRUCTURA_CATALOG),
+    gsi_superficie: toGsiCode(v.rmr_input?.gsi_superficie, GSI_SUPERFICIE_CATALOG),
     gsi_visual: v.rmr_input?.gsi_visual !== null && v.rmr_input?.gsi_visual !== undefined ? v.rmr_input.gsi_visual : 0,
     control_estructural: v.rmr_input?.control_estructural !== null && v.rmr_input?.control_estructural !== undefined ? v.rmr_input.control_estructural : 0,
     efectos_voladura: v.rmr_input?.efectos_voladura !== null && v.rmr_input?.efectos_voladura !== undefined ? v.rmr_input.efectos_voladura : 0,
@@ -261,8 +276,8 @@ export function excelDataToWindowData(codigoFinal: string, excelData: any, estru
     comentario: str(excelData.comentarios),
     // El sistema trabaja con ID de campaña (Campaña 2026 = id 7), no con el año
     campania: campaniaMatch ? (getCampaniaIdFromYear(campaniaMatch[0]) ?? 7) : 7,
-    gsi_superficie: str(excelData.gsi_superficie),
-    gsi_estructura: str(excelData.gsi_estructura),
+    gsi_superficie: toGsiCode(excelData.gsi_superficie, GSI_SUPERFICIE_CATALOG),
+    gsi_estructura: toGsiCode(excelData.gsi_estructura, GSI_ESTRUCTURA_CATALOG),
     gsi_visual: num(excelData.gsi_visual_rmr76, 'gsi_visual') ?? 0,
     control_estructural: num(excelData.control_estructural_rmr76, 'control_estructural') ?? 0,
     efectos_voladura: num(excelData.efectos_voladura_rmr76, 'efectos_voladura') ?? 0,

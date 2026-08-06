@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { WindowHeader, CalculatorResult } from '../../utils/rmrCalculator';
+import { suggestGsiVisual, gsiVisualRange } from '../../utils/rmrCalculator';
 import { Compass } from 'lucide-react';
 import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 import { COLUMN_LABELS, ISRM_TABLE } from '../../utils/geomecColumns';
+import { GSI_SUPERFICIE_CATALOG, GSI_ESTRUCTURA_CATALOG } from '../../utils/catalogData';
 import {
   ratingDiscretoRqd,
   ratingContinuoRqd,
@@ -58,6 +60,30 @@ export default function RmrAnalysis({
 
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
 
+  // GSI Visual: valor sugerido por fórmula (min(85, round(1.5*JCond89 + RQD/2))).
+  // HOOKS SIEMPRE antes del early return (Rules of Hooks).
+  const gsiSuggested = calculated ? suggestGsiVisual(calculated.rqd_est, calculated.condicion_rating_89) : null;
+  const gsiAutoPrevRef = useRef<number | null | undefined>(undefined);
+  const gsiManualRef = useRef(false);
+
+  // Autocompletado del GSI visual SOLO como reacción a que cambian RQD/JCond
+  // (el usuario editó discontinuidades). NUNCA en el primer render/apertura:
+  // mutar el header al montar haría divergir caché vs snapshot → BORRADOR fantasma.
+  useEffect(() => {
+    const s = gsiSuggested;
+    const prev = gsiAutoPrevRef.current;
+    gsiAutoPrevRef.current = s;
+    if (prev === undefined) return; // primer render: no autocompletar
+    if (s === prev) return;         // sin cambio real de RQD/JCond
+    if (gsiManualRef.current) return; // el usuario ya editó el campo a mano
+    const cur = header.gsi_visual;
+    const isBlank = cur === undefined || cur === null || cur === 0;
+    if (isBlank && s !== null && s !== undefined) {
+      onChange({ ...header, gsi_visual: s });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gsiSuggested]);
+
   if (!calculated) {
     return (
       <div className="glass-panel p-8 rounded-xl border border-navy-800 text-center text-slate-500 space-y-2 bg-navy-950/20">
@@ -74,6 +100,7 @@ export default function RmrAnalysis({
   };
 
   const handleNumericInputChange = (field: 'ucs_mpa' | 'is50_mpa' | 'gsi_visual' | 'control_estructural' | 'efectos_voladura', val: string, intDigits: number, decDigits: number) => {
+    if (field === 'gsi_visual') gsiManualRef.current = true; // edición manual: se desactiva el autocompletado
     const sanitized = val.replace(',', '.').replace('-', '');
     const restricted = handleNumberInputLimit(sanitized, intDigits, decDigits);
     setLocalValues(prev => ({ ...prev, [field]: restricted }));
@@ -130,6 +157,9 @@ export default function RmrAnalysis({
   const ctrl = header.control_estructural !== undefined && header.control_estructural !== 0 ? header.control_estructural : undefined;
   const vol = header.efectos_voladura !== undefined && header.efectos_voladura !== 0 ? header.efectos_voladura : undefined;
 
+  // Rango permitido del GSI visual según la combinación Estructura × Superficie seleccionada.
+  const gsiRange = gsiVisualRange(gsiEstruc, gsiCond);
+
   // Resistencia estimada ingresada manualmente por el usuario
   const currentResistGrade = header.resistencia_ucs || '';
 
@@ -138,7 +168,8 @@ export default function RmrAnalysis({
   const p3 = calculated.familias_spacing[3] ? calculated.familias_spacing[3].toFixed(4) : '0.0000';
 
   const ucsIs50Divergent = ucs !== undefined && is50 !== undefined && ucs <= is50;
-  const gsiVisualInvalid = gsiVisual !== undefined && (gsiVisual < 0 || gsiVisual > 100);
+  const gsiVisualInvalid = gsiVisual !== undefined &&
+    (gsiVisual < 0 || gsiVisual > 100 || (gsiRange !== null && (gsiVisual < gsiRange.min || gsiVisual > gsiRange.max)));
 
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 border-l-4 border-l-violet-500 space-y-6 text-left select-none animate-fade-in shadow-xl">
@@ -236,49 +267,62 @@ export default function RmrAnalysis({
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.gsi_superficie}
           </label>
-          <input
-            type="text"
+          <select
             id="header-gsi_superficie"
-            maxLength={2}
             value={gsiCond}
             onChange={(e) => handleFieldChange('gsi_superficie', e.target.value)}
             onBlur={() => markFieldTouched('header-gsi_superficie')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-          />
+            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+          >
+            <option value="" className="bg-navy-950">--</option>
+            {Object.entries(GSI_SUPERFICIE_CATALOG).map(([code, item]) => (
+              <option key={code} value={code} className="bg-navy-950">{code} — {item.termino}</option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.gsi_estructura}
           </label>
-          <input
-            type="text"
+          <select
             id="header-gsi_estructura"
-            maxLength={2}
             value={gsiEstruc}
             onChange={(e) => handleFieldChange('gsi_estructura', e.target.value)}
             onBlur={() => markFieldTouched('header-gsi_estructura')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
-          />
+            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+          >
+            <option value="" className="bg-navy-950">--</option>
+            {Object.entries(GSI_ESTRUCTURA_CATALOG).map(([code, item]) => (
+              <option key={code} value={code} className="bg-navy-950">{code} — {item.termino}</option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.gsi_visual}
           </label>
-          <input
-            type="text"
-            id="header-gsi_visual"
-            inputMode="numeric"
-            value={getInputValue('gsi_visual', gsiVisual)}
-            onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 0)}
-            onBlur={(e) => {
-              markFieldTouched('header-gsi_visual');
-              handleNumericInputBlur('gsi_visual', e.target.value);
-            }}
-            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${gsiVisualInvalid ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300' : 'border-navy-700/80'
-              }`}
-          />
+          <FormulaTooltipTrigger
+            formulaId="gsi_visual"
+            params={{ rqd: calculated.rqd_est, jcond: calculated.condicion_rating_89, val: gsiVisual, suggested: gsiSuggested }}
+            position="bottom"
+            enabled={showFormulas}
+          >
+            <input
+              type="text"
+              id="header-gsi_visual"
+              inputMode="numeric"
+              value={getInputValue('gsi_visual', gsiVisual)}
+              onChange={(e) => handleNumericInputChange('gsi_visual', e.target.value, 3, 0)}
+              onBlur={(e) => {
+                markFieldTouched('header-gsi_visual');
+                handleNumericInputBlur('gsi_visual', e.target.value);
+              }}
+              className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${gsiVisualInvalid ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300' : 'border-navy-700/80'
+                }`}
+            />
+          </FormulaTooltipTrigger>
         </div>
 
         <div className="space-y-1">

@@ -35,6 +35,27 @@ export let FORMA_CATALOG: Record<string, string> = {
   P: "Plana (P)", C: "Curva (C)", O: "Ondulada (O)", E: "Escalonada (E)", I: "Irregular (I)"
 };
 
+/**
+ * Catálogos GSI (gráfica Hoek-Brown). SSOT en backend (/catalogs/all);
+ * aquí solo viven los defaults de arranque y se reemplazan en initCatalogs.
+ * min/max = banda geométrica del eje (superficie: 9 unidades/columna,
+ * estructura: 10 unidades/fila). El rango permitido del GSI visual es la
+ * SUMA de ambos ejes: [sup.min + est.min, min(85, sup.max + est.max)].
+ */
+export let GSI_SUPERFICIE_CATALOG: Record<string, { termino: string; desc: string; min: number; max: number }> = {
+  VG: { termino: "VERY GOOD", desc: "Superficies muy rugosas, frescas y no intemperizadas.", min: 36, max: 45 },
+  G:  { termino: "GOOD",      desc: "Superficies rugosas, ligeramente intemperizadas y con manchas de hierro.", min: 27, max: 36 },
+  F:  { termino: "FAIR",      desc: "Superficies lisas, moderadamente intemperizadas y alteradas.", min: 18, max: 27 },
+  P:  { termino: "POOR",      desc: "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos compactos o rellenos de fragmentos angulares.", min: 9, max: 18 },
+  VP: { termino: "VERY POOR", desc: "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos o rellenos de arcilla blanda.", min: 0, max: 9 },
+};
+export let GSI_ESTRUCTURA_CATALOG: Record<string, { termino: string; desc: string; min: number; max: number }> = {
+  B:  { termino: "BLOCKY",                   desc: "Masa rocosa inalterada y bien intertrabada, formada por bloques cúbicos constituidos por tres familias de juntas que se intersectan.", min: 30, max: 40 },
+  VB: { termino: "VERY BLOCKY",               desc: "Masa rocosa intertrabada y parcialmente perturbada, con bloques angulares multifacéticos formados por 4 o más familias de juntas.", min: 20, max: 30 },
+  BD: { termino: "BLOCKY, DISTURBED / SEAMY", desc: "Plegada con bloques angulares formados por muchas familias de juntas que se intersectan. Persistencia de planos de estratificación o esquistosidad.", min: 10, max: 20 },
+  D:  { termino: "DISINTEGRATED",             desc: "Masa rocosa pobremente intertrabada y fuertemente rota, con una mezcla de fragmentos de roca angulares y redondeados.", min: 0, max: 10 },
+};
+
 export interface ResolvedKResult {
   k: number;
   lito1: string;
@@ -247,5 +268,27 @@ export function initCatalogs(data: any) {
   for (const k in FORMA_CATALOG) delete FORMA_CATALOG[k];
   data.forma.forEach((item: any) => {
     FORMA_CATALOG[item.codigo] = `${item.desc} (${item.codigo})`;
+  });
+
+  // 9. GSI — Condición de la Superficie (eje X de Hoek-Brown)
+  for (const k in GSI_SUPERFICIE_CATALOG) delete GSI_SUPERFICIE_CATALOG[k];
+  (data.gsi_superficie || []).forEach((item: any) => {
+    GSI_SUPERFICIE_CATALOG[item.codigo] = {
+      termino: item.termino,
+      desc: item.desc,
+      min: item.min,
+      max: item.max
+    };
+  });
+
+  // 10. GSI — Estructura (eje Y de Hoek-Brown)
+  for (const k in GSI_ESTRUCTURA_CATALOG) delete GSI_ESTRUCTURA_CATALOG[k];
+  (data.gsi_estructura || []).forEach((item: any) => {
+    GSI_ESTRUCTURA_CATALOG[item.codigo] = {
+      termino: item.termino,
+      desc: item.desc,
+      min: item.min,
+      max: item.max
+    };
   });
 }

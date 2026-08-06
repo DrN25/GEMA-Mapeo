@@ -3,9 +3,20 @@ import {
   GROUNDWATER_CATALOG,
   RELLENO_CATALOG,
   ALTERACION_CATALOG,
-  RUGOSIDAD_CATALOG
+  RUGOSIDAD_CATALOG,
+  GSI_SUPERFICIE_CATALOG,
+  GSI_ESTRUCTURA_CATALOG
 } from './catalogData';
 import { ratingDiscretoRqd, ratingContinuoRqd, ratingDiscretoResistencia, ratingContinuoResistencia } from './rmrInterpolation';
+
+/**
+ * Orientación del hoyo/ventana: cuando HOLE_AUTO = true, dip (hoyo), azimut
+ * (hoyo) y dipdir son AUTOCALCULADOS desde las coordenadas (read-only en UI,
+ * el payload de guardado envía los valores calculados). Para volver a edición
+ * manual, cambiar a false: la UI muestra los inputs editables y el payload
+ * usa los valores del header.
+ */
+export const HOLE_AUTO = true;
 
 export interface JointRow {
   id: number;
@@ -224,9 +235,11 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   let az_hole = largo > 0 && isCoordsValid ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
   if (az_hole < 0) az_hole += 360;
 
-  const dip_dir_talud = header.dipdir_talud !== undefined && header.dipdir_talud !== -1
-    ? header.dipdir_talud
-    : (az_hole + 90) % 360;
+  const dip_dir_talud = HOLE_AUTO
+    ? (az_hole + 90) % 360 // autocalculado desde el azimut (md: DipDir = (AZ_Hole + 90) mod 360)
+    : (header.dipdir_talud !== undefined && header.dipdir_talud !== -1
+      ? header.dipdir_talud
+      : (az_hole + 90) % 360);
 
   const acot = (val: number) => {
     if (val === 0) return Math.PI / 2;
@@ -473,4 +486,30 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     class_89: getRockClass(rmr_89),
     joints: calculatedJoints
   };
+}
+
+/**
+ * GSI Visual sugerido (especificación): una vez se tiene RQD y JCond89,
+ * GSI = min(85, round(1.5 * JCond89 + RQD / 2)).
+ * Devuelve null si falta alguno de los insumos.
+ */
+export function suggestGsiVisual(rqd: number | null | undefined, jcond: number | null | undefined): number | null {
+  if (rqd === null || rqd === undefined || isNaN(rqd)) return null;
+  if (jcond === null || jcond === undefined || isNaN(jcond)) return null;
+  return Math.min(85, Math.round(1.5 * jcond + rqd / 2));
+}
+
+/**
+ * Rango permitido del GSI visual según la combinación Estructura × Superficie
+ * (gráfica Hoek-Brown): [est.min + sup.min, min(85, est.max + sup.max)].
+ * Devuelve null si falta alguno de los códigos o no está en catálogo.
+ */
+export function gsiVisualRange(
+  estructura: string | null | undefined,
+  superficie: string | null | undefined
+): { min: number; max: number } | null {
+  const est = GSI_ESTRUCTURA_CATALOG[String(estructura || '').trim().toUpperCase()];
+  const sup = GSI_SUPERFICIE_CATALOG[String(superficie || '').trim().toUpperCase()];
+  if (!est || !sup) return null;
+  return { min: est.min + sup.min, max: Math.min(85, est.max + sup.max) };
 }

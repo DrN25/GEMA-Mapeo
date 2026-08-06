@@ -517,7 +517,24 @@ TIPO_FRACTURA_DISPLAY_CATALOG = [
     {"codigo": "C", "descripcion": "Rotura combinada — por matriz y estructura simultáneamente"}
 ]
 
-# D18. SINÓNIMOS DE GRUPOS LITOLÓGICOS (normalización a singular/plural)
+# D18. GSI — CONDICIÓN DE LA SUPERFICIE (eje X de la gráfica Hoek-Brown; 45 unidades / 5 columnas = 9/columna)
+GSI_SUPERFICIE_DISPLAY_CATALOG = [
+    {"codigo": "VG", "termino": "VERY GOOD", "desc": "Superficies muy rugosas, frescas y no intemperizadas.", "min": 36, "max": 45},
+    {"codigo": "G",  "termino": "GOOD",       "desc": "Superficies rugosas, ligeramente intemperizadas y con manchas de hierro.", "min": 27, "max": 36},
+    {"codigo": "F",  "termino": "FAIR",       "desc": "Superficies lisas, moderadamente intemperizadas y alteradas.", "min": 18, "max": 27},
+    {"codigo": "P",  "termino": "POOR",       "desc": "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos compactos o rellenos de fragmentos angulares.", "min": 9, "max": 18},
+    {"codigo": "VP", "termino": "VERY POOR",  "desc": "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos o rellenos de arcilla blanda.", "min": 0, "max": 9},
+]
+
+# D19. GSI — ESTRUCTURA (eje Y de la gráfica Hoek-Brown; 40 unidades / 4 filas = 10/fila)
+GSI_ESTRUCTURA_DISPLAY_CATALOG = [
+    {"codigo": "B",  "termino": "BLOCKY",                   "desc": "Masa rocosa inalterada y bien intertrabada, formada por bloques cúbicos constituidos por tres familias de juntas que se intersectan.", "min": 30, "max": 40},
+    {"codigo": "VB", "termino": "VERY BLOCKY",               "desc": "Masa rocosa intertrabada y parcialmente perturbada, con bloques angulares multifacéticos formados por 4 o más familias de juntas.", "min": 20, "max": 30},
+    {"codigo": "BD", "termino": "BLOCKY, DISTURBED / SEAMY", "desc": "Plegada con bloques angulares formados por muchas familias de juntas que se intersectan. Persistencia de planos de estratificación o esquistosidad.", "min": 10, "max": 20},
+    {"codigo": "D",  "termino": "DISINTEGRATED",             "desc": "Masa rocosa pobremente intertrabada y fuertemente rota, con una mezcla de fragmentos de roca angulares y redondeados.", "min": 0, "max": 10},
+]
+
+# D20. SINÓNIMOS DE GRUPOS LITOLÓGICOS (normalización a singular/plural)
 LITHOLOGY_GROUP_SYNONYMS = {
     "SEDIMENTARIA": "SEDIMENTARIAS",
     "SEDIMENTARIO": "SEDIMENTARIAS",

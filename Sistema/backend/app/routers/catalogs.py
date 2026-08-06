@@ -24,6 +24,8 @@ from app.core.catalogs import (
     LITHOLOGY_FULL_CATALOG,
     DIRECCION_ROTURA_DISPLAY_CATALOG,
     TIPO_FRACTURA_DISPLAY_CATALOG,
+    GSI_SUPERFICIE_DISPLAY_CATALOG,
+    GSI_ESTRUCTURA_DISPLAY_CATALOG,
 )
 
 router = APIRouter()
@@ -51,6 +53,9 @@ def get_all_catalogs():
         "efectos_voladura":     EFECTOS_VOLADURA_DISPLAY_CATALOG,
         "direccion_rotura":     DIRECCION_ROTURA_DISPLAY_CATALOG,
         "tipo_fractura":        TIPO_FRACTURA_DISPLAY_CATALOG,
+        # Catálogos GSI (Hoek-Brown)
+        "gsi_superficie":       GSI_SUPERFICIE_DISPLAY_CATALOG,
+        "gsi_estructura":       GSI_ESTRUCTURA_DISPLAY_CATALOG,
         # Tablas de litología (2 vistas)
         "litologia": {
             "tabla_colores":    LITO_COLORES_DISPLAY_CATALOG,    # lito1/lito2/lito3/k
