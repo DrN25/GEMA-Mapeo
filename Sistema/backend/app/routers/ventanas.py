@@ -738,6 +738,14 @@ def check_codigo_celda(codigo: str, current_codigo: Optional[str] = Query(None),
     }
 
 
+@router.get("/ventanas/celdas")
+def get_all_celdas(db: Session = Depends(get_db)):
+    """Lista ligera de TODOS los códigos de celda existentes en BD (sin filtros
+    ni paginación). La usa el modal de import PLT para validar destinos."""
+    rows = db.query(models.Ventana.codigo_celda).all()
+    return sorted({r[0] for r in rows if r[0]})
+
+
 @router.get("/ventanas/{codigo}", response_model=schemas.VentanaResponseSchema)
 def get_ventana(codigo: str, db: Session = Depends(get_db)):
     code_up = codigo.strip().upper()

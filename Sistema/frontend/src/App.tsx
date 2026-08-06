@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity, RotateCcw, Loader2 } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
@@ -183,7 +183,7 @@ export default function App() {
 
   // Si la vista requiere celda activa pero no hay ninguna seleccionada, redirigir a dashboard
   useEffect(() => {
-    if (!activeWindow && (currentView === 'mapeo' || currentView === 'grafico')) {
+    if (!activeWindow && (currentView === 'mapeo' || currentView === 'grafico' || currentView === 'plt_ensayos')) {
       setCurrentView('dashboard');
     }
   }, [activeWindow, currentView]);
@@ -405,6 +405,27 @@ const [dbOnline, setDbOnline] = useState(true);
   const pendingCellNames = useMemo(
     () => getPendingCellNames(),
     [workspaceDiff, pendingImports]
+  );
+
+  // Celdas que existen en el sistema (BD + borradores locales) — SSOT para el
+  // modal de import PLT (validación de destinos y estado de cada celda del Excel).
+  // Se obtiene con un fetch DEDICADO de todas las celdas (independiente del
+  // filtro/búsqueda actual del dashboard, que limitaría la lista).
+  const [allCellNames, setAllCellNames] = useState<string[]>([]);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/ventanas/celdas`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAllCellNames(data);
+        }
+      })
+      .catch(() => { /* sin backend: solo borradores locales */ });
+  }, []);
+
+  const knownCells = useMemo(
+    () => [...new Set([...allCellNames, ...pendingCellNames])],
+    [allCellNames, pendingCellNames]
   );
 
   useEffect(() => {
@@ -675,6 +696,19 @@ const [dbOnline, setDbOnline] = useState(true);
         loadedPltCeldaRef.current = targetCelda;
       }
     }
+  };
+
+  /**
+   * Importación PLT hacia una celda distinta de la activa (flujo del modal):
+   * cambia la ventana activa a la celda destino, espera la carga de sus PLT
+   * (para no pisar los registros importados) y cambia la vista a Ensayos PLT.
+   */
+  const handlePltImportToOtherCell = async (celda: string, rows: any[]) => {
+    await handleSelectWindow(celda);
+    await fetchPltEnsayos(celda, true);
+    setPltEnsayos(prev => [...prev, ...rows]);
+    setCurrentView('plt_ensayos');
+    alert(`Importación exitosa: se han añadido ${rows.length} registros a Ensayos PLT de ${celda}.`);
   };
 
   const handleSelectWindow = async (name: string) => {
@@ -1949,6 +1983,8 @@ const [dbOnline, setDbOnline] = useState(true);
               onChange={(newRows) => setPltEnsayos(newRows)}
               activeWindowCelda={activeWindow?.header.celda || null}
               showFormulas={showFormulas}
+              knownCells={knownCells}
+              onImportToOtherCell={handlePltImportToOtherCell}
             />
           )}
 

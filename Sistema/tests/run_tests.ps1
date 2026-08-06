@@ -23,4 +23,8 @@ Write-Host "`n=== 4/4 Test de catálogos GSI, autocompletado, QA/QC y geometría
 & node (Join-Path $root "test_gsi.mjs")
 if ($LASTEXITCODE -ne 0) { Write-Host "FALLO en test_gsi.mjs" -ForegroundColor Red; exit 1 }
 
+Write-Host "`n=== 5/5 Test de helpers de import PLT (agrupación y re-etiquetado) ===" -ForegroundColor Cyan
+& node (Join-Path $root "test_plt_import.mjs")
+if ($LASTEXITCODE -ne 0) { Write-Host "FALLO en test_plt_import.mjs" -ForegroundColor Red; exit 1 }
+
 Write-Host "`nTodos los tests pasaron OK" -ForegroundColor Green

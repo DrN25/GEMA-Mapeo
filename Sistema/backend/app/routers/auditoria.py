@@ -382,7 +382,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
         headers_detail = [
             "Fila Excel", "Gravedad", "Estación Padre", "Estructura Hija", "Campaña", 
-            "Logger Geotécnico", "Sector Geotécnico", "Tipo de Mapeo", "Columna de Falla", 
+            "Mapeador Geotécnico", "Sector Geotécnico", "Tipo de Mapeo", "Columna de Falla", 
             "Valor Actual", "Mensaje de Inconsistencia Geomecánica"
         ]
 
@@ -616,7 +616,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         
         headers_inc = [
             "Fila Excel", "Estación Padre", "Estructura Hija", "Tipo de Mapeo", "Campaña", 
-            "Logger Geotécnico", "Sector Geotécnico", "Columna de Falla", 
+            "Mapeador Geotécnico", "Sector Geotécnico", "Columna de Falla", 
             "Valor Actual", "Mensaje de Inconsistencia Geomecánica"
         ]
         header_row_idx = indiv_start + 1
@@ -732,7 +732,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             ws.column_dimensions['D'].width = 14  # Estructura Hija
             ws.column_dimensions['E'].width = 20  # Tipo de Mapeo
             ws.column_dimensions['F'].width = 9   # Campaña
-            ws.column_dimensions['G'].width = 16  # Logger Geotécnico
+            ws.column_dimensions['G'].width = 16  # Mapeador Geotécnico
             ws.column_dimensions['H'].width = 16  # Sector Geotécnico
             ws.column_dimensions['I'].width = 24  # Columna de Falla
             ws.column_dimensions['J'].width = 12  # Valor Actual

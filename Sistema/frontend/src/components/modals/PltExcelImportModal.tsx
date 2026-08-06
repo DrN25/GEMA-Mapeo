@@ -1,6 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { X, FileSpreadsheet, Upload, Check, ArrowRight, Filter } from 'lucide-react';
+import { X, FileSpreadsheet, Upload, Check, ArrowRight, Filter, AlertTriangle, Search, RefreshCw } from 'lucide-react';
 import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../../utils/catalogData';
 import {
     PLT_COLUMN_DEFS as EXPECTED_FIELDS,
@@ -8,22 +8,28 @@ import {
     normalizeTipoLitologico,
     normalizeCeldaCode
 } from '../../utils/geomecColumns';
+import { groupPltRowsByCelda, retagPltRows } from '../../utils/pltImportHelpers';
 
 interface PltExcelImportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onImport: (importedRows: any[]) => void;
+    /** Importa registros a UNA celda de destino. Si la celda no es la activa,
+     *  App cambia la ventana activa y la vista a Ensayos PLT automáticamente. */
+    onImportToCell: (celda: string, rows: any[]) => void;
     activeWindowCelda: string | null;
+    /** Celdas que existen en el sistema (BD + borradores locales) — SSOT de App. */
+    knownCells: string[];
 }
 
 export default function PltExcelImportModal({
     isOpen,
     onClose,
-    onImport,
-    activeWindowCelda
+    onImportToCell,
+    activeWindowCelda,
+    knownCells
 }: PltExcelImportModalProps) {
-    if (!isOpen) return null;
-
+    // HOOKS SIEMPRE antes del early return (Rules of Hooks — el modal monta
+    // siempre y solo renderiza cuando isOpen; alternar el orden crashea React).
     const [file, setFile] = useState<File | null>(null);
     const [sheets, setSheets] = useState<string[]>([]);
     const [selectedSheet, setSelectedSheet] = useState<string>('');
@@ -35,6 +41,14 @@ export default function PltExcelImportModal({
     const [mappings, setMappings] = useState<Record<string, number>>({});
 
     const [importedRowsState, setImportedRowsState] = useState<any[]>([]);
+
+    // Selección: registros marcados de la celda activa + grupos renombrados a la activa
+    const [selectedActiveIds, setSelectedActiveIds] = useState<Set<number>>(new Set());
+    const [renamedGroups, setRenamedGroups] = useState<{ source: string; rows: any[] }[]>([]);
+    // Sub-modales: advertencia por registros de otra celda + selector de celda destino
+    const [warningGroup, setWarningGroup] = useState<any>(null);
+    const [showPicker, setShowPicker] = useState(false);
+    const [pickerQuery, setPickerQuery] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +62,11 @@ export default function PltExcelImportModal({
         setExcelHeaders([]);
         setMappings({});
         setImportedRowsState([]);
+        setSelectedActiveIds(new Set());
+        setRenamedGroups([]);
+        setWarningGroup(null);
+        setShowPicker(false);
+        setPickerQuery('');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,34 +299,91 @@ export default function PltExcelImportModal({
         runGrouping(rawGrid, headerRowIdx, updated);
     };
 
-    const matchingRows = useMemo(() => {
-        if (!activeWindowCelda) return [];
-        const activeNorm = normalizeCeldaCode(activeWindowCelda);
-        return importedRowsState.filter(r => normalizeCeldaCode(r.celda_mapeo) === activeNorm);
+    // ============ Modelo de grupos (celdas reconocidas en el Excel) ============
+    const groups = useMemo(() => groupPltRowsByCelda(importedRowsState, knownCells), [importedRowsState, knownCells]);
+    const activeNorm = normalizeCeldaCode(activeWindowCelda || '');
+    const activeGroup = groups.find(g => g.name === activeNorm) || null;
+    const otherGroups = groups.filter(g => g.name !== activeNorm);
+
+    // Por defecto: seleccionados todos los registros con el nombre de la celda actual
+    useEffect(() => {
+        if (!activeGroup) {
+            setSelectedActiveIds(new Set());
+            return;
+        }
+        setSelectedActiveIds(new Set(activeGroup.rows.map((r: any) => r.id)));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [importedRowsState, activeWindowCelda]);
 
-    const previewRows = useMemo(() => {
-        return matchingRows.slice(0, 5);
-    }, [matchingRows]);
+    const rowsToImport = useMemo(() => {
+        const active = activeGroup ? activeGroup.rows.filter((r: any) => selectedActiveIds.has(r.id)) : [];
+        const renamed = renamedGroups.flatMap(g => g.rows);
+        return [...active, ...renamed];
+    }, [activeGroup, selectedActiveIds, renamedGroups]);
+
+    // Renombrar el grupo de la advertencia a la celda actual
+    const handleRenameToActive = () => {
+        if (!warningGroup || !activeWindowCelda) return;
+        const tagged = retagPltRows(warningGroup.rows, activeWindowCelda);
+        setRenamedGroups(prev => [...prev.filter(g => g.source !== warningGroup.name), { source: warningGroup.name, rows: tagged }]);
+        setWarningGroup(null);
+        setShowPicker(false);
+    };
+
+    const handleRemoveRenamed = (source: string) => {
+        setRenamedGroups(prev => prev.filter(g => g.source !== source));
+    };
+
+    // Celdas destino del picker: SOLO las que existen en el sistema (excluye la
+    // activa). Se listan con su CÓDIGO REAL (p.ej. "RTF_001"); la normalización
+    // solo se usa para comparar/buscar.
+    const pickerTargets = useMemo(() => {
+        const activeNorm = normalizeCeldaCode(activeWindowCelda || '');
+        const q = normalizeCeldaCode(pickerQuery) || '';
+        const uniq = new Map<string, string>(); // normalized → código real
+        for (const c of knownCells) {
+            const n = normalizeCeldaCode(c);
+            if (!n || n === activeNorm) continue;
+            if (q && !n.includes(q)) continue;
+            if (!uniq.has(n)) uniq.set(n, c);
+        }
+        return [...uniq.values()].sort();
+    }, [knownCells, activeWindowCelda, pickerQuery]);
+
+    // Elegir otra celda destino → los registros del grupo se re-etiquetan y se
+    // importan ahí (App cambia la ventana activa y la vista a PLT).
+    const handlePickTarget = (target: string) => {
+        if (!warningGroup) return;
+        const tagged = retagPltRows(warningGroup.rows, target);
+        onImportToCell(target, tagged);
+        onClose();
+        resetState();
+    };
 
     const handleImportClick = () => {
-        const rowsToImport = matchingRows;
-        if (rowsToImport.length === 0) {
+        if (!activeWindowCelda) {
+            alert("No hay una celda activa para importar los registros.");
+            return;
+        }
+        const rows = rowsToImport;
+        if (rows.length === 0) {
             alert("No se encontraron registros de ensayo PLT válidos para importar.");
             return;
         }
 
-        if (rowsToImport.length > 500) {
+        if (rows.length > 500) {
             const confirmBigImport = window.confirm(
-                `¡ADVERTENCIA DE RENDIMIENTO!\n\nVas a importar ${rowsToImport.length} registros de golpe. Cargar planillas masivas puede ralentizar el rendimiento del navegador.\n\n¿Deseas continuar?`
+                `¡ADVERTENCIA DE RENDIMIENTO!\n\nVas a importar ${rows.length} registros de golpe. Cargar planillas masivas puede ralentizar el rendimiento del navegador.\n\n¿Deseas continuar?`
             );
             if (!confirmBigImport) return;
         }
 
-        onImport(rowsToImport);
+        onImportToCell(activeWindowCelda, rows);
         onClose();
         resetState();
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
@@ -401,77 +477,131 @@ export default function PltExcelImportModal({
 
                                 <div className="lg:col-span-2 space-y-4">
                                     {importedRowsState.length > 0 && (
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                                                Opciones de Ingesta y Segmentación de Ensayos:
-                                            </label>
+                                        <div className="space-y-4">
+                                            {/* Info del proceso */}
+                                            <div className="p-3.5 rounded-xl border border-sky-500/25 bg-sky-500/5 text-sky-200/90 text-[11px] leading-relaxed space-y-1">
+                                                <span className="font-black uppercase tracking-wider text-sky-400 text-[10px] block">¿Cómo funciona la importación?</span>
+                                                <p>
+                                                    Por defecto están seleccionados los registros con el nombre de la celda actual:{' '}
+                                                    <strong className="text-white">{activeWindowCelda || '—'}</strong>. También puedes importar
+                                                    registros que tengan otro código de celda en el archivo, pero deberás{' '}
+                                                    <strong className="text-white">renombrarlos a la celda actual</strong> o{' '}
+                                                    <strong className="text-white">elegir otra celda de destino</strong> (la vista cambiará
+                                                    automáticamente a esa celda).
+                                                </p>
+                                            </div>
 
-                                            {activeWindowCelda ? (
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 flex flex-col gap-1">
-                                                        <div className="flex justify-between items-center w-full">
-                                                            <span className="text-xs uppercase font-extrabold tracking-wider">Ingestar Celda Activa</span>
+                                            {/* Grupo: celda activa */}
+                                            {activeGroup && (
+                                                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 overflow-hidden">
+                                                    <div className="flex items-center justify-between px-3.5 py-2.5 bg-emerald-500/10">
+                                                        <div className="flex items-center gap-2">
                                                             <Check size={14} className="text-emerald-400" />
+                                                            <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                                                                Celda actual: {activeGroup.originalName}
+                                                            </span>
                                                         </div>
-                                                        <p className="text-[10px] text-slate-400 leading-normal">
-                                                            Cargar únicamente los ensayos de la celda activa: <strong className="text-white">{activeWindowCelda}</strong>
-                                                        </p>
-                                                        {matchingRows.length > 0 ? (
-                                                            <span className="text-[10px] mt-2 bg-emerald-500/20 border border-emerald-500/35 px-2.5 py-0.5 rounded-full w-fit font-black font-mono">
-                                                                {matchingRows.length} registros coincidentes
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] mt-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-2.5 py-0.5 rounded-full w-fit font-bold">
-                                                                0 coincidencias halladas
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    <div className="p-4 rounded-xl border border-navy-800 bg-navy-950/40 text-slate-400 flex flex-col gap-1 text-center justify-center min-h-[90px]">
-                                                        <span className="text-xs uppercase font-extrabold tracking-wider text-slate-300">No hay celdas activas actualmente</span>
-                                                        <p className="text-[10px] text-slate-500 leading-normal">
-                                                            No has seleccionado ninguna ventana geomecánica activa en el Dashboard. El filtro por celda de mapeo está deshabilitado.
-                                                        </p>
-                                                        <span className="text-[10px] mt-2 bg-navy-900 border border-navy-800 px-2.5 py-0.5 rounded-full w-fit mx-auto font-black font-mono">
-                                                            {importedRowsState.length} registros totales listos para importar
+                                                        <span className="text-[10px] font-black font-mono text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                                                            {selectedActiveIds.size}/{activeGroup.rows.length} seleccionados
                                                         </span>
+                                                    </div>
+                                                    <div className="p-3 space-y-1 max-h-44 overflow-y-auto">
+                                                        {activeGroup.rows.map((row: any) => (
+                                                            <label key={row.id} className="flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-navy-900/40 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedActiveIds.has(row.id)}
+                                                                    onChange={(e) => {
+                                                                        const next = new Set(selectedActiveIds);
+                                                                        if (e.target.checked) next.add(row.id); else next.delete(row.id);
+                                                                        setSelectedActiveIds(next);
+                                                                    }}
+                                                                    className="accent-emerald-500"
+                                                                />
+                                                                <span className="font-mono font-bold text-slate-200 text-[11px]">{row.codigo_muestra || '—'}</span>
+                                                                <span className="text-[10px] text-slate-400 ml-auto">{row.nivel}</span>
+                                                            </label>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             )}
-                                        </div>
-                                    )}
 
-                                    {previewRows.length > 0 && (
-                                        <div className="space-y-2">
-                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                                                Vista Previa Dinámica (Celda {activeWindowCelda} — Primeras 5 Filas):
-                                            </h4>
-                                            <div className="overflow-x-auto border border-navy-850 rounded-lg">
-                                                <table className="w-full text-xs text-left border-collapse text-slate-300">
-                                                    <thead>
-                                                        <tr className="bg-navy-950 text-slate-400 font-semibold border-b border-navy-850 text-[10px] uppercase">
-                                                            <th className="py-2 px-3 border-r border-navy-850">Muestra</th>
-                                                            <th className="py-2 px-3 text-center border-r border-navy-850">Nivel</th>
-                                                            <th className="py-2 px-3 text-center border-r border-navy-850">Celda Mapeo</th>
-                                                            <th className="py-2 px-3 text-center border-r border-navy-850">Fuerza P (kN)</th>
-                                                            <th className="py-2 px-3 text-center">Espesor D (cm)</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {previewRows.map((row, i) => (
-                                                            <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
-                                                                <td className="py-2 px-3 font-semibold text-slate-200 border-r border-navy-900/20">{row.codigo_muestra || '—'}</td>
-                                                                <td className="py-2 px-3 text-center border-r border-navy-900/20">{row.nivel}</td>
-                                                                <td className="py-2 px-3 text-center border-r border-navy-900/20 font-bold text-orange-400">{row.celda_mapeo}</td>
-                                                                <td className="py-2 px-3 text-center border-r border-navy-900/20">{row.fuerza_p}</td>
-                                                                <td className="py-2 px-3 text-center">{row.espesor_d}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                            {/* Otras celdas del Excel */}
+                                            {otherGroups.map(g => {
+                                                const renamed = renamedGroups.find(r => r.source === g.name);
+                                                return (
+                                                    <div key={g.name} className={`rounded-xl border overflow-hidden ${renamed ? 'border-amber-500/40 bg-amber-500/5' : 'border-navy-800 bg-navy-950/40'}`}>
+                                                        <div className="flex items-center justify-between px-3.5 py-2.5">
+                                                            <div className="flex items-center gap-2">
+                                                                {renamed ? (
+                                                                    <RefreshCw size={14} className="text-amber-400" />
+                                                                ) : (
+                                                                    <span className={`w-2 h-2 rounded-full ${g.exists ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                                                )}
+                                                                <span className="text-xs font-black uppercase tracking-wider text-slate-200">{g.originalName}</span>
+                                                                <span className="text-[10px] font-bold text-slate-400">({g.rows.length} registros)</span>
+                                                                {g.exists && !renamed && (
+                                                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">Existe</span>
+                                                                )}
+                                                            </div>
+                                                            {renamed ? (
+                                                                <button
+                                                                    onClick={() => handleRemoveRenamed(g.name)}
+                                                                    className="text-[10px] font-bold text-rose-400 hover:text-rose-300 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30"
+                                                                >
+                                                                    Quitar (renombrado a {activeWindowCelda})
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => setWarningGroup(g)}
+                                                                    className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg"
+                                                                >
+                                                                    Importar registros
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        {!g.exists && !renamed && (
+                                                            <p className="px-3.5 pb-2 text-[10px] text-rose-300/80">
+                                                                ⚠️ La celda {g.originalName} no tiene registro disponible en el sistema.
+                                                                Solo podrás renombrar sus registros a una celda existente.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Vista previa de lo que se importará */}
+                                            {rowsToImport.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                                        Vista previa — {rowsToImport.length} registros a importar en {activeWindowCelda || '—'}
+                                                    </h4>
+                                                    <div className="overflow-x-auto border border-navy-850 rounded-lg max-h-64 overflow-y-auto">
+                                                        <table className="w-full text-xs text-left border-collapse text-slate-300">
+                                                            <thead className="bg-navy-950 text-slate-400 font-semibold border-b border-navy-850 text-[10px] uppercase sticky top-0">
+                                                                <tr>
+                                                                    <th className="py-2 px-3 border-r border-navy-850">Código Muestra</th>
+                                                                    <th className="py-2 px-3 text-center border-r border-navy-850">Celda</th>
+                                                                    <th className="py-2 px-3 text-center border-r border-navy-850">Nivel</th>
+                                                                    <th className="py-2 px-3 text-center border-r border-navy-850">Fuerza P (kN)</th>
+                                                                    <th className="py-2 px-3 text-center">Espesor D (cm)</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {rowsToImport.map((row, i) => (
+                                                                    <tr key={i} className="border-b border-navy-900/40 bg-navy-900/10">
+                                                                        <td className="py-1.5 px-3 font-semibold text-slate-200 border-r border-navy-900/20">{row.codigo_muestra || '—'}</td>
+                                                                        <td className="py-1.5 px-3 text-center border-r border-navy-900/20 font-bold text-orange-400">{row.celda_mapeo}</td>
+                                                                        <td className="py-1.5 px-3 text-center border-r border-navy-900/20">{row.nivel}</td>
+                                                                        <td className="py-1.5 px-3 text-center border-r border-navy-900/20">{row.fuerza_p}</td>
+                                                                        <td className="py-1.5 px-3 text-center">{row.espesor_d}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -480,13 +610,128 @@ export default function PltExcelImportModal({
                     )}
                 </div>
 
+                {/* SUB-MODAL: advertencia por registros de otra celda */}
+                {warningGroup && !showPicker && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
+                        <div className="glass-panel w-full max-w-xl p-5 rounded-2xl border border-amber-500/40 shadow-2xl bg-navy-900/95 space-y-4">
+                            <div className="flex items-start gap-3 border-b border-navy-800 pb-3">
+                                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+                                    <AlertTriangle size={22} />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">Registros de otra celda</h4>
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                        Seleccionaste {warningGroup.rows.length} registro(s) de la celda{' '}
+                                        <strong className="text-amber-400">{warningGroup.originalName}</strong>. Para importarlos,
+                                        debes renombrarlos a la celda actual o elegir otra celda de destino.
+                                    </p>
+                                    {!warningGroup.exists && (
+                                        <p className="text-[11px] text-rose-300 mt-1">
+                                            ⚠️ La celda {warningGroup.originalName} no existe en el sistema: solo podrás renombrar
+                                            sus registros a una celda existente.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleRenameToActive}
+                                    disabled={!activeWindowCelda}
+                                    className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-left transition-all flex items-start gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <RefreshCw size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="text-xs font-black text-amber-300 block uppercase tracking-wider">
+                                            Renombrar a la celda actual ({activeWindowCelda || '—'})
+                                        </span>
+                                        <p className="text-xs text-slate-400 mt-0.5">
+                                            Los {warningGroup.rows.length} registros se importarán como si pertenecieran a la celda actual.
+                                        </p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPicker(true)}
+                                    className="p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all flex items-start gap-3"
+                                >
+                                    <Search size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="text-xs font-black text-emerald-300 block uppercase tracking-wider">Importar en otra celda</span>
+                                        <p className="text-xs text-slate-400 mt-0.5">
+                                            Elige una celda existente como destino; la vista cambiará automáticamente a esa celda.
+                                        </p>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className="flex justify-end border-t border-navy-800 pt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setWarningGroup(null)}
+                                    className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* SUB-MODAL: elegir celda de destino (solo celdas existentes) */}
+                {showPicker && warningGroup && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
+                        <div className="glass-panel w-full max-w-md p-5 rounded-2xl border border-emerald-500/40 shadow-2xl bg-navy-900/95 space-y-4">
+                            <div>
+                                <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">Elegir celda de destino</h4>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Los {warningGroup.rows.length} registros de{' '}
+                                    <strong className="text-amber-400">{warningGroup.originalName}</strong> se importarán a la celda que elijas.
+                                </p>
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar celda..."
+                                    value={pickerQuery}
+                                    onChange={(e) => setPickerQuery(e.target.value)}
+                                    className="w-full bg-navy-950 border border-navy-700 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                                />
+                            </div>
+                            <div className="space-y-1 max-h-52 overflow-y-auto">
+                                {pickerTargets.length === 0 && (
+                                    <p className="text-[11px] text-slate-500 text-center py-4">No hay celdas disponibles en el sistema.</p>
+                                )}
+                                {pickerTargets.map(t => (
+                                    <button
+                                        key={t}
+                                        type="button"
+                                        onClick={() => handlePickTarget(t)}
+                                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/30 text-xs font-bold font-mono text-slate-200"
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex justify-end gap-2 border-t border-navy-800 pt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPicker(false)}
+                                    className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+                                >
+                                    Volver
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex gap-2 justify-end px-6 py-4 border-t border-navy-800/80 shrink-0 bg-navy-950/40">
                     <button type="button" onClick={() => { onClose(); resetState(); }} className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-400 px-4 py-2 rounded-lg text-xs font-semibold">
                         Cancelar
                     </button>
                     <button
                         onClick={handleImportClick}
-                        disabled={matchingRows.length === 0}
+                        disabled={rowsToImport.length === 0 || !activeWindowCelda}
                         className="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 px-4.5 py-2 rounded-lg text-xs font-black flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                         <span>Importar Ensayos</span>
