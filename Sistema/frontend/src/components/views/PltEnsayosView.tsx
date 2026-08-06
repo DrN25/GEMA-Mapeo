@@ -36,7 +36,8 @@ interface PltEnsayosViewProps {
   activeWindowCelda: string | null;
   showFormulas?: boolean;
   knownCells?: string[];
-  onImportToOtherCell?: (celda: string, rows: any[]) => void;
+  /** Handler único de import (App: agrega, persiste y cambia la vista si aplica). */
+  onImportToCell?: (celda: string, rows: any[]) => void;
 }
 
 export default function PltEnsayosView({
@@ -45,7 +46,7 @@ export default function PltEnsayosView({
   activeWindowCelda,
   showFormulas = true,
   knownCells = [],
-  onImportToOtherCell
+  onImportToCell
 }: PltEnsayosViewProps) {
   const [filterActiveCell, setFilterActiveCell] = useState(true);
 
@@ -727,16 +728,11 @@ export default function PltEnsayosView({
       )}
 
       {/* 📥 EXCEL IMPORT MODAL DE ACOPLAMIENTO MODULAR */}
-            <PltExcelImportModal
+                  <PltExcelImportModal
         isOpen={activeModal === 'import_excel'}
         onClose={() => setActiveModal(null)}
         onImportToCell={(celda, importedRows) => {
-          if (celda === activeWindowCelda) {
-            onChange([...pltEnsayos, ...importedRows]);
-            alert(`Importación exitosa: se han añadido ${importedRows.length} registros a Ensayos PLT de ${celda}.`);
-          } else if (onImportToOtherCell) {
-            onImportToOtherCell(celda, importedRows);
-          }
+          onImportToCell && onImportToCell(celda, importedRows);
         }}
         activeWindowCelda={activeWindowCelda}
         knownCells={knownCells}

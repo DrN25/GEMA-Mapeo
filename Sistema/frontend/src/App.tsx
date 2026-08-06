@@ -22,7 +22,7 @@ import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
 import { apiFetch, pingBackend } from './utils/apiClient';
-import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport } from './utils/storageManager';
+import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
   discardLocalCell,
   getAllKnownCellNames,
@@ -669,7 +669,11 @@ const [dbOnline, setDbOnline] = useState(true);
       if (res.ok) {
         const data = await res.json();
         const computed = (data || []).map((r: any) => applyPltFormulas(r));
-        setPltEnsayos(computed);
+        // Re-hidratar los registros PLT importados pendientes (delta local):
+        // el snapshot queda SOLO con los de BD para que el diff los marque
+        // como cambios pendientes (mismo modelo que el import de Mapeo).
+        const delta = getPltDelta(targetCelda);
+        setPltEnsayos(delta.length > 0 ? [...computed, ...delta] : computed);
         pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
         loadedPltCeldaRef.current = targetCelda;
         setDbOnline(true);
@@ -699,15 +703,23 @@ const [dbOnline, setDbOnline] = useState(true);
   };
 
   /**
-   * Importación PLT hacia una celda distinta de la activa (flujo del modal):
-   * cambia la ventana activa a la celda destino, espera la carga de sus PLT
-   * (para no pisar los registros importados) y cambia la vista a Ensayos PLT.
+   * Importación PLT (una sola vía, mismo modelo que el import de Mapeo):
+   * agrega los registros al estado de la celda destino, los PERSISTE como
+   * delta local (sobreviven recargas) y los registra como pendientes.
+   * Si la celda destino no es la activa, cambia la ventana activa y la vista
+   * a Ensayos PLT automáticamente.
    */
-  const handlePltImportToOtherCell = async (celda: string, rows: any[]) => {
-    await handleSelectWindow(celda);
-    await fetchPltEnsayos(celda, true);
+  const handlePltImport = async (celda: string, rows: any[]) => {
+    if (!celda || !Array.isArray(rows) || rows.length === 0) return;
+    const isOtherCell = activeWindow?.header.celda !== celda;
+    if (isOtherCell) {
+      await handleSelectWindow(celda);
+      await fetchPltEnsayos(celda, true);
+      setCurrentView('plt_ensayos');
+    }
     setPltEnsayos(prev => [...prev, ...rows]);
-    setCurrentView('plt_ensayos');
+    savePltDelta(celda, [...getPltDelta(celda), ...rows]);
+    addPendingPltCell(celda);
     alert(`Importación exitosa: se han añadido ${rows.length} registros a Ensayos PLT de ${celda}.`);
   };
 
@@ -1445,6 +1457,9 @@ const [dbOnline, setDbOnline] = useState(true);
           pltSnapshotRef.current = JSON.parse(JSON.stringify(computed));
           if (activeCelda) {
             loadedPltCeldaRef.current = activeCelda.trim().toUpperCase();
+            // Limpiar el delta local: los registros importados ya están en BD
+            clearPltDelta(activeCelda.trim().toUpperCase());
+            removePendingPltCell(activeCelda.trim().toUpperCase());
           }
           setDbOnline(true);
         }
@@ -1492,6 +1507,12 @@ const [dbOnline, setDbOnline] = useState(true);
         setActiveWindow(null);
       }
       clearPendingImport(celda);
+      // Descartar también los ensayos PLT importados pendientes de la celda
+      if (getPendingPltCells().includes(celda)) {
+        clearPltDelta(celda);
+        removePendingPltCell(celda);
+        fetchPltEnsayos(celda, true);
+      }
     } else {
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
@@ -1984,7 +2005,7 @@ const [dbOnline, setDbOnline] = useState(true);
               activeWindowCelda={activeWindow?.header.celda || null}
               showFormulas={showFormulas}
               knownCells={knownCells}
-              onImportToOtherCell={handlePltImportToOtherCell}
+              onImportToCell={handlePltImport}
             />
           )}
 

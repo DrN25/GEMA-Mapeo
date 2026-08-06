@@ -42,6 +42,85 @@ const KEY_HASH = (celda: string) => `geolog_window_snapshot_hash_${celda}`;
 const KEY_PLT = (celda: string) => `plt_ensayos_${celda}`;
 const KEY_UNSAVED = 'geolog_unsaved_windows';
 
+// ---------------------------------------------------------------------------
+// Persistencia de registros PLT importados (delta pendiente por celda)
+// ---------------------------------------------------------------------------
+// Mismo modelo que las ventanas: los registros importados se guardan como
+// DELTA local (solo lo que aún no se sincronizó a BD) y se registra la celda
+// en geolog_plt_pending. Al recargar, el delta se re-hidrata junto a los
+// registros de BD; al guardar, se limpia.
+
+const KEY_PLT_DELTA = (celda: string) => `geolog_plt_delta_${celda}`;
+const KEY_PLT_PENDING = 'geolog_plt_pending';
+
+function getPltPendingList(): string[] {
+  try {
+    const raw = localStorage.getItem(KEY_PLT_PENDING);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Celdas con registros PLT importados aún no sincronizados a BD. */
+export function getPendingPltCells(): string[] {
+  return getPltPendingList();
+}
+
+/** Registra una celda como pendiente de PLT (idempotente). */
+export function addPendingPltCell(celda: string): void {
+  const list = getPltPendingList();
+  if (!list.includes(celda)) {
+    try {
+      localStorage.setItem(KEY_PLT_PENDING, JSON.stringify([...list, celda]));
+    } catch {
+      // ignorar: nunca debe romper el flujo principal
+    }
+  }
+}
+
+/** Quita una celda de la lista de pendientes PLT (idempotente). */
+export function removePendingPltCell(celda: string): void {
+  const list = getPltPendingList();
+  if (list.includes(celda)) {
+    try {
+      localStorage.setItem(KEY_PLT_PENDING, JSON.stringify(list.filter(c => c !== celda)));
+    } catch {
+      // ignorar
+    }
+  }
+}
+
+/** Guarda (reemplaza) el delta de registros PLT importados de una celda. */
+export function savePltDelta(celda: string, rows: any[]): void {
+  try {
+    localStorage.setItem(KEY_PLT_DELTA(celda), JSON.stringify(rows || []));
+  } catch {
+    // ignorar: la persistencia nunca debe romper el flujo principal
+  }
+}
+
+/** Delta de registros PLT importados pendientes de una celda (o []). */
+export function getPltDelta(celda: string): any[] {
+  try {
+    const raw = localStorage.getItem(KEY_PLT_DELTA(celda));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Elimina el delta PLT de una celda (tras sincronizar o descartar). */
+export function clearPltDelta(celda: string): void {
+  try {
+    localStorage.removeItem(KEY_PLT_DELTA(celda));
+  } catch {
+    // ignorar
+  }
+}
+
 /** Claves globales que empiezan con el mismo prefijo que las celdas. */
 const GLOBAL_KEYS = new Set([
   'geolog_window_current_view',
