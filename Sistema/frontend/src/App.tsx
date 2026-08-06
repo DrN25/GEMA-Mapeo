@@ -20,7 +20,7 @@ import DiscardModal from './components/modals/DiscardModal';
 import SaveResultModal from './components/modals/SaveResultModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
-import { fastHashObject } from './utils/hashUtils';
+import { fastHashObject, canonicalEqual } from './utils/hashUtils';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport } from './utils/storageManager';
 import {
   discardLocalCell,
@@ -640,7 +640,11 @@ const [dbOnline, setDbOnline] = useState(true);
       if (!cached) return false;
       try {
         const parsed = JSON.parse(cached);
-        parsed.joints = normalizeJoints(parsed.joints || []);
+        // Normalizar SIEMPRE con el mismo criterio que windowFromServerResponse
+        // (intemperismo del header): si se usa el default 'd', alteracion difiere
+        // del snapshot → hash distinto → la celda se marca pendiente al abrirla
+        // sin tocar nada y el diff muestra cambios que no existen.
+        parsed.joints = normalizeJoints(parsed.joints || [], parsed.header?.intemperia);
         setActiveWindow(parsed);
         const snapshotRaw = localStorage.getItem(`geolog_window_snapshot_${name}`);
         if (snapshotRaw) {
@@ -669,6 +673,26 @@ const [dbOnline, setDbOnline] = useState(true);
         // esa versión es el estado activo y la BD solo es el baseline del diff.
         const cachedLocalRaw = getCachedCellRaw(name);
         const hasLocalPending = isCellPending(name) && !!cachedLocalRaw;
+
+        // Reparación silenciosa de residuos viejos: si el borrador local es
+        // IDÉNTICO a la BD (mismos valores, ignorando formato/orden de keys),
+        // no es un cambio real → se limpia automáticamente para que no marque
+        // la celda como pendiente al abrirla sin haber tocado nada.
+        if (hasLocalPending && cachedLocalRaw) {
+          try {
+            const cachedParsed = JSON.parse(cachedLocalRaw);
+            const cachedNorm: any = {
+              header: cachedParsed.header,
+              joints: normalizeJoints(cachedParsed.joints || [], cachedParsed.header?.intemperia),
+            };
+            if (canonicalEqual(cachedNorm, loadedWindow)) {
+              removePendingCell(name);
+            }
+          } catch {
+            // caché corrupto: se ignora; el flujo normal decide más abajo
+          }
+        }
+
         let activeToUse = loadedWindow;
         if (hasLocalPending && cachedLocalRaw) {
           try {
@@ -1360,6 +1384,13 @@ const [dbOnline, setDbOnline] = useState(true);
         setActiveWindow(parsed);
         safeSetItem(`geolog_window_${celda}`, JSON.stringify(parsed), ctx);
         removePendingCell(celda);
+        // Sincronizar la referencia de hash con el estado restaurado: el efecto de
+        // rastreo compara el hash del caché contra ESTA referencia, y si divergen
+        // (p. ej. referencia vieja o ausente) vuelve a marcar la celda como
+        // pendiente → badge BORRADOR fantasma tras descartar.
+        const restoredHash = fastHashObject(parsed);
+        setDbSnapshotHash(restoredHash);
+        safeSetItem(`geolog_window_snapshot_hash_${celda}`, restoredHash, ctx);
       } else {
         // Borrador local puro: se elimina definitivamente
         discardLocalCell(celda);
@@ -1376,8 +1407,12 @@ const [dbOnline, setDbOnline] = useState(true);
             const ctx = { activeCelda: celda, pendingImports };
             const parsed = JSON.parse(snapshotRaw);
             safeSetItem(`geolog_window_${celda}`, JSON.stringify(parsed), ctx);
+            // Mismo principio que el scope 'active': referencia = estado restaurado.
+            const restoredHash = fastHashObject(parsed);
+            safeSetItem(`geolog_window_snapshot_hash_${celda}`, restoredHash, ctx);
             if (activeWindow && activeWindow.header.celda === celda) {
               setActiveWindow(parsed);
+              setDbSnapshotHash(restoredHash);
             }
           } else {
             // Borrador local puro: no tiene respaldo en BD → eliminar definitivamente

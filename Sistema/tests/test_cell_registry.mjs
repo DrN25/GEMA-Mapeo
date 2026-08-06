@@ -21,9 +21,9 @@ const FRONTEND = path.resolve(TESTS_DIR, '..', 'frontend');
 const CACHE = path.join(TESTS_DIR, '.cache');
 
 // 1. Compilar los módulos TS necesarios a CJS (una sola vez por corrida)
-if (!existsSync(path.join(CACHE, 'utils', 'cellRegistry.js')) || !existsSync(path.join(CACHE, 'utils', 'mandatoryRules.js'))) {
+if (!existsSync(path.join(CACHE, 'utils', 'cellRegistry.js')) || !existsSync(path.join(CACHE, 'utils', 'mandatoryRules.js')) || !existsSync(path.join(CACHE, 'utils', 'hashUtils.js')) || !existsSync(path.join(CACHE, 'utils', 'windowTransform.js'))) {
   execSync(
-    `npx tsc src\\utils\\cellRegistry.ts src\\utils\\storageManager.ts src\\config\\storage.ts src\\utils\\mandatoryRules.ts ` +
+    `npx tsc src\\utils\\cellRegistry.ts src\\utils\\storageManager.ts src\\config\\storage.ts src\\utils\\mandatoryRules.ts src\\utils\\hashUtils.ts src\\utils\\windowTransform.ts src\\utils\\numericPrecision.ts src\\utils\\campaniasCatalog.ts ` +
     `--module commonjs --outDir ${CACHE} --target es2022 --skipLibCheck --esModuleInterop --ignoreConfig --types react`,
     { cwd: FRONTEND, stdio: 'inherit' }
   );
@@ -44,6 +44,8 @@ const require = createRequire(import.meta.url);
 const cr = require(path.join(CACHE, 'utils', 'cellRegistry.js'));
 const sm = require(path.join(CACHE, 'utils', 'storageManager.js'));
 const mr = require(path.join(CACHE, 'utils', 'mandatoryRules.js'));
+const hashUtils = require(path.join(CACHE, 'utils', 'hashUtils.js'));
+const wt = require(path.join(CACHE, 'utils', 'windowTransform.js'));
 
 let passed = 0;
 let failed = 0;
@@ -122,6 +124,84 @@ ok(cr.getInvalidPendingCells().length === 0,
 cr.setCellValidation(CELDA_BD, ['Campo obligatorio vacío']);
 ok(cr.getInvalidPendingCells().length === 1,
   'Celda con 1 VACIO sigue bloqueando el guardado (correcto)');
+
+console.log('\n📋 Bug del badge BORRADOR fantasma tras DESCARTAR (efecto de rastreo por hash)\n');
+
+// --- Simula el flujo: abrir celda de BD, editar, descartar, re-ejecutar el
+// --- efecto de rastreo (App.tsx useEffect que decide addPendingCell/removePendingCell).
+
+// Escenario 1 (BEFORE del fix): la referencia de hash queda vieja/ausente → el
+// efecto de rastreo vuelve a marcar la celda como pendiente aunque caché == snapshot.
+const snapshotBD = JSON.stringify({ header: { celda: CELDA_BD, fecha: '05/08/2026', mapeador: 'P. TEST', largo: 10 } });
+const snapshotHash = hashUtils.fastHashObject(JSON.parse(snapshotBD));
+
+// Celda abierta y editada: caché ≠ snapshot, pendiente
+sm.addPendingCell(CELDA_BD);
+store.set(`geolog_window_${CELDA_BD}`, JSON.stringify(JSON.parse(snapshotBD))); // caché = snapshot (tras descartar)
+// Simular el descarte SIN actualizar la referencia: hash ausente (referencia vieja/null)
+store.delete(`geolog_window_snapshot_hash_${CELDA_BD}`);
+const savedHashViejo = null; // lo que leería el efecto (dbSnapshotHash null o key ausente)
+const activeHash = hashUtils.fastHashObject(JSON.parse(store.get(`geolog_window_${CELDA_BD}`)));
+if (activeHash !== savedHashViejo) { sm.addPendingCell(CELDA_BD); } // lo que hace el efecto 346
+ok(cr.getPendingCellNames().includes(CELDA_BD),
+  'REPRODUCIDO (antes del fix): con referencia vieja/ausente el efecto re-marca pendiente → badge fantasma');
+
+// Escenario 2 (AFTER del fix): el descarte sincroniza la referencia con el estado
+// restaurado → el efecto de rastreo ve hash igual → removePendingCell → badge limpio.
+store.set(`geolog_window_snapshot_hash_${CELDA_BD}`, snapshotHash); // fix: referencia sincronizada
+const savedHashNuevo = snapshotHash;
+if (activeHash !== savedHashNuevo) { sm.addPendingCell(CELDA_BD); } else { sm.removePendingCell(CELDA_BD); } // efecto 346
+ok(!cr.getPendingCellNames().includes(CELDA_BD),
+  'CON el fix: caché == referencia → el efecto remueve la celda → sin badge fantasma');
+
+// Consistencia final: con caché == snapshot, el diff da 0 (botón de descartar oculto) ✓
+ok(cr.getPendingCellNames().length === 0, 'Al final no quedan celdas pendientes fantasma');
+
+console.log('\n📋 Bug "abrir celda sin tocar se marca BORRADOR" (normalización inconsistente de joints)\n');
+
+// --- Los 3 puntos de carga deben normalizar los joints con el MISMO criterio
+// --- (intemperismo del header). windowFromServerResponse usa header.intemperia,
+// --- pero loadCachedLocal usaba el default 'd' → alteracion difería → hash ≠.
+
+const intempHeader = { celda: CELDA_BD, intemperia: 'm', fecha: '05/08/2026' };
+const jointSucio = { familia: 1, distancia: 3, tipo_estructura: 'J', alteracion: '-1', dip: 20 };
+
+// Lo que hace windowFromServerResponse (snapshot): normaliza CON intemperia
+const snapshotJoints = wt.normalizeJoints([jointSucio], intempHeader.intemperia);
+// Lo que hacía loadCachedLocal (bug): normaliza SIN intemperia → default 'd'
+const cacheJointsBug = wt.normalizeJoints([jointSucio]);
+ok(cacheJointsBug[0].alteracion !== snapshotJoints[0].alteracion,
+  `REPRODUCIDO: caché normalizado sin intemperia difiere del snapshot ('${cacheJointsBug[0].alteracion}' vs '${snapshotJoints[0].alteracion}') → hash distinto → BORRADOR al abrir`);
+// Lo que hace el fix: normaliza CON intemperia
+const cacheJointsFix = wt.normalizeJoints([jointSucio], intempHeader.intemperia);
+ok(hashUtils.fastHashObject(cacheJointsFix) === hashUtils.fastHashObject(snapshotJoints),
+  'CON el fix: caché y snapshot se normalizan igual → hash coincide → sin BORRADOR al abrir');
+
+// Idempotencia: re-normalizar lo ya normalizado no cambia nada (estable entre aperturas)
+const reNormalized = wt.normalizeJoints(cacheJointsFix, intempHeader.intemperia);
+ok(hashUtils.fastHashObject(reNormalized) === hashUtils.fastHashObject(cacheJointsFix),
+  'Re-normalizar es idempotente: abrir la celda varias veces no introduce cambios fantasma');
+
+console.log('\n📋 Residuos de sesiones viejas (hash canónico + reparación silenciosa)\n');
+
+// El hash ignora el ORDEN de keys: un caché viejo con keys reordenadas (mismos
+// valores) debe tener el MISMO hash que la BD → no marca pendiente fantasma.
+const reverseKeys = (o) => {
+  const r = {};
+  for (const k of Object.keys(o).reverse()) r[k] = o[k];
+  return r;
+};
+const bd = { header: intempHeader, joints: snapshotJoints };
+const residuoFormato = { header: reverseKeys(intempHeader), joints: snapshotJoints.map(j => reverseKeys(j)) };
+ok(hashUtils.fastHashObject(bd) === hashUtils.fastHashObject(residuoFormato),
+  'Hash canónico: keys reordenadas con los mismos valores → mismo hash (residuo de formato no marca pendiente)');
+ok(hashUtils.canonicalEqual(bd, residuoFormato) === true,
+  'canonicalEqual detecta que el residuo de formato es IDÉNTICO a la BD (→ reparación silenciosa lo limpia)');
+
+// Un cambio REAL de valor NO se confunde con un residuo de formato
+const conCambioReal = { header: { ...intempHeader, unidad_litologica: 'SEDIMENTARIOS' }, joints: snapshotJoints };
+ok(hashUtils.canonicalEqual(bd, conCambioReal) === false,
+  'canonicalEqual NO limpia un cambio real (SEDIMENTARIOS vs SEDIMENTARIAS) → el pendiente es legítimo');
 
 console.log(`\n${passed} pasaron, ${failed} fallaron\n`);
 process.exit(failed === 0 ? 0 : 1);

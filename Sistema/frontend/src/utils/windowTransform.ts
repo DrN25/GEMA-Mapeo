@@ -52,7 +52,11 @@ export function normalizeJoints(loadedJoints: JointRow[], defaultAlt: string = '
         jrc: -1,
         rugosidad: -1,
         forma: '-1',
-        alteracion: '-1'
+        // Mismo criterio que los joints cargados (map de arriba): la fila vacía
+        // toma el defaultAlt. Si quedara '-1', la PRIMERA re-normalización lo
+        // cambiaría a defaultAlt → el hash del caché diferiría del snapshot en
+        // cada apertura → celda marcada BORRADOR sin cambios y diff fantasma.
+        alteracion: defaultAlt
       });
     }
   }
