@@ -201,7 +201,22 @@ export default function VentanaForm({
   // Si hay combinación válida → se deriva del grupo del match.
   // Si la combinación deja de ser válida (litos vacíos, incompletos o inexistentes)
   // → la unidad se limpia, para no confundir al usuario con valores obsoletos.
+  // NO muta el header al montar: si lo hiciera, la celda se marcaría como
+  // pendiente (BORRADOR) sin que el usuario toque nada (el catálogo puede
+  // derivar un grupo distinto al valor guardado en BD).
+  const prevLitoKeyRef = React.useRef<string | null>(null);
+  const litoMountedRef = React.useRef(false);
+
   React.useEffect(() => {
+    const currentLitoKey = JSON.stringify([header.lito_1, header.lito_2, header.lito_3]);
+    if (!litoMountedRef.current) {
+      litoMountedRef.current = true;
+      prevLitoKeyRef.current = currentLitoKey;
+      return;
+    }
+    if (currentLitoKey === prevLitoKeyRef.current) return;
+    prevLitoKeyRef.current = currentLitoKey;
+
     const grupo = litoValidation.matchedItem?.grupo;
     if (grupo && header.unidad_litologica !== grupo) {
       handleChange('unidad_litologica', grupo);
@@ -232,7 +247,20 @@ export default function VentanaForm({
   const headerLargoNum = header.largo !== undefined && header.largo !== null ? Number(header.largo) : NaN;
   const displayLargo = calculatedLargo !== null ? calculatedLargo : (!isNaN(headerLargoNum) && headerLargoNum > 0 ? Math.round(headerLargoNum) : null);
 
+  // NO recalcular el largo al montar: mutar el header en el primer render marca
+  // la celda como pendiente (BORRADOR) sin interacción del usuario. Solo se
+  // recalcula cuando las coordenadas CAMBIAN por interacción del usuario.
+  const prevCoordsKeyRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
+    const coordsKey = `${header.este_from}-${header.norte_from}-${header.cota_from}-${header.este_to}-${header.norte_to}-${header.cota_to}`;
+    if (prevCoordsKeyRef.current === null) {
+      prevCoordsKeyRef.current = coordsKey;
+      return;
+    }
+    if (coordsKey === prevCoordsKeyRef.current) return;
+    prevCoordsKeyRef.current = coordsKey;
+
     if (calculatedLargo !== null) {
       if (Number(header.largo) !== calculatedLargo) {
         handleChange('largo', calculatedLargo);

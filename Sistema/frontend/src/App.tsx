@@ -66,7 +66,7 @@ import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
-import { normalizeJoints, windowFromServerResponse, excelDataToWindowData } from './utils/windowTransform';
+import { normalizeJoints, windowFromServerResponse, excelDataToWindowData, applyDistanceCascade } from './utils/windowTransform';
 export default function App() {
   // Inicializar vista y paginación desde localStorage de forma síncrona para resiliencia ante F5
   const [currentView, setCurrentView] = useState<string>(() => {
@@ -87,7 +87,9 @@ export default function App() {
         const cached = localStorage.getItem(`geolog_window_${activeCelda}`);
         if (cached) {
           const parsed = JSON.parse(cached);
-          parsed.joints = normalizeJoints(parsed.joints || []);
+          // Mismo criterio que windowFromServerResponse/loadCachedLocal: normalizar
+          // con el intemperismo del header para que el hash coincida con el snapshot.
+          parsed.joints = normalizeJoints(parsed.joints || [], parsed.header?.intemperia);
           return parsed;
         }
       }
@@ -417,42 +419,23 @@ const [dbOnline, setDbOnline] = useState(true);
     resetTouchedFields();
   }, [activeWindow?.header?.celda]);
 
-  // Reevaluación en cascada de distancias (m) al largo máximo de la celda
+  // Reevaluación en cascada de distancias (m) al largo máximo de la celda.
+  // La misma política se aplica al snapshot/baseline en handleSelectWindow,
+  // para que caché y snapshot nunca diverjan por este ajuste automático.
+  // IMPORTANTE: el largo se computa FRESCO desde la ventana activa. Usar
+  // `calculated?.largo` aquí era un bug: al cambiar de celda, el efecto corría
+  // con el largo de la celda ANTERIOR (stale) y clampeaba distancias que el
+  // baseline (clampeado con el largo correcto) no tocó → la celda quedaba
+  // pendiente con "cambios de discontinuidad" fantasma e intermitente.
   useEffect(() => {
     if (!activeWindow) return;
 
-    let maxLargo = 0;
-    if (calculated && calculated.largo > 0) {
-      maxLargo = calculated.largo;
-    } else {
-      const ix = parseFloat(String(activeWindow.header.este_from));
-      const iy = parseFloat(String(activeWindow.header.norte_from));
-      const ic = parseFloat(String(activeWindow.header.cota_from));
-      const fx = parseFloat(String(activeWindow.header.este_to));
-      const fy = parseFloat(String(activeWindow.header.norte_to));
-      const fc = parseFloat(String(activeWindow.header.cota_to));
-      const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
-      maxLargo = hasCoords
-        ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
-        : Math.round(Number(activeWindow.header.largo) || 0);
+    const computedLargo = calculateWindowGeomec(activeWindow.header, activeWindow.joints).largo;
+    const adjustedJoints = applyDistanceCascade(activeWindow.header, activeWindow.joints, computedLargo);
+    if (adjustedJoints !== activeWindow.joints) {
+      setActiveWindow(prev => prev ? { ...prev, joints: adjustedJoints } : null);
     }
-
-    if (maxLargo > 0) {
-      const needsAdjustment = activeWindow.joints.some(
-        j => j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo
-      );
-
-      if (needsAdjustment) {
-        const adjustedJoints = activeWindow.joints.map(j => {
-          if (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
-            return { ...j, distancia: maxLargo };
-          }
-          return j;
-        });
-        setActiveWindow(prev => prev ? { ...prev, joints: adjustedJoints } : null);
-      }
-    }
-  }, [activeWindow?.header, calculated?.largo]);
+  }, [activeWindow?.header]);
 
   // Synchronize photo loading from localStorage when the active window celda changes
   useEffect(() => {
@@ -668,6 +651,15 @@ const [dbOnline, setDbOnline] = useState(true);
       if (res.ok) {
         const v = await res.json();
         const loadedWindow = windowFromServerResponse(v);
+        // Aplicar la política de cascada (distancia ≤ largo) al BASELINE antes
+        // de guardarlo como snapshot/hash: así caché y snapshot quedan
+        // consistentes y la celda no se marca pendiente con "cambios de
+        // discontinuidad" solo por el ajuste automático al abrirla.
+        loadedWindow.joints = applyDistanceCascade(
+          loadedWindow.header,
+          loadedWindow.joints,
+          calculateWindowGeomec(loadedWindow.header, loadedWindow.joints).largo
+        );
 
         // Si la celda tiene una versión local con cambios sin guardar (borrador),
         // esa versión es el estado activo y la BD solo es el baseline del diff.
@@ -889,6 +881,13 @@ const [dbOnline, setDbOnline] = useState(true);
           if (res.ok) {
             const v = await res.json();
             const baseline = windowFromServerResponse(v);
+            // Misma política de cascada que handleSelectWindow: el baseline del
+            // import también debe quedar consistente con el caché.
+            baseline.joints = applyDistanceCascade(
+              baseline.header,
+              baseline.joints,
+              calculateWindowGeomec(baseline.header, baseline.joints).largo
+            );
             safeSetItem(`geolog_window_snapshot_${celda}`, JSON.stringify(baseline), ctx);
             safeSetItem(`geolog_window_snapshot_hash_${celda}`, fastHashObject(baseline), ctx);
           }
@@ -1412,6 +1411,7 @@ const [dbOnline, setDbOnline] = useState(true);
             safeSetItem(`geolog_window_snapshot_hash_${celda}`, restoredHash, ctx);
             if (activeWindow && activeWindow.header.celda === celda) {
               setActiveWindow(parsed);
+              setDbSnapshotData(parsed);
               setDbSnapshotHash(restoredHash);
             }
           } else {
@@ -1628,6 +1628,7 @@ const [dbOnline, setDbOnline] = useState(true);
           {currentView === 'mapeo' && activeWindow && (
             <div className="space-y-6 animate-fade-in">
               <VentanaForm
+                key={activeWindow.header.celda}
                 header={activeWindow.header}
                 onChange={(header) => {
                   setActiveWindow({ ...activeWindow, header });

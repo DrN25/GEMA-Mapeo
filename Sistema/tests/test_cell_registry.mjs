@@ -203,5 +203,29 @@ const conCambioReal = { header: { ...intempHeader, unidad_litologica: 'SEDIMENTA
 ok(hashUtils.canonicalEqual(bd, conCambioReal) === false,
   'canonicalEqual NO limpia un cambio real (SEDIMENTARIOS vs SEDIMENTARIAS) → el pendiente es legítimo');
 
+console.log('\n📋 Cascada de distancias (distancia ≤ largo) aplicada también al snapshot\n');
+
+// La cascada ajusta joints con distancia > largo; aplicada al baseline, el
+// caché y el snapshot quedan consistentes → sin "cambios de discontinuidad".
+const headerCascada = { celda: CELDA_BD, intemperia: 'm', largo: 10, este_from: 0, norte_from: 0, cota_from: 0, este_to: 10, norte_to: 0, cota_to: 0 };
+const jointsDesbordados = [
+  { id: 1, familia: 1, distancia: 15, tipo_estructura: 'JN', dip: 30, dip_dir: 100, alteracion: 'm' },
+  { id: 2, familia: 1, distancia: 5, tipo_estructura: 'JN', dip: 40, dip_dir: 200, alteracion: 'm' },
+];
+const cascaded = wt.applyDistanceCascade(headerCascada, jointsDesbordados);
+ok(cascaded[0].distancia === 10, 'distancia 15 > largo 10 → se ajusta a 10');
+ok(cascaded[1].distancia === 5, 'distancia 5 ≤ largo → NO se toca');
+ok(cascaded !== jointsDesbordados, 'Devuelve un array nuevo solo cuando hay ajustes');
+
+// Idempotencia: aplicar la cascada dos veces no cambia nada (estable entre aperturas)
+const cascaded2 = wt.applyDistanceCascade(headerCascada, cascaded);
+ok(hashUtils.fastHashObject(cascaded2) === hashUtils.fastHashObject(cascaded),
+  'Aplicar la cascada de nuevo es idempotente (sin re-marcar al reabrir)');
+
+// Sin ajustes necesarios → devuelve el MISMO array (sin re-render en el efecto)
+const jointsOk = [{ id: 1, familia: 1, distancia: 3, tipo_estructura: 'JN', dip: 30, dip_dir: 100, alteracion: 'm' }];
+ok(wt.applyDistanceCascade(headerCascada, jointsOk) === jointsOk,
+  'Sin desbordes devuelve el mismo array (el efecto no re-renderiza)');
+
 console.log(`\n${passed} pasaron, ${failed} fallaron\n`);
 process.exit(failed === 0 ? 0 : 1);

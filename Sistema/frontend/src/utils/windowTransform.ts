@@ -66,6 +66,55 @@ export function normalizeJoints(loadedJoints: JointRow[], defaultAlt: string = '
 }
 
 /**
+ * Política del sistema en cascada: ninguna distancia de discontinuidad puede
+ * exceder el largo de la celda. Ajusta los joints que la violan.
+ *
+ * Devuelve el MISMO array si no hay nada que ajustar (para evitar re-renders).
+ * Debe aplicarse por igual al estado activo Y al snapshot/baseline, para que
+ * el caché y el snapshot nunca diverjan por esta política (si divergieran,
+ * la celda quedaría marcada pendiente con "cambios de discontinuidad" sin que
+ * el usuario toque nada).
+ *
+ * @param calculatedLargo largo calculado (RMR) si ya está disponible; si no,
+ *        se deriva de las coordenadas o del largo del header (misma lógica
+ *        que el efecto de cascada de App.tsx).
+ */
+export function applyDistanceCascade(
+  header: WindowHeader,
+  joints: JointRow[],
+  calculatedLargo?: number
+): JointRow[] {
+  let maxLargo = 0;
+  if (calculatedLargo !== undefined && calculatedLargo !== null && calculatedLargo > 0) {
+    maxLargo = calculatedLargo;
+  } else {
+    const ix = parseFloat(String(header.este_from));
+    const iy = parseFloat(String(header.norte_from));
+    const ic = parseFloat(String(header.cota_from));
+    const fx = parseFloat(String(header.este_to));
+    const fy = parseFloat(String(header.norte_to));
+    const fc = parseFloat(String(header.cota_to));
+    const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
+    maxLargo = hasCoords
+      ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
+      : Math.round(Number(header.largo) || 0);
+  }
+
+  if (maxLargo <= 0) return joints;
+  const needsAdjustment = (joints || []).some(
+    j => j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo
+  );
+  if (!needsAdjustment) return joints;
+
+  return (joints || []).map(j => {
+    if (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
+      return { ...j, distancia: maxLargo };
+    }
+    return j;
+  });
+}
+
+/**
  * Convierte la respuesta del GET /api/ventanas/{codigo} al formato interno
  * WindowData (header + joints normalizados). Se reutiliza al abrir una celda
  * y al importar celdas duplicadas (baseline del diff).
