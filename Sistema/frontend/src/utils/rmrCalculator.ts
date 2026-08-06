@@ -222,17 +222,17 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const dy = (header.norte_to ?? 0) - (header.norte_from ?? 0);
   const dz = (header.cota_to ?? 0) - (header.cota_from ?? 0);
 
-  let largo = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  let largoExact = Math.sqrt(dx * dx + dy * dy + dz * dz);
   const isCoordsValid = [header.este_from, header.norte_from, header.cota_from, header.este_to, header.norte_to, header.cota_to].every(c => c !== undefined && c !== null && !isNaN(c) && c !== 0);
-  if (!isCoordsValid || largo <= 0) {
-    largo = typeof header.largo === 'string' ? parseFloat(header.largo) : (header.largo || 0.0);
-    if (isNaN(largo)) largo = 0;
+  if (!isCoordsValid || largoExact <= 0) {
+    largoExact = typeof header.largo === 'string' ? parseFloat(header.largo) : (header.largo || 0.0);
+    if (isNaN(largoExact)) largoExact = 0;
   }
-  largo = Math.round(largo);
+  const largo = Math.round(largoExact);
 
-  const dip_hole = largo > 0 && isCoordsValid ? Math.asin(((header.cota_from ?? 0) - (header.cota_to ?? 0)) / largo) * (180 / Math.PI) : 0;
+  const dip_hole = largoExact > 0 && isCoordsValid ? Math.asin(((header.cota_from ?? 0) - (header.cota_to ?? 0)) / largoExact) * (180 / Math.PI) : 0;
 
-  let az_hole = largo > 0 && isCoordsValid ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
+  let az_hole = largoExact > 0 && isCoordsValid ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
   if (az_hole < 0) az_hole += 360;
 
   const dip_dir_talud = HOLE_AUTO

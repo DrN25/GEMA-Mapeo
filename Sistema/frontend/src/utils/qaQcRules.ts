@@ -605,6 +605,20 @@ const RULES: QaQcRuleDef[] = [
       return n < 0 ? 'El espaciamiento de la junta no puede ser negativo.' : null;
     },
   },
+  {
+    id: 'ESPACIAMIENTO_EXCEDE_LARGO',
+    severity: 'CRITICA',
+    enabled: true,
+    fieldId: 'joint-espaciamiento',
+    section: 'DISCONTINUIDADES',
+    evalua: (ctx, row) => {
+      const n = num(row?.espaciamiento);
+      if (n === null || n === -1) return null;
+      return n > ctx.largoEntero
+        ? `El espaciamiento (${n}m) supera el largo de la celda (${ctx.largoEntero}m).`
+        : null;
+    },
+  },
 
   // ============ B13/B14. JRC y RUGOSIDAD (catálogo) ============
   {

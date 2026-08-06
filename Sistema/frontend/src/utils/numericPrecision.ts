@@ -23,7 +23,7 @@ export const NUMERIC_PRECISION: Record<string, FieldPrecision> = {
   // ===================== Ensayos PLT (plt.EnsayoPLT) =====================
   este:                { storage: 4, display: 4, intDigits: 6 },  // BD (10,4)
   norte:               { storage: 4, display: 4, intDigits: 7 },  // BD (11,4)
-  elevacion:           { storage: 2, display: 2, intDigits: 4 },  // BD (8,2)
+  elevacion:           { storage: 3, display: 3, intDigits: 4 },  // BD (8,2)
   espesor_d:           { storage: 2, display: 1, intDigits: 4 },  // BD (5,2)
   nivel:               { storage: 2, display: 2, intDigits: 4 },  // BD String; clamp 4999
   longitud_l:          { storage: 2, display: 2, intDigits: 5 },  // BD (6,2)
@@ -44,8 +44,8 @@ export const NUMERIC_PRECISION: Record<string, FieldPrecision> = {
   este_to:             { storage: 3, display: 3, intDigits: 6 },  // BD (12,3) · UI 3 ✓
   norte_from:          { storage: 3, display: 3, intDigits: 7 },  // BD (12,3)
   norte_to:            { storage: 3, display: 3, intDigits: 7 },  // BD (12,3)
-  cota_from:           { storage: 3, display: 2, intDigits: 4 },  // BD (8,3)
-  cota_to:             { storage: 3, display: 2, intDigits: 4 },  // BD (8,3)
+  cota_from:           { storage: 3, display: 3, intDigits: 4 },  // BD (8,3)
+  cota_to:             { storage: 3, display: 3, intDigits: 4 },  // BD (8,3)
   largo:               { storage: 3, display: 3, intDigits: 8 },  // BD (8,3)
   altura:              { storage: 3, display: 1, intDigits: 2 },  // BD (8,3)
   dip_hw:              { storage: 2, display: 2, intDigits: 3 },  // BD (5,2)

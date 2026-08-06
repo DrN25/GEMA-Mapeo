@@ -117,15 +117,20 @@ export function applyDistanceCascade(
 
   if (maxLargo <= 0) return joints;
   const needsAdjustment = (joints || []).some(
-    j => j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo
+    j => (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) ||
+         (j.espaciamiento !== undefined && j.espaciamiento !== -1 && j.espaciamiento !== null && j.espaciamiento > maxLargo)
   );
   if (!needsAdjustment) return joints;
 
   return (joints || []).map(j => {
+    let updated = j;
     if (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
-      return { ...j, distancia: maxLargo };
+      updated = { ...updated, distancia: maxLargo };
     }
-    return j;
+    if (j.espaciamiento !== undefined && j.espaciamiento !== -1 && j.espaciamiento !== null && j.espaciamiento > maxLargo) {
+      updated = { ...updated, espaciamiento: maxLargo };
+    }
+    return updated;
   });
 }
 
