@@ -43,17 +43,17 @@ export let FORMA_CATALOG: Record<string, string> = {
  * SUMA de ambos ejes: [sup.min + est.min, min(85, sup.max + est.max)].
  */
 export let GSI_SUPERFICIE_CATALOG: Record<string, { termino: string; desc: string; min: number; max: number }> = {
-  VG: { termino: "VERY GOOD", desc: "Superficies muy rugosas, frescas y no intemperizadas.", min: 36, max: 45 },
-  G:  { termino: "GOOD",      desc: "Superficies rugosas, ligeramente intemperizadas y con manchas de hierro.", min: 27, max: 36 },
-  F:  { termino: "FAIR",      desc: "Superficies lisas, moderadamente intemperizadas y alteradas.", min: 18, max: 27 },
-  P:  { termino: "POOR",      desc: "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos compactos o rellenos de fragmentos angulares.", min: 9, max: 18 },
-  VP: { termino: "VERY POOR", desc: "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos o rellenos de arcilla blanda.", min: 0, max: 9 },
+  VG: { termino: "Muy Buena", desc: "Superficies muy rugosas, frescas y no intemperizadas.", min: 36, max: 45 },
+  G:  { termino: "Buena",     desc: "Superficies rugosas, ligeramente intemperizadas y con manchas de hierro.", min: 27, max: 36 },
+  F:  { termino: "Regular",   desc: "Superficies lisas, moderadamente intemperizadas y alteradas.", min: 18, max: 27 },
+  P:  { termino: "Pobre",     desc: "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos compactos o rellenos de fragmentos angulares.", min: 9, max: 18 },
+  VP: { termino: "Muy Pobre", desc: "Superficies con espejo de falla (slickensided), altamente intemperizadas con recubrimientos o rellenos de arcilla blanda.", min: 0, max: 9 },
 };
 export let GSI_ESTRUCTURA_CATALOG: Record<string, { termino: string; desc: string; min: number; max: number }> = {
-  B:  { termino: "BLOCKY",                   desc: "Masa rocosa inalterada y bien intertrabada, formada por bloques cúbicos constituidos por tres familias de juntas que se intersectan.", min: 30, max: 40 },
-  VB: { termino: "VERY BLOCKY",               desc: "Masa rocosa intertrabada y parcialmente perturbada, con bloques angulares multifacéticos formados por 4 o más familias de juntas.", min: 20, max: 30 },
-  BD: { termino: "BLOCKY, DISTURBED / SEAMY", desc: "Plegada con bloques angulares formados por muchas familias de juntas que se intersectan. Persistencia de planos de estratificación o esquistosidad.", min: 10, max: 20 },
-  D:  { termino: "DISINTEGRATED",             desc: "Masa rocosa pobremente intertrabada y fuertemente rota, con una mezcla de fragmentos de roca angulares y redondeados.", min: 0, max: 10 },
+  B:  { termino: "Blocosa",                        desc: "Masa rocosa inalterada y bien intertrabada, formada por bloques cúbicos constituidos por tres familias de juntas que se intersectan.", min: 30, max: 40 },
+  VB: { termino: "Muy Blocosa",                    desc: "Masa rocosa intertrabada y parcialmente perturbada, con bloques angulares multifacéticos formados por 4 o más familias de juntas.", min: 20, max: 30 },
+  BD: { termino: "Blocosa, Alterada/Con Costuras", desc: "Plegada con bloques angulares formados por muchas familias de juntas que se intersectan. Persistencia de planos de estratificación o esquistosidad.", min: 10, max: 20 },
+  D:  { termino: "Desintegrada",                     desc: "Masa rocosa pobremente intertrabada y fuertemente rota, con una mezcla de fragmentos de roca angulares y redondeados.", min: 0, max: 10 },
 };
 
 export interface ResolvedKResult {

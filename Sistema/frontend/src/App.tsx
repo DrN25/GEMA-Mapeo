@@ -298,8 +298,12 @@ const [dbOnline, setDbOnline] = useState(true);
         setDbOnline(true);
         setBootAttempt(0);
         setBootFailed(false);
-        setSyncStatus('synced');
-        setSyncMessage('Conectado al servidor de base de datos SQL Server.');
+        // No pisar 'unsaved' si hay cambios pendientes (ventana o PLT): el
+        // estado de sincronización lo gestiona el efecto reactivo.
+        if (!hasPendingRef.current) {
+          setSyncStatus('synced');
+          setSyncMessage('Conectado al servidor de base de datos SQL Server.');
+        }
         fetchWindows();
       } catch (err) {
         console.error("Error loading geomechanical catalogs:", err);
@@ -453,9 +457,14 @@ const [dbOnline, setDbOnline] = useState(true);
   }, [activeWindow?.header?.celda]);
 
   // Actualización reactiva del estado de sincronización (amarillo / verde)
+  // hasPendingRef: espejo SIEMPRE actual del estado pendiente (ventana + PLT),
+  // para que los async (fetchWindows/catálogos) no lean valores STALE de un
+  // closure anterior al decidir si pisan 'unsaved' (regla: inputs frescos).
+  const hasPendingRef = useRef(false);
   useEffect(() => {
     const hasWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
     const hasPltChanges = pltDiffSummary.totalChanges > 0;
+    hasPendingRef.current = hasWindowChanges || hasPltChanges;
     if (hasWindowChanges || hasPltChanges) {
       setSyncStatus('unsaved');
       setSyncMessage('Cambios pendientes por sincronizar en SQL Server.');
@@ -633,8 +642,15 @@ const [dbOnline, setDbOnline] = useState(true);
         setTotalPages(data.total_pages);
         setPage(data.page);
         setDbOnline(true);
-        setSyncStatus('synced');
-        setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} páginas.`);
+        // No pisar 'unsaved': el estado de sincronización lo gestiona el efecto
+        // reactivo según los diffs (ventana + PLT). fetchWindows corre al montar
+        // y al aplicar filtros; un 'synced' incondicional desactivaría el botón
+        // de guardar aunque haya cambios pendientes (p. ej. registros PLT
+        // importados y persistidos en localStorage).
+        if (!hasPendingRef.current) {
+          setSyncStatus('synced');
+          setSyncMessage(`${data.total_filtered.toLocaleString()} celdas en ${data.page}/${data.total_pages} páginas.`);
+        }
         return data;
       } else {
         throw new Error();
@@ -727,14 +743,19 @@ const [dbOnline, setDbOnline] = useState(true);
    */
   const handlePltImport = async (celda: string, rows: any[]) => {
     if (!celda || !Array.isArray(rows) || rows.length === 0) return;
+    // Computar los campos derivados (muestra_valida_*, diam_equiv, f, is, is50,
+    // ucs, resistencia) ANTES de entrar al estado: la validación QA/QC los exige
+    // y el resto del sistema (fetch BD, grilla) siempre trabaja con filas
+    // computadas. Sin esto, las filas importadas nunca podrían guardarse.
+    const computedRows = rows.map((r: any) => applyPltFormulas(r));
     const isOtherCell = activeWindow?.header.celda !== celda;
     if (isOtherCell) {
       await handleSelectWindow(celda);
       await fetchPltEnsayos(celda, true);
       setCurrentView('plt_ensayos');
     }
-    setPltEnsayos(prev => [...prev, ...rows]);
-    savePltDelta(celda, [...getPltDelta(celda), ...rows]);
+    setPltEnsayos(prev => [...prev, ...computedRows]);
+    savePltDelta(celda, [...getPltDelta(celda), ...computedRows]);
     addPendingPltCell(celda);
   };
 
@@ -836,7 +857,11 @@ const [dbOnline, setDbOnline] = useState(true);
 
         fetchPltEnsayos(name);
         setDbOnline(true);
-        setSyncStatus('synced');
+        if (!hasPendingRef.current) {
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('unsaved');
+        }
         setCurrentView('mapeo');
         setSelectedRowIndex(0);
         return;
@@ -847,8 +872,12 @@ const [dbOnline, setDbOnline] = useState(true);
         // El estado de sincronización lo recalcula el efecto reactivo.
         const loaded = loadCachedLocal();
         if (!loaded) {
-          setSyncStatus('synced');
-          setSyncMessage('SQL Server Conectado.');
+          if (!hasPendingRef.current) {
+            setSyncStatus('synced');
+            setSyncMessage('SQL Server Conectado.');
+          } else {
+            setSyncStatus('unsaved');
+          }
         }
         setCurrentView('mapeo');
         return;
@@ -937,12 +966,16 @@ const [dbOnline, setDbOnline] = useState(true);
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { method: 'DELETE' });
-      if (res.ok) {
-        setDbOnline(true);
-        setSyncStatus('synced');
-        setSyncMessage(`Celda ${name} eliminada con éxito.`);
-        fetchWindows();
+         const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { method: 'DELETE' });
+         if (res.ok) {
+           setDbOnline(true);
+           if (!hasPendingRef.current) {
+             setSyncStatus('synced');
+             setSyncMessage(`Celda ${name} eliminada con éxito.`);
+           } else {
+             setSyncStatus('unsaved');
+           }
+           fetchWindows();
       } else {
         throw new Error();
       }
@@ -1063,11 +1096,15 @@ const [dbOnline, setDbOnline] = useState(true);
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Error al renombrar la celda en el servidor.");
       }
-      setDbOnline(true);
-      setSyncStatus('synced');
-      setSyncMessage(`Celda renombrada a '${cleanNewName}' en SQL Server.`);
-    } catch (err) {
-      console.warn("Backend rename offline or failed, applying local snapshot migration:", err);
+        setDbOnline(true);
+        if (!hasPendingRef.current) {
+          setSyncStatus('synced');
+          setSyncMessage(`Celda renombrada a '${cleanNewName}' en SQL Server.`);
+        } else {
+          setSyncStatus('unsaved');
+        }
+      } catch (err) {
+        console.warn("Backend rename offline or failed, applying local snapshot migration:", err);
       setSyncStatus('offline');
       setDbOnline(false);
       setSyncMessage(`Celda renombrada localmente a '${cleanNewName}'.`);
@@ -1493,10 +1530,14 @@ const [dbOnline, setDbOnline] = useState(true);
       }
     }
 
-    setIsLoadingWindow(false);
-    setSyncStatus('synced');
-    setSyncMessage(`${successCount} celda(s) sincronizadas con SQL Server.`);
-    fetchWindows();
+      setIsLoadingWindow(false);
+      if (!hasPendingRef.current) {
+        setSyncStatus('synced');
+        setSyncMessage(`${successCount} celda(s) sincronizadas con SQL Server.`);
+      } else {
+        setSyncStatus('unsaved');
+      }
+      fetchWindows();
 
     setSaveResultData({
       savedCount: successCount,
