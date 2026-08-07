@@ -18,6 +18,15 @@ import { ratingDiscretoRqd, ratingContinuoRqd, ratingDiscretoResistencia, rating
  */
 export const HOLE_AUTO = true;
 
+/**
+ * GSI Visual: cuando GSI_VISUAL_AUTO = true el campo es SOLO autocalculado
+ * (read-only, igual que dip/az/dipdir). El valor sugerido se muestra en vivo,
+ * se envía en el payload de guardado y lo valida el QA/QC (regla
+ * GSI_VISUAL_RANGO). El header conserva el valor de BD (no se muta en
+ * montaje → sin riesgo de divergencia caché/snapshot).
+ */
+export const GSI_VISUAL_AUTO = true;
+
 export interface JointRow {
   id: number;
   /** EstructuraID real en BD (null/undefined = fila nueva local sin persistir). */

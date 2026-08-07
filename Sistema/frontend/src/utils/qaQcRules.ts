@@ -17,7 +17,7 @@ import type { JointRow, WindowHeader } from './rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION } from './catalogData';
 import { isFieldTouched, markFieldTouched } from './qaQcTouch';
 import { getCampaniaYear } from './campaniasCatalog';
-import { gsiVisualRange } from './rmrCalculator';
+import { gsiVisualRange, GSI_VISUAL_AUTO, suggestGsiVisual, calculateWindowGeomec } from './rmrCalculator';
 
 export type QaQcSeverity = 'CRITICA' | 'ADVERTENCIA';
 
@@ -716,11 +716,18 @@ const RULES: QaQcRuleDef[] = [
     global: true,
     fieldId: 'header-gsi_visual',
     section: 'ANÁLISIS RMR & GSI',
-    evalua: ({ header }) => {
+    evalua: ({ header, joints }) => {
       const est = String(header.gsi_estructura || '').trim().toUpperCase();
       const sup = String(header.gsi_superficie || '').trim().toUpperCase();
-      const n = num(header.gsi_visual);
-      if (n === null) return null;
+      // Con GSI_VISUAL_AUTO el valor es SIEMPRE la sugerencia derivada por
+      // fórmula (la que se muestra y se envía al guardar); con manual, el header.
+      const n = GSI_VISUAL_AUTO
+        ? (() => {
+            const c = calculateWindowGeomec(header, joints);
+            return suggestGsiVisual(c.rqd_est, c.condicion_rating_89);
+          })()
+        : num(header.gsi_visual);
+      if (n === null || n === undefined) return null;
       // La regla solo aplica si ambas condiciones (estructura y superficie)
       // tienen valor y corresponden al catálogo GSI.
       const rango = gsiVisualRange(est, sup);

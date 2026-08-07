@@ -52,6 +52,8 @@ import { initCatalogs } from './utils/catalogData';
 
 import {
   calculateWindowGeomec,
+  suggestGsiVisual,
+  GSI_VISUAL_AUTO,
   type WindowHeader,
   type JointRow,
   type CalculatorResult
@@ -1439,7 +1441,7 @@ const [dbOnline, setDbOnline] = useState(true);
           resistencia_codigo: (winData.header.resistencia_ucs && winData.header.resistencia_ucs !== '-1') ? winData.header.resistencia_ucs : null,
           gsi_estructura: (winData.header.gsi_estructura && winData.header.gsi_estructura !== '-1') ? winData.header.gsi_estructura : null,
           gsi_superficie: (winData.header.gsi_superficie && winData.header.gsi_superficie !== '-1') ? winData.header.gsi_superficie : null,
-          gsi_visual: winData.header.gsi_visual || null,
+          gsi_visual: GSI_VISUAL_AUTO ? (suggestGsiVisual(winCalc.rqd_est, winCalc.condicion_rating_89) ?? null) : (winData.header.gsi_visual || null),
           control_estructural: winData.header.control_estructural || null,
           efectos_voladura: winData.header.efectos_voladura || null,
           ucs_mpa: winData.header.ucs_mpa || null,

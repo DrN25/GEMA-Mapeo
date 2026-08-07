@@ -114,7 +114,8 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
     resistencia_ucs: true,
     is50_mpa: true,
     gsi_superficie: true,
-    gsi_visual: true,
+    // gsi_visual NO es obligatorio de forma directa: con GSI_VISUAL_AUTO=true
+    // siempre se deriva por fórmula (suggestGsiVisual) y se envía en el payload.
     gsi_estructura: true,
     control_estructural: true,
     efectos_voladura: true
