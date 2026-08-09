@@ -66,3 +66,20 @@ def test_admin_list_users_protected():
     assert isinstance(users, list)
     assert len(users) >= 1
     assert any(u["usuario"] == "ADMIN" for u in users)
+
+
+def test_change_password_endpoint():
+    login_resp = client.post(
+        "/api/auth/login",
+        json={"username_or_email": "ADMIN", "password": "Admin2026!"}
+    )
+    token = login_resp.json()["access_token"]
+
+    # Probar con contraseña actual incorrecta -> 400
+    bad_resp = client.post(
+        "/api/auth/change-password",
+        json={"old_password": "WrongPassword", "new_password": "NewAdminPass2026!"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert bad_resp.status_code == 400
+    assert "correcta" in bad_resp.json()["detail"]

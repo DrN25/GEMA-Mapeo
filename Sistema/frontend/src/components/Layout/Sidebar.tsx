@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Home, Map, TrendingUp, Share2, Moon, Sun, FileSpreadsheet, Users, LogOut, ShieldAlert } from 'lucide-react';
+import { Home, Map, TrendingUp, Share2, Moon, Sun, FileSpreadsheet, Users, LogOut, ShieldAlert, Key } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 
 interface SidebarProps {
   currentView: string;
@@ -21,6 +22,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Home / Dashboard', icon: Home, category: 'GENERAL' },
@@ -119,14 +121,25 @@ export default function Sidebar({
                 </div>
               </div>
 
-              <button
-                onClick={() => setShowLogoutModal(true)}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all active:scale-95 shadow-sm"
-                title="Cerrar Sesión del Sistema"
-              >
-                <LogOut size={14} />
-                <span>Cerrar Sesión</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowChangePasswordModal(true)}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+                  title="Cambiar Mi Contraseña"
+                >
+                  <Key size={13} />
+                  <span>Contraseña</span>
+                </button>
+
+                <button
+                  onClick={() => setShowLogoutModal(true)}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
+                  title="Cerrar Sesión del Sistema"
+                >
+                  <LogOut size={13} />
+                  <span>Salir</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -176,6 +189,12 @@ export default function Sidebar({
           </div>
         </div>
       )}
+
+      {/* Modal Cambiar Mi Contraseña */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+      />
     </>
   );
 }

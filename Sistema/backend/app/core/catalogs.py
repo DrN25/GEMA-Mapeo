@@ -529,7 +529,7 @@ GSI_SUPERFICIE_DISPLAY_CATALOG = [
 # D19. GSI — ESTRUCTURA (eje Y de la gráfica Hoek-Brown; 40 unidades / 4 filas = 10/fila)
 GSI_ESTRUCTURA_DISPLAY_CATALOG = [
     {"codigo": "B",  "termino": "Blocosa",      "desc": "Masa rocosa inalterada y bien intertrabada, formada por bloques cúbicos constituidos por tres familias de juntas que se intersectan.", "min": 30, "max": 40},
-    {"codigo": "VB", "termino": "Muy Blocosa",  "desc": "Masa rocosa intertrabada y parcialmente perturbada, con bloques angulares multifacéticos formados por 4 o más familias de juntas.", "min": 20, "max": 30},
+    {"codigo": "VB", "termino": "Muy Blocosa",  "des|c": "Masa rocosa intertrabada y parcialmente perturbada, con bloques angulares multifacéticos formados por 4 o más familias de juntas.", "min": 20, "max": 30},
     {"codigo": "BD", "termino": "Blocosa, Alterada/Con Costuras", "desc": "Plegada con bloques angulares formados por muchas familias de juntas que se intersectan. Persistencia de planos de estratificación o esquistosidad.", "min": 10, "max": 20},
     {"codigo": "D",  "termino": "Desintegrada", "desc": "Masa rocosa pobremente intertrabada y fuertemente rota, con una mezcla de fragmentos de roca angulares y redondeados.", "min": 0, "max": 10},
 ]
