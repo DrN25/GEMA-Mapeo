@@ -355,3 +355,71 @@ class VentanasPaginatedResponse(BaseModel):
     page_size: int = 20
     total_pages: int = 1
     kpis: VentanasKPISchema = VentanasKPISchema()
+
+
+# ============================================================================
+# AUTENTICACIÓN Y GESTIÓN DE USUARIOS SCHEMAS
+# ============================================================================
+
+class LoginSchema(BaseModel):
+    username_or_email: str
+    password: str
+
+
+class RoleOutSchema(BaseModel):
+    rol_id: int
+    nombre: str
+    descripcion: Optional[str] = None
+    estado: str
+
+    class Config:
+        from_attributes = True
+
+
+class UserOutSchema(BaseModel):
+    usuario_id: int
+    usuario: str
+    email: str
+    nombre_completo: Optional[str] = None
+    rol_id: int
+    rol_nombre: str
+    geotecnico_id: Optional[int] = None
+    estado: str
+    ultimo_acceso: Optional[datetime] = None
+    fecha_registro: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TokenResponseSchema(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOutSchema
+
+
+class UserCreateSchema(BaseModel):
+    usuario: str
+    email: str
+    password: str
+    nombre_completo: Optional[str] = None
+    rol_id: int
+    geotecnico_id: Optional[int] = None
+
+
+class UserUpdateSchema(BaseModel):
+    usuario: Optional[str] = None
+    nombre_completo: Optional[str] = None
+    email: Optional[str] = None
+    rol_id: Optional[int] = None
+    geotecnico_id: Optional[int] = None
+    password: Optional[str] = None
+
+
+class UserStatusSchema(BaseModel):
+    estado: str  # 'A', 'I', '*'
+
+
+class ChangePasswordSchema(BaseModel):
+    old_password: str
+    new_password: str

@@ -24,6 +24,8 @@ from sqlalchemy import func, or_, case
 from app.database import get_db
 from app import models, schemas, calculator
 from app.core.catalogs import LITHOLOGY_CLASSIFICATION
+from app.core.audit import apply_audit
+from app.auth.dependencies import require_role
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -756,7 +758,11 @@ def get_ventana(codigo: str, db: Session = Depends(get_db)):
 
 
 @router.post("/ventanas")
-def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db)):
+def save_ventana(
+    data: schemas.VentanaSaveSchema,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
+):
     code_up = data.codigo.strip().upper()
     resolver = GEMACatalogResolver(db)
 
@@ -806,6 +812,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         v.alteracion = raw_alt_zona.lower().strip() if raw_alt_zona else None
         v.fase = data.fase
         v.geotecnico_id = geotecnico_id
+        apply_audit(v, current_user, is_new=False)
         db.flush()
     else:
         raw_alt_zona = data.alteracion or data.altura_mapeo or data.alteracion_codigo
@@ -827,6 +834,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             fase=data.fase,
             geotecnico_id=geotecnico_id,
         )
+        apply_audit(v, current_user, is_new=True)
         db.add(v)
         db.flush()
 
@@ -855,12 +863,6 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
             return "c"
         return v_clean
 
-    # Upsert de discontinuidades: las que vienen con EstructuraID real se
-    # ACTUALIZAN en su mismo registro (no se recrean, preservando cualquier
-    # columna futura); si no viene id pero coincide el NumeroEstructura, se
-    # actualiza por posición (clave natural, evita colisión con el UNIQUE
-    # UQ_EstructurasGeo_VentanaNumero); las nuevas se insertan; las existentes
-    # que ya no vienen en la lista se eliminan (el usuario las borró localmente).
     existing_map = {e.estructura_id: e for e in v.discontinuidades}
     existing_by_num = {e.numero_estructura: e for e in v.discontinuidades}
     incoming_ids = set()
@@ -872,12 +874,14 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         fam_computed = math.ceil(idx / 3.0)
 
         e = None
+        is_new_struct = False
         if d.estructura_id and d.estructura_id in existing_map:
             e = existing_map[d.estructura_id]
         elif idx in existing_by_num:
             e = existing_by_num[idx]
         if e is None:
             e = models.EstructuraGeologica(ventana_id=v.ventana_id)
+            is_new_struct = True
             db.add(e)
         if e.estructura_id:
             incoming_ids.add(e.estructura_id)
@@ -898,6 +902,7 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
         e.rugosidad_estructura = str(d.rug) if d.rug is not None and str(d.rug) not in ("-1", "-1.0") else None
         e.forma_estructura = d.forma if d.forma and str(d.forma) not in ("-1", "-1.0") else None
         e.alteracion = d.alt if d.alt and str(d.alt) not in ("-1", "-1.0") else None
+        apply_audit(e, current_user, is_new=is_new_struct)
 
     for old_id, e in existing_map.items():
         if old_id not in incoming_ids:
@@ -911,7 +916,11 @@ def save_ventana(data: schemas.VentanaSaveSchema, db: Session = Depends(get_db))
 
 
 @router.delete("/ventanas/{codigo}")
-def delete_ventana(codigo: str, db: Session = Depends(get_db)):
+def delete_ventana(
+    codigo: str,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
+):
     code_up = codigo.strip().upper()
     v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if not v:

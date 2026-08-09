@@ -13,6 +13,8 @@ from app.routers.ventanas import GEMACatalogResolver, serialize_ventana, get_db,
 from app.utils.validator import get_row_val, sanitize_value
 from app.core.catalogs import infer_lithology_from_lito3
 from app.parsers.excel_a import detect_format, parse_excel_a, normalize_station_to_celda
+from app.core.audit import apply_audit
+from app.auth.dependencies import require_role
 
 router = APIRouter()
 
@@ -581,7 +583,11 @@ class ImportExecuteSchema(BaseModel):
 
 
 @router.post("/importar-excel/ejecutar")
-def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get_db)):
+def execute_import_excel(
+    payload: ImportExecuteSchema,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
+):
     """
     Guarda masivamente en la base de datos SQL Server las celdas seleccionadas
     y renombradas desde la previsualización del usuario.
@@ -628,10 +634,12 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
 
         # Buscar si ya existe la ventana en la base de datos
         existing_v = db.query(models.Ventana).filter_by(codigo_celda=code_final).first()
+        is_new_v = True
         if existing_v:
             if payload.overwrite_duplicates:
                 # Modo SOBREESCRIBIR: actualizar celda existente y limpiar discontinuidades anteriores
                 v = existing_v
+                is_new_v = False
                 for old_est in list(v.discontinuidades):
                     db.delete(old_est)
             else:
@@ -714,6 +722,8 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
         v.condicion_discontinuidad_valor_rmr89 = clean_num(h.get("condicion_discontinuidad_valor_rmr89"))
         v.rmr89_total = clean_num(h.get("rmr_89"))
 
+        apply_audit(v, current_user, is_new=is_new_v)
+
         # Eliminar viejas estructuras si existía
         for old_est in list(v.discontinuidades):
             db.delete(old_est)
@@ -759,6 +769,7 @@ def execute_import_excel(payload: ImportExecuteSchema, db: Session = Depends(get
                 alteracion=s.get("alteracion_codigo"),
                 familia_id=fam_id
             )
+            apply_audit(est, current_user, is_new=True)
             db.add(est)
             estructuras_creadas += 1
 

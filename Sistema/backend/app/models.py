@@ -331,3 +331,41 @@ class EnsayoPLT(Base):
     tipo_litologico = Column("TipoLitologico", String(20), nullable=True)
     nivel = Column("Nivel", String(50), nullable=True)
     sector_geotecnico_id = Column("SectorGeotecnicoID", Integer, nullable=True)
+
+
+# ============================================================================
+# ESQUEMA DE AUTENTICACIÓN Y ROLES: auth.Roles y auth.Usuarios
+# ============================================================================
+
+class Role(Base):
+    __tablename__ = "Roles"
+    __table_args__ = {"schema": "auth"}
+
+    rol_id = Column("RolID", Integer, primary_key=True)
+    nombre = Column("Nombre", String(50), nullable=False, unique=True)
+    descripcion = Column("Descripcion", String(200), nullable=True)
+    estado = Column("Estado", String(1), nullable=False, default="A")
+
+    usuarios = relationship("Usuario", back_populates="rol")
+
+
+class Usuario(Base):
+    __tablename__ = "Usuarios"
+    __table_args__ = {"schema": "auth"}
+
+    usuario_id = Column("UsuarioID", Integer, primary_key=True)
+    usuario = Column("Usuario", String(50), nullable=False, unique=True)
+    email = Column("Email", String(200), nullable=False, unique=True)
+    contrasena_hash = Column("ContrasenaHash", String(255), nullable=False)
+    nombre_completo = Column("NombreCompleto", String(150), nullable=True)
+    rol_id = Column("RolID", Integer, ForeignKey("auth.Roles.RolID"), nullable=False)
+    geotecnico_id = Column("GeotecnicoID", Integer, ForeignKey("dbo.Geotecnicos.GeotecnicoID"), nullable=True)
+    estado = Column("Estado", String(1), nullable=False, default="A")
+    ultimo_acceso = Column("UltimoAcceso", DateTime, nullable=True)
+    fecha_registro = Column("FechaRegistro", DateTime, nullable=False, default=func.getdate())
+    usuario_registro = Column("UsuarioRegistro", String(100), nullable=True)
+    fecha_modificacion = Column("FechaModificacion", DateTime, nullable=True)
+    usuario_modificacion = Column("UsuarioModificacion", String(100), nullable=True)
+
+    rol = relationship("Role", back_populates="usuarios")
+    geotecnico = relationship("Geotecnico")

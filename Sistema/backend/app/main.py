@@ -35,7 +35,11 @@ from app.routers.comparativo import router as comparativo_router
 from app.routers.catalogs import router as catalogs_router
 from app.routers.congruencia import router as congruencia_router
 from app.routers.importador import router as importador_router
+from app.auth.router import router as auth_router
+from app.routers.admin import router as admin_router
 
+app.include_router(auth_router, prefix="/api/auth", tags=["Autenticación"])
+app.include_router(admin_router, prefix="/api/admin", tags=["Administración de Usuarios"])
 app.include_router(ventanas_router, prefix="/api", tags=["Ventanas"])
 app.include_router(plt_router, prefix="/api", tags=["Ensayos PLT"])
 app.include_router(auditoria_router, prefix="/api", tags=["Auditoría Geotécnica Masiva"])

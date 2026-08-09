@@ -8,6 +8,8 @@ from typing import List, Optional, Any
 
 from app.database import get_db
 from app import models, schemas as s
+from app.core.audit import apply_audit
+from app.auth.dependencies import require_role
 
 router = APIRouter()
 
@@ -155,7 +157,11 @@ def get_ensayos_plt(celda: Optional[str] = Query(None), db: Session = Depends(ge
 
 
 @router.delete("/ensayos-plt/{plt_id}")
-def delete_ensayo_plt(plt_id: int, db: Session = Depends(get_db)):
+def delete_ensayo_plt(
+    plt_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
+):
     sql_row = db.query(models.EnsayoPLT).filter_by(ensayo_plt_id=plt_id).first()
     if not sql_row:
         raise HTTPException(status_code=404, detail=f"Registro PLT {plt_id} no encontrado.")
@@ -165,7 +171,12 @@ def delete_ensayo_plt(plt_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/ensayos-plt", response_model=List[s.EnsayoPLTSaveSchema])
-def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Query(None), db: Session = Depends(get_db)):
+def save_ensayos_plt(
+    data: List[s.EnsayoPLTSaveSchema],
+    celda: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
+):
     celda_origen = celda.strip().upper() if celda and celda.strip() else None
     affected_celdas = set()
     if celda_origen:
@@ -218,6 +229,7 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
         sector_id = resolver.sector_id(d.sector_geotecnico)
 
         sql_row = None
+        is_new_plt = False
         if d.id and isinstance(d.id, int) and d.id < 1000000000:
             sql_row = db.query(models.EnsayoPLT).filter_by(ensayo_plt_id=d.id).first()
 
@@ -230,6 +242,7 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
         ejecutado_val = d.ejecutado_por.strip() if d.ejecutado_por and str(d.ejecutado_por).strip() else None
 
         if not sql_row:
+            is_new_plt = True
             sql_row = models.EnsayoPLT(
                 codigo_muestra=codigo_m,
                 campania_id=int(d.campana) if d.campana and str(d.campana).isdigit() else 7,
@@ -268,8 +281,10 @@ def save_ensayos_plt(data: List[s.EnsayoPLTSaveSchema], celda: Optional[str] = Q
                 tipo_litologico=d.tipo_litologico if d.tipo_litologico and str(d.tipo_litologico).strip() else None,
                 nivel=str(d.nivel).strip() if d.nivel is not None and str(d.nivel).strip() else None
             )
+            apply_audit(sql_row, current_user, is_new=True)
             db.add(sql_row)
         else:
+            apply_audit(sql_row, current_user, is_new=False)
             sql_row.codigo_muestra = codigo_m
             sql_row.campania_id = int(d.campana) if d.campana and str(d.campana).isdigit() else 7
             sql_row.litologia1_id = lito1_id

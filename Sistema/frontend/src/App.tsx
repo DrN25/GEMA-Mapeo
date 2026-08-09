@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity, RotateCcw, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, BarChart3, Layers, Gauge, BookOpen, X, Calculator, Menu, FileSpreadsheet, Activity, RotateCcw, Loader2, LogOut, User as UserIcon } from 'lucide-react';
 
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -14,6 +14,10 @@ import ExcelImportModal, { type ImportedCellItem } from './components/modals/Exc
 import CatalogsView from './components/views/CatalogsView';
 import CommentsPhotos from './components/views/CommentsPhotos';
 import PltEnsayosView from './components/views/PltEnsayosView';
+import { AdminUsersView } from './components/views/AdminUsersView';
+
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { ProtectedRoute } from './auth/ProtectedRoute';
 
 import SaveConfirmModal from './components/modals/SaveConfirmModal';
 import DiscardModal from './components/modals/DiscardModal';
@@ -71,7 +75,9 @@ const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.loc
 
 import { normalizeJoints, windowFromServerResponse, excelDataToWindowData, applyDistanceCascade } from './utils/windowTransform';
 import { HOLE_AUTO } from './utils/rmrCalculator';
-export default function App() {
+
+function AppContent() {
+  const { user, logout, hasRole } = useAuth();
   // Inicializar vista y paginación desde localStorage de forma síncrona para resiliencia ante F5
   const [currentView, setCurrentView] = useState<string>(() => {
     try {
@@ -80,6 +86,13 @@ export default function App() {
     } catch (e) { }
     return 'dashboard';
   });
+
+  // Salvaguarda RBAC: Si la vista activa es de administración y los permisos cambiaron a no-admin, redirigir limpiamente a 'dashboard'
+  useEffect(() => {
+    if (currentView === 'admin_usuarios' && !hasRole(['admin'])) {
+      setCurrentView('dashboard');
+    }
+  }, [currentView, user]);
 
   const [windows, setWindows] = useState<WindowSummary[]>([]);
 
@@ -1804,12 +1817,17 @@ const [dbOnline, setDbOnline] = useState(true);
                   </span>
                 )}
               </button>
+
             </div>
           </div>
         </header>
 
         {/* Main Content scroll window */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
+          {currentView === 'admin_usuarios' && hasRole(['admin']) && (
+            <AdminUsersView />
+          )}
+
           {currentView === 'dashboard' && (
             <Dashboard
               windows={windows}
@@ -2218,5 +2236,15 @@ const [dbOnline, setDbOnline] = useState(true);
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <ProtectedRoute>
+        <AppContent />
+      </ProtectedRoute>
+    </AuthProvider>
   );
 }
