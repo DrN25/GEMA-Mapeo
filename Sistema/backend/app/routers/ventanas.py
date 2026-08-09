@@ -937,7 +937,12 @@ def delete_ventana(
 
 
 @router.put("/ventanas/{codigo}/rename")
-def rename_ventana(codigo: str, payload: Dict[str, str], db: Session = Depends(get_db)):
+def rename_ventana(
+    codigo: str,
+    payload: Dict[str, str],
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
+):
     old_code = codigo.strip().upper()
     new_code = payload.get("new_codigo", "").strip().upper()
     

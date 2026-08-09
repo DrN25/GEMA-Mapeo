@@ -22,6 +22,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import SaveConfirmModal from './components/modals/SaveConfirmModal';
 import DiscardModal from './components/modals/DiscardModal';
 import SaveResultModal from './components/modals/SaveResultModal';
+import SaveErrorModal from './components/modals/SaveErrorModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
@@ -145,6 +146,10 @@ function AppContent() {
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState<boolean>(false);
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
   const [showSaveResultModal, setShowSaveResultModal] = useState<boolean>(false);
+  const [saveErrorData, setSaveErrorData] = useState<{ isOpen: boolean; title?: string; errorMessage: string }>({
+    isOpen: false,
+    errorMessage: ''
+  });
   const [isLoadingWindow, setIsLoadingWindow] = useState<boolean>(false);
   const [saveResultData, setSaveResultData] = useState<{ savedCount: number; totalEdits: number; totalJoints: number }>({
     savedCount: 0,
@@ -1489,20 +1494,30 @@ const [dbOnline, setDbOnline] = useState(true);
           const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
           const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
           safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== winData.header.celda)), ctx);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const detailMsg = errData.detail || `Error (${res.status}) al guardar la celda en la base de datos.`;
+          setIsLoadingWindow(false);
+          setSyncStatus('unsaved');
+          setSyncMessage(`No se guardó: ${detailMsg}`);
+          setSaveErrorData({
+            isOpen: true,
+            title: res.status === 403 ? 'Acceso Denegado' : 'Error al Guardar',
+            errorMessage: detailMsg
+          });
+          return;
         }
       } catch (err) {
-        console.warn("Save DB failed, persisting locally in localStorage:", winData.header.celda, err);
+        console.warn("Save DB failed:", winData.header.celda, err);
         setDbOnline(false);
-        const hash = fastHashObject(winData);
-        const ctx = { activeCelda: winData.header.celda, pendingImports };
-        safeSetItem(`geolog_window_${winData.header.celda}`, JSON.stringify(winData), ctx);
-        safeSetItem(`geolog_window_snapshot_${winData.header.celda}`, JSON.stringify(winData), ctx);
-        safeSetItem(`geolog_window_snapshot_hash_${winData.header.celda}`, hash, ctx);
-        if (activeWindow && activeWindow.header.celda === winData.header.celda) {
-          setDbSnapshotData(winData);
-          setDbSnapshotHash(hash);
-        }
-        successCount++;
+        setIsLoadingWindow(false);
+        setSyncStatus('unsaved');
+        setSaveErrorData({
+          isOpen: true,
+          title: 'Error de Conexión',
+          errorMessage: 'No se pudo comunicar con el servidor backend para guardar los datos.'
+        });
+        return;
       }
     }
 
@@ -1538,28 +1553,50 @@ const [dbOnline, setDbOnline] = useState(true);
           clearPltDelta(celdaName);
           removePendingPltCell(celdaName);
           setDbOnline(true);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const detailMsg = errData.detail || `Error (${res.status}) al guardar ensayos PLT.`;
+          setIsLoadingWindow(false);
+          setSyncStatus('unsaved');
+          setSyncMessage(`No se guardó: ${detailMsg}`);
+          setSaveErrorData({
+            isOpen: true,
+            title: res.status === 403 ? 'Acceso Denegado' : 'Error al Guardar Ensayos PLT',
+            errorMessage: detailMsg
+          });
+          return;
         }
       } catch (e) {
         console.error("Error saving PLT trials to SQL Server for cell", celdaName, e);
         setDbOnline(false);
+        setIsLoadingWindow(false);
+        setSyncStatus('unsaved');
+        setSaveErrorData({
+          isOpen: true,
+          title: 'Error de Conexión',
+          errorMessage: 'No se pudo comunicar con el servidor backend para guardar los ensayos PLT.'
+        });
+        return;
       }
     }
 
-      setIsLoadingWindow(false);
-      if (!hasPendingRef.current) {
-        setSyncStatus('synced');
-        setSyncMessage(`${successCount} celda(s) sincronizadas con SQL Server.`);
-      } else {
-        setSyncStatus('unsaved');
-      }
-      fetchWindows();
+    setIsLoadingWindow(false);
+    if (!hasPendingRef.current) {
+      setSyncStatus('synced');
+      setSyncMessage(`${successCount} celda(s) sincronizadas con SQL Server.`);
+    } else {
+      setSyncStatus('unsaved');
+    }
+    fetchWindows();
 
-    setSaveResultData({
-      savedCount: successCount,
-      totalEdits: workspaceDiff.totalCellEditsAll,
-      totalJoints: totalJointsSaved
-    });
-    setShowSaveResultModal(true);
+    if (successCount > 0) {
+      setSaveResultData({
+        savedCount: successCount,
+        totalEdits: workspaceDiff.totalCellEditsAll,
+        totalJoints: totalJointsSaved
+      });
+      setShowSaveResultModal(true);
+    }
   };
 
   const handleConfirmDiscard = (scope: 'active' | 'all') => {
@@ -2215,6 +2252,13 @@ const [dbOnline, setDbOnline] = useState(true);
         savedCount={saveResultData.savedCount}
         totalEdits={saveResultData.totalEdits}
         totalJoints={saveResultData.totalJoints}
+      />
+
+      <SaveErrorModal
+        isOpen={saveErrorData.isOpen}
+        onClose={() => setSaveErrorData(prev => ({ ...prev, isOpen: false }))}
+        title={saveErrorData.title}
+        errorMessage={saveErrorData.errorMessage}
       />
 
       <RenameCellModal

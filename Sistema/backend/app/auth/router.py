@@ -146,12 +146,17 @@ def forgot_password(
         (models.Usuario.usuario == val.upper()) | (models.Usuario.email == val.lower())
     ).first()
 
-    if not user or user.estado != 'A':
-        # Responder mensaje genérico por seguridad
-        return {
-            "message": "Si la cuenta existe y se encuentra activa, se ha enviado un código de verificación.",
-            "email_sent": False
-        }
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"El usuario o correo electrónico '{val}' no se encuentra registrado en el sistema."
+        )
+
+    if user.estado != 'A':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La cuenta de usuario '{user.usuario}' se encuentra inhabilitada o desactivada. Contacte al Administrador."
+        )
 
     # Generar código numérico de 6 dígitos
     code = "".join(random.choices(string.digits, k=6))
