@@ -99,7 +99,8 @@ export const AdminUsersView: React.FC = () => {
   const isCreateUserDuplicate = cleanCreateUsuario !== '' && users.some(u => u.usuario.trim().toUpperCase() === cleanCreateUsuario);
   const isCreateEmailDuplicate = cleanCreateEmail !== '' && users.some(u => u.email.trim().toLowerCase() === cleanCreateEmail);
   const isPasswordMatch = newPassword.trim() !== '' && newPassword === newConfirmPassword;
-  const isCreateValid = cleanCreateUsuario !== '' && !isCreateUserDuplicate && cleanCreateEmail !== '' && !isCreateEmailDuplicate && isPasswordMatch && !isSubmitting;
+  const isCreatePasswordMinLength = newPassword.length >= 4;
+  const isCreateValid = cleanCreateUsuario !== '' && !isCreateUserDuplicate && cleanCreateEmail !== '' && !isCreateEmailDuplicate && isPasswordMatch && isCreatePasswordMinLength && !isSubmitting;
 
   // Validaciones en tiempo real para Editar Usuario
   const cleanEditUsuario = editUsuario.trim().toUpperCase();
@@ -107,7 +108,8 @@ export const AdminUsersView: React.FC = () => {
 
   const isEditUserDuplicate = editUser !== null && cleanEditUsuario !== '' && users.some(u => Number(u.usuario_id) !== Number(editUser.usuario_id) && u.usuario.trim().toUpperCase() === cleanEditUsuario);
   const isEditEmailDuplicate = editUser !== null && cleanEditEmail !== '' && users.some(u => Number(u.usuario_id) !== Number(editUser.usuario_id) && (u.email || '').trim().toLowerCase() === cleanEditEmail);
-  const isEditValid = editUser !== null && cleanEditUsuario !== '' && !isEditUserDuplicate && cleanEditEmail !== '' && !isEditEmailDuplicate && !isSubmitting;
+  const isEditPasswordMinLength = !editPassword.trim() || editPassword.trim().length >= 4;
+  const isEditValid = editUser !== null && cleanEditUsuario !== '' && !isEditUserDuplicate && cleanEditEmail !== '' && !isEditEmailDuplicate && isEditPasswordMinLength && !isSubmitting;
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -543,6 +545,12 @@ export const AdminUsersView: React.FC = () => {
                     {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+                {newPassword !== '' && !isCreatePasswordMinLength && (
+                  <p className="mt-1 text-[11px] text-amber-400 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Debe tener al menos 4 caracteres.</span>
+                  </p>
+                )}
               </div>
 
               <div>

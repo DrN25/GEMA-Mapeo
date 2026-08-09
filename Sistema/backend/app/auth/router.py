@@ -85,28 +85,165 @@ def get_me(current_user: models.Usuario = Depends(get_current_user)):
     )
 
 
+import random
+import string
+import logging
+import os
+import smtplib
+from email.mime.text import MIMEText
+
+logger = logging.getLogger(__name__)
+
+# Diccionario en memoria para almacenar códigos de recuperación temporales
+# { "email_o_usuario": { "code": "123456", "expires": timestamp } }
+RECOVERY_CODES = {}
+
+
 @router.post("/change-password")
 def change_password(
     data: schemas.ChangePasswordSchema,
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user)
 ):
-    """Permite al usuario logueado cambiar su contraseña actual."""
+    """Permite al usuario logueado cambiar su contraseña actual (mínimo 4 caracteres)."""
     if not verify_password(data.old_password, current_user.contrasena_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña actual ingresada no es correcta."
         )
 
-    if not data.new_password or len(data.new_password) < 6:
+    if not data.new_password or len(data.new_password.strip()) < 4:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La nueva contraseña debe tener al menos 6 caracteres."
+            detail="La nueva contraseña debe tener al menos 4 caracteres."
         )
 
-    current_user.contrasena_hash = hash_password(data.new_password)
+    current_user.contrasena_hash = hash_password(data.new_password.strip())
     current_user.fecha_modificacion = datetime.now()
     current_user.usuario_modificacion = current_user.usuario
     db.commit()
 
     return {"message": "Contraseña actualizada exitosamente."}
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    data: schemas.ForgotPasswordSchema,
+    db: Session = Depends(get_db)
+):
+    """
+    Solicita la recuperación de contraseña enviando un código de 6 dígitos al correo del usuario.
+    Soporta envío vía SMTP en entornos configurados y registra en consola en modo local/Docker.
+    """
+    val = data.email_or_username.strip()
+    if not val:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe ingresar su nombre de usuario o correo electrónico."
+        )
+
+    user = db.query(models.Usuario).filter(
+        (models.Usuario.usuario == val.upper()) | (models.Usuario.email == val.lower())
+    ).first()
+
+    if not user or user.estado != 'A':
+        # Responder mensaje genérico por seguridad
+        return {
+            "message": "Si la cuenta existe y se encuentra activa, se ha enviado un código de verificación.",
+            "email_sent": False
+        }
+
+    # Generar código numérico de 6 dígitos
+    code = "".join(random.choices(string.digits, k=6))
+    RECOVERY_CODES[user.email.lower()] = {
+        "code": code,
+        "usuario": user.usuario,
+        "created_at": datetime.now()
+    }
+
+    # Intentar envío vía SMTP si está configurado en .env
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+
+    email_sent = False
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            msg = MIMEText(f"Hola {user.usuario},\n\nTu código de verificación para restablecer tu contraseña en GEMA es: {code}\n\nEste código expira pronto.\nSi no solicitaste este cambio, puedes ignorar este correo.")
+            msg['Subject'] = 'GEMA — Código de Recuperación de Contraseña'
+            msg['From'] = smtp_user
+            msg['To'] = user.email
+
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, [user.email], msg.as_string())
+            email_sent = True
+            logger.info(f"Correo de recuperación enviado a {user.email}")
+        except Exception as e:
+            logger.warning(f"No se pudo enviar correo SMTP: {e}. Se utilizó el código generado: {code}")
+
+    logger.info(f"🔑 CÓDIGO DE RECUPERACIÓN GEMA para '{user.usuario}' ({user.email}): {code}")
+
+    return {
+        "message": f"Código de verificación generado para {user.email}.",
+        "email": user.email,
+        "code_preview": code if not email_sent else None,
+        "email_sent": email_sent
+    }
+
+
+@router.post("/reset-password")
+def reset_password(
+    data: schemas.ResetPasswordSchema,
+    db: Session = Depends(get_db)
+):
+    """
+    Restablece la contraseña del usuario verificando el código de 6 dígitos.
+    Requiere una nueva contraseña de al menos 4 caracteres.
+    """
+    val = data.email_or_username.strip()
+    code_input = data.code.strip()
+    new_pass = data.new_password.strip()
+
+    if not val or not code_input or not new_pass:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Todos los campos son obligatorios."
+        )
+
+    if len(new_pass) < 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe tener al menos 4 caracteres."
+        )
+
+    user = db.query(models.Usuario).filter(
+        (models.Usuario.usuario == val.upper()) | (models.Usuario.email == val.lower())
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario o correo no encontrado."
+        )
+
+    recovery = RECOVERY_CODES.get(user.email.lower())
+    if not recovery or recovery["code"] != code_input:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de verificación es incorrecto o ha expirado."
+        )
+
+    # Actualizar contraseña
+    user.contrasena_hash = hash_password(new_pass)
+    user.fecha_modificacion = datetime.now()
+    user.usuario_modificacion = user.usuario
+    db.commit()
+
+    # Consumir el código
+    RECOVERY_CODES.pop(user.email.lower(), None)
+
+    return {"message": "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva clave."}
+

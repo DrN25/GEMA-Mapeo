@@ -25,7 +25,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
   if (!isOpen) return null;
 
   const isPasswordMatch = newPassword.trim() !== '' && newPassword === confirmPassword;
-  const isMinLength = newPassword.length >= 6;
+  const isMinLength = newPassword.length >= 4;
   const isValid = oldPassword.trim() !== '' && newPassword.trim() !== '' && isPasswordMatch && isMinLength && !isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,7 +149,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
                   required
                   disabled={isSubmitting}
                   className="w-full bg-[#02040a] border border-slate-800 rounded-xl pl-3.5 pr-10 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none font-medium"
-                  placeholder="Mínimo 6 caracteres..."
+                  placeholder="Mínimo 4 caracteres..."
                 />
                 <button
                   type="button"

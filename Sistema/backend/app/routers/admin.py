@@ -77,6 +77,12 @@ def create_user(
             detail="El campo Usuario, Email y Contraseña son obligatorios."
         )
 
+    if len(data.password.strip()) < 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 4 caracteres."
+        )
+
     # Verificar duplicado por Usuario
     existing_u = db.query(models.Usuario).filter(models.Usuario.usuario == usuario_str).first()
     if existing_u:
@@ -181,6 +187,11 @@ def update_user(
         user.geotecnico_id = data.geotecnico_id
 
     if data.password and data.password.strip():
+        if len(data.password.strip()) < 4:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña debe tener al menos 4 caracteres."
+            )
         user.contrasena_hash = hash_password(data.password.strip())
 
     apply_audit(user, current_user, is_new=False)

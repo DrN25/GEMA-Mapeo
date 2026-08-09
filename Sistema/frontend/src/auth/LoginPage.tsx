@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { pingBackend } from '../utils/apiClient';
 import { Eye, EyeOff, Loader2, WifiOff, RefreshCw, Lock } from 'lucide-react';
+import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
 
@@ -12,6 +13,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   // Estado para la verificación previa de conectividad con el backend
   const [checkingBackend, setCheckingBackend] = useState(true);
@@ -130,9 +132,18 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                  Contraseña <span className="text-rose-500 font-bold ml-0.5">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400">
+                    Contraseña <span className="text-rose-500 font-bold ml-0.5">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(true)}
+                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -178,6 +189,12 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Modal Olvidaste Tu Contraseña */}
+      <ForgotPasswordModal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+      />
     </div>
   );
 };

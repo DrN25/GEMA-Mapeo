@@ -83,3 +83,26 @@ def test_change_password_endpoint():
     )
     assert bad_resp.status_code == 400
     assert "correcta" in bad_resp.json()["detail"]
+
+
+def test_forgot_and_reset_password_flow():
+    # 1. Solicitar código de recuperación
+    forgot_resp = client.post(
+        "/api/auth/forgot-password",
+        json={"email_or_username": "ADMIN"}
+    )
+    assert forgot_resp.status_code == 200
+    data = forgot_resp.json()
+    assert "email" in data or "message" in data
+
+    # 2. Intentar restablecer con código incorrecto -> 400
+    bad_reset = client.post(
+        "/api/auth/reset-password",
+        json={
+            "email_or_username": "ADMIN",
+            "code": "000000",
+            "new_password": "Pass"
+        }
+    )
+    assert bad_reset.status_code == 400
+

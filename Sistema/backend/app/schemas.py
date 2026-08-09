@@ -423,3 +423,13 @@ class UserStatusSchema(BaseModel):
 class ChangePasswordSchema(BaseModel):
     old_password: str
     new_password: str
+
+
+class ForgotPasswordSchema(BaseModel):
+    email_or_username: str
+
+
+class ResetPasswordSchema(BaseModel):
+    email_or_username: str
+    code: str
+    new_password: str
