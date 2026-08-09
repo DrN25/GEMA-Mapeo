@@ -124,10 +124,10 @@ export const LoginPage: React.FC = () => {
                 <input
                   type="text"
                   value={usernameOrEmail}
-                  onChange={(e) => setUsernameOrEmail(e.target.value.toUpperCase())}
-                  placeholder="ej: ADMIN o CBAL"
+                  onChange={(e) => setUsernameOrEmail(e.target.value)}
+                  placeholder="ej: ADMIN o usuario@gema.com"
                   disabled={loading}
-                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-xs font-bold uppercase tracking-wider"
+                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-xs font-medium"
                 />
               </div>
 

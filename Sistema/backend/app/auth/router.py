@@ -24,7 +24,10 @@ def login(credentials: schemas.LoginSchema, db: Session = Depends(get_db)):
         )
 
     user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == val) | (models.Usuario.email == val)
+        (models.Usuario.usuario == val.upper()) |
+        (models.Usuario.usuario == val) |
+        (models.Usuario.email == val.lower()) |
+        (models.Usuario.email == val)
     ).first()
 
     if not user or not verify_password(credentials.password, user.contrasena_hash):
@@ -143,7 +146,10 @@ def forgot_password(
         )
 
     user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == val.upper()) | (models.Usuario.email == val.lower())
+        (models.Usuario.usuario == val.upper()) |
+        (models.Usuario.usuario == val) |
+        (models.Usuario.email == val.lower()) |
+        (models.Usuario.email == val)
     ).first()
 
     if not user:
@@ -165,6 +171,8 @@ def forgot_password(
         "usuario": user.usuario,
         "created_at": datetime.now()
     }
+    if user.usuario:
+        RECOVERY_CODES[user.usuario.upper()] = RECOVERY_CODES[user.email.lower()]
 
     # Intentar envío vía SMTP si está configurado en .env
     smtp_host = os.getenv("SMTP_HOST")
@@ -180,12 +188,24 @@ def forgot_password(
             msg['From'] = smtp_user
             msg['To'] = user.email
 
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_pass)
-                server.sendmail(smtp_user, [user.email], msg.as_string())
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                    server.login(smtp_user, smtp_pass)
+                    server.sendmail(smtp_user, [user.email], msg.as_string())
+            else:
+                try:
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                        server.starttls()
+                        server.login(smtp_user, smtp_pass)
+                        server.sendmail(smtp_user, [user.email], msg.as_string())
+                except Exception as inner_err:
+                    logger.warning(f"SMTP port {smtp_port} falló ({inner_err}), reintentando con SSL en puerto 465...")
+                    with smtplib.SMTP_SSL(smtp_host, 465, timeout=10) as server:
+                        server.login(smtp_user, smtp_pass)
+                        server.sendmail(smtp_user, [user.email], msg.as_string())
+
             email_sent = True
-            logger.info(f"Correo de recuperación enviado a {user.email}")
+            logger.info(f"Correo de recuperación enviado exitosamente a {user.email}")
         except Exception as e:
             logger.warning(f"No se pudo enviar correo SMTP: {e}. Se utilizó el código generado: {code}")
 
@@ -225,7 +245,10 @@ def reset_password(
         )
 
     user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == val.upper()) | (models.Usuario.email == val.lower())
+        (models.Usuario.usuario == val.upper()) |
+        (models.Usuario.usuario == val) |
+        (models.Usuario.email == val.lower()) |
+        (models.Usuario.email == val)
     ).first()
 
     if not user:
@@ -234,7 +257,7 @@ def reset_password(
             detail="Usuario o correo no encontrado."
         )
 
-    recovery = RECOVERY_CODES.get(user.email.lower())
+    recovery = RECOVERY_CODES.get(user.email.lower()) or RECOVERY_CODES.get(user.usuario.upper())
     if not recovery or recovery["code"] != code_input:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -249,6 +272,7 @@ def reset_password(
 
     # Consumir el código
     RECOVERY_CODES.pop(user.email.lower(), None)
+    RECOVERY_CODES.pop(user.usuario.upper(), None)
 
     return {"message": "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva clave."}
 
