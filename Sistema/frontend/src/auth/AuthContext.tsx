@@ -18,6 +18,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const TOKEN_KEY = 'gema_auth_token';
 const USER_KEY = 'gema_auth_user';
 
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : ''
+);
+
+function buildUrl(endpoint: string): string {
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) return endpoint;
+  return `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem(USER_KEY);
@@ -40,7 +51,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       try {
-        const response = await fetch('/api/auth/me', {
+        const response = await fetch(buildUrl('/api/auth/me'), {
           headers: {
             'Authorization': `Bearer ${storedToken}`,
             'Content-Type': 'application/json'
@@ -65,7 +76,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<void> => {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(buildUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials)
@@ -94,7 +105,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (!storedToken) return;
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch(buildUrl('/api/auth/me'), {
         headers: {
           'Authorization': `Bearer ${storedToken}`,
           'Content-Type': 'application/json'
@@ -127,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       headers
     };
 
-    const response = await fetch(url, modifiedOptions);
+    const response = await fetch(buildUrl(url), modifiedOptions);
 
     if (response.status === 401) {
       // Token inválido o sesión expirada -> logout inmediato
