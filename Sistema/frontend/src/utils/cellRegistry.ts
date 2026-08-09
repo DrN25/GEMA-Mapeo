@@ -28,6 +28,7 @@ import {
   type CellValidationRecord,
 } from './storageManager';
 import type { WindowHeader } from './rmrCalculator';
+import { getAuthHeaders } from './apiClient';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -248,7 +249,7 @@ export async function verifyNameCollisions(
     unique.map(async (name) => {
       if (dbSet.has(name)) return { name, collision: true };
       try {
-        const res = await fetch(`${apiBase}/api/ventanas-check/${encodeURIComponent(name)}`);
+        const res = await fetch(`${apiBase}/api/ventanas-check/${encodeURIComponent(name)}`, { headers: getAuthHeaders() });
         if (!res.ok) return { name, collision: true };
         const data = await res.json();
         return { name, collision: Boolean(data?.exists) };

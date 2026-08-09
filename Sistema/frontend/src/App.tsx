@@ -25,7 +25,7 @@ import SaveResultModal from './components/modals/SaveResultModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
-import { apiFetch, pingBackend } from './utils/apiClient';
+import { apiFetch, pingBackend, getAuthHeaders } from './utils/apiClient';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
   discardLocalCell,
@@ -432,7 +432,7 @@ const [dbOnline, setDbOnline] = useState(true);
   // filtro/búsqueda actual del dashboard, que limitaría la lista).
   const [allCellNames, setAllCellNames] = useState<string[]>([]);
   useEffect(() => {
-    fetch(`${API_BASE}/api/ventanas/celdas`)
+    fetch(`${API_BASE}/api/ventanas/celdas`, { headers: getAuthHeaders() })
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (Array.isArray(data)) {
@@ -547,7 +547,7 @@ const [dbOnline, setDbOnline] = useState(true);
   // Synchronize photo loading from localStorage when the active window celda changes
   useEffect(() => {
     if (activeWindow?.header.celda) {
-      fetch(`${API_BASE}/api/ventanas/${activeWindow.header.celda}/fotos`)
+      fetch(`${API_BASE}/api/ventanas/${activeWindow.header.celda}/fotos`, { headers: getAuthHeaders() })
         .then(res => {
           if (res.ok) return res.json();
           throw new Error();
@@ -632,7 +632,7 @@ const [dbOnline, setDbOnline] = useState(true);
 
       if (searchTerm) params.set('q', searchTerm);
 
-      const res = await fetch(`${API_BASE}/api/ventanas?${params}`);
+      const res = await fetch(`${API_BASE}/api/ventanas?${params}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const summaries: WindowSummary[] = data.items.map((v: any) => ({
@@ -696,7 +696,7 @@ const [dbOnline, setDbOnline] = useState(true);
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(targetCelda)}`);
+      const res = await fetch(`${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(targetCelda)}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const computed = (data || []).map((r: any) => applyPltFormulas(r));
@@ -806,7 +806,7 @@ const [dbOnline, setDbOnline] = useState(true);
     };
 
     try {
-      const res = await fetch(`${API_BASE}/api/ventanas/${name}`);
+      const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const v = await res.json();
         const loadedWindow = windowFromServerResponse(v);
@@ -981,7 +981,7 @@ const [dbOnline, setDbOnline] = useState(true);
     }
 
     try {
-         const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { method: 'DELETE' });
+         const res = await fetch(`${API_BASE}/api/ventanas/${name}`, { method: 'DELETE', headers: getAuthHeaders() });
          if (res.ok) {
            setDbOnline(true);
            if (!hasPendingRef.current) {
@@ -1048,7 +1048,7 @@ const [dbOnline, setDbOnline] = useState(true);
       const hasSnapshot = !!localStorage.getItem(`geolog_window_snapshot_${celda}`);
       if (!hasSnapshot && celda !== firstCelda) {
         try {
-          const res = await fetch(`${API_BASE}/api/ventanas/${encodeURIComponent(celda)}`);
+          const res = await fetch(`${API_BASE}/api/ventanas/${encodeURIComponent(celda)}`, { headers: getAuthHeaders() });
           if (res.ok) {
             const v = await res.json();
             const baseline = windowFromServerResponse(v);
@@ -1104,7 +1104,7 @@ const [dbOnline, setDbOnline] = useState(true);
     try {
       const res = await fetch(`${RESOLVED_API_BASE}/api/ventanas/${encodeURIComponent(oldCeldaName)}/rename`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ new_codigo: cleanNewName })
       });
       if (!res.ok) {
@@ -1466,7 +1466,7 @@ const [dbOnline, setDbOnline] = useState(true);
       try {
         const res = await fetch(`${API_BASE}/api/ventanas`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload)
         });
         if (res.ok) {
@@ -1524,7 +1524,7 @@ const [dbOnline, setDbOnline] = useState(true);
         const targetUrl = `${API_BASE}/api/ensayos-plt?celda=${encodeURIComponent(celdaName)}`;
         const res = await fetch(targetUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(rowsToSave)
         });
         if (res.ok) {

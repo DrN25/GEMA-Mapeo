@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getAuthHeaders } from '../../utils/apiClient';
 import {
     FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
     Loader2, RefreshCw, Trash2, X, WifiOff
@@ -184,7 +185,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
         const tick = async () => {
             try {
-                const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`);
+                const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`, { headers: getAuthHeaders() });
                 if (res.status === 404) {
                     failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos). Vuelve a cargar tu planilla.', auditId);
                     return;
@@ -273,7 +274,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     // confirma que la data del reporte sigue existiendo antes de renderizar el dashboard.
     const verifyAuditExists = async (auditId: string) => {
         try {
-            const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`);
+            const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`, { headers: getAuthHeaders() });
             if (res.status === 404) {
                 failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
                 return;
@@ -313,7 +314,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
     const fetchHistory = async () => {
         try {
-            const res = await fetch(`${apiBase}/api/geomecanica/auditorias`);
+            const res = await fetch(`${apiBase}/api/geomecanica/auditorias`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
                 setHistory(data);
@@ -326,7 +327,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     const fetchKpis = async (auditId: string) => {
         try {
             const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
-            const res = await fetch(`${apiBase}/api/geomecanica/resumen-ligero?audit_id=${auditId}&years=${yearParam}`);
+            const res = await fetch(`${apiBase}/api/geomecanica/resumen-ligero?audit_id=${auditId}&years=${yearParam}`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
                 setKpis(data);
@@ -360,7 +361,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             if (filterGeotecnico) queryParams.append('geotecnico', filterGeotecnico);
             if (filterSearch) queryParams.append('search', filterSearch);
 
-            const res = await fetch(`${apiBase}/api/geomecanica/incidencias-paginadas?${queryParams.toString()}`);
+            const res = await fetch(`${apiBase}/api/geomecanica/incidencias-paginadas?${queryParams.toString()}`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
                 setIncidencias(data.data);
@@ -387,6 +388,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         try {
             const res = await fetch(`${apiBase}/api/geomecanica/importar-excel-bulk`, {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 body: formData
             });
             if (res.ok) {
@@ -432,7 +434,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         if (target && !window.confirm('¿Cancelar la auditoría en curso? Se detendrá el procesamiento en el servidor y se eliminarán sus archivos parciales.')) return;
         try {
             if (target) {
-                await fetch(`${apiBase}/api/geomecanica/cancelar?audit_id=${target}`, { method: 'POST' });
+                await fetch(`${apiBase}/api/geomecanica/cancelar?audit_id=${target}`, { method: 'POST', headers: getAuthHeaders() });
             }
         } catch (e) {
             console.warn("No se pudo notificar la cancelación al servidor:", e);

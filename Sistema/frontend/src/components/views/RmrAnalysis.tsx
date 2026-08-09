@@ -186,7 +186,7 @@ export default function RmrAnalysis({
       </div>
 
       {/* INPUTS DE CONTROL */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3 bg-navy-950/45 pt-2 pb-4 px-4 rounded-xl border border-navy-900">
+      <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3 bg-navy-950/45 pt-2 pb-4 px-4 rounded-xl border border-navy-900">
         <div className="col-span-2 space-y-1">
           <label className="block text-slate-500 font-bold uppercase tracking-wider text-[10px] h-7 flex items-end justify-center pb-0.5 text-center leading-tight">
             {COLUMN_LABELS.condicion_agua}

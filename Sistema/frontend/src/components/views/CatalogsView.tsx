@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getAuthHeaders } from '../../utils/apiClient';
 import {
   Table, Layers, Compass, Flame, AlignLeft, Droplet,
   Shield, Zap, Sparkles, Sliders, Maximize2, MoveRight,
@@ -66,7 +67,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
 
   useEffect(() => {
     const apiBase = import.meta.env.VITE_API_BASE || "";
-    fetch(`${apiBase}/api/catalogs/all`)
+    fetch(`${apiBase}/api/catalogs/all`, { headers: getAuthHeaders() })
       .then(res => {
         if (!res.ok) throw new Error("Server error");
         return res.json();

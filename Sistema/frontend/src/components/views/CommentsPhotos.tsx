@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Camera, Trash2, Plus, MessageSquare, X, Maximize2 } from 'lucide-react';
+import { getAuthHeaders } from '../../utils/apiClient';
 
 interface CommentsPhotosProps {
   celda: string;
@@ -44,6 +45,7 @@ export default function CommentsPhotos({
     try {
       const res = await fetch(`${apiBase}/api/ventanas/${celda}/fotos?index=${index}`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData
       });
 
@@ -84,7 +86,8 @@ export default function CommentsPhotos({
 
     try {
       await fetch(`${apiBase}/api/ventanas/${celda}/fotos/${index}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
       saveMetadata(updatedCaptions);
     } catch (err) {
@@ -96,7 +99,7 @@ export default function CommentsPhotos({
     try {
       await fetch(`${apiBase}/api/ventanas/${celda}/fotos/meta`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ captions: currentCaptions })
       });
     } catch (err) {

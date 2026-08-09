@@ -4,6 +4,7 @@ import { User, Check, Plus, ChevronDown } from 'lucide-react';
 import { markFieldTouched } from '../../utils/qaQcTouch';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+import { getAuthHeaders } from '../../utils/apiClient';
 
 interface CatalogOption {
   codigo: string;
@@ -42,7 +43,7 @@ export default function MapeadorCombobox({
       setOptions(externalOptions);
     } else {
       setLoading(true);
-      fetch(`${API_BASE}/api/filtros/opciones`)
+      fetch(`${API_BASE}/api/filtros/opciones`, { headers: getAuthHeaders() })
         .then(res => res.json())
         .then(data => {
           if (data.mapeadores) {
@@ -123,7 +124,7 @@ export default function MapeadorCombobox({
     try {
       await fetch(`${API_BASE}/api/geotecnicos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ nombre: newName })
       });
     } catch (e) {

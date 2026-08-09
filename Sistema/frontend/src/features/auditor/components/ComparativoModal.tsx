@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getAuthHeaders } from '../../../utils/apiClient';
 import { X, ArrowRight, Upload, AlertTriangle, FileSpreadsheet, Loader2, Download } from 'lucide-react';
 import type { AuditHistoryItem } from './AuditHistory';
 
@@ -41,7 +42,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
 
         try {
             const url = `${apiBase}/api/geomecanica/comparativo/reporte?audit_id_a=${auditA}&audit_id_b=${auditB}`;
-            const res = await fetch(url);
+            const res = await fetch(url, { headers: getAuthHeaders() });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({ detail: 'Fallo al generar el reporte comparativo.' }));
                 throw new Error(errData.detail || 'Fallo de procesamiento.');
@@ -82,6 +83,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
             const url = `${apiBase}/api/geomecanica/comparativo/importar-y-comparar`;
             const res = await fetch(url, {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 body: formData
             });
 

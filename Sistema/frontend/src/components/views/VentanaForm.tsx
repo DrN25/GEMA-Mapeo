@@ -467,7 +467,7 @@ export default function VentanaForm({
             </div>
 
             {/* Geometría y Orientación de Talud (Estandarizado a inputs de texto con formateo a punto ".") */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-2">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase block">Altura (m)</label>
                 <input
@@ -681,7 +681,7 @@ export default function VentanaForm({
 
             {/* Bloque Litológico con Selección Independiente y Validación Reactiva */}
             <div className="space-y-2">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Lito 1</label>
                   <select
@@ -869,7 +869,7 @@ export default function VentanaForm({
 
             {/* Divisor de Sección: Metadatos y Control de Campaña */}
             <div className="border-t border-navy-900/60 pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase block">Campaña</label>
                   <select

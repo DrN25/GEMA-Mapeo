@@ -4,6 +4,7 @@ import MapeadorCombobox from '../Common/MapeadorCombobox';
 import { handleNumberInputLimit } from '../../utils/inputLimits';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+import { getAuthHeaders } from '../../utils/apiClient';
 
 interface CreateWindowModalProps {
   isOpen: boolean;
@@ -56,7 +57,7 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
 
     setNameCheckStatus('checking');
     const timer = setTimeout(() => {
-      fetch(`${API_BASE}/api/ventanas-check/${encodeURIComponent(clean)}`)
+      fetch(`${API_BASE}/api/ventanas-check/${encodeURIComponent(clean)}`, { headers: getAuthHeaders() })
         .then(res => {
           if (!res.ok) throw new Error("HTTP " + res.status);
           return res.json();
@@ -92,7 +93,7 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
   useEffect(() => {
     if (!isOpen) return;
     setLoadingCatalogs(true);
-    fetch(`${API_BASE}/api/filtros/opciones`)
+    fetch(`${API_BASE}/api/filtros/opciones`, { headers: getAuthHeaders() })
       .then(r => r.json())
       .then(data => {
         setSectores(data.sectores || []);

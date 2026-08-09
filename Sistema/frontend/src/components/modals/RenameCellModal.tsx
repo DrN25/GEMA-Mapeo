@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Pencil, X, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+import { getAuthHeaders } from '../../utils/apiClient';
 
 interface RenameCellModalProps {
   isOpen: boolean;
@@ -55,7 +56,7 @@ export default function RenameCellModal({
 
     setNameCheckStatus('checking');
     const timer = setTimeout(() => {
-      fetch(`${API_BASE}/api/ventanas-check/${encodeURIComponent(clean)}?current_codigo=${encodeURIComponent(cleanCurrent)}`)
+      fetch(`${API_BASE}/api/ventanas-check/${encodeURIComponent(clean)}?current_codigo=${encodeURIComponent(cleanCurrent)}`, { headers: getAuthHeaders() })
         .then(res => {
           if (!res.ok) throw new Error("HTTP " + res.status);
           return res.json();

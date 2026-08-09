@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getAuthHeaders } from '../../utils/apiClient';
 import { 
   FileSpreadsheet, Upload, Download, CheckCircle, 
   AlertCircle, GitCompare, ArrowRightLeft, Shield, Sliders
@@ -37,6 +38,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
     try {
       const res = await fetch(`${apiBase}/api/congruencia/auditar`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData,
       });
 
@@ -79,6 +81,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
     try {
       const res = await fetch(`${apiBase}/api/congruencia/comparar`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData,
       });
 

@@ -357,7 +357,7 @@ export default function Dashboard({
         </details>
 
         {/* KPIs contextuales */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
             <div className="space-y-1">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Rango activo</span>

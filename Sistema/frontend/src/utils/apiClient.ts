@@ -1,6 +1,5 @@
-// apiClient.ts — Cliente HTTP global con timeout, reintentos con backoff
-// y monitor de conexión para manejar cold-start y sleep del backend
-// (Render free tier: duerme a los 15 min de inactividad, tarda ~1 min en despertar).
+// apiClient.ts — Cliente HTTP global con timeout, reintentos con backoff,
+// inyección automática de cabeceras Bearer JWT y monitor de conexión
 
 type ConnectionState = 'online' | 'offline';
 
@@ -51,6 +50,20 @@ function isRetryableStatus(status: number) {
     return status >= 500 || status === 429;
 }
 
+/**
+ * Retorna un objeto con las cabeceras inyectando automáticamente el token Bearer si existe en localStorage
+ */
+export function getAuthHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
+    const headers: Record<string, string> = { ...customHeaders };
+    try {
+        const token = localStorage.getItem('gema_auth_token');
+        if (token && !headers['Authorization'] && !headers['authorization']) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+    } catch (e) { }
+    return headers;
+}
+
 export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise<Response> {
     const {
         timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -61,6 +74,8 @@ export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise
         headers = {},
         signal,
     } = opts;
+
+    const mergedHeaders = getAuthHeaders(headers);
 
     let attempt = 0;
     let lastError: unknown = null;
@@ -78,7 +93,7 @@ export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise
             const res = await fetch(url, {
                 method,
                 body,
-                headers,
+                headers: mergedHeaders,
                 signal: controller.signal,
                 cache: 'no-store',
             });

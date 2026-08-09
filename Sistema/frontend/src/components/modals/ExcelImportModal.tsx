@@ -5,6 +5,7 @@ import {
   Layers, Eye, AlertCircle, Info, RefreshCw
 } from 'lucide-react';
 import { getFieldPrecision } from '../../utils/numericPrecision';
+import { getAuthHeaders } from '../../utils/apiClient';
 
 // Formatea un valor con la precisión de display del SSOT (los decimales del
 // Excel no deben verse crudos en el preview: generan desconfianza).
@@ -234,7 +235,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
       setSheetsLoading(true);
       const fd = new FormData();
       fd.append('file', f);
-      fetch(`${apiBaseUrl}/api/importar-excel/hojas`, { method: 'POST', body: fd })
+      fetch(`${apiBaseUrl}/api/importar-excel/hojas`, { method: 'POST', headers: getAuthHeaders(), body: fd })
         .then(res => res.json().catch(() => null))
         .then(data => {
           const names = data?.hojas || [];
@@ -263,7 +264,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(targetUrl, { method: 'POST', body: formData });
+      const res = await fetch(targetUrl, { method: 'POST', headers: getAuthHeaders(), body: formData });
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && data.status === 'success') {
