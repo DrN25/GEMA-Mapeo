@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import type { User, Role } from '../../types/auth';
-import { CheckCircle2, AlertTriangle, Loader2, Plus, Edit, ShieldAlert, X, Shield, UserCheck } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Loader2, Plus, Edit, ShieldAlert, X, Shield, UserCheck, Eye, EyeOff } from 'lucide-react';
 
 export const AdminUsersView: React.FC = () => {
   const { authFetch, user: currentUser } = useAuth();
@@ -14,6 +14,11 @@ export const AdminUsersView: React.FC = () => {
   // Submitting state para prevenir múltiples clics
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingActionId, setSubmittingActionId] = useState<string | null>(null);
+
+  // Visibilidad de contraseñas
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showNewConfirmPassword, setShowNewConfirmPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   // Modal Feedback de Resultado / Éxito / Alerta
   const [feedbackModal, setFeedbackModal] = useState<{
@@ -100,8 +105,8 @@ export const AdminUsersView: React.FC = () => {
   const cleanEditUsuario = editUsuario.trim().toUpperCase();
   const cleanEditEmail = editEmail.trim().toLowerCase();
 
-  const isEditUserDuplicate = editUser !== null && cleanEditUsuario !== '' && users.some(u => u.usuario_id !== editUser.usuario_id && u.usuario.trim().toUpperCase() === cleanEditUsuario);
-  const isEditEmailDuplicate = editUser !== null && cleanEditEmail !== '' && users.some(u => u.usuario_id !== editUser.usuario_id && u.email.trim().toLowerCase() === cleanEditEmail);
+  const isEditUserDuplicate = editUser !== null && cleanEditUsuario !== '' && users.some(u => Number(u.usuario_id) !== Number(editUser.usuario_id) && u.usuario.trim().toUpperCase() === cleanEditUsuario);
+  const isEditEmailDuplicate = editUser !== null && cleanEditEmail !== '' && users.some(u => Number(u.usuario_id) !== Number(editUser.usuario_id) && (u.email || '').trim().toLowerCase() === cleanEditEmail);
   const isEditValid = editUser !== null && cleanEditUsuario !== '' && !isEditUserDuplicate && cleanEditEmail !== '' && !isEditEmailDuplicate && !isSubmitting;
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -131,6 +136,7 @@ export const AdminUsersView: React.FC = () => {
       setNewUsuario('');
       setNewEmail('');
       setNewPassword('');
+      setNewConfirmPassword('');
       setNewNombreCompleto('');
       await loadData();
 
@@ -159,6 +165,7 @@ export const AdminUsersView: React.FC = () => {
     setEditEmail(u.email);
     setEditRolId(u.rol_id);
     setEditPassword('');
+    setShowEditPassword(false);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -295,6 +302,8 @@ export const AdminUsersView: React.FC = () => {
               setNewPassword('');
               setNewConfirmPassword('');
               setNewNombreCompleto('');
+              setShowNewPassword(false);
+              setShowNewConfirmPassword(false);
               setShowCreateModal(true);
             }}
             disabled={isSubmitting}
@@ -456,7 +465,7 @@ export const AdminUsersView: React.FC = () => {
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Usuario Corto (para Auditoría, ej: CBAL) *
+                  Usuario Corto (para Auditoría, ej: CBAL) <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <input
                   type="text"
@@ -477,7 +486,7 @@ export const AdminUsersView: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Correo Electrónico *
+                  Correo Electrónico <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <input
                   type="email"
@@ -512,32 +521,54 @@ export const AdminUsersView: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Contraseña Inicial *
+                  Contraseña Inicial <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    className="w-full bg-[#02040a] border border-slate-800 rounded-xl pl-3.5 pr-10 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    disabled={isSubmitting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors"
+                    title={showNewPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Confirmar Contraseña *
+                  Confirmar Contraseña <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
-                <input
-                  type="password"
-                  value={newConfirmPassword}
-                  onChange={(e) => setNewConfirmPassword(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewConfirmPassword ? 'text' : 'password'}
+                    value={newConfirmPassword}
+                    onChange={(e) => setNewConfirmPassword(e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    className="w-full bg-[#02040a] border border-slate-800 rounded-xl pl-3.5 pr-10 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewConfirmPassword(!showNewConfirmPassword)}
+                    disabled={isSubmitting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors"
+                    title={showNewConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showNewConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
                 {newConfirmPassword !== '' && !isPasswordMatch && (
                   <p className="mt-1.5 text-[11px] text-rose-400 font-semibold flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -548,7 +579,7 @@ export const AdminUsersView: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Rol de Usuario RBAC *
+                  Rol de Usuario RBAC <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <select
                   value={newRolId}
@@ -614,7 +645,7 @@ export const AdminUsersView: React.FC = () => {
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Usuario Corto *
+                  Usuario Corto <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <input
                   type="text"
@@ -634,7 +665,7 @@ export const AdminUsersView: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Correo Electrónico *
+                  Correo Electrónico <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <input
                   type="email"
@@ -667,7 +698,7 @@ export const AdminUsersView: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Rol de Usuario RBAC
+                  Rol de Usuario RBAC <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <select
                   value={editRolId}
@@ -687,14 +718,25 @@ export const AdminUsersView: React.FC = () => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
                   Cambiar Contraseña (Dejar en blanco para conservar actual)
                 </label>
-                <input
-                  type="password"
-                  value={editPassword}
-                  onChange={(e) => setEditPassword(e.target.value)}
-                  placeholder="Nueva contraseña opcional..."
-                  disabled={isSubmitting}
-                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="Nueva contraseña opcional..."
+                    disabled={isSubmitting}
+                    className="w-full bg-[#02040a] border border-slate-800 rounded-xl pl-3.5 pr-10 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    disabled={isSubmitting}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors"
+                    title={showEditPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showEditPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">

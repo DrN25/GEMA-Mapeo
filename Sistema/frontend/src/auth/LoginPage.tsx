@@ -117,7 +117,7 @@ export const LoginPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                  Usuario o Correo Electrónico
+                  Usuario o Correo Electrónico <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <input
                   type="text"
@@ -131,7 +131,7 @@ export const LoginPage: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                  Contraseña
+                  Contraseña <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <div className="relative">
                   <input
