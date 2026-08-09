@@ -172,31 +172,40 @@ def forgot_password(
     if user.usuario:
         RECOVERY_CODES[user.usuario.upper()] = RECOVERY_CODES[user.email.lower()]
 
-    # Envío de correo vía Resend API (HTTP/443) — funciona en Render Free Plan
-    resend_api_key = os.getenv("RESEND_API_KEY")
-    resend_from = os.getenv("RESEND_FROM", "GEMA Mapeo <onboarding@resend.dev>")
+    # Envío de correo vía Brevo API (HTTP/443) — funciona en Render Free Plan
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+    brevo_sender_name = os.getenv("BREVO_SENDER_NAME", "GEMA Mapeo")
+    brevo_sender_email = os.getenv("BREVO_SENDER_EMAIL", "soporte.gema.mapeo@gmail.com")
 
     email_sent = False
-    if resend_api_key:
+    if brevo_api_key:
         try:
-            import resend
-            resend.api_key = resend_api_key
-            params: resend.Emails.SendParams = {
-                "from": resend_from,
-                "to": [user.email],
+            import httpx
+            payload = {
+                "sender": {"name": brevo_sender_name, "email": brevo_sender_email},
+                "to": [{"email": user.email, "name": user.usuario}],
                 "subject": "GEMA — Código de Recuperación de Contraseña",
-                "text": (
+                "textContent": (
                     f"Hola {user.usuario},\n\n"
                     f"Tu código de verificación para restablecer tu contraseña en GEMA es:\n\n"
                     f"  {code}\n\n"
-                    f"Este código expira en breve. Si no solicitaste este cambio, puedes ignorar este correo."
+                    f"Este código expira en breve. Si no solicitaste este cambio, puedes ignorar este correo.\n\n"
+                    f"— Sistema GEMA Mapeo"
                 ),
             }
-            resend.Emails.send(params)
-            email_sent = True
-            logger.info(f"Correo Resend enviado exitosamente a {user.email}")
+            response = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                json=payload,
+                headers={"api-key": brevo_api_key, "Content-Type": "application/json"},
+                timeout=15,
+            )
+            if response.status_code in (200, 201):
+                email_sent = True
+                logger.info(f"Correo Brevo enviado exitosamente a {user.email}")
+            else:
+                logger.warning(f"Brevo respondió {response.status_code}: {response.text}. Se utilizó el código generado: {code}")
         except Exception as e:
-            logger.warning(f"No se pudo enviar correo vía Resend: {e}. Se utilizó el código generado: {code}")
+            logger.warning(f"No se pudo enviar correo vía Brevo: {e}. Se utilizó el código generado: {code}")
 
     logger.info(f"🔑 CÓDIGO DE RECUPERACIÓN GEMA para '{user.usuario}' ({user.email}): {code}")
 

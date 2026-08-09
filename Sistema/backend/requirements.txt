@@ -15,4 +15,3 @@ bcrypt>=4.0.0
 python-jose[cryptography]>=3.3.0
 pytest>=7.0.0
 httpx>=0.24.0
-resend>=0.7.0
