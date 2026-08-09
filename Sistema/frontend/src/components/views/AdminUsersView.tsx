@@ -44,6 +44,7 @@ export const AdminUsersView: React.FC = () => {
   const [newUsuario, setNewUsuario] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newConfirmPassword, setNewConfirmPassword] = useState('');
   const [newNombreCompleto, setNewNombreCompleto] = useState('');
   const [newRolId, setNewRolId] = useState<number>(2); // Default 'mapeador'
 
@@ -92,7 +93,8 @@ export const AdminUsersView: React.FC = () => {
 
   const isCreateUserDuplicate = cleanCreateUsuario !== '' && users.some(u => u.usuario.trim().toUpperCase() === cleanCreateUsuario);
   const isCreateEmailDuplicate = cleanCreateEmail !== '' && users.some(u => u.email.trim().toLowerCase() === cleanCreateEmail);
-  const isCreateValid = cleanCreateUsuario !== '' && !isCreateUserDuplicate && cleanCreateEmail !== '' && !isCreateEmailDuplicate && newPassword.trim() !== '' && !isSubmitting;
+  const isPasswordMatch = newPassword.trim() !== '' && newPassword === newConfirmPassword;
+  const isCreateValid = cleanCreateUsuario !== '' && !isCreateUserDuplicate && cleanCreateEmail !== '' && !isCreateEmailDuplicate && isPasswordMatch && !isSubmitting;
 
   // Validaciones en tiempo real para Editar Usuario
   const cleanEditUsuario = editUsuario.trim().toUpperCase();
@@ -291,6 +293,7 @@ export const AdminUsersView: React.FC = () => {
               setNewUsuario('');
               setNewEmail('');
               setNewPassword('');
+              setNewConfirmPassword('');
               setNewNombreCompleto('');
               setShowCreateModal(true);
             }}
@@ -520,6 +523,27 @@ export const AdminUsersView: React.FC = () => {
                   className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
                   placeholder="••••••••"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Confirmar Contraseña *
+                </label>
+                <input
+                  type="password"
+                  value={newConfirmPassword}
+                  onChange={(e) => setNewConfirmPassword(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none"
+                  placeholder="••••••••"
+                />
+                {newConfirmPassword !== '' && !isPasswordMatch && (
+                  <p className="mt-1.5 text-[11px] text-rose-400 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Las contraseñas no coinciden.</span>
+                  </p>
+                )}
               </div>
 
               <div>
