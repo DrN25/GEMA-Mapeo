@@ -158,11 +158,11 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
                 <input
                   type="text"
                   value={emailOrUsername}
-                  onChange={(e) => setEmailOrUsername(e.target.value.toUpperCase())}
+                  onChange={(e) => setEmailOrUsername(e.target.value)}
                   required
                   disabled={isSubmitting}
-                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl pl-3.5 pr-4 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none uppercase font-bold"
-                  placeholder="ej: ADMIN o CARLOS@GEMA.COM"
+                  className="w-full bg-[#02040a] border border-slate-800 rounded-xl pl-3.5 pr-4 py-2.5 text-slate-100 text-xs focus:border-indigo-500 focus:outline-none font-medium"
+                  placeholder="ej: ADMIN o carlos@gema.com"
                 />
               </div>
             </div>
