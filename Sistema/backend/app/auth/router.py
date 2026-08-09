@@ -92,8 +92,6 @@ import random
 import string
 import logging
 import os
-import smtplib
-from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +134,7 @@ def forgot_password(
 ):
     """
     Solicita la recuperación de contraseña enviando un código de 6 dígitos al correo del usuario.
-    Soporta envío vía SMTP en entornos configurados y registra en consola en modo local/Docker.
+    Usa Resend API (HTTP/443) en producción — compatible con Render Free Plan.
     """
     val = data.email_or_username.strip()
     if not val:
@@ -174,40 +172,31 @@ def forgot_password(
     if user.usuario:
         RECOVERY_CODES[user.usuario.upper()] = RECOVERY_CODES[user.email.lower()]
 
-    # Intentar envío vía SMTP si está configurado en .env
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASSWORD")
+    # Envío de correo vía Resend API (HTTP/443) — funciona en Render Free Plan
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    resend_from = os.getenv("RESEND_FROM", "GEMA Mapeo <onboarding@resend.dev>")
 
     email_sent = False
-    if smtp_host and smtp_user and smtp_pass:
+    if resend_api_key:
         try:
-            msg = MIMEText(f"Hola {user.usuario},\n\nTu código de verificación para restablecer tu contraseña en GEMA es: {code}\n\nEste código expira pronto.\nSi no solicitaste este cambio, puedes ignorar este correo.")
-            msg['Subject'] = 'GEMA — Código de Recuperación de Contraseña'
-            msg['From'] = smtp_user
-            msg['To'] = user.email
-
-            if smtp_port == 465:
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
-                    server.login(smtp_user, smtp_pass)
-                    server.sendmail(smtp_user, [user.email], msg.as_string())
-            else:
-                try:
-                    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                        server.starttls()
-                        server.login(smtp_user, smtp_pass)
-                        server.sendmail(smtp_user, [user.email], msg.as_string())
-                except Exception as inner_err:
-                    logger.warning(f"SMTP port {smtp_port} falló ({inner_err}), reintentando con SSL en puerto 465...")
-                    with smtplib.SMTP_SSL(smtp_host, 465, timeout=10) as server:
-                        server.login(smtp_user, smtp_pass)
-                        server.sendmail(smtp_user, [user.email], msg.as_string())
-
+            import resend
+            resend.api_key = resend_api_key
+            params: resend.Emails.SendParams = {
+                "from": resend_from,
+                "to": [user.email],
+                "subject": "GEMA — Código de Recuperación de Contraseña",
+                "text": (
+                    f"Hola {user.usuario},\n\n"
+                    f"Tu código de verificación para restablecer tu contraseña en GEMA es:\n\n"
+                    f"  {code}\n\n"
+                    f"Este código expira en breve. Si no solicitaste este cambio, puedes ignorar este correo."
+                ),
+            }
+            resend.Emails.send(params)
             email_sent = True
-            logger.info(f"Correo de recuperación enviado exitosamente a {user.email}")
+            logger.info(f"Correo Resend enviado exitosamente a {user.email}")
         except Exception as e:
-            logger.warning(f"No se pudo enviar correo SMTP: {e}. Se utilizó el código generado: {code}")
+            logger.warning(f"No se pudo enviar correo vía Resend: {e}. Se utilizó el código generado: {code}")
 
     logger.info(f"🔑 CÓDIGO DE RECUPERACIÓN GEMA para '{user.usuario}' ({user.email}): {code}")
 
