@@ -50,7 +50,7 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       await login({
-        username_or_email: usernameOrEmail.trim().toUpperCase(),
+        username_or_email: usernameOrEmail.trim(),
         password: password
       });
     } catch (err: any) {

@@ -199,7 +199,7 @@ def forgot_password(
                 headers={"api-key": brevo_api_key, "Content-Type": "application/json"},
                 timeout=15,
             )
-            if response.status_code in (200, 201):
+            if 200 <= response.status_code < 300:
                 email_sent = True
                 logger.info(f"Correo Brevo enviado exitosamente a {user.email}")
             else:
