@@ -1553,6 +1553,7 @@ const [dbOnline, setDbOnline] = useState(true);
           clearPltDelta(celdaName);
           removePendingPltCell(celdaName);
           setDbOnline(true);
+          successCount++;
         } else {
           const errData = await res.json().catch(() => ({}));
           const detailMsg = errData.detail || `Error (${res.status}) al guardar ensayos PLT.`;
@@ -1592,7 +1593,7 @@ const [dbOnline, setDbOnline] = useState(true);
     if (successCount > 0) {
       setSaveResultData({
         savedCount: successCount,
-        totalEdits: workspaceDiff.totalCellEditsAll,
+        totalEdits: workspaceDiff.totalCellEditsAll + pltDiffSummary.totalChanges,
         totalJoints: totalJointsSaved
       });
       setShowSaveResultModal(true);
