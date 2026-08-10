@@ -156,9 +156,9 @@ export default function CommentsPhotos({
           </h3>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-300 font-bold bg-navy-900 border border-navy-800 px-2.5 py-1 rounded-md">
-              {activePhotoCount} / 4 fotos
+              {activePhotoCount} / 2 fotos
             </span>
-            {activePhotoCount < 4 && (
+            {activePhotoCount < 2 && (
               <button
                 onClick={addPhotoSlot}
                 className="flex items-center gap-1 bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/25 text-orange-400 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md"
@@ -172,7 +172,7 @@ export default function CommentsPhotos({
 
         {/* Rejilla de Imágenes */}
         <div className="grid grid-cols-2 gap-4 mt-4">
-          {[0, 1, 2, 3].map((idx) => {
+          {[0, 1].map((idx) => {
             const hasPhoto = !!photos[idx];
 
             return (
