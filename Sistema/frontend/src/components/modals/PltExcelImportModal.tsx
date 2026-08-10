@@ -208,7 +208,12 @@ export default function PltExcelImportModal({
         const getNum = (row: any[], key: string, fallback = 0) => {
             const val = getVal(row, key);
             if (val === null || val === undefined || val === "") return fallback;
-            const num = parseFloat(String(val).replace(/,/g, ''));
+            let s = String(val).trim();
+            if (s.includes(',')) {
+                const commas = (s.match(/,/g) || []).length;
+                s = commas === 1 ? s.replace(',', '.') : s.replace(/,/g, '');
+            }
+            const num = parseFloat(s);
             return isNaN(num) ? fallback : num;
         };
 
@@ -272,7 +277,7 @@ export default function PltExcelImportModal({
 
             const cUp = rowObj.celda_mapeo.trim().toUpperCase();
             const mUp = rowObj.muestra.trim();
-            rowObj.codigo_muestra = cUp && mUp ? `${cUp}-${mUp}` : "";
+            rowObj.codigo_muestra = cUp && mUp ? `${cUp}_${mUp}` : "";
 
             resolveImportedLithology(rowObj);
             list.push(rowObj);

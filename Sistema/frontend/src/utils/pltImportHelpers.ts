@@ -48,7 +48,8 @@ export function groupPltRowsByCelda(rows: any[], knownCells: string[]): PltImpor
  * celda_mapeo con el CÓDIGO REAL de la celda (trim + mayúsculas, sin
  * normalizar: normalizeCeldaCode solo sirve para comparar/agrupar, el valor
  * persistido debe ser el código tal cual, p.ej. "TEST_004") y regenera
- * codigo_muestra con el mismo criterio del modal ({CELDA}-{muestra}).
+ * codigo_muestra con el mismo criterio del modal y de applyPltFormulas
+ * ({CELDA}_{muestra}, guion bajo — el formato persistido en la tabla).
  */
 export function retagPltRows(rows: any[], targetCelda: string): any[] {
   const cUp = String(targetCelda || '').trim().toUpperCase();
@@ -57,7 +58,7 @@ export function retagPltRows(rows: any[], targetCelda: string): any[] {
     return {
       ...r,
       celda_mapeo: cUp,
-      codigo_muestra: cUp && mUp ? `${cUp}-${mUp}` : ''
+      codigo_muestra: cUp && mUp ? `${cUp}_${mUp}` : ''
     };
   });
 }

@@ -32,13 +32,13 @@ const ok = (cond, msg) => {
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const rows = [
-  { id: 1, celda_mapeo: 'test_004 ', muestra: 'A1', codigo_muestra: 'TEST_004-A1' },
-  { id: 2, celda_mapeo: 'test_004', muestra: 'A2', codigo_muestra: 'TEST_004-A2' },
-  { id: 3, celda_mapeo: 'RTF_001', muestra: 'B1', codigo_muestra: 'RTF_001-B1' },
-  { id: 4, celda_mapeo: 'RTF_001', muestra: 'B2', codigo_muestra: 'RTF_001-B2' },
-  { id: 5, celda_mapeo: 'noexiste_zz', muestra: 'C1', codigo_muestra: 'NOEXISTE_ZZ-C1' },
+  { id: 1, celda_mapeo: 'test_004 ', muestra: 'A1', codigo_muestra: 'TEST_004_A1' },
+  { id: 2, celda_mapeo: 'test_004', muestra: 'A2', codigo_muestra: 'TEST_004_A2' },
+  { id: 3, celda_mapeo: 'RTF_001', muestra: 'B1', codigo_muestra: 'RTF_001_B1' },
+  { id: 4, celda_mapeo: 'RTF_001', muestra: 'B2', codigo_muestra: 'RTF_001_B2' },
+  { id: 5, celda_mapeo: 'noexiste_zz', muestra: 'C1', codigo_muestra: 'NOEXISTE_ZZ_C1' },
   { id: 6, celda_mapeo: '  ', muestra: 'D1', codigo_muestra: '' },
-  { id: 7, celda_mapeo: 'RTF_001', muestra: 'B3', codigo_muestra: 'RTF_001-B3' },
+  { id: 7, celda_mapeo: 'RTF_001', muestra: 'B3', codigo_muestra: 'RTF_001_B3' },
 ];
 
 console.log('\n=== 1. groupPltRowsByCelda (agrupación + existencia) ===');
@@ -62,7 +62,7 @@ console.log('\n=== 2. retagPltRows (renombrado a otra celda) ===');
 const retagged = h.retagPltRows(gRtf.rows, 'test_004');
 ok(retagged.length === 3, 'Mantiene la cantidad de registros');
 ok(retagged.every(r => r.celda_mapeo === 'TEST_004'), 'celda_mapeo con el CÓDIGO REAL (TEST_004, no normalizado)');
-ok(retagged[0].codigo_muestra === 'TEST_004-B1', `codigo_muestra regenerado (obtuvo ${retagged[0].codigo_muestra})`);
+ok(retagged[0].codigo_muestra === 'TEST_004_B1', `codigo_muestra regenerado con guion bajo (obtuvo ${retagged[0].codigo_muestra})`);
 ok(retagged[0].muestra === 'B1' && retagged[0].id === 3, 'Resto de campos intactos');
 
 const retagged2 = h.retagPltRows([{ id: 1, celda_mapeo: 'X', muestra: '  ', codigo_muestra: 'X-1' }], 'RTF_001');

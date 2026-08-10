@@ -407,7 +407,7 @@ export function applyPltFormulas(row: any) {
         ? roundTo(r.is_mpa * r.f, 4)
         : null;
 
-    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, null);
+    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, r.model2022 || null);
     r.factor_conversion_k = res.k;
     r.tipo_litologico = res.clase;
 
@@ -477,7 +477,7 @@ export function applyLitoCascade(key: string, val: any, row: any) {
         }
     }
 
-    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, null);
+    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, r.model2022 || null);
     r.factor_conversion_k = res.k;
     r.tipo_litologico = res.clase;
 
