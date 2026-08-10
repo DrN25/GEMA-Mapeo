@@ -1065,68 +1065,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
           </div>
         )}
 
-        {activeTab === 'plt_direccion_rotura' && (
-          <div className="space-y-3">
-            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <Compass size={14} className="text-emerald-400" />
-              <span>Dirección de Rotura (ISRM)</span>
-            </h3>
-            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
-                    <th className="py-2.5 px-4 w-24">Sigla</th>
-                    <th className="py-2.5 px-4">Descripción Geológica</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
-                  {[
-                    { sigla: "Pa", desc: "Paralela a los planos de debilidad (estratificación, foliación)" },
-                    { sigla: "Pe", desc: "Perpendicular a los planos de debilidad (estratificación, foliación)" },
-                    { sigla: "NA", desc: "No aplica (rocas masivas sin planos de debilidad)" }
-                  ].map((row, index) => (
-                    <tr key={index} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-bold text-emerald-400">{row.sigla}</td>
-                      <td className="py-2.5 px-4 text-slate-200">{row.desc}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'plt_tipo_fractura' && (
-          <div className="space-y-3">
-            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <AlignLeft size={14} className="text-indigo-400" />
-              <span>Tipo de Fractura / Rotura</span>
-            </h3>
-            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
-                    <th className="py-2.5 px-4 w-24">Tipo</th>
-                    <th className="py-2.5 px-4">Criterio de Aceptación</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
-                  {[
-                    { tipo: "M", desc: "Rotura por matriz. Si la muestra no se rompe se considera M." },
-                    { tipo: "E", desc: "Rotura por estructura preexistente." },
-                    { tipo: "C", desc: "Rotura combinada (por matriz y estructura en simultáneo)." }
-                  ].map((row, index) => (
-                    <tr key={index} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-bold text-indigo-400">{row.tipo}</td>
-                      <td className="py-2.5 px-4 text-slate-200">{row.desc}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'plt_valoracion_rmr' && (
           <div className="space-y-3">
             <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
