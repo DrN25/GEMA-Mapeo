@@ -55,23 +55,27 @@ RUGOSIDAD_RATING_CATALOG = {
 }
 
 # 5. CONSTANTES DE RELLENO (Unificado de calculator.py)
+# Semántica de clase: 1 = Blando, 2 = Duro, 3 = Sin relleno
+# (coherente con frontend catalogData.ts: initCatalogs y defaults)
 RELLENO_TIPO = {
     "-1": 3,
     "c": 3,
     "cwf": 3,
-    "si": 1,
-    "sf": 1,
-    "ep": 1,
-    "ox": 1,
-    "qz": 1,
-    "g": 2,
-    "cl": 2,
-    "ca": 2,
-    "ys": 2,
-    "ch": 2,
-    "sa": 2,
+    "si": 2,
+    "sf": 2,
+    "ep": 2,
+    "ox": 2,
+    "qz": 2,
+    "g": 1,
+    "cl": 1,
+    "ca": 1,
+    "ys": 1,
+    "ch": 1,
+    "sa": 1,
 }
 
+# comb = tipo × espesor: 1 = Duro < 5mm, 2 = Duro >= 5mm,
+# 3 = Blando < 5mm, 4 = Blando >= 5mm, 5 = Sin relleno
 RELLENO_VALORES = {
     1: {"r89": 4, "r76": 4}, # Duro < 5mm
     2: {"r89": 2, "r76": 3}, # Duro >= 5mm

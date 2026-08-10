@@ -48,9 +48,9 @@ def get_relleno_comb_code(tipo_code, espesor):
         return None
     
     es_menor_5 = espesor < 5.0
-    if r_type == 1: # Duro
+    if r_type == 2: # Duro (clase 2)
         return 1 if es_menor_5 else 2
-    if r_type == 2: # Blando
+    if r_type == 1: # Blando (clase 1)
         return 3 if es_menor_5 else 4
     return None
 
