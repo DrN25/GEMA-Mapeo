@@ -1827,7 +1827,7 @@ const [connectionLost, setConnectionLost] = useState(false);
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-navy-950 text-slate-100 font-sans">
+    <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-navy-950 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
       {/* 1. SIDEBAR */}
       <Sidebar
         currentView={currentView}
@@ -1841,13 +1841,13 @@ const [connectionLost, setConnectionLost] = useState(false);
       {/* 2. MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Sync Status Header */}
-        <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
+        <header className="h-16 border-b border-slate-200/80 dark:border-navy-800 flex items-center justify-between px-6 bg-white/80 dark:bg-navy-950/40 backdrop-blur z-10 shrink-0 transition-colors">
           <div className="flex items-center gap-3">
 
             {/* BOTÓN INTERACTIVO DE COLAPSO */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
+              className="p-2 mr-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-navy-900 dark:hover:bg-navy-850 border border-slate-200 dark:border-navy-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-all shadow-sm active:scale-95"
               title={sidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
             >
               <Menu size={16} />
@@ -1856,7 +1856,7 @@ const [connectionLost, setConnectionLost] = useState(false);
             {currentView !== 'dashboard' && (
               <button
                 onClick={() => setCurrentView('dashboard')}
-                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-navy-900 dark:hover:bg-navy-850 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
               >
                 <ArrowLeft size={14} />
                 <span>Volver al Panel</span>
@@ -1866,12 +1866,12 @@ const [connectionLost, setConnectionLost] = useState(false);
 
           <div className="flex items-center gap-4">
             {/* Server Connectivity Indicator */}
-            <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
+            <div className="flex items-center gap-2 pr-3 border-r border-slate-200 dark:border-navy-800">
               <span className={`w-2.5 h-2.5 rounded-full ${dbOnline
                 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
                 : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
                 }`} />
-              <span className="text-xs text-slate-400 font-semibold hidden md:inline" title={dbOnline ? 'Conectado al servidor de base de datos SQL Server.' : 'SQL Server Desconectado'}>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold hidden md:inline" title={dbOnline ? 'Conectado al servidor de base de datos SQL Server.' : 'SQL Server Desconectado'}>
                 {dbOnline ? 'SQL Server Conectado' : 'SQL Server Desconectado'}
               </span>
             </div>
@@ -1882,40 +1882,40 @@ const [connectionLost, setConnectionLost] = useState(false);
               <button
                 onClick={() => setShowFormulas(!showFormulas)}
                 className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${showFormulas
-                  ? 'bg-violet-500/10 border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.12)]'
-                  : 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200'
+                  ? 'bg-violet-500/10 border-violet-500/40 text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.12)]'
+                  : 'bg-slate-100 dark:bg-navy-900 border-slate-200 dark:border-navy-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 title="Activar/Desactivar visualización de fórmulas al pasar el mouse"
               >
-                <Calculator size={14} className={showFormulas ? 'text-violet-400 animate-pulse' : 'text-slate-400'} />
+                <Calculator size={14} className={showFormulas ? 'text-violet-600 dark:text-violet-400 animate-pulse' : 'text-slate-500 dark:text-slate-400'} />
                 <span>{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
               </button>
 
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
-                className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95"
+                className="flex items-center gap-1.5 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/40 hover:bg-sky-100 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                 title="Ver Catálogos de Referencia Geomecánica de Ventanas"
               >
-                <BookOpen size={14} className="text-sky-400" />
+                <BookOpen size={14} className="text-sky-600 dark:text-sky-400" />
                 <span>Catálogo de Ventanas</span>
               </button>
 
               <button
                 onClick={() => setIsPltCatalogModalOpen(true)}
-                className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95"
+                className="flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/40 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                 title="Ver Catálogos de Referencia de Ensayos PLT"
               >
-                <Activity size={14} className="text-cyan-400" />
+                <Activity size={14} className="text-cyan-600 dark:text-cyan-400" />
                 <span>Catálogo de Ensayos PLT</span>
               </button>
 
               {activeWindow && (
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95"
+                  className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/40 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                   title="Exportar Mapeo de esta Ventana en Formato Excel DB"
                 >
-                  <FileSpreadsheet size={14} className="text-emerald-400" />
+                  <FileSpreadsheet size={14} className="text-emerald-600 dark:text-emerald-400" />
                   <span>Exportar</span>
                 </button>
               )}
@@ -1925,7 +1925,7 @@ const [connectionLost, setConnectionLost] = useState(false);
                 <button
                   onClick={() => setShowDiscardModal(true)}
                   disabled={isLoadingWindow}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/40"
                   title="Descartar cambios no guardados en el espacio de trabajo"
                 >
                   <RotateCcw size={14} />
@@ -1938,15 +1938,15 @@ const [connectionLost, setConnectionLost] = useState(false);
                 onClick={() => setShowSaveConfirmModal(true)}
                 disabled={isLoadingWindow || (unsavedCount === 0 && syncStatus !== 'unsaved')}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative ${unsavedCount > 0 || syncStatus === 'unsaved'
-                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
-                  : 'bg-navy-900 border-navy-800 text-slate-500 cursor-not-allowed opacity-70'
+                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
+                  : 'bg-slate-100 dark:bg-navy-900 border-slate-200 dark:border-navy-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-70'
                   }`}
                 title="Guardar todos los cambios en SQL Server"
               >
                 <Save size={14} />
                 <span>GUARDAR CAMBIOS</span>
                 {(unsavedCount > 0 || syncStatus === 'unsaved') && (
-                  <span className="ml-1 bg-amber-500 text-navy-950 font-black text-[10px] px-1.5 py-0.5 rounded-full">
+                  <span className="ml-1 bg-amber-500 text-slate-900 dark:text-navy-950 font-black text-[10px] px-1.5 py-0.5 rounded-full">
                     {unsavedCount > 0 ? unsavedCount : '!'}
                   </span>
                 )}
