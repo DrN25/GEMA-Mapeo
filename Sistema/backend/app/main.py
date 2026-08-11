@@ -1,9 +1,11 @@
 # app/main.py
 import os
 import sys
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from app.database import engine
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -51,3 +53,12 @@ app.include_router(importador_router, prefix="/api", tags=["Importador de Excel"
 @app.get("/")
 def read_root():
     return {"status": "online", "service": "Geomechanical Mapping Engine API", "bd": "GEMA + SQLite PLT"}
+
+@app.get("/api/health")
+def health_check():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "online", "bd": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Base de datos no disponible")

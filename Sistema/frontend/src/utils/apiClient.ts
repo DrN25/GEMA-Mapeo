@@ -128,13 +128,33 @@ export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise
     throw lastError ?? new Error('Fetch failed');
 }
 
-// Ping liviano: despierta el backend (cold start) y actualiza el estado de conexión.
+// Ping liviano: verifica la salud del backend (proceso + base de datos) y
+// actualiza el estado de conexión. Va a /api/health para que también pase por
+// el proxy local de Vite y el de Netlify (un ping a "/" devolvería el index.html).
 export async function pingBackend(baseUrl: string): Promise<boolean> {
     try {
-        const res = await apiFetch(`${baseUrl}/`, {
+        const res = await apiFetch(`${baseUrl}/api/health`, {
             timeoutMs: 60_000,
             retries: 2,
             baseDelayMs: 2_000,
+        });
+        const ok = res.ok;
+        setConnectionState(ok ? 'online' : 'offline');
+        return ok;
+    } catch {
+        setConnectionState('offline');
+        return false;
+    }
+}
+
+// Ping de detección rápida: si el backend no responde en 10 s se sospecha caída.
+// Sirve para el cronómetro de actividad; la confirmación real la hace pingBackend.
+export async function pingBackendFast(baseUrl: string): Promise<boolean> {
+    try {
+        const res = await apiFetch(`${baseUrl}/api/health`, {
+            timeoutMs: 10_000,
+            retries: 0,
+            baseDelayMs: 0,
         });
         const ok = res.ok;
         setConnectionState(ok ? 'online' : 'offline');

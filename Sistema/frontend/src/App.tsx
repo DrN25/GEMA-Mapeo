@@ -9,6 +9,7 @@ import DisconTable from './components/views/DisconTable';
 import RmrAnalysis from './components/views/RmrAnalysis';
 import StructurePlot from './components/views/StructurePlot';
 import ValidationPanel from './components/Common/ValidationPanel';
+import ConnectionLostOverlay from './components/Common/ConnectionLostOverlay';
 import ExcelImportModal, { type ImportedCellItem } from './components/modals/ExcelImportModal';
 
 import CatalogsView from './components/views/CatalogsView';
@@ -26,7 +27,7 @@ import SaveErrorModal from './components/modals/SaveErrorModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
-import { apiFetch, pingBackend, getAuthHeaders } from './utils/apiClient';
+import { apiFetch, pingBackend, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState } from './utils/apiClient';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
   discardLocalCell,
@@ -250,6 +251,8 @@ const [syncMessage, setSyncMessage] = useState<string>('Conectado al servidor de
 // Indicador de conexión: SOLO refleja si la BD responde (verde/rojo).
 // Independiente del estado de cambios pendientes (syncStatus).
 const [dbOnline, setDbOnline] = useState(true);
+// Conexión perdida confirmada: modal bloqueante que obliga a recargar.
+const [connectionLost, setConnectionLost] = useState(false);
 
   // Boot resiliente: reintentos automáticos mientras el backend despierta (cold start)
   const [bootAttempt, setBootAttempt] = useState<number>(0);
@@ -342,45 +345,110 @@ const [dbOnline, setDbOnline] = useState(true);
     loadCatalogs();
   }, []);
 
-  // Heartbeat + detección de visibilidad:
-  // - Pestaña visible: ping cada 5 min (Render free duerme a los 15 min de inactividad)
-  //   -> el backend nunca duerme mientras la app está abierta.
-  // - Volver a la pestaña (visibilitychange): ping inmediato que despierta el backend
-  //   y actualiza el indicador de conexión (banner de reconexión).
-  // - Pestaña oculta: se detienen los pings (no se queman horas de instancia gratis).
+  // Cronómetro de actividad y verificación de conexión:
+  // - Se registra la última interacción del usuario (clic, tecla, scroll, toque).
+  // - Pings automáticos cada 1 minuto mientras haya actividad reciente (hasta
+  //   45 min sin interactuar): el backend (Render free) no duerme mientras el
+  //   usuario trabaja o acaba de irse.
+  // - Pasados 45 min sin interacción, los pings pasan a cada 20 minutos: la
+  //   instancia duerme entre pings (ahorra horas del plan free) y aun así se
+  //   detecta una caída en menos de 20 min.
+  // - El cronómetro corre siempre, incluso con la pestaña en segundo plano
+  //   (el navegador puede espaciar los timers, pero el ping llega igual).
+  // - Si un ping falla, se confirma con un segundo ping (60 s) antes de mostrar
+  //   el modal: evita falsos positivos por un blip de red.
+  // - Volver a la pestaña (visibilitychange): ping inmediato.
   const catalogsLoadedRef = useRef(false);
   useEffect(() => {
     catalogsLoadedRef.current = catalogsLoaded;
   }, [catalogsLoaded]);
 
+  const lastActivityRef = useRef(Date.now());
+
+  useEffect(() => {
+    const markActivity = () => { lastActivityRef.current = Date.now(); };
+    const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(ev => window.addEventListener(ev, markActivity, { passive: true }));
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, markActivity));
+    };
+  }, []);
+
   useEffect(() => {
     let disposed = false;
     let timer: number | undefined;
 
-    const heartbeat = async () => {
-      if (disposed) return;
+    const confirmLost = async () => {
       const ok = await pingBackend(API_BASE);
-      if (!disposed) setDbOnline(ok);
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        heartbeat();
-        if (!timer) timer = window.setInterval(heartbeat, 5 * 60 * 1000);
-      } else if (timer) {
-        window.clearInterval(timer);
-        timer = undefined;
+      if (disposed) return;
+      if (ok) {
+        setDbOnline(true);
+      } else {
+        setDbOnline(false);
+        setConnectionLost(true);
       }
     };
 
+    const heartbeat = async () => {
+      if (disposed) return;
+      const ok = await pingBackendFast(API_BASE);
+      if (disposed) return;
+      if (ok) {
+        setDbOnline(true);
+      } else {
+        await confirmLost();
+      }
+    };
+
+    const scheduleNext = () => {
+      if (disposed) return;
+      const inactiveMs = Date.now() - lastActivityRef.current;
+      const delay = inactiveMs < 45 * 60_000 ? 60_000 : 20 * 60_000;
+      timer = window.setTimeout(async () => {
+        await heartbeat();
+        if (!disposed) scheduleNext();
+      }, delay);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !timer) heartbeat();
+    };
+
     document.addEventListener('visibilitychange', onVisibility);
-    onVisibility();
+    scheduleNext();
     return () => {
       disposed = true;
       document.removeEventListener('visibilitychange', onVisibility);
-      if (timer) window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
     };
   }, []);
+
+  // Monitor global de conexión: cualquier petición que agote sus reintentos
+  // (apiClient marca 'offline') activa el modal al instante. Al volver 'online'
+  // solo se actualiza el indicador: el modal se cierra con sus botones.
+  useEffect(() => {
+    const unsubscribe = onConnectionChange((state) => {
+      if (state === 'offline') {
+        setDbOnline(false);
+        setConnectionLost(true);
+      } else {
+        setDbOnline(true);
+      }
+    });
+    if (getConnectionState() === 'offline') {
+      setDbOnline(false);
+      setConnectionLost(true);
+    }
+    return unsubscribe;
+  }, []);
+
+  const handleRetryConnection = async () => {
+    const ok = await pingBackend(API_BASE);
+    if (ok) {
+      setDbOnline(true);
+      setConnectionLost(false);
+    }
+  };
 
   // 3. Auditoría reactiva de diferencias y rastreo de celda activa
   const workspaceDiff = computeAllWindowsDiff(activeWindow, dbSnapshotData);
@@ -1749,6 +1817,11 @@ const [dbOnline, setDbOnline] = useState(true);
             <p className="text-xs text-slate-500 font-semibold">Se reintenta automáticamente cada 10 segundos...</p>
           </div>
         )}
+
+        <ConnectionLostOverlay
+          isOpen={connectionLost}
+          onRetry={handleRetryConnection}
+        />
       </div>
     );
   }
@@ -1767,13 +1840,6 @@ const [dbOnline, setDbOnline] = useState(true);
 
       {/* 2. MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        {/* Banner global de reconexión (backend dormido / fuera de línea) */}
-        {!dbOnline && (
-          <div className="bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs font-bold px-6 py-2 flex items-center gap-2 z-20">
-            <Loader2 size={14} className="animate-spin shrink-0" />
-            <span>Perdiste conexión con el servidor. Puede estar despertando... Reconectando automáticamente.</span>
-          </div>
-        )}
         {/* Sync Status Header */}
         <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
           <div className="flex items-center gap-3">
@@ -2310,6 +2376,12 @@ const [dbOnline, setDbOnline] = useState(true);
           </div>
         </div>
       )}
+
+      {/* Modal global de conexión perdida: bloquea todo (z-200) y obliga a recargar */}
+      <ConnectionLostOverlay
+        isOpen={connectionLost}
+        onRetry={handleRetryConnection}
+      />
     </div>
   );
 }
