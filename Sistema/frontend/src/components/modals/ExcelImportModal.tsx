@@ -30,6 +30,9 @@ export interface ImportedCellItem {
   codigo_final: string;
   excel_data: CellComparisonData;
   estructuras: EstructuraPreview[];
+  /** true si el código final YA existe en la BD (del preview). Permite a la
+   * app saltarse el GET de baseline para celdas nuevas (devolvía 404). */
+  exists_in_db?: boolean;
 }
 
 interface ExcelImportModalProps {
@@ -325,14 +328,19 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
     setShowDoubleConfirmModal(false);
 
     try {
+      const existingSet = new Set(existingCodes.map(c => String(c).trim().toUpperCase()));
       const itemsToImport: ImportedCellItem[] = celdas
         .filter(c => selectedCodes.has(c.codigo))
-        .map(c => ({
-          codigo_original: c.codigo,
-          codigo_final: (editedNames[c.codigo] || c.codigo).trim().toUpperCase(),
-          excel_data: c.excel_data,
-          estructuras: c.estructuras
-        }));
+        .map(c => {
+          const codigo_final = (editedNames[c.codigo] || c.codigo).trim().toUpperCase();
+          return {
+            codigo_original: c.codigo,
+            codigo_final,
+            excel_data: c.excel_data,
+            estructuras: c.estructuras,
+            exists_in_db: existingSet.has(codigo_final)
+          };
+        });
 
       onImport(itemsToImport);
       setImportResult({

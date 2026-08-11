@@ -1038,20 +1038,26 @@ const [dbOnline, setDbOnline] = useState(true);
 
     let imported = 0;
     const firstCelda = items[0]?.codigo_final;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const windowData = excelDataToWindowData(item.codigo_final, item.excel_data, item.estructuras);
-      if (!windowData) continue;
-      const celda = windowData.header.celda;
-      const ctx = { activeCelda: celda };
-      safeSetItem(`geolog_window_${celda}`, JSON.stringify(windowData), ctx);
 
-      // Baseline: si la celda ya existe en BD, traer su estado para que el
-      // guardado la ACTUALICE en lugar de bloquear por colisión de nombre.
-      // La PRIMERA celda se salta: handleSelectWindow la abrirá y hará ese
-      // fetch con su propia lógica (evita el GET duplicado en los logs).
-      const hasSnapshot = !!localStorage.getItem(`geolog_window_snapshot_${celda}`);
-      if (!hasSnapshot && celda !== firstCelda) {
+    // Baselines: el GET /ventanas/{celda} solo aporta si la celda YA existe
+    // en BD (para celdas nuevas devolvía 404 y se descartaba). Se hace solo
+    // para las existentes y con concurrencia limitada en vez de secuencial.
+    const prepared = items
+      .map(item => ({ item, windowData: excelDataToWindowData(item.codigo_final, item.excel_data, item.estructuras) }))
+      .filter((p): p is { item: ImportedCellItem; windowData: WindowData } => p.windowData !== null);
+
+    const needBaseline = prepared.filter(({ item, windowData }) => {
+      const celda = windowData.header.celda;
+      if (celda === firstCelda) return false;
+      if (localStorage.getItem(`geolog_window_snapshot_${celda}`)) return false;
+      return item.exists_in_db === true;
+    });
+
+    const BASELINE_CONCURRENCY = 5;
+    for (let i = 0; i < needBaseline.length; i += BASELINE_CONCURRENCY) {
+      await Promise.all(needBaseline.slice(i, i + BASELINE_CONCURRENCY).map(async ({ windowData }) => {
+        const celda = windowData.header.celda;
+        const ctx = { activeCelda: celda };
         try {
           const res = await fetch(`${API_BASE}/api/ventanas/${encodeURIComponent(celda)}`, { headers: getAuthHeaders() });
           if (res.ok) {
@@ -1070,7 +1076,13 @@ const [dbOnline, setDbOnline] = useState(true);
         } catch {
           // offline: quedará como borrador nuevo; el guardado avisará si colisiona
         }
-      }
+      }));
+    }
+
+    for (const { item, windowData } of prepared) {
+      const celda = windowData.header.celda;
+      const ctx = { activeCelda: celda };
+      safeSetItem(`geolog_window_${celda}`, JSON.stringify(windowData), ctx);
 
       addPendingCell(celda);
       // Estado de validación desde el primer momento (bloquea el guardado si está incompleta)
@@ -1376,7 +1388,13 @@ const [dbOnline, setDbOnline] = useState(true);
       return;
     }
 
-    for (const winData of windowsToSave) {
+    // Guardado por lotes de 4 concurrentes: mismo payload y mismo manejo de
+    // errores que el loop secuencial (se aborta al primer error), pero con
+    // ~4x menos latencia total. El backend hace commit por celda, así que no
+    // hay transacción compartida entre las celdas del lote.
+    const SAVE_CONCURRENCY = 4;
+
+    const saveWindow = async (winData: WindowData): Promise<{ ok: true } | { ok: false; title: string; errorMessage: string; connectionError?: boolean }> => {
       const nonVacantJoints = (winData.joints || []).filter(j => !(j.distancia === -1 && j.dip === -1 && j.espaciamiento === -1));
       const winCalc = calculateWindowGeomec(winData.header, winData.joints);
 
@@ -1494,28 +1512,40 @@ const [dbOnline, setDbOnline] = useState(true);
           const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
           const unsavedList: string[] = unsavedRaw ? JSON.parse(unsavedRaw) : [];
           safeSetItem('geolog_unsaved_windows', JSON.stringify(unsavedList.filter(c => c !== winData.header.celda)), ctx);
+          return { ok: true };
         } else {
           const errData = await res.json().catch(() => ({}));
           const detailMsg = errData.detail || `Error (${res.status}) al guardar la celda en la base de datos.`;
-          setIsLoadingWindow(false);
-          setSyncStatus('unsaved');
-          setSyncMessage(`No se guardó: ${detailMsg}`);
-          setSaveErrorData({
-            isOpen: true,
+          return {
+            ok: false,
             title: res.status === 403 ? 'Acceso Denegado' : 'Error al Guardar',
             errorMessage: detailMsg
-          });
-          return;
+          };
         }
       } catch (err) {
         console.warn("Save DB failed:", winData.header.celda, err);
-        setDbOnline(false);
+        return {
+          ok: false,
+          title: 'Error de Conexión',
+          errorMessage: 'No se pudo comunicar con el servidor backend para guardar los datos.',
+          connectionError: true
+        };
+      }
+    };
+
+    for (let i = 0; i < windowsToSave.length; i += SAVE_CONCURRENCY) {
+      const batch = windowsToSave.slice(i, i + SAVE_CONCURRENCY);
+      const results = await Promise.all(batch.map(winData => saveWindow(winData)));
+      const failed = results.find(r => !r.ok);
+      if (failed) {
+        if (failed.connectionError) setDbOnline(false);
         setIsLoadingWindow(false);
         setSyncStatus('unsaved');
+        setSyncMessage(`No se guardó: ${failed.errorMessage}`);
         setSaveErrorData({
           isOpen: true,
-          title: 'Error de Conexión',
-          errorMessage: 'No se pudo comunicar con el servidor backend para guardar los datos.'
+          title: failed.title,
+          errorMessage: failed.errorMessage
         });
         return;
       }

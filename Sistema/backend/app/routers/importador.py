@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel
 
 from app.database import SessionLocal
@@ -106,6 +107,72 @@ def check_duplicate(db: Session, code_celda: str):
         }
 
     return is_duplicate, existing_data
+
+
+def build_celdas_existing(db: Session, celdas_codes: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Prefetch en batch de la info de celdas que YA existen en BD.
+
+    Reemplaza check_duplicate() en el preview: en vez de ~9 queries por celda
+    (ventana + 3 litologías + unidad + sector + geotécnico + campaña + conteo
+    de discontinuidades), hace 1 query de ventanas con IN + 5 queries de
+    catálogos + 1 de conteo agrupado — coste fijo, independiente de N.
+
+    Devuelve {codigo_celda (mayúsculas): existing_data} — el mismo shape y los
+    mismos defaults que check_duplicate, para no alterar el resultado final.
+    """
+    if not celdas_codes:
+        return {}
+    codes_upper = {c.strip().upper() for c in celdas_codes if c and str(c).strip()}
+    if not codes_upper:
+        return {}
+
+    ventanas = db.query(models.Ventana).filter(
+        models.Ventana.codigo_celda.in_(codes_upper)
+    ).all()
+    if not ventanas:
+        return {}
+
+    litos = {l.litologia_id: l.codigo for l in db.query(models.Litologia).all()}
+    unidades = {u.unidad_id: u.codigo for u in db.query(models.UnidadLitologica).all()}
+    sectores = {s.sector_id: s.codigo for s in db.query(models.SectorGeotecnico).all()}
+    geotecnicos = {g.geotecnico_id: g.nombre for g in db.query(models.Geotecnico).all()}
+    campanias = {c.campania_id: c.nombre for c in db.query(models.Campania).all()}
+
+    counts = dict(
+        db.query(models.EstructuraGeologica.ventana_id, func.count(models.EstructuraGeologica.estructura_id))
+        .filter(models.EstructuraGeologica.ventana_id.in_([v.ventana_id for v in ventanas]))
+        .group_by(models.EstructuraGeologica.ventana_id)
+        .all()
+    )
+
+    result: Dict[str, Dict[str, Any]] = {}
+    for v in ventanas:
+        campania_name = campanias.get(v.campania_id) if v.campania_id else '2026'
+        sector_code = sectores.get(v.sector_geotecnico_id) if v.sector_geotecnico_id else 'PENDIENTE'
+        geotecnico_name = geotecnicos.get(v.geotecnico_id) if v.geotecnico_id else 'SRK'
+        result[v.codigo_celda] = {
+            "codigo": v.codigo_celda,
+            "campania": campania_name or 2026,
+            "sector": sector_code or 'PENDIENTE',
+            "este_ini": float(v.este_from or 0.0),
+            "norte_ini": float(v.norte_from or 0.0),
+            "cota_ini": float(v.cota_from or 0.0),
+            "este_fin": float(v.este_to or 0.0),
+            "norte_fin": float(v.norte_to or 0.0),
+            "cota_fin": float(v.cota_to or 0.0),
+            "largo_m": float(v.distancia_celda or 15.0),
+            "altura_m": float(v.altura or 15.0),
+            "lito_1": (litos.get(v.litologia1_id) if v.litologia1_id else '') or '',
+            "lito_2": (litos.get(v.litologia2_id) if v.litologia2_id else '') or '',
+            "lito_3": (litos.get(v.litologia3_id) if v.litologia3_id else '') or '',
+            "unidad_litologica": (unidades.get(v.unidad_litologica_id) if v.unidad_litologica_id else '') or '',
+            "mapeador": geotecnico_name or 'N/A',
+            "fecha": str(v.fecha_mapeo) if v.fecha_mapeo else 'N/A',
+            "n_discontinuidades": counts.get(v.ventana_id, 0),
+            "rmr_76": float(v.rmr76_total) if v.rmr76_total is not None else None,
+            "rmr_89": float(v.rmr89_total) if v.rmr89_total is not None else None
+        }
+    return result
 
 
 STANDARD_FIELD_MAPPINGS = {    "codigo_celda": ["CELDA", "CELDA_PADRE", "CODIGOCELDA", "CELDA.1"],
@@ -285,9 +352,14 @@ async def preview_import_excel(
             df[col] = df[col].ffill()
 
     grouped = df.groupby(celda_col, sort=False)
+    groups = list(grouped)
+
+    # Prefetch en batch de celdas existentes (1 query IN + catálogos) en vez
+    # de check_duplicate() por celda (~9 queries cada una).
+    existing_map = build_celdas_existing(db, [clean_str(c) for c, _ in groups])
     celdas_preview = []
 
-    for code_raw, block_df in grouped:
+    for code_raw, block_df in groups:
         code_celda = clean_str(code_raw)
         if not code_celda:
             continue
@@ -379,8 +451,10 @@ async def preview_import_excel(
                 "alteracion_codigo": clean_str(get_row_val_robust(row, ['ALTERACION']))
             })
 
-        # Buscar coincidencia en la Base de Datos SQL Server
-        is_duplicate, existing_data = check_duplicate(db, code_celda)
+        # Buscar coincidencia en la Base de Datos SQL Server (batch prefetch)
+        code_up = code_celda.strip().upper()
+        is_duplicate = code_up in existing_map
+        existing_data = existing_map.get(code_up)
 
         # Extraer metadatos de cabecera y geomecanica del Excel
         dip_val = clean_num(get_row_val_robust(header_row, ['DIP']))
@@ -536,10 +610,6 @@ def _preview_excel_a(ws, db: Session, hoja: str):
         celda = normalize_station_to_celda(station, infer_lito=infer_lithology_from_lito3)
         if not celda.get("codigo"):
             continue
-        code_celda = celda["codigo"]
-        is_duplicate, existing_data = check_duplicate(db, code_celda)
-        celda["is_duplicate"] = is_duplicate
-        celda["existing_data"] = existing_data
         celdas_preview.append(celda)
 
     if not celdas_preview:
@@ -551,6 +621,14 @@ def _preview_excel_a(ws, db: Session, hoja: str):
                 "o intente con otra hoja del libro."
             )
         )
+
+    # Prefetch en batch de celdas existentes (1 query IN + catálogos) en vez
+    # de check_duplicate() por estación (~9 queries cada una).
+    existing_map = build_celdas_existing(db, [c["codigo"] for c in celdas_preview])
+    for celda in celdas_preview:
+        code_up = celda["codigo"].strip().upper()
+        celda["is_duplicate"] = code_up in existing_map
+        celda["existing_data"] = existing_map.get(code_up)
 
     all_existing_codes = [
         c[0] for c in db.query(models.Ventana.codigo_celda).all() if c[0]
