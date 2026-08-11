@@ -99,7 +99,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
         { id: 'plt_resistencia_isrm', label: 'Clasificación Resistencia ISRM', icon: Shield },
         { id: 'plt_direccion_rotura', label: 'Dirección de Rotura', icon: Compass },
         { id: 'plt_tipo_fractura', label: 'Tipo de Fractura', icon: AlignLeft },
-        { id: 'plt_valoracion_rmr', label: 'Valoración Resistencia RMR', icon: Table },
         { id: 'extremos_terminacion', label: 'Extremos / Terminación', icon: Maximize2 }
       ]
     }
@@ -1057,42 +1056,6 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                       <td className="py-2.5 px-4 text-center font-mono">{row.min}</td>
                       <td className="py-2.5 px-4 text-center font-mono">{row.max}</td>
                       <td className="py-2.5 px-4">{row.desc}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'plt_valoracion_rmr' && (
-          <div className="space-y-3">
-            <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-              <AlignLeft size={14} className="text-amber-400" />
-              <span>Valoración de Resistencia de la Roca Intacta (RMR)</span>
-            </h3>
-            <div className="overflow-x-auto rounded-lg border border-navy-900 max-w-2xl">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-navy-850">
-                    <th className="py-2.5 px-4">Rango de Resistencia UCS (MPa)</th>
-                    <th className="py-2.5 px-4 text-center">Rating RMR'89</th>
-                    <th className="py-2.5 px-4 text-center">Rating RMR'76</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-900/30 text-slate-300 font-medium">
-                  {[
-                    { ucs: "≥ 250 MPa", r89: 15, r76: 10 },
-                    { ucs: "100 - < 250 MPa", r89: 12, r76: 8 },
-                    { ucs: "50 - < 100 MPa", r89: 7, r76: 5 },
-                    { ucs: "25 - < 50 MPa", r89: 4, r76: 2 },
-                    { ucs: "5 - < 25 MPa", r89: 2, r76: 1 },
-                    { ucs: "1 - < 5 MPa", r89: 1, r76: 0 }
-                  ].map((row, index) => (
-                    <tr key={index} className="hover:bg-navy-900/20">
-                      <td className="py-2.5 px-4 font-semibold text-slate-200">{row.ucs}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-emerald-400">{row.r89}</td>
-                      <td className="py-2.5 px-4 text-center font-bold text-emerald-400">{row.r76}</td>
                     </tr>
                   ))}
                 </tbody>
