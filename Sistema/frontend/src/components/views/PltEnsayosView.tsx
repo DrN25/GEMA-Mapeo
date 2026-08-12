@@ -367,19 +367,19 @@ export default function PltEnsayosView({
   }, [computedRows, allComputedRows]);
 
   return (
-    <div className="space-y-6 select-none animate-fade-in text-left font-sans">
+    <div className="space-y-6 select-none animate-fade-in text-left">
       {/* Header Toolbar */}
-      <div className="glass-panel p-4 rounded-xl border border-slate-200 dark:border-navy-800 bg-white/90 dark:bg-navy-950/40 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+      <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/40 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          <h2 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-violet-600 dark:bg-violet-400 shadow-sm" />
+          <h2 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
             <span>Ensayos PLT Irregulares</span>
           </h2>
-          <span className="text-xs bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30 text-violet-700 dark:text-violet-300 font-extrabold px-3 py-1 rounded-lg flex items-center gap-1.5">
+          <span className="text-xs bg-violet-500/10 border border-violet-500/30 text-violet-300 font-extrabold px-3 py-1 rounded-lg flex items-center gap-1.5">
             <span>Celda Activa:</span>
-            <span className="text-amber-600 dark:text-amber-400 font-mono">{activeWindowCelda || "Sin Celda Seleccionada"}</span>
+            <span className="text-amber-400 font-mono">{activeWindowCelda || "Sin Celda Seleccionada"}</span>
           </span>
-          <span className="text-xs bg-slate-100 dark:bg-navy-900 border border-slate-200 dark:border-navy-800 text-slate-700 dark:text-slate-300 font-bold px-3 py-1 rounded-full">
+          <span className="text-xs bg-navy-900 border border-navy-800 text-slate-300 font-bold px-3 py-1 rounded-full">
             {hasActiveFilters ? `${computedRows.length} / ${pltEnsayos.length}` : pltEnsayos.length} ensayos PLT
           </span>
         </div>
@@ -387,31 +387,31 @@ export default function PltEnsayosView({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveModal('reporte')}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-violet-500/10 dark:border dark:border-violet-500/40 dark:hover:bg-violet-500/20 dark:text-violet-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-sm rounded-lg flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-violet-500/10 border border-violet-500/40 hover:bg-violet-500/20 hover:border-violet-400 text-violet-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <Activity size={14} className="text-white dark:text-violet-400" />
+            <Activity size={14} className="text-violet-400" />
             <span>Reporte Resumen</span>
           </button>
 
           <button
             onClick={() => setActiveModal('import_excel')}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500/10 dark:border dark:border-emerald-500/40 dark:hover:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-sm rounded-lg flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <FileSpreadsheet size={14} className="text-white dark:text-emerald-400" />
+            <FileSpreadsheet size={14} className="text-emerald-400" />
             <span>Importar Excel</span>
           </button>
 
           <button
             onClick={handleExportExcel}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500/10 dark:border dark:border-emerald-500/40 dark:hover:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-sm rounded-lg flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
-            <Download size={14} className="text-white dark:text-emerald-400" />
+            <Download size={14} className="text-emerald-400" />
             <span>Exportar Excel</span>
           </button>
 
           <button
             onClick={handleAddRow}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-violet-500/10 dark:border dark:border-violet-500/40 dark:hover:bg-violet-500/20 dark:text-violet-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-sm rounded-lg flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-violet-500/10 border border-violet-500/40 hover:bg-violet-500/20 hover:border-violet-400 text-violet-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(139,92,246,0.12)] rounded-lg flex items-center justify-center gap-2"
           >
             <Plus size={14} />
             <span>Nueva Fila</span>
@@ -421,34 +421,34 @@ export default function PltEnsayosView({
 
       {/* ── FILTROS AVANZADOS ── */}
       <details className="group" open>
-        <summary className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-semibold cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-all select-none list-none">
-          <Filter size={14} className="text-indigo-600 dark:text-violet-400" />
+        <summary className="flex items-center gap-2 text-xs text-slate-400 font-semibold cursor-pointer hover:text-slate-200 transition-all select-none list-none">
+          <Filter size={14} className="text-violet-400" />
           <span>Filtros avanzados</span>
           {hasActiveFilters && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/20 border border-violet-200 dark:border-violet-500/40 text-violet-700 dark:text-violet-300 text-xs font-bold">
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-300 text-xs font-bold">
               {activeFilterCount} activos
             </span>
           )}
           {hasDraftChanges && (
-            <span className="ml-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-navy-900 border border-slate-200 dark:border-navy-700 text-slate-500 dark:text-slate-400 text-xs font-medium">
+            <span className="ml-1 px-2 py-0.5 rounded-md bg-navy-900 border border-navy-700 text-slate-400 text-xs font-medium">
               Sin aplicar
             </span>
           )}
           <ChevronDown size={12} className="group-open:rotate-180 transition-transform text-slate-400" />
         </summary>
 
-        <div className="mt-3 p-5 bg-white/95 dark:bg-navy-950/70 backdrop-blur-md border border-slate-200 dark:border-navy-800 rounded-2xl space-y-4 shadow-sm">
+        <div className="mt-3 p-5 bg-navy-950/70 backdrop-blur-md border border-navy-800 rounded-2xl space-y-4 shadow-2xl">
           {/* SECCIÓN 1: Búsqueda e Identificación */}
           <div className="space-y-2">
-            <div className="text-xs font-bold text-indigo-600 dark:text-violet-400 uppercase tracking-wider flex items-center gap-2 pb-1 border-b border-slate-200 dark:border-navy-800/80">
-              <Search size={13} className="text-indigo-600 dark:text-violet-400" />
+            <div className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center gap-2 pb-1 border-b border-navy-800/80">
+              <Search size={13} className="text-violet-400" />
               <span>Identificación & Búsqueda</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {/* CÓDIGO MUESTRA */}
+              {/* CÓDIGO MUESTRA (PRIMERA FILA - PRIMERA POSICIÓN) */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  Código Muestra <span className="text-indigo-600 dark:text-violet-400/80 font-normal">(búsqueda)</span>
+                <label className="text-xs font-semibold text-slate-300 block">
+                  Código Muestra <span className="text-violet-400/80 font-normal">(búsqueda)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -457,42 +457,42 @@ export default function PltEnsayosView({
                     value={draftFilters.codigoMuestra}
                     onChange={e => setDraftFilters({ ...draftFilters, codigoMuestra: e.target.value })}
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                    className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-violet-500/40 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all font-semibold"
+                    className="w-full bg-navy-900 border border-violet-500/40 focus:border-violet-400 focus:ring-1 focus:ring-violet-400 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all font-semibold"
                   />
-                  <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400 dark:text-violet-400/60 pointer-events-none" />
+                  <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-400/60 pointer-events-none" />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Fecha desde</label>
+                <label className="text-xs font-semibold text-slate-300 block">Fecha desde</label>
                 <input
                   type="date"
                   value={draftFilters.fechaDesde}
                   onChange={e => setDraftFilters({ ...draftFilters, fechaDesde: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-violet-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Fecha hasta</label>
+                <label className="text-xs font-semibold text-slate-300 block">Fecha hasta</label>
                 <input
                   type="date"
                   value={draftFilters.fechaHasta}
                   onChange={e => setDraftFilters({ ...draftFilters, fechaHasta: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-violet-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Campaña</label>
+                <label className="text-xs font-semibold text-slate-300 block">Campaña</label>
                 <select
                   value={draftFilters.campana}
                   onChange={e => setDraftFilters({ ...draftFilters, campana: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las campañas</option>
                   {["2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026", "2027", "2028"].map(y => (
-                    <option key={y} value={y} className="bg-white dark:bg-navy-950 text-slate-800 dark:text-slate-100">{y}</option>
+                    <option key={y} value={y} className="bg-navy-950">{y}</option>
                   ))}
                 </select>
               </div>
@@ -501,53 +501,53 @@ export default function PltEnsayosView({
 
           {/* SECCIÓN 2: Geología y Ubicación */}
           <div className="space-y-2">
-            <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider flex items-center gap-2 pb-1 border-b border-slate-200 dark:border-navy-800/80">
-              <Activity size={13} className="text-teal-600 dark:text-teal-400" />
+            <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2 pb-1 border-b border-navy-800/80">
+              <Activity size={13} className="text-teal-400" />
               <span>Geología & Ubicación</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Sector Geotécnico</label>
+                <label className="text-xs font-semibold text-slate-300 block">Sector Geotécnico</label>
                 <input
                   type="text"
                   placeholder="NW1_B, E1..."
                   value={draftFilters.sector}
                   onChange={e => setDraftFilters({ ...draftFilters, sector: e.target.value })}
                   onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Unidad Litológica</label>
+                <label className="text-xs font-semibold text-slate-300 block">Unidad Litológica</label>
                 <select
                   value={draftFilters.tipoLito}
                   onChange={e => setDraftFilters({ ...draftFilters, tipoLito: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las unidades</option>
                   {CAT_TIPO_LITOLOGICO.map(t => (
-                    <option key={t} value={t} className="bg-white dark:bg-navy-950 text-slate-800 dark:text-slate-100">{t}</option>
+                    <option key={t} value={t} className="bg-navy-950">{t}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Litología 1</label>
+                <label className="text-xs font-semibold text-slate-300 block">Litología 1</label>
                 <select
                   value={draftFilters.lito1}
                   onChange={e => setDraftFilters({ ...draftFilters, lito1: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las litologías</option>
                   {Array.from(new Set(LITHOLOGY_CLASSIFICATION.map((it: any) => it.unidad))).sort().map((u: any) => (
-                    <option key={u} value={u} className="bg-white dark:bg-navy-950 text-slate-800 dark:text-slate-100">{u}</option>
+                    <option key={u} value={u} className="bg-navy-950">{u}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Nivel</label>
+                <label className="text-xs font-semibold text-slate-300 block">Nivel</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -555,7 +555,7 @@ export default function PltEnsayosView({
                   value={draftFilters.nivel}
                   onChange={e => setDraftFilters({ ...draftFilters, nivel: e.target.value })}
                   onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-sky-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all"
                 />
               </div>
             </div>
@@ -563,23 +563,23 @@ export default function PltEnsayosView({
 
           {/* SECCIÓN 3: Rangos de Resistencia ISRM */}
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2.5 pb-1 border-b border-slate-200 dark:border-navy-800/80">
-              <div className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider flex items-center gap-2">
-                <TrendingUp size={13} className="text-sky-600 dark:text-sky-400" />
+            <div className="flex flex-wrap items-center gap-2.5 pb-1 border-b border-navy-800/80">
+              <div className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
+                <TrendingUp size={13} className="text-sky-400" />
                 <span>Rangos de Resistencia ISRM</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-navy-900/60 border border-slate-200 dark:border-navy-800 px-2.5 py-0.5 rounded-md select-none">
-                <Info size={12} className="text-sky-600 dark:text-sky-400/80 shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-navy-900/60 border border-navy-800 px-2.5 py-0.5 rounded-md select-none">
+                <Info size={12} className="text-sky-400/80 shrink-0" />
                 <span>
-                  <strong className="text-slate-800 dark:text-slate-300 font-semibold">Mín</strong> = desde, <strong className="text-slate-800 dark:text-slate-300 font-semibold">Máx</strong> = hasta. <span className="text-slate-500 font-normal italic">Ej: Mín 50 y Máx 150 busca entre 50 y 150 MPa</span>
+                  <strong className="text-slate-300 font-semibold">Mín</strong> = desde, <strong className="text-slate-300 font-semibold">Máx</strong> = hasta. <span className="text-slate-500 font-normal italic">Ej: Mín 50 y Máx 150 busca entre 50 y 150 MPa</span>
                 </span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  UCS Mín <span className="text-slate-500 dark:text-slate-400 font-normal">(desde)</span>
+                <label className="text-xs font-semibold text-slate-300 block">
+                  UCS Mín <span className="text-slate-400 font-normal">(desde)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -589,15 +589,15 @@ export default function PltEnsayosView({
                     value={draftFilters.ucsMin}
                     onChange={e => setDraftFilters({ ...draftFilters, ucsMin: e.target.value.replace(/[^0-9.]/g, '') })}
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                    className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-violet-500/30 focus:border-indigo-500 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all font-medium"
+                    className="w-full bg-navy-900 border border-violet-500/30 focus:border-violet-400 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all font-medium"
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-indigo-600 dark:text-violet-400/80 pointer-events-none">MPa</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-violet-400/80 pointer-events-none">MPa</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  UCS Máx <span className="text-slate-500 dark:text-slate-400 font-normal">(hasta)</span>
+                <label className="text-xs font-semibold text-slate-300 block">
+                  UCS Máx <span className="text-slate-400 font-normal">(hasta)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -607,15 +607,15 @@ export default function PltEnsayosView({
                     value={draftFilters.ucsMax}
                     onChange={e => setDraftFilters({ ...draftFilters, ucsMax: e.target.value.replace(/[^0-9.]/g, '') })}
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                    className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-violet-500/30 focus:border-indigo-500 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all font-medium"
+                    className="w-full bg-navy-900 border border-violet-500/30 focus:border-violet-400 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all font-medium"
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-indigo-600 dark:text-violet-400/80 pointer-events-none">MPa</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-violet-400/80 pointer-events-none">MPa</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  Is(50) Mín <span className="text-slate-500 dark:text-slate-400 font-normal">(desde)</span>
+                <label className="text-xs font-semibold text-slate-300 block">
+                  Is(50) Mín <span className="text-slate-400 font-normal">(desde)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -625,15 +625,15 @@ export default function PltEnsayosView({
                     value={draftFilters.is50Min}
                     onChange={e => setDraftFilters({ ...draftFilters, is50Min: e.target.value.replace(/[^0-9.]/g, '') })}
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                    className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-sky-500/30 focus:border-indigo-500 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all font-medium"
+                    className="w-full bg-navy-900 border border-sky-500/30 focus:border-sky-400 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all font-medium"
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-sky-600 dark:text-sky-400/80 pointer-events-none">MPa</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-sky-400/80 pointer-events-none">MPa</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  Is(50) Máx <span className="text-slate-500 dark:text-slate-400 font-normal">(hasta)</span>
+                <label className="text-xs font-semibold text-slate-300 block">
+                  Is(50) Máx <span className="text-slate-400 font-normal">(hasta)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -643,22 +643,22 @@ export default function PltEnsayosView({
                     value={draftFilters.is50Max}
                     onChange={e => setDraftFilters({ ...draftFilters, is50Max: e.target.value.replace(/[^0-9.]/g, '') })}
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                    className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-sky-500/30 focus:border-indigo-500 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all font-medium"
+                    className="w-full bg-navy-900 border border-sky-500/30 focus:border-sky-400 rounded-lg px-3 pr-9 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all font-medium"
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-sky-600 dark:text-sky-400/80 pointer-events-none">MPa</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-sky-400/80 pointer-events-none">MPa</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Clase ISRM</label>
+                <label className="text-xs font-semibold text-slate-300 block">Clase ISRM</label>
                 <select
                   value={draftFilters.isrm}
                   onChange={e => setDraftFilters({ ...draftFilters, isrm: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-sky-400 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las clases</option>
                   {ISRM_TABLE.map(r => (
-                    <option key={r.indice} value={r.indice} className="bg-white dark:bg-navy-950 text-slate-800 dark:text-slate-100">{r.indice} — {r.denominacion}</option>
+                    <option key={r.indice} value={r.indice} className="bg-navy-950">{r.indice} — {r.denominacion}</option>
                   ))}
                 </select>
               </div>
@@ -666,11 +666,11 @@ export default function PltEnsayosView({
           </div>
 
           {/* BOTONERA Y PIE DE CONSOLA DE FILTROS */}
-          <div className="pt-3 border-t border-slate-200 dark:border-navy-800/80 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold flex items-center gap-2">
-              <Info size={14} className="text-slate-400" />
+          <div className="pt-3 border-t border-navy-800/80 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-slate-400 font-semibold flex items-center gap-2">
+              <Info size={14} className="text-slate-500" />
               <span>
-                Mostrando <span className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">{computedRows.length}</span> de <span className="font-mono text-slate-800 dark:text-slate-300 font-bold">{allComputedRows.length}</span> ensayos
+                Mostrando <span className="font-mono text-cyan-400 font-bold">{computedRows.length}</span> de <span className="font-mono text-slate-300 font-bold">{allComputedRows.length}</span> ensayos
               </span>
             </div>
 
@@ -678,7 +678,7 @@ export default function PltEnsayosView({
               {(hasActiveFilters || Object.values(draftFilters).some(v => v.trim() !== '')) && (
                 <button
                   onClick={handleClearFilters}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-navy-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-navy-600 transition-all active:scale-95 text-xs font-bold flex items-center gap-1.5 bg-slate-100 dark:bg-navy-900/60"
+                  className="px-3.5 py-1.5 rounded-lg border border-navy-700 text-slate-400 hover:text-slate-200 hover:border-navy-600 transition-all active:scale-95 text-xs font-bold flex items-center gap-1.5 bg-navy-900/60"
                 >
                   <RotateCcw size={13} />
                   <span>Limpiar filtros</span>
@@ -687,7 +687,7 @@ export default function PltEnsayosView({
 
               <button
                 onClick={handleApplyFilters}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-500/10 dark:border dark:border-indigo-500/40 dark:text-indigo-400 px-5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-sm flex items-center gap-1.5"
+                className="bg-indigo-500/10 border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-300 px-5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[0_0_12px_rgba(99,102,241,0.12)] flex items-center gap-1.5"
               >
                 <CheckCircle2 size={14} />
                 <span>Aplicar filtros</span>
@@ -698,22 +698,22 @@ export default function PltEnsayosView({
       </details>
 
       {/* Tabla de Ensayos */}
-      <div className="overflow-x-auto relative rounded-xl border border-slate-200 dark:border-navy-700 bg-white dark:bg-navy-950/20 shadow-sm">
+      <div className="overflow-x-auto relative rounded-lg border border-navy-700 bg-navy-950/20">
         <table className="w-max min-w-full border-collapse border-separate border-spacing-0" style={{ minWidth: '3500px' }}>
           <thead>
-            <tr className="bg-slate-50 dark:bg-navy-950 text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-slate-200 dark:border-navy-800">
-              <th className="py-3 px-2 text-center sticky left-0 bg-slate-50 dark:bg-navy-950 z-20 border-r border-b border-slate-200 dark:border-navy-800 w-12 min-w-[48px]">#</th>
+            <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
+              <th className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-b border-navy-800 w-12 min-w-[48px]">#</th>
               {visibleCols.map(c => (
                 <th
                   key={c.key}
                   style={{ width: c.width, minWidth: c.width }}
-                  className={`py-3 px-2 text-center border-r border-b border-slate-200 dark:border-navy-800 text-xs select-none font-bold uppercase tracking-wider ${c.computed ? "text-slate-400 dark:text-slate-500" : "text-slate-700 dark:text-slate-400"
+                  className={`py-3 px-2 text-center border-r border-b border-navy-800 text-xs select-none font-bold uppercase tracking-wider ${c.computed ? "text-slate-500" : "text-slate-400"
                     }`}
                 >
                   {c.label}
                 </th>
               ))}
-              <th className="py-3 px-2 text-center sticky right-0 bg-slate-50 dark:bg-navy-950 z-20 border-l border-b border-slate-200 dark:border-navy-800 w-[75px] min-w-[75px]">Acción</th>
+              <th className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-b border-navy-800 w-[75px] min-w-[75px]">Acción</th>
             </tr>
           </thead>
 

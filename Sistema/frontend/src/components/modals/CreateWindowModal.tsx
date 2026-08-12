@@ -175,15 +175,15 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-navy-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="glass-panel w-full max-w-2xl p-6 rounded-2xl border border-slate-200 dark:border-navy-800 shadow-2xl bg-white dark:bg-navy-900/95 my-8 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="glass-panel w-full max-w-2xl p-6 rounded-2xl border border-navy-800 shadow-2xl bg-navy-900/95 my-8 relative overflow-hidden">
         <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 w-full absolute top-0 left-0" />
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-navy-800 pb-3">
-          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 tracking-wider uppercase flex items-center gap-2 mt-1">
-            <Plus size={16} className="text-indigo-600 dark:text-indigo-400" />
+        <div className="flex items-center justify-between border-b border-navy-800 pb-3">
+          <h3 className="text-sm font-black text-slate-100 tracking-wider uppercase flex items-center gap-2 mt-1">
+            <Plus size={16} className="text-indigo-400" />
             <span>Nueva Celda de Mapeo Geomecánico</span>
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-navy-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all">
+          <button onClick={onClose} className="p-1 rounded hover:bg-navy-800 text-slate-400 hover:text-slate-200 transition-all">
             <X size={16} />
           </button>
         </div>
@@ -193,19 +193,19 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Código Celda / Ventana</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Código Celda / Ventana</label>
                 {nameCheckStatus === 'checking' && (
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 animate-pulse flex items-center gap-1">
+                  <span className="text-[10px] text-slate-400 animate-pulse flex items-center gap-1">
                     <Loader2 size={10} className="animate-spin" /> Verificando...
                   </span>
                 )}
                 {nameCheckStatus === 'available' && (
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 size={11} /> Disponible
                   </span>
                 )}
                 {nameCheckStatus === 'duplicate' && (
-                  <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
                     <AlertTriangle size={11} /> Ya existe
                   </span>
                 )}
@@ -217,22 +217,22 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
                 placeholder="ej. TD2-001"
                 value={celda}
                 onChange={(e) => setCelda(e.target.value.trim().toUpperCase().slice(0, 20))}
-                className={`w-full bg-slate-50 dark:bg-navy-950 border rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 text-xs placeholder-slate-400 dark:placeholder-slate-600 focus:bg-white focus:outline-none font-bold tracking-wider ${nameCheckStatus === 'duplicate'
-                  ? 'border-rose-500/80 bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-200 focus:ring-1 focus:ring-rose-500'
+                className={`w-full bg-navy-950 border rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none font-bold tracking-wider ${nameCheckStatus === 'duplicate'
+                  ? 'border-rose-500/80 bg-rose-950/20 text-rose-200 focus:ring-1 focus:ring-rose-500'
                   : nameCheckStatus === 'available'
-                    ? 'border-emerald-500/80 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200 focus:ring-1 focus:ring-emerald-500'
-                    : 'border-slate-200 dark:border-navy-800 focus:ring-1 focus:ring-indigo-500'
+                    ? 'border-emerald-500/80 bg-emerald-950/20 text-emerald-200 focus:ring-1 focus:ring-emerald-500'
+                    : 'border-navy-800 focus:ring-1 focus:ring-indigo-500'
                   }`}
               />
               {nameCheckStatus === 'duplicate' && (
-                <p className="text-[10px] font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                <p className="text-[10px] font-bold text-rose-400 mt-1 flex items-center gap-1">
                   <AlertTriangle size={12} className="shrink-0" />
                   <span>{nameCheckMsg}</span>
                 </p>
               )}
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Mapeador</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Mapeador</label>
               <MapeadorCombobox
                 value={mapeadorId}
                 onChange={(val) => setMapeadorId(val)}
@@ -245,100 +245,100 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
           {/* Fila 2: Campaña, Sector, Nivel */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Campaña</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Campaña</label>
               <select required value={campania} onChange={(e) => setCampania(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer text-slate-800 dark:text-slate-100">
+                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer text-slate-100">
                 <option value="">— Campaña —</option>
                 {campanias.map(c => (
-                  <option key={c.id} value={c.id} className="bg-white dark:bg-navy-950 text-slate-800 dark:text-slate-100">{c.nombre}</option>
+                  <option key={c.id} value={c.id} className="bg-navy-950 text-slate-100">{c.nombre}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Sector Geot.</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Sector Geot.</label>
               <select required value={sector} onChange={(e) => setSector(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer text-slate-800 dark:text-slate-100">
+                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer text-slate-100">
                 <option value="">— Sector —</option>
                 {sectores.map(s => (
-                  <option key={s.codigo} value={s.codigo} className="bg-white dark:bg-navy-950 text-slate-800 dark:text-slate-100">{s.codigo} — {s.nombre}</option>
+                  <option key={s.codigo} value={s.codigo} className="bg-navy-950 text-slate-100">{s.codigo} — {s.nombre}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Nivel</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nivel</label>
               <input type="text" required placeholder="ej. 3960" value={nivel}
                 onChange={(e) => setNivel(handleNumberInputLimit(e.target.value, 4, 2))}
-                className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 text-xs placeholder-slate-400 dark:placeholder-slate-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold" />
+                className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold" />
             </div>
           </div>
 
           {/* Mostrar más / menos */}
           <button type="button" onClick={() => setShowMore(!showMore)}
-            className="flex items-center gap-1 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider hover:text-indigo-700 dark:hover:text-indigo-300 transition-all">
+            className="flex items-center gap-1 text-[10px] font-black text-indigo-400 uppercase tracking-wider hover:text-indigo-300 transition-all">
             {showMore ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             {showMore ? 'Ocultar' : 'Mostrar'} coordenadas y detalles
           </button>
 
           {showMore && (
             <>
-              <div className="border-t border-slate-200 dark:border-navy-800/80 pt-3">
-                <h4 className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-2">Coordenadas Iniciales (FROM)</h4>
+              <div className="border-t border-navy-800/80 pt-3">
+                <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-2">Coordenadas Iniciales (FROM)</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Este (X)</label>
                     <input type="text" required placeholder="794444.8700" value={esteFrom}
                       onChange={(e) => setEsteFrom(handleNumberInputLimit(e.target.value, 6, 4))}
-                      className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-2.5 py-2 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Norte (Y)</label>
                     <input type="text" required placeholder="8440465.910" value={norteFrom}
                       onChange={(e) => setNorteFrom(handleNumberInputLimit(e.target.value, 7, 3))}
-                      className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-2.5 py-2 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cota (C)</label>
                     <input type="text" required placeholder="3960.50" value={cotaFrom}
                       onChange={(e) => setCotaFrom(handleNumberInputLimit(e.target.value, 4, 2))}
-                      className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-2.5 py-2 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 dark:border-navy-800/60 pt-3">
-                <h4 className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Coordenadas Finales (TO)</h4>
+              <div className="border-t border-navy-800/60 pt-3">
+                <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-wider mb-2">Coordenadas Finales (TO)</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Este (X)</label>
                     <input type="text" required placeholder="794449.1300" value={esteTo}
                       onChange={(e) => setEsteTo(handleNumberInputLimit(e.target.value, 6, 4))}
-                      className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-2.5 py-2 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Norte (Y)</label>
                     <input type="text" required placeholder="8440456.690" value={norteTo}
                       onChange={(e) => setNorteTo(handleNumberInputLimit(e.target.value, 7, 3))}
-                      className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-2.5 py-2 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cota (C)</label>
                     <input type="text" required placeholder="3961.10" value={cotaTo}
                       onChange={(e) => setCotaTo(handleNumberInputLimit(e.target.value, 4, 2))}
-                      className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-2.5 py-2 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase block">Altura Ventana (m)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase block">Altura Ventana (m)</label>
                   <input type="text" required placeholder="ej. 15" value={altura}
                     onChange={(e) => setAltura(handleNumberInputLimit(e.target.value, 2, 1))}
-                    className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 text-xs placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium" />
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase block">Largo de celda (calculado)</label>
-                  <div className="w-full bg-slate-100 dark:bg-navy-950/80 border border-slate-200 dark:border-navy-800 rounded-lg px-3 py-2 text-indigo-600 dark:text-indigo-400 text-xs font-black flex items-center justify-center min-h-[34px]">
+                  <label className="text-[10px] font-black text-slate-400 uppercase block">Largo de celda (calculado)</label>
+                  <div className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-indigo-400 text-xs font-black flex items-center justify-center min-h-[34px]">
                     {calculatedLargo !== null ? `${Math.round(calculatedLargo)}` : '—'}
                   </div>
                 </div>
@@ -346,26 +346,26 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Fase</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Fase</label>
                   <input type="text" inputMode="numeric" placeholder="ej. 5" value={fase}
                     onChange={(e) => {
                       const cleaned = e.target.value.replace(/\D/g, '').slice(0, 2);
                       setFase(cleaned);
                     }}
-                    className="w-full bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 text-xs placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold" />
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold" />
                 </div>
               </div>
             </>
           )}
 
           {/* Acciones */}
-          <div className="flex gap-2.5 justify-end pt-4 border-t border-slate-200 dark:border-navy-800">
+          <div className="flex gap-2.5 justify-end pt-4 border-t border-navy-800">
             <button type="button" onClick={() => { onClose(); resetForm(); }}
-              className="bg-slate-100 hover:bg-slate-200 dark:bg-navy-900 border border-slate-200 dark:border-navy-800 dark:hover:bg-navy-850 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-95">
+              className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-all active:scale-95">
               Cancelar
             </button>
             <button type="submit" disabled={loadingCatalogs || nameCheckStatus !== 'available'}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-violet-500/10 dark:border dark:border-violet-500/40 dark:text-violet-400 dark:hover:bg-violet-500/20 dark:hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
+              className="bg-violet-500/10 border border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 font-bold transition-all shadow-sm active:scale-95 px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
               <Plus size={14} /> Crear Celda
             </button>
           </div>
