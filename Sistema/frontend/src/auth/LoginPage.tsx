@@ -4,7 +4,11 @@ import { pingBackend } from '../utils/apiClient';
 import { Eye, EyeOff, Loader2, WifiOff, RefreshCw, Lock } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 
-const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : ''
+);
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();

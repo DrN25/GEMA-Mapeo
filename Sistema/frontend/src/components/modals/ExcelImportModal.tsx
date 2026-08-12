@@ -16,7 +16,11 @@ const fmtPrec = (key: string, val: any): string => {
   return n.toFixed(dec);
 };
 
-const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : ''
+);
 
 // Tamaño máximo permitido por archivo Excel (MB).
 // Nota: Render free tiene 512 MB de RAM; un xlsx se expande al descomprimirse,

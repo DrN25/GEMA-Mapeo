@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Pencil, X, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : ''
+);
 import { getAuthHeaders } from '../../utils/apiClient';
 
 interface RenameCellModalProps {

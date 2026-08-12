@@ -153,7 +153,7 @@ export default function Dashboard({
 
   return (
     <>
-      <div className="space-y-6 select-none w-full animate-fade-in text-left">
+      <div className="space-y-6 select-none w-full animate-fade-in text-left view-dashboard">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
           <div>
             <h2 className="text-xl font-black text-slate-100 tracking-wide flex items-center gap-2">

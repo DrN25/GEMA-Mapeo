@@ -3,7 +3,11 @@ import { Plus, X, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2 }
 import MapeadorCombobox from '../Common/MapeadorCombobox';
 import { handleNumberInputLimit } from '../../utils/inputLimits';
 
-const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : ''
+);
 import { getAuthHeaders } from '../../utils/apiClient';
 
 interface CreateWindowModalProps {
