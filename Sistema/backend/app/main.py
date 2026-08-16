@@ -39,6 +39,7 @@ from app.routers.congruencia import router as congruencia_router
 from app.routers.importador import router as importador_router
 from app.auth.router import router as auth_router
 from app.routers.admin import router as admin_router
+from app.agents.router import router as scan_router
 
 app.include_router(auth_router, prefix="/api/auth", tags=["Autenticación"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Administración de Usuarios"])
@@ -49,6 +50,7 @@ app.include_router(comparativo_router, prefix="/api", tags=["Comparación de Aud
 app.include_router(catalogs_router, prefix="/api", tags=["Catálogos"])
 app.include_router(congruencia_router, prefix="/api", tags=["Congruencia Geomecánica"])
 app.include_router(importador_router, prefix="/api", tags=["Importador de Excel"])
+app.include_router(scan_router, prefix="/api", tags=["Agente de Escaneo IA"])
 
 @app.get("/")
 def read_root():
