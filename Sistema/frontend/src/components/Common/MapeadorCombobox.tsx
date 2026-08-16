@@ -144,7 +144,7 @@ export default function MapeadorCombobox({
         width: `${coords.width}px`,
         zIndex: 99999,
       }}
-      className="max-h-56 overflow-y-auto bg-navy-900 border border-navy-700/90 rounded-lg shadow-2xl py-1 text-xs animate-fade-in text-slate-100 backdrop-blur-md"
+      className="max-h-56 overflow-y-auto view-modal bg-navy-900 border border-navy-800 rounded-lg shadow-2xl py-1 text-xs animate-fade-in text-slate-100 backdrop-blur-md"
     >
       {filteredOptions.length > 0 ? (
         filteredOptions.map((opt) => {
@@ -154,7 +154,7 @@ export default function MapeadorCombobox({
               key={opt.codigo}
               onClick={() => handleSelect(opt.nombre)}
               className={`px-3 py-2 cursor-pointer flex items-center justify-between transition-colors ${
-                isSelected ? 'bg-indigo-600/30 text-indigo-300 font-bold' : 'text-slate-200 hover:bg-navy-800'
+                isSelected ? 'bg-indigo-500/10 text-indigo-400 font-bold' : 'text-slate-200 hover:bg-navy-800'
               }`}
             >
               <span className="truncate">{opt.nombre}</span>
@@ -169,7 +169,7 @@ export default function MapeadorCombobox({
       {query.trim() && !exactMatch && (
         <div
           onClick={handleCreateNew}
-          className="px-3 py-2 border-t border-navy-800/80 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+          className="px-3 py-2 border-t border-navy-800/80 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
         >
           <Plus size={13} className="text-indigo-400" />
           <span>Crear mapeador "<strong className="text-white">{query.trim().toUpperCase()}</strong>"</span>

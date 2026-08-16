@@ -23,7 +23,7 @@ export default function SaveErrorModal({
     errorMessage.toLowerCase().includes('401');
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-fade-in text-left font-sans select-none">
+    <div className="fixed inset-0 view-modal z-[120] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-fade-in text-left font-sans select-none">
       <div className="glass-panel w-full max-w-md flex flex-col border border-rose-500/30 rounded-2xl shadow-2xl relative overflow-hidden bg-[#090f1d] text-slate-100">
 
         {/* Superior Accent Line */}

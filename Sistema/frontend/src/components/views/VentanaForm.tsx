@@ -330,7 +330,7 @@ export default function VentanaForm({
                     readOnly
                     value={header.celda || ''}
                     title="El código de celda no se edita directamente para evitar duplicados. Use el botón 'Editar'."
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 font-black tracking-wider text-xs text-center cursor-not-allowed select-none opacity-90"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-200 font-black tracking-wider text-xs text-center cursor-not-allowed select-none opacity-90"
                   />
                   {onOpenRenameModal && (
                     <button
@@ -381,8 +381,8 @@ export default function VentanaForm({
             {/* COORDENADAS INICIALES (FROM) - VECTOR 3D CON PREFIJOS E, N, Z */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Iniciales (From)</label>
-              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/80 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
-                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/80 text-[10px] select-none uppercase tracking-widest shrink-0">
+              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/70 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
+                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/70 text-[10px] select-none uppercase tracking-widest shrink-0">
                   From
                 </div>
                 <div className="flex-1 flex items-center h-full">
@@ -425,8 +425,8 @@ export default function VentanaForm({
             {/* COORDENADAS FINALES (TO) - VECTOR 3D CON PREFIJOS E, N, Z */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Finales (To)</label>
-              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/80 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
-                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/80 text-[10px] select-none uppercase tracking-widest shrink-0">
+              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/70 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
+                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/70 text-[10px] select-none uppercase tracking-widest shrink-0">
                   To
                 </div>
                 <div className="flex-1 flex items-center h-full">
@@ -489,7 +489,7 @@ export default function VentanaForm({
                     const num = parseFloat(val);
                     handleChange('altura', isNaN(num) ? undefined : Math.min(99, Math.max(0, num)));
                   }}
-                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                  className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
               </div>
 
@@ -514,7 +514,7 @@ export default function VentanaForm({
                     const num = parseFloat(val);
                     handleChange('dip_talud', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
                   }}
-                  className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                  className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
               </div>
 
@@ -560,7 +560,7 @@ export default function VentanaForm({
                       const num = parseFloat(val);
                       handleChange('dipdir_talud', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
                     }}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                   />
                 )}
               </div>
@@ -612,7 +612,7 @@ export default function VentanaForm({
                       const num = parseFloat(val);
                       handleChange('dip_hw', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
                     }}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                   />
                 )}
               </div>
@@ -665,7 +665,7 @@ export default function VentanaForm({
                       const num = parseFloat(val);
                       handleChange('az_hw', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
                     }}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                   />
                 )}
               </div>
@@ -689,7 +689,7 @@ export default function VentanaForm({
                     value={header.lito_1 || ''}
                     onChange={(e) => handleLito1Change(e.target.value)}
                     onBlur={touchField('header-lito_1')}
-                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/70'
                       }`}
                   >
                     <option value="">— Lito 1 —</option>
@@ -706,7 +706,7 @@ export default function VentanaForm({
                     value={header.lito_2 || '-1'}
                     onChange={(e) => handleLito2Change(e.target.value)}
                     onBlur={touchField('header-lito_2')}
-                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80 text-slate-100'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/70 text-slate-100'
                       }`}
                   >
                     <option value="-1">— Lito 2 —</option>
@@ -723,7 +723,7 @@ export default function VentanaForm({
                     value={header.lito_3 || '-1'}
                     onChange={(e) => handleLito3Change(e.target.value)}
                     onBlur={touchField('header-lito_3')}
-                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80 text-orange-400'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/70 text-orange-400'
                       }`}
                   >
                     <option value="-1">— Lito 3 —</option>
@@ -737,7 +737,7 @@ export default function VentanaForm({
                   <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Litológica</label>
                   <div
                     title="Se deriva automáticamente de la combinación de litologías válida"
-                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal text-center select-none ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80 text-slate-100'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal text-center select-none ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/70 text-slate-100'
                       }`}
                   >
                     {header.unidad_litologica || '—'}
@@ -815,7 +815,7 @@ export default function VentanaForm({
                     onBlur={touchField('header-sect_geot')}
                     placeholder="Sector Geot."
                     maxLength={12}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   />
                 </div>
 
@@ -826,7 +826,7 @@ export default function VentanaForm({
                     value={header.intemperia || ''}
                     onChange={(e) => handleChange('intemperia', e.target.value)}
                     onBlur={touchField('header-intemperia')}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
                   >
                     <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
                     {Object.entries(ALTERACION_CATALOG).map(([key, item]) => {
@@ -850,7 +850,7 @@ export default function VentanaForm({
                       handleChange('alteracion', val);
                       handleChange('alt_mapeo', val);
                     }}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer"
                   >
                     <option value="" className="bg-navy-950 text-slate-500">— Seleccionar —</option>
                     {Object.entries(ALTERACION_CATALOG).map(([key, item]) => {
@@ -877,7 +877,7 @@ export default function VentanaForm({
                     value={header.campania !== undefined && header.campania !== null ? String(header.campania) : ''}
                     onChange={(e) => handleChange('campania', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                     onBlur={touchField('header-campania')}
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                   >
                     <option value="" className="bg-navy-950 text-slate-500">— Campaña —</option>
                     {CAMPANAS_HARDCODED.map(c => (
@@ -899,7 +899,7 @@ export default function VentanaForm({
                     }}
                     onBlur={touchField('header-fase')}
                     placeholder="Fase"
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
                   />
                 </div>
 
@@ -916,7 +916,7 @@ export default function VentanaForm({
                     }}
                     onBlur={touchField('header-nivel')}
                     placeholder="Nivel"
-                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
+                    className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal"
                   />
                 </div>
 
@@ -929,7 +929,7 @@ export default function VentanaForm({
                       value={header.fecha || ''}
                       onChange={(e) => handleChange('fecha', e.target.value)}
                       onBlur={touchField('header-fecha')}
-                      className="w-full bg-navy-900/40 border border-navy-700/85 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer"
+                      className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-2 py-1.5 text-slate-200 text-xs text-center font-normal cursor-pointer"
                     />
                   </div>
                 </div>

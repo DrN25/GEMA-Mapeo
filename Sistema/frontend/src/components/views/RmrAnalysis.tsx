@@ -196,7 +196,7 @@ export default function RmrAnalysis({
             value={header.condicion_agua || ''}
             onChange={handleWaterChange}
             onBlur={() => markFieldTouched('header-condicion_agua')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+            className="w-full bg-navy-900 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">-- Seleccione --</option>
             <option value="C" className="bg-navy-950">C — Completamente seco</option>
@@ -216,7 +216,7 @@ export default function RmrAnalysis({
             value={header.resistencia_ucs || ''}
             onChange={(e) => handleFieldChange('resistencia_ucs', e.target.value)}
             onBlur={() => markFieldTouched('header-resistencia_ucs')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+            className="w-full bg-navy-900 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>
             <option value="R6" className="bg-navy-950">R6</option>
@@ -243,7 +243,7 @@ export default function RmrAnalysis({
               markFieldTouched('header-is50_mpa');
               handleNumericInputBlur('is50_mpa', e.target.value);
             }}
-            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${ucsIs50Divergent ? 'border-red-500/80 bg-red-950/20 shadow-[0_0_8px_rgba(239,68,68,0.15)] text-red-300 font-bold' : 'border-navy-700/80'
+            className={`w-full bg-navy-900 border rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center ${ucsIs50Divergent ? 'border-red-500/80 bg-red-950/20 shadow-[0_0_8px_rgba(239,68,68,0.15)] text-red-300 font-bold' : 'border-navy-700/70'
               }`}
           />
         </div>
@@ -257,7 +257,7 @@ export default function RmrAnalysis({
             value={gsiCond}
             onChange={(e) => handleFieldChange('gsi_superficie', e.target.value)}
             onBlur={() => markFieldTouched('header-gsi_superficie')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+            className="w-full bg-navy-900 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>
             {Object.entries(GSI_SUPERFICIE_CATALOG).map(([code, item]) => (
@@ -275,7 +275,7 @@ export default function RmrAnalysis({
             value={gsiEstruc}
             onChange={(e) => handleFieldChange('gsi_estructura', e.target.value)}
             onBlur={() => markFieldTouched('header-gsi_estructura')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+            className="w-full bg-navy-900 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>
             {Object.entries(GSI_ESTRUCTURA_CATALOG).map(([code, item]) => (
@@ -319,7 +319,7 @@ export default function RmrAnalysis({
               handleFieldChange('control_estructural', val);
             }}
             onBlur={() => markFieldTouched('header-control_estructural')}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+            className="w-full bg-navy-900 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>
             <option value="1" className="bg-navy-950">1</option>
@@ -340,7 +340,7 @@ export default function RmrAnalysis({
               const val = e.target.value === "" ? 0 : parseInt(e.target.value);
               handleFieldChange('efectos_voladura', val);
             }}
-            className="w-full bg-navy-900 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
+            className="w-full bg-navy-900 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 cursor-pointer text-center"
           >
             <option value="" className="bg-navy-950">--</option>
             <option value="1" className="bg-navy-950">1</option>

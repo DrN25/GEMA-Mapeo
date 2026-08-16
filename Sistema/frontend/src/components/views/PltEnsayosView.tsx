@@ -469,7 +469,7 @@ export default function PltEnsayosView({
                   type="date"
                   value={draftFilters.fechaDesde}
                   onChange={e => setDraftFilters({ ...draftFilters, fechaDesde: e.target.value })}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-violet-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-violet-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 />
               </div>
 
@@ -479,7 +479,7 @@ export default function PltEnsayosView({
                   type="date"
                   value={draftFilters.fechaHasta}
                   onChange={e => setDraftFilters({ ...draftFilters, fechaHasta: e.target.value })}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-violet-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-violet-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 />
               </div>
 
@@ -488,7 +488,7 @@ export default function PltEnsayosView({
                 <select
                   value={draftFilters.campana}
                   onChange={e => setDraftFilters({ ...draftFilters, campana: e.target.value })}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las campañas</option>
                   {["2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026", "2027", "2028"].map(y => (
@@ -514,7 +514,7 @@ export default function PltEnsayosView({
                   value={draftFilters.sector}
                   onChange={e => setDraftFilters({ ...draftFilters, sector: e.target.value })}
                   onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all"
                 />
               </div>
 
@@ -523,7 +523,7 @@ export default function PltEnsayosView({
                 <select
                   value={draftFilters.tipoLito}
                   onChange={e => setDraftFilters({ ...draftFilters, tipoLito: e.target.value })}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las unidades</option>
                   {CAT_TIPO_LITOLOGICO.map(t => (
@@ -537,7 +537,7 @@ export default function PltEnsayosView({
                 <select
                   value={draftFilters.lito1}
                   onChange={e => setDraftFilters({ ...draftFilters, lito1: e.target.value })}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-teal-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las litologías</option>
                   {Array.from(new Set(LITHOLOGY_CLASSIFICATION.map((it: any) => it.unidad))).sort().map((u: any) => (
@@ -555,7 +555,7 @@ export default function PltEnsayosView({
                   value={draftFilters.nivel}
                   onChange={e => setDraftFilters({ ...draftFilters, nivel: e.target.value })}
                   onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-sky-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-sky-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 transition-all"
                 />
               </div>
             </div>
@@ -654,7 +654,7 @@ export default function PltEnsayosView({
                 <select
                   value={draftFilters.isrm}
                   onChange={e => setDraftFilters({ ...draftFilters, isrm: e.target.value })}
-                  className="w-full bg-navy-900 border border-navy-700/80 focus:border-sky-400 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
+                  className="w-full bg-navy-900 border border-navy-700/70 focus:border-sky-400 rounded-lg px-3 py-1.5 text-xs text-slate-100 transition-all"
                 >
                   <option value="">Todas las clases</option>
                   {ISRM_TABLE.map(r => (

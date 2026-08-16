@@ -216,7 +216,7 @@ export default function DisconTable({
 
   const getRowClassName = (_row: any, idx: number) => {
     const famId = _row?.familia || Math.floor(idx / 3) + 1;
-    const borderClass = (idx + 1) % 3 === 0 ? "border-b-2 border-navy-700/80" : "border-b border-navy-900/25";
+    const borderClass = (idx + 1) % 3 === 0 ? "border-b-2 border-navy-700/70" : "border-b border-navy-900/25";
 
     const backgrounds: Record<number, string> = {
       1: "bg-orange-500/[0.015]",
@@ -337,7 +337,7 @@ export default function DisconTable({
             <select
               value={familyToDelete}
               onChange={(e) => setFamilyToDelete(parseInt(e.target.value) || 1)}
-              className="bg-navy-900 border border-navy-700/80 text-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none cursor-pointer font-bold"
+              className="bg-navy-900 border border-navy-700/70 text-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none cursor-pointer font-bold"
             >
               {activeFamilies.map(f => (
                 <option key={f} value={f}>

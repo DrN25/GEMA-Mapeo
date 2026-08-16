@@ -142,12 +142,12 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
   ];
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 p-4 md:p-6 bg-slate-100 dark:bg-navy-950 min-h-screen text-slate-800 dark:text-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row gap-6 p-4 md:p-6 bg-navy-950 min-h-screen text-slate-100 font-sans">
       {/* SIDE MENU */}
       <div className="w-full md:w-64 shrink-0 space-y-4">
         {groups.map((g, gIdx) => (
-          <div key={gIdx} className="space-y-1 bg-white/80 dark:bg-navy-900/30 p-3 rounded-xl border border-slate-200 dark:border-navy-900 shadow-sm">
-            <h4 className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider px-2 mb-2">
+          <div key={gIdx} className="space-y-1 bg-navy-900/30 p-3 rounded-xl border border-navy-800 shadow-sm">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-2 mb-2">
               {g.title}
             </h4>
             {g.items.map((item) => {
@@ -158,11 +158,11 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all text-left ${active
-                      ? 'bg-indigo-600 dark:bg-violet-600 text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-navy-900/60 hover:text-indigo-700 dark:hover:text-slate-200'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:bg-indigo-500/10 hover:text-indigo-400'
                     }`}
                 >
-                  <Icon size={14} className={active ? 'text-white' : 'text-slate-500 dark:text-slate-400'} />
+                  <Icon size={14} className={active ? 'text-white' : 'text-slate-400'} />
                   <span>{item.label}</span>
                 </button>
               );
@@ -172,7 +172,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
       </div>
 
       {/* CONTENT TAB */}
-      <div className="flex-1 bg-white/90 dark:bg-navy-900/10 p-5 rounded-2xl border border-slate-200 dark:border-navy-900/55 min-w-0 shadow-sm">
+      <div className="flex-1 bg-navy-900/10 p-5 rounded-2xl border border-navy-800 min-w-0 shadow-sm">
 
         {/* 1. LITOLOGÍA Y K */}
         {activeTab === 'litologia' && (

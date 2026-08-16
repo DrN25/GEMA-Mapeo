@@ -29,6 +29,7 @@ import SaveErrorModal from './components/modals/SaveErrorModal';
 import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
+import { getStoredDarkMode, persistTheme } from './utils/theme';
 import { apiFetch, pingBackend, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState } from './utils/apiClient';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
@@ -243,7 +244,7 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   // UI & Theme
-  const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [darkMode, setDarkMode] = useState<boolean>(() => getStoredDarkMode());
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
@@ -276,16 +277,9 @@ const [connectionLost, setConnectionLost] = useState(false);
   const [isCommentsExpanded, setIsCommentsExpanded] = useState<boolean>(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState<boolean>(false);
 
-  // 1. Initialize Dark Mode Theme
+  // 1. Initialize Dark Mode Theme (aplica clase + persiste en localStorage)
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (darkMode) {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
+    persistTheme(darkMode);
   }, [darkMode]);
 
   // Evitar de forma global que el scroll del mouse modifique los valores de inputs numéricos y desplegables
@@ -1963,7 +1957,9 @@ const [connectionLost, setConnectionLost] = useState(false);
         {/* Main Content scroll window */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           {currentView === 'admin_usuarios' && hasRole(['admin']) && (
-            <AdminUsersView />
+            <div className="view-mapeo animate-fade-in">
+              <AdminUsersView />
+            </div>
           )}
 
           {currentView === 'dashboard' && (
@@ -1997,15 +1993,19 @@ const [connectionLost, setConnectionLost] = useState(false);
           )}
 
           {currentView === 'auditoria_masiva' && (
-            <BulkAuditor apiBase={RESOLVED_API_BASE} />
+            <div className="view-mapeo animate-fade-in">
+              <BulkAuditor apiBase={RESOLVED_API_BASE} />
+            </div>
           )}
 
           {currentView === 'congruencia' && (
-            <CongruenceAuditor apiBase={RESOLVED_API_BASE} />
+            <div className="view-mapeo animate-fade-in">
+              <CongruenceAuditor apiBase={RESOLVED_API_BASE} />
+            </div>
           )}
 
           {currentView === 'mapeo' && activeWindow && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in view-mapeo">
               <VentanaForm
                 key={activeWindow.header.celda}
                 header={activeWindow.header}
@@ -2224,30 +2224,34 @@ const [connectionLost, setConnectionLost] = useState(false);
           )}
 
           {currentView === 'grafico' && activeWindow && calculated && (
-            <StructurePlot
-              header={activeWindow.header}
-              calculatedJoints={calculated.joints}
-              largo={calculated.largo}
-              showFormulas={showFormulas}
-            />
+            <div className="view-mapeo space-y-6 animate-fade-in">
+              <StructurePlot
+                header={activeWindow.header}
+                calculatedJoints={calculated.joints}
+                largo={calculated.largo}
+                showFormulas={showFormulas}
+              />
+            </div>
           )}
 
           {currentView === 'plt_ensayos' && (
-            <PltEnsayosView
-              pltEnsayos={pltEnsayos}
-              onChange={handlePltChange}
-              activeWindowCelda={activeWindow?.header.celda || null}
-              showFormulas={showFormulas}
-              knownCells={knownCells}
-              onImportToCell={handlePltImport}
-            />
+            <div className="view-mapeo animate-fade-in">
+              <PltEnsayosView
+                pltEnsayos={pltEnsayos}
+                onChange={handlePltChange}
+                activeWindowCelda={activeWindow?.header.celda || null}
+                showFormulas={showFormulas}
+                knownCells={knownCells}
+                onImportToCell={handlePltImport}
+              />
+            </div>
           )}
 
         </main>
 
         {/* 3. QA/QC VALIDATION PANEL */}
         {alerts.length > 0 && (activeWindow || currentView === 'plt_ensayos') && (
-          <div className="absolute bottom-6 right-6 z-50">
+          <div className="absolute bottom-6 right-6 z-50 view-modal">
             <ValidationPanel
               alerts={alerts}
               onFocusField={handleFocusField}
@@ -2271,7 +2275,7 @@ const [connectionLost, setConnectionLost] = useState(false);
         existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
       />
       {isCatalogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
+        <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
           <div className="glass-panel w-full max-w-[72vw] max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
             <div className="h-1.5 bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-500 w-full" />
 
@@ -2303,7 +2307,7 @@ const [connectionLost, setConnectionLost] = useState(false);
       )}
 
       {isPltCatalogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
+        <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
           <div className="glass-panel w-full max-w-[95vw] max-h-[90vh] flex flex-col border border-navy-800 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95">
             <div className="h-1.5 bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-500 w-full" />
 
@@ -2381,7 +2385,7 @@ const [connectionLost, setConnectionLost] = useState(false);
 
       {/* Glassmorphic UI Loading Lock Overlay */}
       {isLoadingWindow && (
-        <div className="fixed inset-0 z-[100] bg-navy-950/70 backdrop-blur-md flex flex-col items-center justify-center gap-4 text-slate-100 pointer-events-auto select-none">
+        <div className="fixed inset-0 view-modal z-[100] bg-navy-950/70 backdrop-blur-md flex flex-col items-center justify-center gap-4 text-slate-100 pointer-events-auto select-none">
           <div className="p-6 bg-navy-900 border border-violet-500/30 rounded-2xl shadow-2xl flex flex-col items-center gap-3">
             <Loader2 size={40} className="text-violet-400 animate-spin" />
             <p className="text-xs font-black uppercase tracking-wider text-slate-100">Sincronizando ventanas con SQL Server...</p>

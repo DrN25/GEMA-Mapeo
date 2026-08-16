@@ -395,7 +395,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
   // Renderizado de Pantalla de Éxito
   if (step === 'done') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in">
+      <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in">
         <div className="glass-panel w-full max-w-md p-8 rounded-2xl border border-navy-800 shadow-2xl bg-navy-900/95 text-center relative overflow-hidden">
           <div className="h-1.5 bg-emerald-500 w-full absolute top-0 left-0" />
           <CheckCircle size={52} className="mx-auto text-emerald-400 mb-4" />
@@ -420,7 +420,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in">
       <div className="glass-panel w-full max-w-5xl p-6 rounded-2xl border border-navy-800 shadow-2xl bg-navy-900/95 relative overflow-hidden max-h-[92vh] flex flex-col">
         <div className="h-1.5 bg-indigo-500 w-full absolute top-0 left-0 shrink-0" />
 
@@ -846,7 +846,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
 
       {/* SUB-MODAL DE DOBLE CONFIRMACIÓN DE CELDAS DUPLICADAS */}
       {showDoubleConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
           <div className="glass-panel w-full max-w-xl p-6 rounded-2xl border border-amber-500/40 shadow-2xl bg-navy-900/95 relative overflow-hidden flex flex-col space-y-4">
             <div className="h-1.5 bg-amber-500 w-full absolute top-0 left-0" />
 
@@ -953,7 +953,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
 
       {/* SUB-MODAL DE COMPARACIÓN LADO A LADO (DUPLICADOS) */}
       {comparingCelda && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
           <div className="glass-panel w-full max-w-4xl p-6 rounded-2xl border border-navy-800 shadow-2xl bg-navy-900/95 relative overflow-hidden flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-navy-800 pb-3">
               <div className="flex items-center gap-2">

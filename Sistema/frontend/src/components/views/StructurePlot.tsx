@@ -146,6 +146,18 @@ export default function StructurePlot({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      // Paleta del canvas según el tema activo (claro/oscuro)
+      const isDark = document.documentElement.classList.contains('dark');
+      const plotBg = isDark ? '#0c0a09' : '#eef2f6';
+      const gridColor = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.05)';
+      const axisColor = isDark ? '#94a3b8' : '#475569';
+      const axisFaint = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(71,85,105,0.35)';
+      const frameColor = isDark ? 'rgba(100,116,139,0.6)' : 'rgba(71,85,105,0.55)';
+      const labelColor = isDark ? '#94a3b8' : '#475569';
+      const axisTitleColor = isDark ? 'rgba(148,163,184,0.8)' : 'rgba(71,85,105,0.8)';
+      const nodeStroke = isDark ? '#0c0a09' : '#ffffff';
+      const nodeLabel = isDark ? '#f8fafc' : '#0f172a';
+
       const W = dimensions.width;
       const H = dimensions.height;
 
@@ -156,10 +168,10 @@ export default function StructurePlot({
       canvas.style.height = `${H}px`;
       ctx.scale(dpr, dpr);
 
-      ctx.fillStyle = '#0c0a09';
+      ctx.fillStyle = plotBg;
       ctx.fillRect(0, 0, W, H);
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+      ctx.strokeStyle = gridColor;
       ctx.lineWidth = 1;
       const gridSpacing = 40;
       for (let x = 0; x < W; x += gridSpacing) {
@@ -170,7 +182,7 @@ export default function StructurePlot({
       }
 
       if (!largoValid || !isCoordsValid) {
-        ctx.fillStyle = '#64748b';
+        ctx.fillStyle = labelColor;
         ctx.font = '13px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Ingrese coordenadas FROM y TO válidas para graficar el plano.', W / 2, H / 2);
@@ -265,23 +277,23 @@ export default function StructurePlot({
           ctx.restore();
         }
 
-        ctx.fillStyle = cj.inBounds ? '#94a3b8' : 'rgba(148,163,184,0.4)';
+        ctx.fillStyle = cj.inBounds ? axisColor : 'rgba(71,85,105,0.4)';
         ctx.font = 'bold 10px monospace';
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'left';
         ctx.fillText(`F${fam} (#${id})`, cx + 6, cy + 3);
       });
 
-      drawNode(ctx, xFrom, yFrom, 'FROM', '#22d3ee');
-      drawNode(ctx, xTo, yTo, 'TO', '#a78bfa');
+      drawNode(ctx, xFrom, yFrom, 'FROM', '#22d3ee', nodeStroke, nodeLabel);
+      drawNode(ctx, xTo, yTo, 'TO', '#a78bfa', nodeStroke, nodeLabel);
 
       ctx.restore();
 
-      ctx.strokeStyle = 'rgba(100, 116, 139, 0.6)';
+      ctx.strokeStyle = frameColor;
       ctx.lineWidth = 1.5;
       ctx.strokeRect(ML, MT, PW, PH);
 
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = axisColor;
       ctx.font = '11px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -290,7 +302,7 @@ export default function StructurePlot({
       for (let i = 0; i <= tickCount; i++) {
         const cx = ML + (i / tickCount) * PW;
         const wx = fromCanvasX(cx);
-        ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+        ctx.strokeStyle = axisFaint;
         ctx.beginPath(); ctx.moveTo(cx, MT + PH); ctx.lineTo(cx, MT + PH + 5); ctx.stroke();
         ctx.fillText(formatNumber3(wx), cx, MT + PH + 8);
       }
@@ -300,14 +312,14 @@ export default function StructurePlot({
       for (let i = 0; i <= tickCount; i++) {
         const cy = MT + PH - (i / tickCount) * PH;
         const wy = fromCanvasY(cy);
-        ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+        ctx.strokeStyle = axisFaint;
         ctx.beginPath(); ctx.moveTo(ML, cy); ctx.lineTo(ML - 5, cy); ctx.stroke();
         ctx.fillText(formatNumber3(wy), ML - 8, cy);
       }
 
       // CORREGIDO: Cambio de tipografía de 'Outfit' a 'Inter' para garantizar consistencia global
       ctx.font = "13px 'Inter', sans-serif";
-      ctx.fillStyle = "rgba(148,163,184,0.8)";
+      ctx.fillStyle = axisTitleColor;
       ctx.textAlign = "center";
       ctx.fillText("Este (UTM X) →", ML + PW / 2, MT + PH + 32);
 
@@ -322,11 +334,20 @@ export default function StructurePlot({
     }
   };
 
-  const drawNode = (ctx: CanvasRenderingContext2D, x: number, y: number, label: string, color: string) => {
+  // Repintar el canvas cuando cambia el tema (clase dark/light en <html>)
+  const drawPlotRef = useRef(drawPlot);
+  drawPlotRef.current = drawPlot;
+  useEffect(() => {
+    const observer = new MutationObserver(() => drawPlotRef.current());
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const drawNode = (ctx: CanvasRenderingContext2D, x: number, y: number, label: string, color: string, stroke: string, labelFill: string) => {
     ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill();
-    ctx.strokeStyle = '#0c0a09'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#f8fafc'; ctx.font = 'bold 11px monospace';
+    ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = labelFill; ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center'; ctx.fillText(label, x, y - 10);
   };
 
@@ -467,7 +488,7 @@ export default function StructurePlot({
           <button
             onClick={handleDownload}
             disabled={!largoValid || !isCoordsValid}
-            className="flex items-center gap-1 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-800 dark:text-orange-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 bg-orange-500/10 border border-orange-500/40 hover:bg-orange-500/20 hover:border-orange-400 text-orange-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed shadow-[0_0_12px_rgba(249,115,22,0.12)]"
           >
             <Download size={14} />
             <span>Exportar PNG</span>
@@ -498,7 +519,7 @@ export default function StructurePlot({
 
         {showTooltip && tooltipData && tooltipData.joint.row && (
           <div
-            className="absolute z-50 bg-navy-950/95 border border-navy-700 rounded-xl p-3.5 text-xs shadow-2xl backdrop-blur-md space-y-1.5 w-64 text-left pointer-events-none text-slate-300"
+            className="absolute z-50 bg-navy-950/95 border border-navy-800 rounded-xl p-3.5 text-xs shadow-2xl backdrop-blur-md space-y-1.5 w-64 text-left pointer-events-none text-slate-300"
             style={{
               left: tooltipData.alignedLeft ? tooltipData.x - 270 : tooltipData.x + 15,
               top: tooltipData.alignedTop ? tooltipData.y - 140 : tooltipData.y + 15
@@ -524,7 +545,7 @@ export default function StructurePlot({
               </div>
               <div>
                 <span className="text-slate-500 block text-[9px] uppercase">Familia:</span>
-                <span className="font-bold text-purple-400">F{tooltipData.joint.row.familia || (tooltipData.joint.row as any).fam}</span>
+                <span className="font-bold text-violet-400">F{tooltipData.joint.row.familia || (tooltipData.joint.row as any).fam}</span>
               </div>
             </div>
             <div className="border-t border-navy-850 pt-1.5 mt-1 space-y-0.5 font-mono text-[9px] text-slate-400">
@@ -573,11 +594,11 @@ export default function StructurePlot({
                 <th className="py-2.5 px-2 text-center">Fam</th>
                 <th className="py-2.5 px-2">Tipo</th>
                 <th className="py-2.5 px-3 text-center">Dist (m)</th>
-                <th className="py-2.5 px-3 text-center text-blue-400">UTM Este (X)</th>
-                <th className="py-2.5 px-3 text-center text-blue-400">UTM Norte (Y)</th>
-                <th className="py-2.5 px-3 text-center text-blue-400">UTM Cota (Z)</th>
-                <th className="py-2.5 px-3 text-center text-purple-400">Ángulo θ (&deg;)</th>
-                <th className="py-2.5 px-3 text-center text-purple-400">Ángulo α (&deg;)</th>
+                <th className="py-2.5 px-3 text-center text-sky-400">UTM Este (X)</th>
+                <th className="py-2.5 px-3 text-center text-sky-400">UTM Norte (Y)</th>
+                <th className="py-2.5 px-3 text-center text-sky-400">UTM Cota (Z)</th>
+                <th className="py-2.5 px-3 text-center text-violet-400">Ángulo θ (&deg;)</th>
+                <th className="py-2.5 px-3 text-center text-violet-400">Ángulo α (&deg;)</th>
                 <th className="py-2.5 px-2 text-center">Orientación</th>
                 <th className="py-2.5 px-3 text-center">Estado</th>
               </tr>
@@ -593,28 +614,28 @@ export default function StructurePlot({
                     <td className="py-2 px-3 font-mono text-slate-500">#{id}</td>
                     <td className="py-2 px-2 text-center font-extrabold" style={{ color }}>F{fam}</td>
                     <td className="py-2 px-2 font-bold text-slate-400">{cj.row.tipo_estructura}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">{formatNumber3(cj.row.distancia)}</td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">
+                    <td className="py-2 px-3 text-center font-mono text-sky-300 bg-sky-500/5">{formatNumber3(cj.row.distancia)}</td>
+                    <td className="py-2 px-3 text-center font-mono text-sky-300 bg-sky-500/5">
                       <FormulaTooltipTrigger formulaId="utm_x_proj" params={{ dist: cj.row.distancia, theta: cj.theta, este_from: parseLocaleFloat(header?.este_from), val: cj.x }} position="top" enabled={showFormulas}>
                         <span>{formatNumber4(cj.x)}</span>
                       </FormulaTooltipTrigger>
                     </td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">
+                    <td className="py-2 px-3 text-center font-mono text-sky-300 bg-sky-500/5">
                       <FormulaTooltipTrigger formulaId="utm_y_proj" params={{ dist: cj.row.distancia, theta: cj.theta, norte_from: parseLocaleFloat(header?.norte_from), val: cj.y }} position="top" enabled={showFormulas}>
                         <span>{formatNumber2(cj.y)}</span>
                       </FormulaTooltipTrigger>
                     </td>
-                    <td className="py-2 px-3 text-center font-mono text-blue-300 bg-blue-500/5">
+                    <td className="py-2 px-3 text-center font-mono text-sky-300 bg-sky-500/5">
                       <FormulaTooltipTrigger formulaId="utm_z_proj" params={{ dist: cj.row.distancia, theta: cj.theta, alpha: cj.alpha, cota_from: parseLocaleFloat(header?.cota_from), val: cj.z }} position="top" enabled={showFormulas}>
                         <span>{formatNumber6(cj.z)}</span>
                       </FormulaTooltipTrigger>
                     </td>
-                    <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">
+                    <td className="py-2 px-3 text-center font-mono text-violet-300 bg-violet-500/5">
                       <FormulaTooltipTrigger formulaId="theta_angle" params={{ val: cj.theta, norte_to: parseLocaleFloat(header?.norte_to), norte_from: parseLocaleFloat(header?.norte_from), este_to: parseLocaleFloat(header?.este_to), este_from: parseLocaleFloat(header?.este_from) }} position="top" enabled={showFormulas}>
                         <span>{formatNumber6(cj.theta)}&deg;</span>
                       </FormulaTooltipTrigger>
                     </td>
-                    <td className="py-2 px-3 text-center font-mono text-purple-300 bg-purple-500/5">
+                    <td className="py-2 px-3 text-center font-mono text-violet-300 bg-violet-500/5">
                       <FormulaTooltipTrigger formulaId="alpha_angle" params={{ val: cj.alpha, este_to: parseLocaleFloat(header?.este_to), este_from: parseLocaleFloat(header?.este_from), cota_to: parseLocaleFloat(header?.cota_to), cota_from: parseLocaleFloat(header?.cota_from) }} position="top" enabled={showFormulas}>
                         <span>{formatNumber6(cj.alpha)}&deg;</span>
                       </FormulaTooltipTrigger>

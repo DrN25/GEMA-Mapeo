@@ -235,7 +235,7 @@ export default function CommentsPhotos({
                       onChange={(e) => handleCaptionChange(e.target.value, idx)}
                       onBlur={() => saveMetadata(captions)}
                       placeholder={`Descripción foto ${idx + 1}...`}
-                      className="absolute bottom-0 left-0 right-0 bg-slate-950/90 border-t border-navy-900/60 text-slate-300 text-xs font-bold px-2 py-1.5 focus:outline-none focus:bg-slate-950 text-center z-20"
+                      className="absolute bottom-0 left-0 right-0 bg-black/70 border-t border-white/10 text-slate-200 text-xs font-bold px-2 py-1.5 focus:outline-none focus:bg-black/80 placeholder-slate-400 text-center z-20"
                     />
                   </>
                 ) : (

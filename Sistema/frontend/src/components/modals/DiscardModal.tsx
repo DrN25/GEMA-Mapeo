@@ -29,7 +29,7 @@ export default function DiscardModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-fade-in text-left">
+    <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-fade-in text-left">
       <div className="glass-panel w-full max-w-xl flex flex-col border border-rose-500/30 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95 text-slate-100">
         
         {/* Superior Accent Line */}

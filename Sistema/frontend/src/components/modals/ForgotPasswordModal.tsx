@@ -111,7 +111,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
   };
 
   return (
-    <div className="fixed inset-0 bg-[#02040a]/80 backdrop-blur-md flex justify-center items-center p-4 z-[110] animate-fade-in font-sans select-none">
+    <div className="fixed inset-0 view-modal bg-[#02040a]/80 backdrop-blur-md flex justify-center items-center p-4 z-[110] animate-fade-in font-sans select-none">
       <div className="bg-[#090f1d] border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-left">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">

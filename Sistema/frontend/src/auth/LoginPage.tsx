@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { pingBackend } from '../utils/apiClient';
+import { applyStoredTheme } from '../utils/theme';
 import { Eye, EyeOff, Loader2, WifiOff, RefreshCw, Lock } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 
@@ -37,8 +38,8 @@ export const LoginPage: React.FC = () => {
   };
 
   useEffect(() => {
-    // Garantizar que la clase 'dark' esté activa en el html
-    document.documentElement.classList.add('dark');
+    // Respetar el tema guardado en localStorage (claro/oscuro)
+    applyStoredTheme();
     checkConnection();
   }, []);
 

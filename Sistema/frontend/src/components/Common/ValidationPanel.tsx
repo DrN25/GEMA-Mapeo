@@ -87,25 +87,25 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
   if (!isOpen) {
     const statusStyles: Record<string, { btn: string; ping: string; icon: ReactNode; badge: string }> = {
       critical: {
-        btn: 'bg-red-50 dark:bg-red-950/85 border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.15)] dark:shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_25px_rgba(239,68,68,0.55)]',
+        btn: 'bg-red-500/10 border-red-500/40 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.25)] hover:shadow-[0_0_25px_rgba(239,68,68,0.5)]',
         ping: 'bg-red-500',
         icon: <AlertOctagon size={24} className="animate-pulse" />,
         badge: 'bg-red-500 border-red-400 text-white',
       },
       vacio: {
-        btn: 'bg-violet-50 dark:bg-violet-950/85 border-violet-200 dark:border-violet-500/50 text-violet-600 dark:text-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.15)] dark:shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.55)]',
+        btn: 'bg-violet-500/10 border-violet-500/40 text-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.25)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)]',
         ping: 'bg-violet-500',
         icon: <CircleSlash size={24} className="animate-pulse" />,
         badge: 'bg-violet-500 border-violet-400 text-white',
       },
       warning: {
-        btn: 'bg-amber-50 dark:bg-amber-950/85 border-amber-200 dark:border-amber-500/50 text-amber-600 dark:text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)] dark:shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.45)]',
+        btn: 'bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.45)]',
         ping: 'bg-amber-500',
         icon: <AlertTriangle size={24} />,
         badge: 'bg-amber-500 border-amber-400 text-black',
       },
       ok: {
-        btn: 'bg-emerald-50 dark:bg-emerald-950/85 border-emerald-200 dark:border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)] dark:shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]',
+        btn: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]',
         ping: 'bg-emerald-500',
         icon: <CheckCircle size={24} />,
         badge: '',
@@ -139,21 +139,21 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
       key: 'CRITICA',
       title: 'Alertas Críticas',
       icon: <AlertOctagon size={14} className="text-red-400 shrink-0 mt-0.5" />,
-      cardCls: 'bg-red-50 dark:bg-red-950/45 border-red-200 dark:border-red-800/40 text-red-800 dark:text-slate-200 hover:bg-red-100 dark:hover:bg-red-950/60',
+      cardCls: 'bg-red-500/10 border-red-500/30 text-slate-100 hover:bg-red-500/15',
       badgeCls: 'bg-red-500/20 border-red-500/40 text-red-300',
     },
     {
       key: 'ADVERTENCIA',
       title: 'Advertencias',
       icon: <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />,
-      cardCls: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/30 text-amber-800 dark:text-slate-200 hover:bg-amber-100 dark:hover:bg-amber-950/50',
+      cardCls: 'bg-amber-500/10 border-amber-500/30 text-slate-100 hover:bg-amber-500/15',
       badgeCls: 'bg-amber-500/20 border-amber-500/40 text-amber-300',
     },
     {
       key: 'VACIO',
       title: 'Campos Vacíos',
       icon: <CircleSlash size={14} className="text-violet-400 shrink-0 mt-0.5" />,
-      cardCls: 'bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800/30 text-violet-800 dark:text-slate-200 hover:bg-violet-100 dark:hover:bg-violet-950/50',
+      cardCls: 'bg-violet-500/10 border-violet-500/30 text-slate-100 hover:bg-violet-500/15',
       badgeCls: 'bg-violet-500/20 border-violet-500/40 text-violet-300',
     },
   ];

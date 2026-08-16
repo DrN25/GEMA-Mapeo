@@ -384,7 +384,7 @@ export default function PltExcelImportModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in text-left">
+        <div className="fixed inset-0 view-modal z-[55] flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in text-left">
             <div className="glass-panel w-full max-w-4xl max-h-[92vh] flex flex-col border border-navy-800/80 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.6)] relative overflow-hidden bg-navy-950/95 text-xs text-slate-100">
                 {/* Top accent bar */}
                 <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 w-full" />
@@ -614,7 +614,7 @@ export default function PltExcelImportModal({
 
                 {/* MODAL CONFIRMACIÓN REDISEÑADO (Sombra glassmorphism con botones de tarjeta) */}
                 {showConfirm && !showPicker && (
-                    <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
+                    <div className="fixed inset-0 view-modal z-[65] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
                         <div className="glass-panel w-full max-w-xl p-6 rounded-2xl border border-amber-500/40 shadow-2xl bg-navy-900/95 space-y-5">
                             <div className="flex items-start gap-3.5 border-b border-navy-800 pb-4">
                                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
@@ -682,7 +682,7 @@ export default function PltExcelImportModal({
 
                 {/* MODAL PICKER DESTINO REDISEÑADO */}
                 {showPicker && showConfirm && (
-                    <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
+                    <div className="fixed inset-0 view-modal z-[65] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in">
                         <div className="glass-panel w-full max-w-md p-6 rounded-2xl border border-sky-500/40 shadow-2xl bg-navy-900/95 space-y-4">
                             <div>
                                 <h4 className="text-sm font-black text-slate-100 uppercase tracking-wider">Elegir Celda de Destino</h4>
@@ -734,7 +734,7 @@ export default function PltExcelImportModal({
 
                 {/* SUB-MODAL RESULTADO DE IMPORTACIÓN EXITOSA (Estilo SaveResultModal) */}
                 {successData && (
-                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in text-left">
+                    <div className="fixed inset-0 view-modal z-[70] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md animate-fade-in text-left">
                         <div className="glass-panel w-full max-w-md flex flex-col border border-emerald-500/40 rounded-2xl shadow-2xl relative overflow-hidden bg-navy-900/95 text-slate-100">
                             <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 w-full shrink-0" />
 
