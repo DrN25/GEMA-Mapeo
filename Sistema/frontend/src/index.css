@@ -449,6 +449,36 @@ input[type=number] {
 .light aside [class*="border-rose-500/"],
 .light header [class*="border-rose-500/"],
 .light .view-dashboard [class*="border-rose-500/"], .light .view-mapeo [class*="border-rose-500/"], .light .view-modal [class*="border-rose-500/"] { border-color: #fb7185; }
+.light aside [class*="bg-pink-500/10"],
+.light header [class*="bg-pink-500/10"],
+.light .view-dashboard [class*="bg-pink-500/10"], .light .view-mapeo [class*="bg-pink-500/10"], .light .view-modal [class*="bg-pink-500/10"] { background-color: #fecdd3; }
+.light aside [class*="hover:bg-pink-500/20"]:hover,
+.light header [class*="hover:bg-pink-500/20"]:hover,
+.light .view-dashboard [class*="hover:bg-pink-500/20"]:hover, .light .view-mapeo [class*="hover:bg-pink-500/20"]:hover, .light .view-modal [class*="hover:bg-pink-500/20"]:hover { background-color: #fda4af; }
+.light aside [class*="bg-pink-500/20"]:not([class*="hover:"]),
+.light header [class*="bg-pink-500/20"]:not([class*="hover:"]),
+.light .view-dashboard [class*="bg-pink-500/20"]:not([class*="hover:"]), .light .view-mapeo [class*="bg-pink-500/20"]:not([class*="hover:"]), .light .view-modal [class*="bg-pink-500/20"]:not([class*="hover:"]) { background-color: #fda4af; }
+.light aside [class*="bg-pink-500/5"],
+.light header [class*="bg-pink-500/5"],
+.light .view-dashboard [class*="bg-pink-500/5"], .light .view-mapeo [class*="bg-pink-500/5"], .light .view-modal [class*="bg-pink-500/5"] { background-color: #fce7f3; }
+.light aside [class*="text-pink-300"],
+.light header [class*="text-pink-300"],
+.light .view-dashboard [class*="text-pink-300"], .light .view-mapeo [class*="text-pink-300"], .light .view-modal [class*="text-pink-300"] { color: #9d174d; }
+.light aside [class*="text-pink-400"],
+.light header [class*="text-pink-400"],
+.light .view-dashboard [class*="text-pink-400"], .light .view-mapeo [class*="text-pink-400"], .light .view-modal [class*="text-pink-400"] { color: #9d174d; }
+.light aside [class*="text-pink-500"],
+.light header [class*="text-pink-500"],
+.light .view-dashboard [class*="text-pink-500"], .light .view-mapeo [class*="text-pink-500"], .light .view-modal [class*="text-pink-500"] { color: #9d174d; }
+.light aside [class*="text-pink-600"],
+.light header [class*="text-pink-600"],
+.light .view-dashboard [class*="text-pink-600"], .light .view-mapeo [class*="text-pink-600"], .light .view-modal [class*="text-pink-600"] { color: #9d174d; }
+.light aside [class*="text-pink-700"],
+.light header [class*="text-pink-700"],
+.light .view-dashboard [class*="text-pink-700"], .light .view-mapeo [class*="text-pink-700"], .light .view-modal [class*="text-pink-700"] { color: #9d174d; }
+.light aside [class*="border-pink-500/"],
+.light header [class*="border-pink-500/"],
+.light .view-dashboard [class*="border-pink-500/"], .light .view-mapeo [class*="border-pink-500/"], .light .view-modal [class*="border-pink-500/"] { border-color: #f472b6; }
 .light aside [class*="bg-amber-500/10"],
 .light header [class*="bg-amber-500/10"],
 .light .view-dashboard [class*="bg-amber-500/10"], .light .view-mapeo [class*="bg-amber-500/10"], .light .view-modal [class*="bg-amber-500/10"] { background-color: #fde68a; }

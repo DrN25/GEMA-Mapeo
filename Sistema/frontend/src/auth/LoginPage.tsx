@@ -76,10 +76,10 @@ export const LoginPage: React.FC = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-4 shadow-lg shadow-indigo-500/5">
             <Lock className="w-7 h-7 text-indigo-400" />
           </div>
-          <h1 className="text-xl font-black tracking-widest bg-gradient-to-r from-indigo-400 via-violet-400 to-indigo-500 bg-clip-text text-transparent uppercase">
+          <h1 className="text-xl font-black tracking-widest bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-600 bg-clip-text text-transparent uppercase">
             VENTANAS 2.0
           </h1>
-          <p className="text-xs text-indigo-400 font-extrabold uppercase tracking-widest mt-1">
+          <p className="text-xs text-indigo-500 font-extrabold uppercase tracking-widest mt-1">
             Mapeo Geomecánico & Control de Acceso
           </p>
         </div>
@@ -95,7 +95,7 @@ export const LoginPage: React.FC = () => {
           </div>
         ) : backendOnline === false ? (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3 animate-fade-in text-left">
-            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-amber-600 text-xs font-bold uppercase tracking-wider">
               <WifiOff className="w-4 h-4 shrink-0" />
               <span>Servidor Inaccesible o Despertando</span>
             </div>
@@ -104,7 +104,7 @@ export const LoginPage: React.FC = () => {
             </p>
             <button
               onClick={checkConnection}
-              className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 border border-amber-500/40 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Reintentar Conexión</span>
@@ -113,8 +113,8 @@ export const LoginPage: React.FC = () => {
         ) : (
           <>
             {error && (
-              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-3 text-rose-300 text-xs font-semibold animate-fade-in">
-                <svg className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-3 text-rose-600 text-xs font-semibold animate-fade-in">
+                <svg className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>{error}</span>
@@ -144,7 +144,7 @@ export const LoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(true)}
-                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="text-[11px] font-bold text-indigo-500 hover:text-indigo-400 transition-colors"
                   >
                     ¿Olvidaste tu contraseña?
                   </button>

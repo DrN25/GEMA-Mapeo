@@ -417,9 +417,9 @@ export default function RmrAnalysis({
           <tbody className="divide-y divide-navy-900/50 text-slate-300 font-medium text-xs">
             {/* RMR'76 */}
             <tr className="hover:bg-navy-900/30 transition-colors bg-amber-500/[0.01]">
-              <td className="py-3 px-3 text-center font-black text-amber-400 bg-amber-500/10 sticky left-0 z-10 w-20 border-r border-b border-navy-800/80 shadow-[2px_0_5px_rgba(245,158,11,0.15)]">{(76).toFixed(2)}</td>
+              <td className="py-3 px-3 text-center font-black text-amber-300 bg-amber-500/10 sticky left-0 z-10 w-20 border-r border-b border-navy-800/80 shadow-[2px_0_5px_rgba(245,158,11,0.15)]">{(76).toFixed(2)}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{header.condicion_agua}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-300 bg-amber-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="val_agua_r76" params={{ code: header.condicion_agua, val: calculated.water_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.water_rating_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
@@ -429,7 +429,7 @@ export default function RmrAnalysis({
                   <span>{currentResistGrade}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-300 bg-amber-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="val_resist_r76" params={{ code: header.resistencia_ucs, val: calculated.ucs_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.ucs_rating_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
@@ -439,7 +439,7 @@ export default function RmrAnalysis({
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol?.toFixed(2) ?? '—'}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-300 bg-amber-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="rqd_rating_r76" params={{ rqd: calculated.rqd_est, val: calculated.rqd_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.rqd_rating_76?.toFixed(2) ?? '—'}</span>
                 </FormulaTooltipTrigger>
@@ -464,17 +464,17 @@ export default function RmrAnalysis({
                   <span>{calculated.global_spacing.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-300 bg-amber-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="spacing_rating_r76" params={{ spacing: calculated.global_spacing, val: calculated.spacing_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.spacing_rating_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-400 bg-amber-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-amber-300 bg-amber-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="condicion_rating_r76" params={{ val: calculated.condicion_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.condicion_rating_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-3 text-center border-r border-b border-navy-800/80 font-black text-amber-400 bg-amber-500/20 text-sm shadow-[inset_0_0_10px_rgba(245,158,11,0.2)]">
+              <td className="py-3 px-3 text-center border-r border-b border-navy-800/80 font-black text-amber-300 bg-amber-500/20 text-sm shadow-[inset_0_0_10px_rgba(245,158,11,0.2)]">
                 <FormulaTooltipTrigger formulaId="rmr_76" params={{ ucs: calculated.ucs_rating_76, rqd: calculated.rqd_rating_76, spacing: calculated.spacing_rating_76, cond: calculated.condicion_rating_76, water: calculated.water_rating_76 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.rmr_76.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
@@ -485,9 +485,9 @@ export default function RmrAnalysis({
 
             {/* RMR'89 */}
             <tr className="hover:bg-navy-900/30 transition-colors bg-pink-500/[0.01]">
-              <td className="py-3 px-3 text-center font-black text-pink-400 bg-pink-500/10 sticky left-0 z-10 w-20 border-r border-b border-navy-800/80 shadow-[2px_0_5px_rgba(236,72,153,0.15)]">{(89).toFixed(2)}</td>
+              <td className="py-3 px-3 text-center font-black text-pink-300 bg-pink-500/10 sticky left-0 z-10 w-20 border-r border-b border-navy-800/80 shadow-[2px_0_5px_rgba(236,72,153,0.15)]">{(89).toFixed(2)}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{header.condicion_agua}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-300 bg-pink-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="val_agua_r89" params={{ code: header.condicion_agua, val: calculated.water_rating_89 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.water_rating_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
@@ -497,7 +497,7 @@ export default function RmrAnalysis({
                   <span>{currentResistGrade}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-300 bg-pink-500/[0.04]">
                 <FormulaTooltipTrigger
                   formulaId="val_resist_r89"
                   params={{
@@ -518,7 +518,7 @@ export default function RmrAnalysis({
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol?.toFixed(2) ?? '—'}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-300 bg-pink-500/[0.04]">
                 <FormulaTooltipTrigger
                   formulaId="rqd_rating_r89"
                   params={{
@@ -553,17 +553,17 @@ export default function RmrAnalysis({
                   <span>{calculated.global_spacing.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-300 bg-pink-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="spacing_rating_r89" params={{ spacing: calculated.global_spacing, val: calculated.spacing_rating_89 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.spacing_rating_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-400 bg-pink-500/[0.04]">
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-300 bg-pink-500/[0.04]">
                 <FormulaTooltipTrigger formulaId="condicion_rating_r89" params={{ val: calculated.condicion_rating_89 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.condicion_rating_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>
               </td>
-              <td className="py-3 px-3 text-center border-r border-b border-navy-800/80 font-black text-pink-400 bg-pink-500/20 text-sm shadow-[inset_0_0_10px_rgba(236,72,153,0.2)]">
+              <td className="py-3 px-3 text-center border-r border-b border-navy-800/80 font-black text-pink-300 bg-pink-500/20 text-sm shadow-[inset_0_0_10px_rgba(236,72,153,0.2)]">
                 <FormulaTooltipTrigger formulaId="rmr_89" params={{ ucs: calculated.ucs_rating_89, rqd: calculated.rqd_rating_89, spacing: calculated.spacing_rating_89, cond: calculated.condicion_rating_89, water: calculated.water_rating_89 }} position="bottom" enabled={showFormulas}>
                   <span>{calculated.rmr_89.toFixed(2)}</span>
                 </FormulaTooltipTrigger>

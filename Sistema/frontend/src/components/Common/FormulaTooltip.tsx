@@ -692,7 +692,7 @@ const PortalTooltip: React.FC<PortalTooltipProps> = ({ coords, def, params, posi
                 zIndex: 9999,
                 width: '320px'
             }}
-            className="p-4 bg-slate-950/95 border border-indigo-500/40 rounded-xl shadow-2xl backdrop-blur-md text-left select-none animate-fade-in text-xs space-y-3 pointer-events-none"
+            className="p-4 view-modal bg-slate-950/95 border border-indigo-500/40 rounded-xl shadow-2xl backdrop-blur-md text-left select-none animate-fade-in text-xs space-y-3 pointer-events-none"
         >
             <div className="flex items-center justify-between border-b border-navy-850 pb-1.5">
                 <span className="font-black text-indigo-400 uppercase tracking-widest text-[9px]">

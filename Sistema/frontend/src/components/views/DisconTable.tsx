@@ -64,7 +64,7 @@ export default function DisconTable({
       if (pinkKeys.includes(col.key)) {
         return {
           ...col,
-          customStyleClass: 'bg-pink-500/[0.015] text-pink-400 font-normal'
+          customStyleClass: 'bg-pink-500/[0.015] text-pink-300 font-normal'
         };
       }
       if (col.key === 'totalR89') {
@@ -76,7 +76,7 @@ export default function DisconTable({
       if (amberKeys.includes(col.key)) {
         return {
           ...col,
-          customStyleClass: 'bg-amber-500/[0.015] text-amber-400 font-normal'
+          customStyleClass: 'bg-amber-500/[0.015] text-amber-300 font-normal'
         };
       }
       if (col.key === 'totalR76') {
@@ -263,32 +263,32 @@ export default function DisconTable({
         <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.terminacion}</th>
         <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.relleno1}</th>
         <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.relleno2}</th>
-        <th colSpan={2} className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400 bg-pink-950/15 text-[11px] font-black tracking-widest h-5">Valor Relleno (R89)</th>
-        <th colSpan={2} className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400 bg-amber-950/15 text-[11px] font-black tracking-widest h-5">Valor Relleno (R76)</th>
+        <th colSpan={2} className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-300 bg-pink-950/15 text-[11px] font-black tracking-widest h-5">Valor Relleno (R89)</th>
+        <th colSpan={2} className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-300 bg-amber-950/15 text-[11px] font-black tracking-widest h-5">Valor Relleno (R76)</th>
         <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.jrc}</th>
         <th rowSpan={2} className="py-2 px-2 w-36 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.rugosidad}</th>
         <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.forma}</th>
         <th rowSpan={2} className="py-2 px-2 w-32 text-center border-r border-b border-navy-800/80 h-9">{COLUMN_LABELS.alteracion}</th>
-        <th colSpan={6} className="py-1 px-2 text-center bg-pink-950/15 border-r border-b border-navy-800/80 text-pink-400 text-[11px] font-black tracking-widest h-5">Condición Discontinuidades (RMR'89)</th>
-        <th colSpan={6} className="py-1 px-2 text-center bg-amber-950/15 border-r border-b border-navy-800/80 text-amber-400 text-[11px] font-black tracking-widest h-5">Condición Discontinuidades (RMR'76)</th>
+        <th colSpan={6} className="py-1 px-2 text-center bg-pink-950/15 border-r border-b border-navy-800/80 text-pink-300 text-[11px] font-black tracking-widest h-5">Condición Discontinuidades (RMR'89)</th>
+        <th colSpan={6} className="py-1 px-2 text-center bg-amber-950/15 border-r border-b border-navy-800/80 text-amber-300 text-[11px] font-black tracking-widest h-5">Condición Discontinuidades (RMR'76)</th>
         <th rowSpan={2} className="py-2 px-2 text-center sticky right-0 bg-navy-950 z-30 border-l border-b border-navy-800/80 w-[70px] min-w-[70px] shadow-[-2px_0_5px_rgba(0,0,0,0.15)] h-9">Acción</th>
       </tr>
       <tr className="bg-navy-950 text-slate-500 font-extrabold uppercase tracking-wider text-[10px] h-4">
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400/85 bg-pink-950/10 h-4">{COLUMN_LABELS.r1_sub_89}</th>
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-400/85 bg-pink-950/10 h-4">{COLUMN_LABELS.r2_sub_89}</th>
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400/85 bg-amber-950/10 h-4">{COLUMN_LABELS.r1_sub_76}</th>
-        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-400/85 bg-amber-950/10 h-4">{COLUMN_LABELS.r2_sub_76}</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.alt_sub}</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.rel_sub}</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.cont_sub}</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.aber_sub}</th>
-        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-400/85 h-4">{COLUMN_LABELS.rug_sub}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-300/85 bg-pink-950/10 h-4">{COLUMN_LABELS.r1_sub_89}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-pink-300/85 bg-pink-950/10 h-4">{COLUMN_LABELS.r2_sub_89}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-300/85 bg-amber-950/10 h-4">{COLUMN_LABELS.r1_sub_76}</th>
+        <th className="py-1 px-2 text-center border-r border-b border-navy-800/80 text-amber-300/85 bg-amber-950/10 h-4">{COLUMN_LABELS.r2_sub_76}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.alt_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.rel_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.cont_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.aber_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.rug_sub}</th>
         <th className="py-1 px-2 text-center bg-pink-500/20 border-r border-b border-navy-800/80 text-pink-300 font-black h-4 shadow-[inset_0_0_8px_rgba(236,72,153,0.1)]">{COLUMN_LABELS.val_sub}</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.alt_sub}</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.rel_sub}</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.cont_sub}</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.aber_sub}</th>
-        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-400/85 h-4">{COLUMN_LABELS.rug_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.alt_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.rel_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.cont_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.aber_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.rug_sub}</th>
         <th className="py-1 px-2 text-center bg-amber-500/20 border-r border-b border-navy-800/80 text-amber-300 font-black h-4 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]">{COLUMN_LABELS.val_sub}</th>
       </tr>
     </thead>

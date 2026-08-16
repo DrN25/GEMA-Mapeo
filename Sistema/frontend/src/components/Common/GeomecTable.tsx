@@ -357,7 +357,7 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                                         <div className={`absolute inset-0 flex items-center justify-center text-xs text-center leading-none ${c.customStyleClass || 'text-indigo-300 font-semibold'}`}>
                                                             <span className="relative z-10">
                                                                 {displayValue || (
-                                                                    <span className="text-navy-700/60 font-semibold select-none">—</span>
+                                                                    <span className="text-slate-600/60 font-semibold select-none">—</span>
                                                                 )}
                                                             </span>
                                                         </div>
