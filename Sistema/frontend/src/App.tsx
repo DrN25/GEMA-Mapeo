@@ -11,6 +11,8 @@ import StructurePlot from './components/views/StructurePlot';
 import ValidationPanel from './components/Common/ValidationPanel';
 import ConnectionLostOverlay from './components/Common/ConnectionLostOverlay';
 import ExcelImportModal, { type ImportedCellItem } from './components/modals/ExcelImportModal';
+import ScanImportModal from './features/scan/ScanImportModal';
+import type { ScanImportedCellItem } from './features/scan/types';
 
 import CatalogsView from './components/views/CatalogsView';
 import CommentsPhotos from './components/views/CommentsPhotos';
@@ -244,6 +246,7 @@ function AppContent() {
   const [darkMode, setDarkMode] = useState<boolean>(true);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
 
   // Backend Sync Status
 const [syncStatus, setSyncStatus] = useState<'synced' | 'unsaved' | 'saving' | 'offline'>('synced');
@@ -1089,6 +1092,7 @@ const [connectionLost, setConnectionLost] = useState(false);
    * Fase 2 del import: las celdas del Excel NO se escriben directo en BD.
    * Se convierten en borradores pendientes (localStorage) con su estado de
    * validación, y se suben recién con GUARDAR CAMBIOS (QA/QC + colisiones).
+   * Acepta el contrato compartido del importador (Excel y Escaneo IA).
    */
   const handleImportToPending = async (items: ImportedCellItem[]) => {
     if (!Array.isArray(items) || items.length === 0) return;
@@ -1988,6 +1992,7 @@ const [connectionLost, setConnectionLost] = useState(false);
               onCreateWindow={handleCreateWindow}
               onDeleteWindow={handleDeleteWindow}
               onOpenImportModal={() => setIsImportModalOpen(true)}
+              onOpenScanModal={() => setIsScanModalOpen(true)}
             />
           )}
 
@@ -2255,6 +2260,14 @@ const [connectionLost, setConnectionLost] = useState(false);
         apiBase={RESOLVED_API_BASE}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportToPending}
+        existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
+      />
+      <ScanImportModal
+        isOpen={isScanModalOpen}
+        apiBase={API_BASE}
+        onClose={() => setIsScanModalOpen(false)}
+        onImport={(items: ScanImportedCellItem[]) => handleImportToPending(items)}
+        targetCelda={activeWindow?.header.celda || null}
         existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
       />
       {isCatalogModalOpen && (

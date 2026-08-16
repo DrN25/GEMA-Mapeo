@@ -330,13 +330,13 @@ export default function VentanaForm({
                     readOnly
                     value={header.celda || ''}
                     title="El código de celda no se edita directamente para evitar duplicados. Use el botón 'Editar'."
-                    className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-1.5 text-slate-200 font-black tracking-wider text-xs text-center cursor-not-allowed select-none opacity-90"
+                    className="w-full bg-navy-900/40 border border-navy-700/80 rounded-lg px-3 py-1.5 text-slate-200 font-black tracking-wider text-xs text-center cursor-not-allowed select-none opacity-90"
                   />
                   {onOpenRenameModal && (
                     <button
                       type="button"
                       onClick={onOpenRenameModal}
-                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:text-indigo-200 font-bold text-xs transition-all active:scale-95 shrink-0 shadow-sm"
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 hover:text-indigo-300 font-bold text-xs transition-all active:scale-95 shrink-0"
                       title="Editar o renombrar el código de esta celda"
                     >
                       <Pencil size={13} />
@@ -349,7 +349,7 @@ export default function VentanaForm({
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between block w-full">
                   <span>Dist. Celda (m)</span>
-                  <span className="text-[10px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.1)] select-none">
+                  <span className="text-[9px] bg-orange-500/10 text-orange-400 font-black px-1.5 py-0.5 rounded-full tracking-widest select-none">
                     AUTO
                   </span>
                 </label>
@@ -370,7 +370,7 @@ export default function VentanaForm({
                   <div
                     id="header-largo"
                     title="Calculado automáticamente desde coordenadas FROM→TO"
-                    className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                    className="w-full border border-dashed border-orange-500/40 bg-orange-500/[0.04] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
                   >
                     {displayLargo !== null ? `${displayLargo} m` : '—'}
                   </div>
@@ -382,7 +382,7 @@ export default function VentanaForm({
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Iniciales (From)</label>
               <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/80 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
-                <div className="px-2.5 py-1.5 bg-navy-950/60 text-slate-400 font-extrabold border-r border-navy-700/80 text-xs select-none uppercase tracking-wider shrink-0">
+                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/80 text-[10px] select-none uppercase tracking-widest shrink-0">
                   From
                 </div>
                 <div className="flex-1 flex items-center h-full">
@@ -426,7 +426,7 @@ export default function VentanaForm({
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Finales (To)</label>
               <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/80 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
-                <div className="px-2.5 py-1.5 bg-navy-950/60 text-slate-400 font-extrabold border-r border-navy-700/80 text-xs select-none uppercase tracking-wider shrink-0">
+                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/80 text-[10px] select-none uppercase tracking-widest shrink-0">
                   To
                 </div>
                 <div className="flex-1 flex items-center h-full">
@@ -522,7 +522,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block flex items-center justify-between">
                   <span>DipDir Talud°</span>
                   {HOLE_AUTO && (
-                    <span className="text-[9px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1 py-0.5 rounded select-none">AUTO</span>
+                    <span className="text-[9px] bg-orange-500/10 text-orange-400 font-black px-1.5 py-0.5 rounded-full tracking-widest select-none">AUTO</span>
                   )}
                 </label>
                 {HOLE_AUTO ? (
@@ -535,7 +535,7 @@ export default function VentanaForm({
                     <div
                       id="header-dipdir_talud"
                       title="Autocalculado: (AZ_Hole + 90) mod 360"
-                      className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                      className="w-full border border-dashed border-orange-500/40 bg-orange-500/[0.04] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
                     >
                       {fmtAuto(calculated?.dip_dir_talud)}
                     </div>
@@ -569,7 +569,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block flex items-center justify-between">
                   <span>DIP°</span>
                   {HOLE_AUTO && (
-                    <span className="text-[9px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1 py-0.5 rounded select-none">AUTO</span>
+                    <span className="text-[9px] bg-orange-500/10 text-orange-400 font-black px-1.5 py-0.5 rounded-full tracking-widest select-none">AUTO</span>
                   )}
                 </label>
                 {HOLE_AUTO ? (
@@ -587,7 +587,7 @@ export default function VentanaForm({
                     <div
                       id="header-dip_hw"
                       title="Autocalculado: asin(ΔZ / L) × 180/π"
-                      className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                      className="w-full border border-dashed border-orange-500/40 bg-orange-500/[0.04] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
                     >
                       {fmtAuto(calculated?.dip_hole)}
                     </div>
@@ -621,7 +621,7 @@ export default function VentanaForm({
                 <label className="text-xs font-bold text-slate-500 uppercase block flex items-center justify-between">
                   <span>AZ_HOLE°</span>
                   {HOLE_AUTO && (
-                    <span className="text-[9px] bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold px-1 py-0.5 rounded select-none">AUTO</span>
+                    <span className="text-[9px] bg-orange-500/10 text-orange-400 font-black px-1.5 py-0.5 rounded-full tracking-widest select-none">AUTO</span>
                   )}
                 </label>
                 {HOLE_AUTO ? (
@@ -640,7 +640,7 @@ export default function VentanaForm({
                     <div
                       id="header-az_hw"
                       title="Autocalculado: (atan2(ΔE, ΔN) × 180/π + 360) mod 360"
-                      className="w-full border border-orange-500/30 bg-orange-500/[0.03] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
+                      className="w-full border border-dashed border-orange-500/40 bg-orange-500/[0.04] rounded-lg px-3 py-1.5 text-xs font-bold text-center text-orange-400 cursor-not-allowed select-none"
                     >
                       {fmtAuto(calculated?.az_hole)}
                     </div>
@@ -689,7 +689,7 @@ export default function VentanaForm({
                     value={header.lito_1 || ''}
                     onChange={(e) => handleLito1Change(e.target.value)}
                     onBlur={touchField('header-lito_1')}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-slate-100 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80'
                       }`}
                   >
                     <option value="">— Lito 1 —</option>
@@ -706,7 +706,7 @@ export default function VentanaForm({
                     value={header.lito_2 || '-1'}
                     onChange={(e) => handleLito2Change(e.target.value)}
                     onBlur={touchField('header-lito_2')}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80 text-slate-100'
                       }`}
                   >
                     <option value="-1">— Lito 2 —</option>
@@ -723,7 +723,7 @@ export default function VentanaForm({
                     value={header.lito_3 || '-1'}
                     onChange={(e) => handleLito3Change(e.target.value)}
                     onBlur={touchField('header-lito_3')}
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-orange-400'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal cursor-pointer text-center ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80 text-orange-400'
                       }`}
                   >
                     <option value="-1">— Lito 3 —</option>
@@ -737,7 +737,7 @@ export default function VentanaForm({
                   <label className="text-xs font-bold text-slate-500 uppercase block">Unidad Litológica</label>
                   <div
                     title="Se deriva automáticamente de la combinación de litologías válida"
-                    className={`w-full bg-navy-900 border rounded-lg px-2 py-1.5 text-xs font-normal text-center select-none ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/85 text-slate-100'
+                    className={`w-full bg-navy-900/40 border rounded-lg px-2 py-1.5 text-xs font-normal text-center select-none ${litoValidation.isInvalid ? 'border-amber-500/80 bg-amber-950/20 text-amber-300' : 'border-navy-700/80 text-slate-100'
                       }`}
                   >
                     {header.unidad_litologica || '—'}

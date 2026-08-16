@@ -352,13 +352,9 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                                             ) : c.isComputed ? (
                                                 (() => {
                                                     const displayValue = formatCellValue(val, c, false);
-                                                    const isTotal = c.key === 'totalR89' || c.key === 'totalR76';
 
                                                     const renderCellContent = (
                                                         <div className={`absolute inset-0 flex items-center justify-center text-xs text-center leading-none ${c.customStyleClass || 'text-indigo-300 font-semibold'}`}>
-                                                            {!isTotal && (
-                                                                <div className="absolute inset-[2px] border border-dashed border-indigo-500/20 rounded-sm pointer-events-none" />
-                                                            )}
                                                             <span className="relative z-10">
                                                                 {displayValue || (
                                                                     <span className="text-navy-700/60 font-semibold select-none">—</span>

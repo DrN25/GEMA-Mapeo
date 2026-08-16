@@ -1,8 +1,11 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  /* Indica al navegador que use el tema claro para campos nativos
+     (inputs/selects) aunque el sistema operativo esté en modo oscuro. */
+  color-scheme: light;
   /* Premium Light Mode Palette - Clean Slate, Crisp Borders, Charcoal Text */
   --navy-50: 15, 23, 42;
   --navy-100: 30, 41, 59;
@@ -38,6 +41,8 @@
 }
 
 .dark {
+  /* Indica al navegador que use el tema oscuro para campos nativos. */
+  color-scheme: dark;
   /* Premium Obsidian & Geomechanical Space Blue Palette - Unified 2.0 Style */
   --navy-50: 241, 245, 249;
   --navy-100: 226, 232, 240;
@@ -98,7 +103,7 @@
 .light .glass-panel {
   background-color: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid rgba(15, 23, 42, 0.15) !important;
   box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06) !important;
 }
 
@@ -544,3 +549,13 @@ input[type=number] {
 .light header [class*="bg-navy-900/60"],
 .light .view-dashboard [class*="bg-navy-900/60"] { background-color: #e2e8f0; }
 
+
+/* ================================================================
+ * LIGHT MODE - CONTORNO DEFINIDO EN EL DASHBOARD
+ * Los bordes navy-800 en claro eran gris palido (#cbd5e1) y se
+ * perdian con el fondo; se refuerzan para definir tarjetas, KPIs,
+ * filtros e inputs. El modo oscuro NO se ve afectado.
+ * ================================================================ */
+.light .view-dashboard [class*="border-navy-800"] {
+  border-color: #94a3b8;
+}

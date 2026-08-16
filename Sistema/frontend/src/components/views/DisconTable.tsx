@@ -70,7 +70,7 @@ export default function DisconTable({
       if (col.key === 'totalR89') {
         return {
           ...col,
-          customStyleClass: 'bg-pink-500/10 text-pink-300 font-black outline-pink-500/30 shadow-[inset_0_0_8px_rgba(236,72,153,0.15)] text-center'
+          customStyleClass: 'bg-pink-500/10 text-pink-300 font-black shadow-[inset_0_0_8px_rgba(236,72,153,0.15)] text-center'
         };
       }
       if (amberKeys.includes(col.key)) {
@@ -82,7 +82,7 @@ export default function DisconTable({
       if (col.key === 'totalR76') {
         return {
           ...col,
-          customStyleClass: 'bg-amber-500/10 text-amber-300 font-black outline-amber-500/30 shadow-[inset_0_0_8px_rgba(245,158,11,0.15)] text-center'
+          customStyleClass: 'bg-amber-500/10 text-amber-300 font-black shadow-[inset_0_0_8px_rgba(245,158,11,0.15)] text-center'
         };
       }
       return {
@@ -239,7 +239,7 @@ export default function DisconTable({
     return (
       <span
         style={{ color, borderColor: `${color}40`, backgroundColor: `${color}10` }}
-        className="text-[11px] font-black px-2 py-0.5 rounded border shadow-sm uppercase font-sans tracking-wide animate-fade-in"
+        className="text-[11px] font-black px-2 py-0.5 rounded-md border uppercase font-sans tracking-wide animate-fade-in"
       >
         F{famId}
       </span>

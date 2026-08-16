@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight, Filter, X, ChevronDown } from 'lucide-react';
+import { Plus, Search, Map, User, LayoutGrid, Trash2, TrendingUp, FileSpreadsheet, Calendar, ChevronLeft, ChevronRight, Filter, X, ChevronDown, ScanLine } from 'lucide-react';
 import CreateWindowModal from '../modals/CreateWindowModal';
 import { limitNumberWithMax } from '../../utils/inputLimits';
 import type { PendingCellSummary } from '../../utils/cellRegistry';
@@ -75,6 +75,7 @@ interface DashboardProps {
   onCreateWindow: (newWindow: any) => void;
   onDeleteWindow: (name: string) => void;
   onOpenImportModal: () => void;
+  onOpenScanModal: () => void;
 }
 
 export default function Dashboard({
@@ -101,7 +102,8 @@ export default function Dashboard({
   onSelectWindow,
   onCreateWindow,
   onDeleteWindow,
-  onOpenImportModal
+  onOpenImportModal,
+  onOpenScanModal
 }: DashboardProps) {
   const [showModal, setShowModal] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchTerm);
@@ -169,6 +171,13 @@ export default function Dashboard({
             >
               <FileSpreadsheet size={16} className="text-emerald-400" />
               <span>Importar Excel</span>
+            </button>
+            <button
+              onClick={onOpenScanModal}
+              className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95"
+            >
+              <ScanLine size={16} className="text-cyan-400" />
+              <span>Importar Escaneado</span>
             </button>
             <button
               onClick={() => setShowModal(true)}

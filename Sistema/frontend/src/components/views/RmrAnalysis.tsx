@@ -299,7 +299,7 @@ export default function RmrAnalysis({
               title="Autocalculado: min(85, round(1.5 × JCond89 + RQD/2))"
               className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold text-center cursor-not-allowed select-none ${gsiVisualInvalid
                   ? 'border-amber-500/80 bg-amber-950/20 shadow-[0_0_8px_rgba(245,158,11,0.15)] text-amber-300'
-                  : 'border-orange-500/30 bg-orange-500/[0.03] text-orange-400'
+                  : 'border-dashed border-orange-500/40 bg-orange-500/[0.04] text-orange-400'
                 }`}
             >
               {gsiVisual !== undefined ? gsiVisual : '—'}
