@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { pingBackend } from '../utils/apiClient';
-import { applyStoredTheme } from '../utils/theme';
-import { Eye, EyeOff, Loader2, WifiOff, RefreshCw, Lock } from 'lucide-react';
+import { applyStoredTheme, getStoredDarkMode, persistTheme } from '../utils/theme';
+import { Eye, EyeOff, Loader2, WifiOff, RefreshCw, Lock, Sun, Moon } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || (
@@ -19,6 +19,14 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [darkMode, setDarkMode] = useState<boolean>(() => getStoredDarkMode());
+
+  // Alterna el tema y lo persiste (mismo mecanismo que el sidebar de la app)
+  const handleToggleTheme = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    persistTheme(next);
+  };
 
   // Estado para la verificación previa de conectividad con el backend
   const [checkingBackend, setCheckingBackend] = useState(true);
@@ -67,6 +75,15 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#02040a] text-slate-100 flex flex-col justify-center items-center px-4 relative overflow-hidden font-sans select-none">
+      {/* Botón flotante para cambiar de tema (claro/oscuro) */}
+      <button
+        onClick={handleToggleTheme}
+        className="absolute top-4 right-4 z-20 p-2.5 rounded-xl bg-[#090f1d]/80 border border-slate-800 text-slate-300 hover:text-slate-100 hover:border-indigo-500/50 transition-all shadow-lg active:scale-95"
+        title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      >
+        {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+
       {/* Ambient glow background */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
