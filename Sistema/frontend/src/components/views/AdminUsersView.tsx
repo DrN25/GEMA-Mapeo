@@ -273,13 +273,13 @@ export const AdminUsersView: React.FC = () => {
   const renderStatusBadge = (st: string) => {
     switch (st) {
       case 'A':
-        return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Activo ('A')</span>;
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-full whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Activo ('A')</span>;
       case 'I':
-        return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Inactivo ('I')</span>;
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-full whitespace-nowrap bg-amber-500/10 text-amber-400 border border-amber-500/20">Inactivo ('I')</span>;
       case '*':
-        return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">Eliminado ('*')</span>;
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-full whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20">Eliminado ('*')</span>;
       default:
-        return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-navy-850 text-slate-400">{st}</span>;
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-full whitespace-nowrap bg-navy-850 text-slate-400">{st}</span>;
     }
   };
 
@@ -296,7 +296,7 @@ export const AdminUsersView: React.FC = () => {
             Administración de Cuentas RBAC y Auditoría del Sistema GEMA
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 justify-start md:justify-end">
           <button
             onClick={() => {
               setNewUsuario('');
@@ -387,7 +387,7 @@ export const AdminUsersView: React.FC = () => {
                       <td className="px-6 py-4 text-[11px] text-slate-500 font-mono">
                         {u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString() : 'Nunca'}
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
+                      <td className="px-6 py-4 text-right whitespace-nowrap space-x-2">
                         <button
                           onClick={() => handleEditOpen(u)}
                           disabled={isSubmitting}

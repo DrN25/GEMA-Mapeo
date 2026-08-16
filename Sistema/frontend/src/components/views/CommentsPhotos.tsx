@@ -149,7 +149,7 @@ export default function CommentsPhotos({
 
       {/* 📸 SECCIÓN 2: Fotografías del Registro (Proporción 2/3 -> lg:col-span-8) */}
       <div className="lg:col-span-8 glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/10 flex flex-col h-full justify-between shadow-lg">
-        <div className="flex items-center justify-between border-b border-navy-900 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-navy-900 pb-3">
           <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
             <Camera size={16} className="text-orange-400" />
             <span>Fotografías del Registro</span>

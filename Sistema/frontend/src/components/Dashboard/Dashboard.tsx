@@ -164,7 +164,7 @@ export default function Dashboard({
             </h2>
             <p className="text-slate-400 text-xs mt-1 font-semibold">{kpiSubset}</p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap justify-start md:justify-end">
             <button
               onClick={onOpenImportModal}
               className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95"

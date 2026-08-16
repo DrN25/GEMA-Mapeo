@@ -708,7 +708,7 @@ export default function ExcelImportModal({ isOpen, onClose, onImport, apiBase, e
             </div>
 
             {/* Tabla Principal de Previsualización de Celdas */}
-            <div className="flex-1 overflow-y-auto min-h-0 rounded-xl border border-navy-800 bg-navy-950/40">
+            <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0 rounded-xl border border-navy-800 bg-navy-950/40">
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="text-xs text-slate-400 font-black uppercase tracking-wider border-b border-navy-800 bg-navy-900/80 sticky top-0 z-10">

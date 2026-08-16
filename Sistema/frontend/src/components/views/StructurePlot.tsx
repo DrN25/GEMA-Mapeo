@@ -454,7 +454,7 @@ export default function StructurePlot({
 
   return (
     <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 select-none text-left animate-fade-in">
-      <div className="flex justify-between items-center border-b border-navy-800 pb-3">
+      <div className="flex flex-wrap justify-between items-center gap-2 border-b border-navy-800 pb-3">
         <h3 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
           <Layers size={14} className="text-orange-400" />
           <span>Vista en Planta de Estructuras (Scanline 3D Proyectado)</span>

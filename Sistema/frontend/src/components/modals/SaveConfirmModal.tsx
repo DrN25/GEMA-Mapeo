@@ -209,7 +209,7 @@ export default function SaveConfirmModal({
                 <span>Resumen de Cambios en Ventanas:</span>
               </h4>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div className="bg-navy-900/80 p-2.5 rounded-lg border border-navy-800 flex justify-between">
                   <span className="text-slate-400">Atributos de Header:</span>
                   <span className="font-bold text-amber-400">{targetDiff.headerEditsCount}</span>

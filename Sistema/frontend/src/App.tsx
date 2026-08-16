@@ -241,7 +241,10 @@ function AppContent() {
     setPendingImports(prev => (prev.includes(celda) ? prev.filter(c => c !== celda) : prev));
   };
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    // En pantallas pequeñas (tablets/móviles) el sidebar inicia colapsado
+    return typeof window !== 'undefined' && window.innerWidth < 1024;
+  });
 
   // UI & Theme
   const [darkMode, setDarkMode] = useState<boolean>(() => getStoredDarkMode());
@@ -1839,13 +1842,13 @@ const [connectionLost, setConnectionLost] = useState(false);
       {/* 2. MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Sync Status Header */}
-        <header className="h-16 border-b border-navy-800 flex items-center justify-between px-6 bg-navy-950/40 backdrop-blur z-10 shrink-0">
-          <div className="flex items-center gap-3">
+        <header className="min-h-16 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 md:px-6 py-2 border-b border-navy-800 bg-navy-950/40 backdrop-blur z-10 shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
 
             {/* BOTÓN INTERACTIVO DE COLAPSO */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95"
+              className="p-2 mr-1 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-400 hover:text-slate-100 transition-all shadow-md active:scale-95 shrink-0"
               title={sidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
             >
               <Menu size={16} />
@@ -1854,67 +1857,67 @@ const [connectionLost, setConnectionLost] = useState(false);
             {currentView !== 'dashboard' && (
               <button
                 onClick={() => setCurrentView('dashboard')}
-                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 hover:text-white border border-navy-800 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 shrink-0"
               >
                 <ArrowLeft size={14} />
-                <span>Volver al Panel</span>
+                <span className="hidden sm:inline">Volver al Panel</span>
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end min-w-0">
             {/* Server Connectivity Indicator */}
-            <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
+            <div className="hidden md:flex items-center gap-2 pr-3 border-r border-navy-800 shrink-0">
               <span className={`w-2.5 h-2.5 rounded-full ${dbOnline
                 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
                 : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
                 }`} />
-              <span className="text-xs text-slate-400 font-semibold hidden md:inline" title={dbOnline ? 'Conectado al servidor de base de datos SQL Server.' : 'SQL Server Desconectado'}>
+              <span className="text-xs text-slate-400 font-semibold hidden lg:inline" title={dbOnline ? 'Conectado al servidor de base de datos SQL Server.' : 'SQL Server Desconectado'}>
                 {dbOnline ? 'SQL Server Conectado' : 'SQL Server Desconectado'}
               </span>
             </div>
 
             {/* General Topbar Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
 
               <button
                 onClick={() => setShowFormulas(!showFormulas)}
-                className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${showFormulas
+                className={`flex items-center gap-1.5 border px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 shrink-0 ${showFormulas
                   ? 'bg-violet-500/10 border-violet-500/40 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.12)]'
                   : 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200'
                   }`}
                 title="Activar/Desactivar visualización de fórmulas al pasar el mouse"
               >
                 <Calculator size={14} className={showFormulas ? 'text-violet-400 animate-pulse' : 'text-slate-400'} />
-                <span>{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
+                <span className="hidden lg:inline">{showFormulas ? 'Fórmulas Activas' : 'Ocultar Fórmulas'}</span>
               </button>
 
               <button
                 onClick={() => setIsCatalogModalOpen(true)}
-                className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95"
+                className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/40 hover:bg-sky-500/20 hover:border-sky-400 text-sky-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(14,165,233,0.12)] active:scale-95 shrink-0"
                 title="Ver Catálogos de Referencia Geomecánica de Ventanas"
               >
                 <BookOpen size={14} className="text-sky-400" />
-                <span>Catálogo de Ventanas</span>
+                <span className="hidden md:inline">Catálogo de Ventanas</span>
               </button>
 
               <button
                 onClick={() => setIsPltCatalogModalOpen(true)}
-                className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95"
+                className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(6,182,212,0.12)] active:scale-95 shrink-0"
                 title="Ver Catálogos de Referencia de Ensayos PLT"
               >
                 <Activity size={14} className="text-cyan-400" />
-                <span>Catálogo de Ensayos PLT</span>
+                <span className="hidden md:inline">Catálogo de Ensayos PLT</span>
               </button>
 
               {activeWindow && (
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95"
+                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95 shrink-0"
                   title="Exportar Mapeo de esta Ventana en Formato Excel DB"
                 >
                   <FileSpreadsheet size={14} className="text-emerald-400" />
-                  <span>Exportar</span>
+                  <span className="hidden md:inline">Exportar</span>
                 </button>
               )}
 
@@ -1923,11 +1926,11 @@ const [connectionLost, setConnectionLost] = useState(false);
                 <button
                   onClick={() => setShowDiscardModal(true)}
                   disabled={isLoadingWindow}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                  className="flex items-center gap-1.5 px-3 md:px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)] shrink-0"
                   title="Descartar cambios no guardados en el espacio de trabajo"
                 >
                   <RotateCcw size={14} />
-                  <span>Descartar Cambios</span>
+                  <span className="hidden md:inline">Descartar Cambios</span>
                 </button>
               )}
 
@@ -1935,7 +1938,7 @@ const [connectionLost, setConnectionLost] = useState(false);
               <button
                 onClick={() => setShowSaveConfirmModal(true)}
                 disabled={isLoadingWindow || (unsavedCount === 0 && syncStatus !== 'unsaved')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative ${unsavedCount > 0 || syncStatus === 'unsaved'
+                className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 border relative shrink-0 ${unsavedCount > 0 || syncStatus === 'unsaved'
                   ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse'
                   : 'bg-navy-900 border-navy-800 text-slate-500 cursor-not-allowed opacity-70'
                   }`}
@@ -1955,7 +1958,7 @@ const [connectionLost, setConnectionLost] = useState(false);
         </header>
 
         {/* Main Content scroll window */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6">
           {currentView === 'admin_usuarios' && hasRole(['admin']) && (
             <div className="view-mapeo animate-fade-in">
               <AdminUsersView />

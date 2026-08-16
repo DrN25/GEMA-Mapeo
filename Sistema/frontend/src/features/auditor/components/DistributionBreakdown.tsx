@@ -30,7 +30,7 @@ export default function DistributionBreakdown({
                     <span>Distribución por Campaña Geotécnica</span>
                 </h3>
                 <div className="rounded-xl border border-navy-800 overflow-hidden bg-slate-950">
-                    <div className="max-h-56 overflow-y-auto scrollbar-thin">
+                    <div className="max-h-56 overflow-y-auto overflow-x-auto scrollbar-thin">
                         <table className="w-full text-xs text-left border-collapse">
                             <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-900">
                                 <tr>
@@ -77,7 +77,7 @@ export default function DistributionBreakdown({
                     <span>Estaciones Geomecánicas con Más Fallas</span>
                 </h3>
                 <div className="rounded-xl border border-navy-800 overflow-hidden bg-slate-950">
-                    <div className="max-h-56 overflow-y-auto scrollbar-thin">
+                    <div className="max-h-56 overflow-y-auto overflow-x-auto scrollbar-thin">
                         <table className="w-full text-xs text-left border-collapse">
                             <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-900">
                                 <tr>
@@ -118,7 +118,7 @@ export default function DistributionBreakdown({
                     <span>Fallas Agrupadas por Geotecnista</span>
                 </h3>
                 <div className="rounded-xl border border-navy-800 overflow-hidden bg-slate-950">
-                    <div className="max-h-56 overflow-y-auto scrollbar-thin">
+                    <div className="max-h-56 overflow-y-auto overflow-x-auto scrollbar-thin">
                         <table className="w-full text-xs text-left border-collapse">
                             <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-900">
                                 <tr>

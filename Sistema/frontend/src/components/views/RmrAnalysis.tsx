@@ -160,7 +160,7 @@ export default function RmrAnalysis({
     <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 border-l-4 border-l-violet-500 space-y-6 text-left select-none animate-fade-in shadow-xl">
 
       {/* ENCABEZADO UNIFICADO */}
-      <div className="flex items-center justify-between border-b border-navy-900 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-navy-900 pb-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-violet-500/10 border border-violet-500/20 text-violet-400 rounded-lg">
             <Compass size={18} />
