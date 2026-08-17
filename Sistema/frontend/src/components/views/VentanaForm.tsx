@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { WindowHeader, CalculatorResult } from '../../utils/rmrCalculator';
 import { HOLE_AUTO } from '../../utils/rmrCalculator';
 import { LITHOLOGY_CLASSIFICATION, ALTERACION_CATALOG } from '../../utils/catalogData';
@@ -8,6 +9,8 @@ import { markFieldTouched } from '../../utils/qaQcTouch';
 import { CAMPANAS_HARDCODED } from '../../utils/campaniasCatalog';
 import { getFieldPrecision } from '../../utils/numericPrecision';
 import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
+import type { ProyectadasCoords } from '../../utils/proyectadas';
+import { isProyectadasDirty as checkProyDirty } from '../../utils/proyectadas';
 
 // Helper: marca el campo como tocado (blur) para habilitar su evaluación QA/QC
 const touchField = (fieldId: string) => () => markFieldTouched(fieldId);
@@ -20,6 +23,9 @@ interface VentanaFormProps {
   onOpenCatalogs?: () => void;
   onOpenRenameModal?: () => void;
   showFormulas?: boolean;
+  /** Coordenadas PROYECTADAS (solo locales, nunca van a la BD). */
+  proyectadas?: ProyectadasCoords;
+  onProyectadasChange?: (coords: ProyectadasCoords) => void;
 }
 
 const handleNumberInputLimit = (value: string, intDigits: number, decDigits: number, allowNegative: boolean = false): string => {
@@ -61,10 +67,16 @@ export default function VentanaForm({
   onOpenImportModal,
   onOpenCatalogs,
   onOpenRenameModal,
-  showFormulas = true
+  showFormulas = true,
+  proyectadas = { este_from: '', norte_from: '', cota_from: '', este_to: '', norte_to: '', cota_to: '' },
+  onProyectadasChange
 }: VentanaFormProps) {
 
   const [localValues, setLocalValues] = React.useState<Record<string, string>>({});
+  // Estado de acordeones: proyectadas abierto por defecto, oficiales colapsado
+  const [coordOficialesOpen, setCoordOficialesOpen] = React.useState(false);
+  const [coordProyectadasOpen, setCoordProyectadasOpen] = React.useState(true);
+  const isProyectadasDirty = checkProyDirty(proyectadas);
 
   // Formateo de valores autocalculados (read-only) a 2 decimales
   const fmtAuto = (val: number | undefined | null): string =>
@@ -112,6 +124,57 @@ export default function VentanaForm({
     } else {
       handleChange(field, Math.max(0, num));
     }
+  };
+
+  // Coordenadas PROYECTADAS: solo locales (localStorage), mismas reglas de
+  // precisión que las oficiales (los keys coinciden con el SSOT).
+  const handleProyInputChange = (field: keyof ProyectadasCoords, val: string) => {
+    if (!onProyectadasChange) return;
+    const restricted = handleNumberInputLimit(
+      val.replace(',', '.'),
+      coordPrecision(field).intDigits,
+      coordPrecision(field).decDigits,
+      false
+    );
+    onProyectadasChange({ ...proyectadas, [field]: restricted });
+  };
+
+  // renderProyVector devuelve solo el contenido interior del input group (sin wrapper externo).
+  // El contenedor estilizado lo provee el acordeón (FROM/TO separados con label fijo).
+  const renderProyVector = (prefix: 'From' | 'To', coords: ProyectadasCoords) => {
+    const fields = prefix === 'From'
+      ? { este: 'este_from' as const, norte: 'norte_from' as const, cota: 'cota_from' as const }
+      : { este: 'este_to' as const, norte: 'norte_to' as const, cota: 'cota_to' as const };
+    return (
+      <div className="flex-1 flex items-center h-full">
+        <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
+        <input
+          type="text"
+          placeholder="Este (X)"
+          value={coords[fields.este]}
+          onChange={(e) => handleProyInputChange(fields.este, e.target.value)}
+          className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+        />
+        <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+        <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
+        <input
+          type="text"
+          placeholder="Norte (Y)"
+          value={coords[fields.norte]}
+          onChange={(e) => handleProyInputChange(fields.norte, e.target.value)}
+          className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+        />
+        <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+        <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
+        <input
+          type="text"
+          placeholder="Cota (C)"
+          value={coords[fields.cota]}
+          onChange={(e) => handleProyInputChange(fields.cota, e.target.value)}
+          className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+        />
+      </div>
+    );
   };
 
   const uniqueLito1 = React.useMemo(() => {
@@ -378,92 +441,158 @@ export default function VentanaForm({
               </div>
             </div>
 
-            {/* COORDENADAS INICIALES (FROM) - VECTOR 3D CON PREFIJOS E, N, Z */}
+
+            {/* ===== BLOQUE UNIFICADO DE COORDENADAS ===== */}
+
+            {/* ACORDEÓN: COORDENADAS PROYECTADAS — FROM + TO juntos (primero, abierto por defecto) */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Iniciales (From)</label>
-              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/70 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
-                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/70 text-[10px] select-none uppercase tracking-widest shrink-0">
-                  From
+              <button
+                type="button"
+                onClick={() => setCoordProyectadasOpen(o => !o)}
+                className="w-full flex items-center justify-between text-left group py-0.5"
+              >
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  Coordenadas Proyectadas
+                  {isProyectadasDirty && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)] animate-pulse" title="Tiene coordenadas proyectadas ingresadas" />
+                  )}
+                </span>
+                <span className={`flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border transition-all select-none ${
+                  coordProyectadasOpen
+                    ? 'bg-sky-500/10 border-sky-500/30 text-sky-400'
+                    : 'bg-navy-900/60 border-navy-700/60 text-slate-400 group-hover:text-slate-200'
+                }`}>
+                  <span>{coordProyectadasOpen ? 'Ocultar' : 'Mostrar'}</span>
+                  {coordProyectadasOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </span>
+              </button>
+
+              {coordProyectadasOpen && (
+                <div className="space-y-2 border border-sky-500/20 rounded-xl p-2.5 bg-sky-500/[0.03]">
+                  {/* FROM proyectadas */}
+                  <div className="flex items-center w-full bg-navy-900/40 border border-sky-500/30 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-sky-500/50 focus-within:border-sky-500 transition-all">
+                    <div className="px-2.5 text-sky-400 font-extrabold border-r border-sky-500/30 text-[10px] select-none uppercase tracking-widest shrink-0 min-w-[42px] text-center">
+                      FROM
+                    </div>
+                    {renderProyVector('From', proyectadas)}
+                  </div>
+
+                  {/* TO proyectadas */}
+                  <div className="flex items-center w-full bg-navy-900/40 border border-sky-500/30 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-sky-500/50 focus-within:border-sky-500 transition-all">
+                    <div className="px-2.5 text-sky-400 font-extrabold border-r border-sky-500/30 text-[10px] select-none uppercase tracking-widest shrink-0 min-w-[42px] text-center">
+                      TO
+                    </div>
+                    {renderProyVector('To', proyectadas)}
+                  </div>
                 </div>
-                <div className="flex-1 flex items-center h-full">
-                  <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
-                  <input
-                    type="text"
-                    placeholder="Este (X)"
-                    value={getInputValue('este_from', header.este_from)}
-                    id="header-este_from"
-                    onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, coordPrecision('este_from').intDigits, coordPrecision('este_from').decDigits)}
-                    onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
-                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
-                  />
-                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
-                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
-                  <input
-                    type="text"
-                    placeholder="Norte (Y)"
-                    value={getInputValue('norte_from', header.norte_from)}
-                    id="header-norte_from"
-                    onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, coordPrecision('norte_from').intDigits, coordPrecision('norte_from').decDigits)}
-                    onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
-                    className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
-                  />
-                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
-                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
-                  <input
-                    type="text"
-                    placeholder="Cota (C)"
-                    value={getInputValue('cota_from', header.cota_from)}
-                    id="header-cota_from"
-                    onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, coordPrecision('cota_from').intDigits, coordPrecision('cota_from').decDigits)}
-                    onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
-                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* COORDENADAS FINALES (TO) - VECTOR 3D CON PREFIJOS E, N, Z */}
+            {/* ACORDEÓN: COORDENADAS OFICIALES — FROM + TO juntos (segundo, colapsado por defecto) */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Coordenadas Finales (To)</label>
-              <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/70 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
-                <div className="px-2.5 text-slate-500 font-extrabold border-r border-navy-700/70 text-[10px] select-none uppercase tracking-widest shrink-0">
-                  To
+              <button
+                type="button"
+                onClick={() => setCoordOficialesOpen(o => !o)}
+                className="w-full flex items-center justify-between text-left group py-0.5"
+              >
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Coordenadas Oficiales
+                </span>
+                <span className={`flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border transition-all select-none ${
+                  coordOficialesOpen
+                    ? 'bg-violet-500/10 border-violet-500/30 text-violet-400'
+                    : 'bg-navy-900/60 border-navy-700/60 text-slate-400 group-hover:text-slate-200'
+                }`}>
+                  <span>{coordOficialesOpen ? 'Ocultar' : 'Mostrar'}</span>
+                  {coordOficialesOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </span>
+              </button>
+
+              {coordOficialesOpen && (
+                <div className="space-y-2 border border-navy-700/40 rounded-xl p-2.5 bg-navy-900/20">
+                  {/* FROM oficial */}
+                  <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/70 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
+                    <div className="px-2.5 text-violet-500/70 font-extrabold border-r border-navy-700/70 text-[10px] select-none uppercase tracking-widest shrink-0 min-w-[42px] text-center">
+                      FROM
+                    </div>
+                    <div className="flex-1 flex items-center h-full">
+                      <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
+                      <input
+                        type="text"
+                        placeholder="Este (X)"
+                        value={getInputValue('este_from', header.este_from)}
+                        id="header-este_from"
+                        onChange={(e) => handleCoordinateInputChange('este_from', e.target.value, coordPrecision('este_from').intDigits, coordPrecision('este_from').decDigits)}
+                        onBlur={(e) => handleCoordinateInputBlur('este_from', e.target.value)}
+                        className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                      />
+                      <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                      <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
+                      <input
+                        type="text"
+                        placeholder="Norte (Y)"
+                        value={getInputValue('norte_from', header.norte_from)}
+                        id="header-norte_from"
+                        onChange={(e) => handleCoordinateInputChange('norte_from', e.target.value, coordPrecision('norte_from').intDigits, coordPrecision('norte_from').decDigits)}
+                        onBlur={(e) => handleCoordinateInputBlur('norte_from', e.target.value)}
+                        className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                      />
+                      <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                      <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
+                      <input
+                        type="text"
+                        placeholder="Cota (C)"
+                        value={getInputValue('cota_from', header.cota_from)}
+                        id="header-cota_from"
+                        onChange={(e) => handleCoordinateInputChange('cota_from', e.target.value, coordPrecision('cota_from').intDigits, coordPrecision('cota_from').decDigits)}
+                        onBlur={(e) => handleCoordinateInputBlur('cota_from', e.target.value)}
+                        className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                      />
+                    </div>
+                  </div>
+
+                  {/* TO oficial */}
+                  <div className="flex items-center w-full bg-navy-900/40 border border-navy-700/70 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500 transition-all">
+                    <div className="px-2.5 text-violet-500/70 font-extrabold border-r border-navy-700/70 text-[10px] select-none uppercase tracking-widest shrink-0 min-w-[42px] text-center">
+                      TO
+                    </div>
+                    <div className="flex-1 flex items-center h-full">
+                      <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
+                      <input
+                        type="text"
+                        placeholder="Este (X)"
+                        value={getInputValue('este_to', header.este_to)}
+                        id="header-este_to"
+                        onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, coordPrecision('este_to').intDigits, coordPrecision('este_to').decDigits)}
+                        onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
+                        className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                      />
+                      <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                      <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
+                      <input
+                        type="text"
+                        placeholder="Norte (Y)"
+                        value={getInputValue('norte_to', header.norte_to)}
+                        id="header-norte_to"
+                        onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, coordPrecision('norte_to').intDigits, coordPrecision('norte_to').decDigits)}
+                        onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
+                        className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                      />
+                      <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
+                      <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
+                      <input
+                        type="text"
+                        placeholder="Cota (C)"
+                        value={getInputValue('cota_to', header.cota_to)}
+                        id="header-cota_to"
+                        onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, coordPrecision('cota_to').intDigits, coordPrecision('cota_to').decDigits)}
+                        onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
+                        className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 flex items-center h-full">
-                  <span className="pl-2.5 text-xs font-bold text-slate-500 select-none">E</span>
-                  <input
-                    type="text"
-                    placeholder="Este (X)"
-                    value={getInputValue('este_to', header.este_to)}
-                    id="header-este_to"
-                    onChange={(e) => handleCoordinateInputChange('este_to', e.target.value, coordPrecision('este_to').intDigits, coordPrecision('este_to').decDigits)}
-                    onBlur={(e) => handleCoordinateInputBlur('este_to', e.target.value)}
-                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
-                  />
-                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
-                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">N</span>
-                  <input
-                    type="text"
-                    placeholder="Norte (Y)"
-                    value={getInputValue('norte_to', header.norte_to)}
-                    id="header-norte_to"
-                    onChange={(e) => handleCoordinateInputChange('norte_to', e.target.value, coordPrecision('norte_to').intDigits, coordPrecision('norte_to').decDigits)}
-                    onBlur={(e) => handleCoordinateInputBlur('norte_to', e.target.value)}
-                    className="w-full bg-navy-900/10 text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
-                  />
-                  <div className="w-[1px] h-5 bg-navy-700/80 shrink-0" />
-                  <span className="pl-2 text-xs font-bold text-slate-500 select-none">C</span>
-                  <input
-                    type="text"
-                    placeholder="Cota (C)"
-                    value={getInputValue('cota_to', header.cota_to)}
-                    id="header-cota_to"
-                    onChange={(e) => handleCoordinateInputChange('cota_to', e.target.value, coordPrecision('cota_to').intDigits, coordPrecision('cota_to').decDigits)}
-                    onBlur={(e) => handleCoordinateInputBlur('cota_to', e.target.value)}
-                    className="w-full bg-transparent text-slate-100 text-xs font-normal focus:outline-none font-mono text-center py-1.5"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Geometría y Orientación de Talud (Estandarizado a inputs de texto con formateo a punto ".") */}

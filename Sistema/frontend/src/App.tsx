@@ -30,6 +30,16 @@ import RenameCellModal from './components/modals/RenameCellModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
 import { getStoredDarkMode, persistTheme } from './utils/theme';
+import {
+  EMPTY_PROYECTADAS,
+  loadProyectadas,
+  saveProyectadas,
+  clearProyectadas,
+  clearAllProyectadas,
+  renameProyectadasKey,
+  isProyectadasDirty,
+  type ProyectadasCoords
+} from './utils/proyectadas';
 import { apiFetch, pingBackend, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState } from './utils/apiClient';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
@@ -274,6 +284,25 @@ const [connectionLost, setConnectionLost] = useState(false);
   // Photos & Captions states
   const [photos, setPhotos] = useState<string[]>(['', '', '', '']);
   const [captions, setCaptions] = useState<string[]>(['', '', '', '']);
+
+  // Coordenadas PROYECTADAS (From/To): SOLO locales (localStorage), nunca a la BD.
+  // No participan del diff/hash de la ventana → NO activan GUARDAR CAMBIOS,
+  // pero SÍ cuentan como cambios a DESCARTAR.
+  const [proyectadas, setProyectadas] = useState<ProyectadasCoords>(EMPTY_PROYECTADAS);
+  const proyectadasDirty = isProyectadasDirty(proyectadas);
+
+  // Cargar las proyectadas de la celda activa (persisten por celda)
+  useEffect(() => {
+    const celda = activeWindow?.header?.celda;
+    setProyectadas(celda ? loadProyectadas(celda) : EMPTY_PROYECTADAS);
+  }, [activeWindow?.header?.celda]);
+
+  const handleProyectadasChange = (coords: ProyectadasCoords) => {
+    setProyectadas(coords);
+    if (activeWindow?.header?.celda) {
+      saveProyectadas(activeWindow.header.celda, coords);
+    }
+  };
 
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
   const [isPltCatalogModalOpen, setIsPltCatalogModalOpen] = useState<boolean>(false);
@@ -1028,6 +1057,14 @@ const [connectionLost, setConnectionLost] = useState(false);
     safeSetItem('geolog_active_window_celda', formatted.header.celda, { activeCelda: formatted.header.celda, pendingImports });
     // NO escribir geolog_window_* aquí: el useEffect de rastreo lo hará en el siguiente ciclo
     // de render, después de que computeWindowDiff detecte correctamente la celda como nueva.
+
+    // Si el modal de creación capturó coordenadas proyectadas, persistirlas ahora en
+    // localStorage (fuera del snapshot/hash de la BD) y sincronizar el estado React.
+    if (newWindow.proyectadas && isProyectadasDirty(newWindow.proyectadas)) {
+      saveProyectadas(formatted.header.celda, newWindow.proyectadas);
+      setProyectadas(newWindow.proyectadas);
+    }
+
     setCurrentView('mapeo');
     setSyncStatus('unsaved');
   };
@@ -1245,6 +1282,9 @@ const [connectionLost, setConnectionLost] = useState(false);
       }
 
       safeSetItem('geolog_active_window_celda', cleanNewName, ctx);
+
+      // Migrar clave de coordenadas PROYECTADAS (solo locales, no se renombran en BD)
+      renameProyectadasKey(oldCeldaName, cleanNewName);
     } catch (e) {
       console.error("Error al migrar claves de LocalStorage:", e);
     }
@@ -1730,6 +1770,11 @@ const [connectionLost, setConnectionLost] = useState(false);
         removePendingPltCell(celda);
         fetchPltEnsayos(celda, true);
       }
+      // Descartar coordenadas PROYECTADAS locales de la celda activa.
+      // No afectan la BD pero sí el botón Descartar: se limpian y se
+      // reinicia el estado en memoria para que proyectadasDirty vuelva a false.
+      clearProyectadas(celda);
+      setProyectadas(EMPTY_PROYECTADAS);
     } else {
       try {
         const unsavedRaw = localStorage.getItem('geolog_unsaved_windows');
@@ -1768,6 +1813,10 @@ const [connectionLost, setConnectionLost] = useState(false);
         if (activeWindow?.header?.celda) {
           fetchPltEnsayos(activeWindow.header.celda, true);
         }
+        // Descartar TODAS las coordenadas proyectadas (todas las celdas pendientes
+        // más la celda activa). clearAllProyectadas() limpia el registro completo.
+        clearAllProyectadas();
+        setProyectadas(EMPTY_PROYECTADAS);
       } catch (e) { }
     }
   };
@@ -1921,8 +1970,9 @@ const [connectionLost, setConnectionLost] = useState(false);
                 </button>
               )}
 
-              {/* Botón Descartar Cambios */}
-              {unsavedCount > 0 && (
+              {/* Botón Descartar Cambios: se activa con cambios BD (unsavedCount)
+                  O con coordenadas proyectadas locales (proyectadasDirty) */}
+              {(unsavedCount > 0 || proyectadasDirty) && (
                 <button
                   onClick={() => setShowDiscardModal(true)}
                   disabled={isLoadingWindow}
@@ -2020,6 +2070,8 @@ const [connectionLost, setConnectionLost] = useState(false);
                 onOpenCatalogs={() => setIsCatalogModalOpen(true)}
                 onOpenRenameModal={() => setIsRenameModalOpen(true)}
                 showFormulas={showFormulas}
+                proyectadas={proyectadas}
+                onProyectadasChange={handleProyectadasChange}
               />
 
               <DisconTable

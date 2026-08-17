@@ -135,12 +135,24 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
 
     onCreate({
       celda: celda.trim().toUpperCase(),
-      este_from: esteFrom === '' ? undefined : Number(esteFrom),
-      norte_from: norteFrom === '' ? undefined : Number(norteFrom),
-      cota_from: cotaFrom === '' ? undefined : Number(cotaFrom),
-      este_to: esteTo === '' ? undefined : Number(esteTo),
-      norte_to: norteTo === '' ? undefined : Number(norteTo),
-      cota_to: cotaTo === '' ? undefined : Number(cotaTo),
+      // Las coordenadas ingresadas en el modal van a los PROYECTADOS (localStorage),
+      // no a los oficiales de la BD. Los oficiales quedan vacíos hasta que el
+      // usuario los complete desde la vista de mapeo.
+      este_from: undefined,
+      norte_from: undefined,
+      cota_from: undefined,
+      este_to: undefined,
+      norte_to: undefined,
+      cota_to: undefined,
+      // Coordenadas proyectadas: se guardan en localStorage via saveProyectadas
+      proyectadas: {
+        este_from: esteFrom,
+        norte_from: norteFrom,
+        cota_from: cotaFrom,
+        este_to: esteTo,
+        norte_to: norteTo,
+        cota_to: cotaTo,
+      },
       largo_m: calculatedLargo !== null ? calculatedLargo : 0,
       altura: altura === '' ? undefined : Number(altura),
       dip_talud: undefined,
@@ -278,57 +290,63 @@ export default function CreateWindowModal({ isOpen, onClose, onCreate, existingC
 
           {/* Mostrar más / menos */}
           <button type="button" onClick={() => setShowMore(!showMore)}
-            className="flex items-center gap-1 text-[10px] font-black text-indigo-400 uppercase tracking-wider hover:text-indigo-300 transition-all">
+            className="flex items-center gap-1 text-[10px] font-black text-sky-400 uppercase tracking-wider hover:text-sky-300 transition-all">
             {showMore ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showMore ? 'Ocultar' : 'Mostrar'} coordenadas y detalles
+            {showMore ? 'Ocultar' : 'Agregar'} coordenadas proyectadas
           </button>
 
           {showMore && (
             <>
               <div className="border-t border-navy-800/80 pt-3">
-                <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-2">Coordenadas Iniciales (FROM)</h4>
+                <h4 className="text-[11px] font-black text-sky-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <span>Coordenadas Proyectadas Iniciales</span>
+                  <span className="text-[9px] bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded-full font-black tracking-widest text-sky-400">FROM</span>
+                </h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Este (X)</label>
-                    <input type="text" required placeholder="794444.8700" value={esteFrom}
-                      onChange={(e) => setEsteFrom(handleNumberInputLimit(e.target.value, 6, 4))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                    <input type="text" placeholder="794444.870" value={esteFrom}
+                      onChange={(e) => setEsteFrom(handleNumberInputLimit(e.target.value, 6, 3))}
+                      className="w-full bg-navy-950 border border-sky-500/30 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Norte (Y)</label>
-                    <input type="text" required placeholder="8440465.910" value={norteFrom}
+                    <input type="text" placeholder="8440465.910" value={norteFrom}
                       onChange={(e) => setNorteFrom(handleNumberInputLimit(e.target.value, 7, 3))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-sky-500/30 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cota (C)</label>
-                    <input type="text" required placeholder="3960.50" value={cotaFrom}
-                      onChange={(e) => setCotaFrom(handleNumberInputLimit(e.target.value, 4, 2))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                    <input type="text" placeholder="3960.500" value={cotaFrom}
+                      onChange={(e) => setCotaFrom(handleNumberInputLimit(e.target.value, 4, 3))}
+                      className="w-full bg-navy-950 border border-sky-500/30 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono text-center" />
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-navy-800/60 pt-3">
-                <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-wider mb-2">Coordenadas Finales (TO)</h4>
+                <h4 className="text-[11px] font-black text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span>Coordenadas Proyectadas Finales</span>
+                  <span className="text-[9px] bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded-full font-black tracking-widest text-sky-400">TO</span>
+                </h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Este (X)</label>
-                    <input type="text" required placeholder="794449.1300" value={esteTo}
-                      onChange={(e) => setEsteTo(handleNumberInputLimit(e.target.value, 6, 4))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                    <input type="text" placeholder="794449.130" value={esteTo}
+                      onChange={(e) => setEsteTo(handleNumberInputLimit(e.target.value, 6, 3))}
+                      className="w-full bg-navy-950 border border-sky-500/30 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Norte (Y)</label>
-                    <input type="text" required placeholder="8440456.690" value={norteTo}
+                    <input type="text" placeholder="8440456.690" value={norteTo}
                       onChange={(e) => setNorteTo(handleNumberInputLimit(e.target.value, 7, 3))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                      className="w-full bg-navy-950 border border-sky-500/30 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono text-center" />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cota (C)</label>
-                    <input type="text" required placeholder="3961.10" value={cotaTo}
-                      onChange={(e) => setCotaTo(handleNumberInputLimit(e.target.value, 4, 2))}
-                      className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center" />
+                    <input type="text" placeholder="3961.100" value={cotaTo}
+                      onChange={(e) => setCotaTo(handleNumberInputLimit(e.target.value, 4, 3))}
+                      className="w-full bg-navy-950 border border-sky-500/30 rounded-lg px-2.5 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono text-center" />
                   </div>
                 </div>
               </div>
