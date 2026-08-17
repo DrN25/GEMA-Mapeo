@@ -148,7 +148,7 @@ export default function DisconTable({
     const updated = joints.map(j => {
       if (j.id === rowId) {
         const clampedVal = (columnKey === 'distancia' || columnKey === 'espaciamiento') && val !== -1 && val !== null && val !== undefined
-          ? Math.min(Math.round(largoMax), Math.max(0, val))
+          ? Math.min(largoMax, Math.max(0, val))
           : val;
         return { ...j, [columnKey]: clampedVal };
       }

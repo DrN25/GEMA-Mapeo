@@ -57,7 +57,7 @@ export const NUMERIC_PRECISION: Record<string, FieldPrecision> = {
   gsi_visual:          { storage: 2, display: 0, intDigits: 3 },  // BD (5,2) · entero en UI
 
   // ===================== Discontinuidades (mapeo.EstructurasGeologicas) =====================
-  distancia:           { storage: 3, display: 0, intDigits: 4 },  // BD (8,3) · UI entero
+  distancia:           { storage: 3, display: 2, intDigits: 4 },  // BD (8,3) · UI 2 decimales
   dip:                 { storage: 2, display: 0, intDigits: 3 },  // BD (5,2) · UI entero
   dip_dir:             { storage: 2, display: 0, intDigits: 3 },  // BD (6,2) · UI entero
   abertura:            { storage: 3, display: 1, intDigits: 5 },  // BD (8,3)

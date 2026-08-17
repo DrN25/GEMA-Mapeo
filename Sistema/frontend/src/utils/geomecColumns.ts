@@ -164,7 +164,7 @@ const ALTERACION_ABBR: Record<string, string> = {
 
 // 2. CONFIGURACIÓN DE COLUMNAS DE DISCONTINUIDADES
 export const DISCON_COLUMNS: ColumnConfig[] = [
-    { key: 'distancia', label: COLUMN_LABELS.distancia, type: 'number', width: 85, precision: 0 },
+    { key: 'distancia', label: COLUMN_LABELS.distancia, type: 'number', width: 85, precision: 2 },
     { key: 'dip', label: COLUMN_LABELS.dip, type: 'number', width: 80, precision: 0, range: [-90, 90] },
     { key: 'dip_dir', label: COLUMN_LABELS.dip_dir, type: 'number', width: 96, precision: 0, range: [0, 359] },
     {

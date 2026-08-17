@@ -216,7 +216,7 @@ export function windowFromServerResponse(v: any): WindowData {
       id: idx + 1,
       estructura_id: d.estructura_id ?? null,
       familia: d.fam || d.familia_id || 1,
-      distancia: dist !== -1 ? Math.max(0, Math.round(dist)) : -1,
+      distancia: dist !== -1 ? Math.max(0, roundDec(dist, 2)) : -1,
       tipo_estructura: (d.tipo && d.tipo !== '-1') ? d.tipo : (d.tipo_estructura && d.tipo_estructura !== '-1' ? d.tipo_estructura : '-1'),
       dip: dip_val !== -1 ? roundDec(dip_val, 2) : -1,
       dip_dir: dip_dir_val !== -1 ? roundDec(dip_dir_val, 2) : -1,

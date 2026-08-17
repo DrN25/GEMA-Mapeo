@@ -111,8 +111,10 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
   },
   rmrGsi: {
     condicion_agua: true,
-    resistencia_ucs: true,
-    is50_mpa: true,
+    // is50_mpa y resistencia_ucs dejaron de ser obligatorios para el guardado
+    // (decisión de campo): el geólogo puede guardar sin digitar el Is50/UCS.
+    resistencia_ucs: false,
+    is50_mpa: false,
     gsi_superficie: true,
     // gsi_visual NO es obligatorio de forma directa: con GSI_VISUAL_AUTO=true
     // siempre se deriva por fórmula (suggestGsiVisual) y se envía en el payload.
