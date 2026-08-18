@@ -154,6 +154,15 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
             fecha_str = fecha_raw[:10]
     campania_val = f"Campaña {fecha_str[:4]}" if fecha_str and fecha_str[:4].isdigit() else "Campaña 2026"
 
+    # Código de celda (tolerar alias comunes como estacion, nombre, code)
+    codigo_raw = (
+        _clean_str(d.get("codigo"))
+        or _clean_str(d.get("estacion"))
+        or _clean_str(d.get("nombre"))
+        or _clean_str(d.get("code"))
+        or _clean_str(d.get("codigo_celda"))
+    )
+
     este_ini = _clamp(_round(_clean_num(d.get("este_ini")), 3), -1e12, 1e12)
     norte_ini = _clamp(_round(_clean_num(d.get("norte_ini")), 3), -1e12, 1e12)
     cota_ini = _clamp(_round(_clean_num(d.get("cota_ini")), 3), -1e12, 1e12)
@@ -162,7 +171,7 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
     cota_fin = _clamp(_round(_clean_num(d.get("cota_fin")), 3), -1e12, 1e12)
 
     return {
-        "codigo": _clean_str(d.get("codigo")),
+        "codigo": codigo_raw,
         "campania": campania_val,
         "sector": _clean_str(d.get("sector")) or "PENDIENTE",
         "este_ini": este_ini if este_ini is not None else 0.0,
@@ -214,30 +223,31 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
 def _normalize_joint(raw: Any, idx: int) -> Dict[str, Any]:
     d = raw if isinstance(raw, dict) else {}
 
-    tipo = _norm_code(d.get("tipo_estructura"), TIPO_ESTRUCTURA_VALID, default="JN")
-    rug = _clean_int(d.get("rugosidad_codigo"))
+    tipo = _norm_code(d.get("tipo_estructura") or d.get("tipo"), TIPO_ESTRUCTURA_VALID, default="JN")
+    rug = _clean_int(d.get("rugosidad_codigo") or d.get("rugosidad"))
     if rug is not None and not (1 <= rug <= 9):
         rug = None
+    dipdir = d.get("dip_dir") if d.get("dip_dir") is not None else d.get("dipdir")
     return {
         "numero_estructura": idx + 1,
         "familia_id": _clean_int(d.get("familia_id")) or math.ceil((idx + 1) / 3.0),
         "tipo_estructura": tipo or "JN",
         "dip": _clamp(_round(_clean_num(d.get("dip")), 2), 0.0, 90.0) or 0.0,
-        "dip_dir": _clamp(_round(_clean_num(d.get("dip_dir")), 2), 0.0, 360.0) or 0.0,
-        "distancia_m": _round(_clean_num(d.get("distancia_m")), 3),
-        "abertura_mm": _round(_clean_num(d.get("abertura_mm")), 3),
-        "espesor_mm": _round(_clean_num(d.get("espesor_mm")), 3),
-        "continuidad_m": _round(_clean_num(d.get("continuidad_m")), 3),
-        "espaciamiento_m": _round(_clean_num(d.get("espaciamiento_m")), 3),
-        "n_estructuras": _clean_int(d.get("n_estructuras")),
+        "dip_dir": _clamp(_round(_clean_num(dipdir), 2), 0.0, 360.0) or 0.0,
+        "distancia_m": _round(_clean_num(d.get("distancia_m") or d.get("distancia")), 3),
+        "abertura_mm": _round(_clean_num(d.get("abertura_mm") or d.get("abertura")), 3),
+        "espesor_mm": _round(_clean_num(d.get("espesor_mm") or d.get("espesor")), 3),
+        "continuidad_m": _round(_clean_num(d.get("continuidad_m") or d.get("continuidad")), 3),
+        "espaciamiento_m": _round(_clean_num(d.get("espaciamiento_m") or d.get("espaciamiento")), 3),
+        "n_estructuras": _clean_int(d.get("n_estructuras") or d.get("n_est")),
         "n_extremos_visibles": _clean_int(d.get("n_extremos_visibles")),
         "terminacion": _clean_int(d.get("terminacion")),
-        "relleno_1_codigo": _norm_code(d.get("relleno_1_codigo"), RELLENO_VALID),
-        "relleno_2_codigo": _norm_code(d.get("relleno_2_codigo"), RELLENO_VALID),
+        "relleno_1_codigo": _norm_code(d.get("relleno_1_codigo") or d.get("relleno_1"), RELLENO_VALID),
+        "relleno_2_codigo": _norm_code(d.get("relleno_2_codigo") or d.get("relleno_2"), RELLENO_VALID),
         "jrc": _clamp(_round(_clean_num(d.get("jrc")), 2), 0.0, 20.0),
         "rugosidad_codigo": _clean_str(rug),
-        "forma_estructura": _norm_code(d.get("forma_estructura"), FORMA_VALID),
-        "alteracion_codigo": _norm_code(d.get("alteracion_codigo"), ALTERACION_VALID),
+        "forma_estructura": _norm_code(d.get("forma_estructura") or d.get("forma"), FORMA_VALID),
+        "alteracion_codigo": _norm_code(d.get("alteracion_codigo") or d.get("alteracion"), ALTERACION_VALID),
     }
 
 
@@ -278,7 +288,7 @@ def _detect_missing_joints(estructuras: List[Dict[str, Any]]) -> List[List[str]]
 # ---------------------------------------------------------------------------
 
 
-def normalize_raw_cell(raw_cell: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_raw_cell(raw_cell: Dict[str, Any], default_index: int = 1) -> Dict[str, Any]:
     """Normaliza UNA celda cruda del LLM -> contrato del sistema.
 
     Devuelve:
@@ -286,7 +296,19 @@ def normalize_raw_cell(raw_cell: Dict[str, Any]) -> Dict[str, Any]:
     """
     raw = raw_cell if isinstance(raw_cell, dict) else {}
     excel_data = _normalize_header(raw)
-    raw_joints = raw.get("estructuras") if isinstance(raw, dict) else None
+
+    # Si la celda no tiene código, asignar SIN_NOMBRE_{default_index}
+    codigo = excel_data.get("codigo")
+    if not codigo:
+        codigo = f"SIN_NOMBRE_{default_index}"
+        excel_data["codigo"] = codigo
+
+    raw_joints = (
+        raw.get("estructuras")
+        or raw.get("discontinuidades")
+        or raw.get("joints")
+        or raw.get("structures")
+    ) if isinstance(raw, dict) else None
     estructuras = [_normalize_joint(j, i) for i, j in enumerate(raw_joints or [])]
 
     missing_header = _detect_missing_header(excel_data)
@@ -300,7 +322,7 @@ def normalize_raw_cell(raw_cell: Dict[str, Any]) -> Dict[str, Any]:
     confidence = round((filled_header + filled_joints) / max(1, expected_total + joint_total), 3)
 
     return {
-        "codigo": excel_data["codigo"],
+        "codigo": codigo,
         "excel_data": excel_data,
         "estructuras": estructuras,
         "missing_header": missing_header,
@@ -309,21 +331,35 @@ def normalize_raw_cell(raw_cell: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def extract_cells_from_raw_response(raw_response: Dict[str, Any]) -> List[Dict[str, Any]]:
+def extract_cells_from_raw_response(raw_response: Any) -> List[Dict[str, Any]]:
     """Extrae y normaliza las celdas de la respuesta cruda del LLM.
 
-    Soporta el contrato actual (tipo_resultado: datos|no_mapping_form) y
-    respuestas legacy sin tipo_resultado (solo con "celdas").
+    Soporta el contrato actual (tipo_resultado: datos|no_mapping_form),
+    respuestas legacy sin tipo_resultado (solo con "celdas"), listas
+    directas, sinónimos de celdas y estructuras planas.
     """
+    if isinstance(raw_response, list):
+        return [normalize_raw_cell(c, i + 1) for i, c in enumerate(raw_response) if isinstance(c, dict)]
     if not isinstance(raw_response, dict):
         return []
+
     celdas_raw = raw_response.get("celdas")
+    if not isinstance(celdas_raw, list):
+        for alias in ("estaciones", "stations", "cells", "datos", "items", "station_list", "resultados"):
+            if isinstance(raw_response.get(alias), list):
+                celdas_raw = raw_response[alias]
+                break
+
+    if not isinstance(celdas_raw, list):
+        if any(k in raw_response for k in ("estructuras", "discontinuidades", "joints", "structures", "excel_data", "sector", "dip", "largo_m", "azimut_hole", "codigo")):
+            celdas_raw = [raw_response]
+
     if not isinstance(celdas_raw, list) or not celdas_raw:
         return []
-    return [normalize_raw_cell(c) for c in celdas_raw]
+    return [normalize_raw_cell(c, i + 1) for i, c in enumerate(celdas_raw) if isinstance(c, dict)]
 
 
-def classify_raw_response(raw_response: Dict[str, Any]) -> Dict[str, Any]:
+def classify_raw_response(raw_response: Any) -> Dict[str, Any]:
     """Clasifica la respuesta cruda del LLM para el servicio/UI.
 
     Devuelve:
@@ -333,18 +369,29 @@ def classify_raw_response(raw_response: Dict[str, Any]) -> Dict[str, Any]:
       un formulario de mapeo (foto equivocada). El frontend debe avisar.
     - "error": respuesta inválida o sin celdas sin marca explícita.
     """
+    if isinstance(raw_response, list) and raw_response:
+        return {"tipo": "datos", "mensaje": None}
     if not isinstance(raw_response, dict):
         return {"tipo": "error", "mensaje": "El modelo no devolvió un JSON válido."}
 
     tipo = raw_response.get("tipo_resultado")
     mensaje = raw_response.get("mensaje") if isinstance(raw_response.get("mensaje"), str) else None
-    celdas = raw_response.get("celdas")
-
     if tipo == "no_mapping_form":
         return {
             "tipo": "no_mapping_form",
             "mensaje": mensaje or "La imagen no parece un formulario de mapeo geomecánico. ¿Seleccionaste la foto correcta?",
         }
+
+    celdas = raw_response.get("celdas")
+    if not isinstance(celdas, list):
+        for alias in ("estaciones", "stations", "cells", "datos", "items", "station_list", "resultados"):
+            if isinstance(raw_response.get(alias), list):
+                celdas = raw_response[alias]
+                break
+    if not isinstance(celdas, list):
+        if any(k in raw_response for k in ("estructuras", "discontinuidades", "joints", "structures", "excel_data", "sector", "dip", "largo_m", "azimut_hole", "codigo")):
+            celdas = [raw_response]
+
     if isinstance(celdas, list) and celdas:
         return {"tipo": "datos", "mensaje": mensaje}
     if isinstance(celdas, list):
@@ -352,4 +399,4 @@ def classify_raw_response(raw_response: Dict[str, Any]) -> Dict[str, Any]:
             "tipo": "no_mapping_form",
             "mensaje": mensaje or "La imagen no contiene datos de mapeo legibles.",
         }
-    return {"tipo": "error", "mensaje": "El modelo no devolvió el campo 'celdas'."}
+    return {"tipo": "error", "mensaje": "El modelo no devolvió datos estructurados."}

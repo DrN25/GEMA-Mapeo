@@ -238,6 +238,32 @@ class TestRetriesAndValidation:
         data = provider.extract_structured_data(IMG, PROMPT)
         assert data["celdas"][0]["codigo"] is None
 
+    def test_auto_envoltura_de_celda_plana(self, monkeypatch):
+        """Si el LLM devuelve una celda plana sin clave 'celdas', el proveedor
+        la auto-envuelve y la valida correctamente."""
+        provider = OpenRouterProvider(api_key="k", free_model="f:free", paid_model="p")
+
+        def fake_post(self, payload, timeout_seconds=None):
+            return {"excel_data": {"largo_m": 15}, "estructuras": [{"dip": 45, "dip_dir": 120}]}, "f:free"
+
+        monkeypatch.setattr(OpenRouterProvider, "_post", fake_post)
+        data = provider.extract_structured_data(IMG, PROMPT)
+        assert "celdas" in data
+        assert len(data["celdas"]) == 1
+        assert data["celdas"][0]["excel_data"]["largo_m"] == 15
+
+    def test_alias_estaciones_valido(self, monkeypatch):
+        """Si el LLM devuelve 'estaciones' en vez de 'celdas', se normaliza."""
+        provider = OpenRouterProvider(api_key="k", free_model="f:free", paid_model="p")
+
+        def fake_post(self, payload, timeout_seconds=None):
+            return {"estaciones": [{"codigo": "E1", "estructuras": [{"dip": 50}]}]}, "f:free"
+
+        monkeypatch.setattr(OpenRouterProvider, "_post", fake_post)
+        data = provider.extract_structured_data(IMG, PROMPT)
+        assert "celdas" in data
+        assert data["celdas"][0]["codigo"] == "E1"
+
     def test_agota_intentos_si_siempre_invalido(self, monkeypatch):
         provider = OpenRouterProvider(api_key="k", free_model="f:free", paid_model="p")
         calls = []

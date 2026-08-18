@@ -8,15 +8,15 @@ import { handleNumberInputLimit } from '../../utils/inputLimits';
 import type { ScanJointRow } from './types';
 
 const JOINT_FIELDS: { key: keyof ScanJointRow; label: string; type: 'num' | 'text'; int?: number; dec?: number }[] = [
+  { key: 'distancia_m', label: 'Dist (m)', type: 'num', int: 4, dec: 3 },
   { key: 'tipo_estructura', label: 'Tipo', type: 'text' },
   { key: 'dip', label: 'Dip', type: 'num', int: 3, dec: 0 },
   { key: 'dip_dir', label: 'Dip Dir', type: 'num', int: 3, dec: 0 },
-  { key: 'distancia_m', label: 'Dist (m)', type: 'num', int: 4, dec: 3 },
+  { key: 'n_estructuras', label: 'N est', type: 'num', int: 3, dec: 0 },
   { key: 'abertura_mm', label: 'Abert (mm)', type: 'num', int: 5, dec: 1 },
   { key: 'espesor_mm', label: 'Esp (mm)', type: 'num', int: 5, dec: 1 },
   { key: 'continuidad_m', label: 'Cont (m)', type: 'num', int: 2, dec: 2 },
   { key: 'espaciamiento_m', label: 'Espac (m)', type: 'num', int: 2, dec: 2 },
-  { key: 'n_estructuras', label: 'N est', type: 'num', int: 3, dec: 0 },
   { key: 'n_extremos_visibles', label: 'N extr', type: 'num', int: 2, dec: 0 },
   { key: 'terminacion', label: 'Term', type: 'num', int: 1, dec: 0 },
   { key: 'relleno_1_codigo', label: 'Relleno 1', type: 'text' },

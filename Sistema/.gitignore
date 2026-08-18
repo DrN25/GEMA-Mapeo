@@ -8,6 +8,7 @@ docs/
 backend/uploads/
 Sistema/backend/uploads/
 *.xlsx
+!backend/templates/*.xlsx
 *.csv
 
 # Base de datos local (SQLite)

@@ -21,15 +21,15 @@ export interface ScanFieldMeta {
 export interface ScanJointRow {
   numero_estructura: number;
   familia_id: number;
+  distancia_m?: number;
   tipo_estructura: string;
   dip: number;
   dip_dir: number;
-  distancia_m?: number;
+  n_estructuras?: number;
   abertura_mm?: number;
   espesor_mm?: number;
   continuidad_m?: number;
   espaciamiento_m?: number;
-  n_estructuras?: number;
   n_extremos_visibles?: number;
   terminacion?: number;
   relleno_1_codigo?: string;

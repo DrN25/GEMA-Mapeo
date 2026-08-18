@@ -13,6 +13,7 @@ import {
   getFillingRatingSingle
 } from '../../utils/rmrCalculator';
 import { Layers, Plus, Trash2 } from 'lucide-react';
+import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 
 interface DisconTableProps {
   joints: JointRow[];
@@ -283,13 +284,21 @@ export default function DisconTable({
         <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.cont_sub}</th>
         <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.aber_sub}</th>
         <th className="py-1 px-2 text-center bg-pink-950/5 border-r border-b border-navy-800/80 text-pink-300/85 h-4">{COLUMN_LABELS.rug_sub}</th>
-        <th className="py-1 px-2 text-center bg-pink-500/20 border-r border-b border-navy-800/80 text-pink-300 font-black h-4 shadow-[inset_0_0_8px_rgba(236,72,153,0.1)]">{COLUMN_LABELS.val_sub}</th>
+        <th className="py-1 px-2 text-center bg-pink-500/20 border-r border-b border-navy-800/80 text-pink-300 font-black h-4 shadow-[inset_0_0_8px_rgba(236,72,153,0.1)]">
+          <FormulaTooltipTrigger formulaId="condicion_rating_r89" position="bottom" enabled={showFormulas}>
+            <span>{COLUMN_LABELS.val_sub}</span>
+          </FormulaTooltipTrigger>
+        </th>
         <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.alt_sub}</th>
         <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.rel_sub}</th>
         <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.cont_sub}</th>
         <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.aber_sub}</th>
         <th className="py-1 px-2 text-center bg-amber-950/5 border-r border-b border-navy-800/80 text-amber-300/85 h-4">{COLUMN_LABELS.rug_sub}</th>
-        <th className="py-1 px-2 text-center bg-amber-500/20 border-r border-b border-navy-800/80 text-amber-300 font-black h-4 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]">{COLUMN_LABELS.val_sub}</th>
+        <th className="py-1 px-2 text-center bg-amber-500/20 border-r border-b border-navy-800/80 text-amber-300 font-black h-4 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]">
+          <FormulaTooltipTrigger formulaId="condicion_rating_r76" position="bottom" enabled={showFormulas}>
+            <span>{COLUMN_LABELS.val_sub}</span>
+          </FormulaTooltipTrigger>
+        </th>
       </tr>
     </thead>
   );

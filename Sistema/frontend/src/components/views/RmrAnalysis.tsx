@@ -514,8 +514,16 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiCond}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiEstruc}</td>
-              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiVisual?.toFixed(2) ?? '—'}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">
+                <FormulaTooltipTrigger
+                  formulaId="gsi_visual"
+                  params={{ rqd: calculated.rqd_est, jcond: calculated.condicion_rating_89, val: gsiVisual, suggested: gsiVisual }}
+                  position="bottom"
+                  enabled={showFormulas}
+                >
+                  <span className="font-bold text-amber-300">{gsiVisual !== undefined ? gsiVisual : '—'}</span>
+                </FormulaTooltipTrigger>
+              </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{ctrl?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{vol?.toFixed(2) ?? '—'}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-bold text-pink-300 bg-pink-500/[0.04]">
@@ -576,8 +584,14 @@ export default function RmrAnalysis({
       </div>
 
       {/* DETALLE FORMULADO */}
-      <div className="p-3.5 bg-navy-950/65 rounded-lg border border-navy-900/80 font-mono text-xs text-slate-300 text-left border-l-4 border-indigo-500 shadow-md">
-        <strong>Jv</strong> = (1/{p1}) + (1/{p2}) + (1/{p3}) = <strong>{calculated.jv.toFixed(4)}</strong> &nbsp;|&nbsp; <strong>RQD% Est. (Palmström)</strong> = 115 − 3.3 × {calculated.jv.toFixed(4)} = <strong className="text-sky-400">{calculated.rqd_est.toFixed(2)}%</strong>
+      <div className="p-3.5 bg-navy-950/65 rounded-lg border border-navy-900/80 font-mono text-xs text-slate-300 text-left border-l-4 border-indigo-500 shadow-md flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span><strong>Jv</strong> = (1/{p1}) + (1/{p2}) + (1/{p3}) = <strong>{calculated.jv.toFixed(4)}</strong></span>
+        <span className="text-slate-600">|</span>
+        <span><strong>RQD% Est. (Palmström)</strong> = 115 − 3.3 × {calculated.jv.toFixed(4)} = <strong className="text-sky-400">{calculated.rqd_est.toFixed(2)}%</strong></span>
+        <span className="text-slate-600">|</span>
+        <span><strong>JCon (R89)</strong> = Σ(Cond × N_est)/ΣN_est = <strong className="text-pink-300">{calculated.condicion_rating_89.toFixed(2)}</strong></span>
+        <span className="text-slate-600">|</span>
+        <span><strong>GSI Sugerido</strong> = min(85, round(1.5×{calculated.condicion_rating_89.toFixed(2)} + {calculated.rqd_est.toFixed(2)}/2)) = <strong className="text-amber-400">{suggestGsiVisual(calculated.rqd_est, calculated.condicion_rating_89) ?? '—'}</strong></span>
       </div>
     </div>
   );

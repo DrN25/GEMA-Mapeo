@@ -131,14 +131,16 @@ REGLAS CRÍTICAS:
    encabezado UBICACIÓN y su propia tabla de discontinuidades). Si ves más
    de un bloque de estación, genera UNA entrada por bloque en "celdas".
 2. El "codigo" es el identificador de la estación (p.ej. TD1, V1-V2, V3).
-   Si no es legible (borroso, recortado o ausente), devuélvelo null — NO
-   descartes la celda ni inventes un código: el usuario lo completará en el
-   preview.
+   Si no es legible (borroso, recortado o ausente), asigna "SIN_NOMBRE_1"
+   (o "SIN_NOMBRE_2" si hay más de una estación) en el campo "codigo".
+   NUNCA descartes la celda ni devuelvas una lista "celdas" vacía por no
+   detectar el nombre si la tabla o datos existen en la imagen.
 3. NO calcules RMR, GSI ni ningún rating: todos esos campos van null.
 4. Los valores numéricos se devuelven como números (no strings).
 5. Extrae TODO lo que veas, incluso si el formulario está parcial, doblado,
-   borroso o sin nombre de celda. Un formulario casi vacío sigue siendo un
-   formulario: devuelve la celda con los pocos campos legibles y el resto null.
+   borroso o sin nombre de celda. Un formulario sin código o casi vacío sigue
+   siendo un formulario: genera la entrada en "celdas" con "codigo": "SIN_NOMBRE_1",
+   los campos legibles y el resto null.
 
 CONVENCIÓN DE REPETICIÓN CON RAYA VERTICAL (MUY IMPORTANTE):
 En las tablas de discontinuidades (y también en otras tablas del formulario),
@@ -250,7 +252,7 @@ def build_correction_prompt(previous_raw: dict, issue: str) -> str:
         + "ÚNICAMENTE con el JSON del esquema indicado arriba (sin texto "
         + "adicional, sin markdown, sin explicaciones).\n"
         + "Si el formulario existe aunque esté incompleto o sin nombre de "
-        + "celda, extráelo igualmente con codigo: null. Si NO es un "
+        + "celda, extráelo igualmente con codigo: \"SIN_NOMBRE_1\". Si NO es un "
         + "formulario de mapeo, usa {\"tipo_resultado\": \"no_mapping_form\", "
         + "\"celdas\": []}.\n"
         + "Respuesta anterior (solo referencia): " + prev_snippet

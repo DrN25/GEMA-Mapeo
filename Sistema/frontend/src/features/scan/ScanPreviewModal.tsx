@@ -10,13 +10,14 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  X, CheckCircle2, AlertTriangle, ScanLine, Loader2, ChevronDown, ChevronUp, RefreshCw
+  X, CheckCircle2, AlertTriangle, ScanLine, Loader2, ChevronDown, ChevronUp, RefreshCw, FileSpreadsheet
 } from 'lucide-react';
 import ScanFieldEditor from './ScanFieldEditor';
 import type { ScanFieldDef } from './ScanFieldEditor';
 import ScanJointsEditor from './ScanJointsEditor';
 import { handleNumberInputLimit } from '../../utils/inputLimits';
 import { getAuthHeaders } from '../../utils/apiClient';
+import { exportVentanaFromMemory, exportMultipleVentanas } from '../../services/excelExportService';
 import type { ScanCeldaItem, ScanImportedCellItem, ScanPreviewResponse } from './types';
 
 const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || (
@@ -124,9 +125,43 @@ export default function ScanPreviewModal({
   const [activeIdx, setActiveIdx] = useState(0);
   const [rescanning, setRescanning] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const active = cells[activeIdx] ?? null;
+
+  const handleExportSingleExcel = async (cell: ScanCeldaItem) => {
+    if (!cell) return;
+    setExporting(true);
+    try {
+      await exportVentanaFromMemory({
+        codigo: cell.codigo || 'SIN_NOMBRE',
+        excel_data: cell.excel_data,
+        estructuras: cell.estructuras,
+      }, undefined, apiBaseUrl);
+    } catch (err: any) {
+      console.error('Error al exportar celda escaneada a Excel:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportAllExcel = async () => {
+    if (cells.length === 0) return;
+    setExporting(true);
+    try {
+      const items = cells.map((c) => ({
+        codigo: c.codigo || 'SIN_NOMBRE',
+        excel_data: c.excel_data,
+        estructuras: c.estructuras,
+      }));
+      await exportMultipleVentanas(items, `mapeo_escaneo_${cells.length}_celdas.xlsx`, apiBaseUrl);
+    } catch (err: any) {
+      console.error('Error al exportar todas las celdas escaneadas a Excel:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Todos los códigos existentes (BD del preview + borradores locales)
   const existingDbCodes = useMemo(() => {
@@ -369,6 +404,18 @@ export default function ScanPreviewModal({
             </div>
             <div className="ml-auto flex items-center gap-2">
               <span className="text-[10px] font-mono text-slate-500">Imagen {active.source_image + 1} · confianza {(active.confidence * 100).toFixed(0)}% · {missingCount} campo(s) faltantes</span>
+              {active && (
+                <button
+                  type="button"
+                  onClick={() => { void handleExportSingleExcel(active); }}
+                  disabled={exporting}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                  title="Exportar esta celda escaneada a la Plantilla Excel"
+                >
+                  {exporting ? <Loader2 size={12} className="animate-spin" /> : <FileSpreadsheet size={12} />}
+                  Exportar Celda
+                </button>
+              )}
               {onRescan && (
                 <button
                   type="button"
@@ -424,19 +471,35 @@ export default function ScanPreviewModal({
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2.5 justify-end pt-3 border-t border-navy-800 shrink-0">
-          <button onClick={onClose} className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition-all">
-            Volver
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={confirming}
-            className="bg-emerald-500 hover:bg-emerald-600 text-navy-950 font-black px-5 py-2 rounded-xl text-xs flex items-center gap-2 disabled:opacity-50 transition-all shadow-lg"
-          >
-            {confirming ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-            {confirming ? 'Preparando...' : `Importar ${cells.length} celda${cells.length !== 1 ? 's' : ''} como borradores`}
-          </button>
+        <div className="flex gap-2.5 justify-between items-center pt-3 border-t border-navy-800 shrink-0">
+          <div>
+            {cells.length > 1 && (
+              <button
+                type="button"
+                onClick={() => { void handleExportAllExcel(); }}
+                disabled={exporting}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 px-3.5 py-2 rounded-xl transition-all disabled:opacity-50"
+                title="Exportar todas las celdas escaneadas en un único archivo Excel"
+              >
+                {exporting ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
+                Exportar Todas ({cells.length}) a Excel
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2.5 items-center">
+            <button onClick={onClose} className="bg-navy-950 border border-navy-800 hover:bg-navy-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+              Volver
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={confirming}
+              className="bg-emerald-500 hover:bg-emerald-600 text-navy-950 font-black px-5 py-2 rounded-xl text-xs flex items-center gap-2 disabled:opacity-50 transition-all shadow-lg"
+            >
+              {confirming ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+              {confirming ? 'Preparando...' : `Importar ${cells.length} celda${cells.length !== 1 ? 's' : ''} como borradores`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

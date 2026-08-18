@@ -24,9 +24,10 @@ class TestNormalizeHeader:
         out = normalize_raw_cell({"codigo": "  td1  "})
         assert out["codigo"] == "td1"
 
-    def test_codigo_null_si_vacio(self):
+    def test_codigo_asignado_por_defecto_si_vacio(self):
         out = normalize_raw_cell({"codigo": None})
-        assert out["codigo"] is None
+        assert out["codigo"] == "SIN_NOMBRE_1"
+        assert out["excel_data"]["codigo"] == "SIN_NOMBRE_1"
 
     def test_coordenadas_redondeadas_a_3(self):
         out = normalize_raw_cell(
@@ -157,6 +158,33 @@ class TestExtractCells:
         cells = extract_cells_from_raw_response(raw)
         assert len(cells) == 2
         assert cells[0]["codigo"] == "TD1"
+
+    def test_respuesta_sin_codigos_asigna_correlativos(self):
+        raw = {"celdas": [{"excel_data": {"largo_m": 10}}, {"excel_data": {"largo_m": 15}}]}
+        cells = extract_cells_from_raw_response(raw)
+        assert len(cells) == 2
+        assert cells[0]["codigo"] == "SIN_NOMBRE_1"
+        assert cells[1]["codigo"] == "SIN_NOMBRE_2"
+
+    def test_respuesta_con_alias_estaciones(self):
+        raw = {"estaciones": [{"codigo": "EST_A", "estructuras": [{"dip": 45}]}]}
+        cells = extract_cells_from_raw_response(raw)
+        assert len(cells) == 1
+        assert cells[0]["codigo"] == "EST_A"
+
+    def test_respuesta_plana_auto_envuelta(self):
+        raw = {"excel_data": {"sector": "NW1", "largo_m": 12}, "estructuras": [{"dip": 45, "dip_dir": 120}]}
+        cells = extract_cells_from_raw_response(raw)
+        assert len(cells) == 1
+        assert cells[0]["codigo"] == "SIN_NOMBRE_1"
+        assert cells[0]["excel_data"]["sector"] == "NW1"
+        assert len(cells[0]["estructuras"]) == 1
+
+    def test_respuesta_lista_directa(self):
+        raw = [{"codigo": "L1", "excel_data": {"largo_m": 5}}]
+        cells = extract_cells_from_raw_response(raw)
+        assert len(cells) == 1
+        assert cells[0]["codigo"] == "L1"
 
     def test_respuesta_sin_celdas(self):
         assert extract_cells_from_raw_response({"celdas": []}) == []

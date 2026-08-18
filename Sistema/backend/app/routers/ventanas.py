@@ -968,85 +968,67 @@ def rename_ventana(
 
 
 # ============================================================================
-# EXPORTAR EXCEL
+# EXPORTAR EXCEL (Basado en Plantilla Maestra)
 # ============================================================================
 
 @router.get("/ventanas/{codigo}/exportar")
 def exportar_ventana_excel(codigo: str, db: Session = Depends(get_db)):
+    """Exporta una ventana existente en BD rellenando la plantilla Excel maestra."""
     code_up = codigo.strip().upper()
     v = db.query(models.Ventana).filter_by(codigo_celda=code_up).first()
     if not v:
         raise HTTPException(status_code=404, detail=f"Ventana {code_up} no encontrada")
     data = serialize_ventana(v, db)
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Mapeo Ventana"
-    headers = [
-        "id", "CELDA", "Campaña", "Sector", "FECHA",
-        "ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO",
-        "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP_DIR_TALUD",
-        "INTEMPERISMO", "Lito1", "Lito2", "Lito3", "Unidad", "AlturaMapeo", "Fase", "Mapeador",
-        "CONDICION_AGUA_76", "VALOR_AGUA_76", "DUREZA_76", "RESISTENCIA_VALOR_76",
-        "GSI_VISUAL_76", "CONTROL_ESTRUC_76", "EFECTOS_VOLADURA_76",
-        "RQD_VALOR_76", "RQD_76", "FREC_FRACT_76", "TAM_BLOQUES_76",
-        "ESPAC_PROM_76", "ESPAC_VALOR_76", "COND_DISC_VALOR_76", "RMR_76",
-        "DUREZA_89", "RESISTENCIA_VALOR_89", "GSI_VISUAL_89", "CONTROL_ESTRUC_89", "EFECTOS_VOL_89",
-        "RQD_VALOR_89", "RQD_89", "FREC_FRACT_89", "TAM_BLOQUES_89",
-        "ESPAC_PROM_89", "ESPAC_VALOR_89", "COND_DISC_VALOR_89", "RMR_89",
-        "UCS_MPa", "IS50_MPa", "COMENTARIO",
-        "TIPO", "DIP", "DIPDIR", "NumEstructura", "NumEstructuras",
-        "ABERTURA_mm", "ESPESOR_mm", "CONTINUIDAD_m", "ESPACIAMIENTO_m",
-        "EXTREMOS", "TERMINACION", "RELLENO1", "RELLENO2", "JRC", "RUGOSIDAD", "FORMA", "ALTERACION",
-        "altR76", "relR76", "contR76", "abR76", "rugR76", "totalR76",
-        "altR89", "relR89", "contR89", "abR89", "rugR89", "totalR89",
-        "teta", "alfa", "x", "y", "z",
-    ]
-    ws.append(headers)
-    for d in data.discontinuidades:
-        ws.append([
-            v.ventana_id, data.codigo, data.campania, data.sector_geotecnico,
-            data.fecha_mapeo.isoformat() if data.fecha_mapeo else "",
-            data.este_ini, data.norte_ini, data.cota_ini,
-            data.este_fin, data.norte_fin, data.cota_fin,
-            data.distancia_celda, data.altura, data.dip, data.azimut_hole,
-            data.dip_talud, data.dipdir_talud,
-            data.intemperismo, data.lito_1, data.lito_2, data.lito_3, data.unidad_litologica,
-            data.alteracion or data.altura_mapeo, data.fase, data.mapeador,
-            data.rmr_input.agua_codigo if data.rmr_input else None, data.agua_r76,
-            data.rmr_input.resistencia_codigo if data.rmr_input else None, data.resist_r76,
-            data.rmr_input.gsi_visual if data.rmr_input else None,
-            data.rmr_input.control_estructural if data.rmr_input else None,
-            data.rmr_input.efectos_voladura if data.rmr_input else None,
-            data.rqd_r76, data.rqd_pct, data.jv,
-            (data.espac_prom ** 3) if data.espac_prom else None,
-            data.espac_prom, data.spacing_r76, data.condisc_r76, data.rmr_76,
-            data.rmr_input.resistencia_codigo if data.rmr_input else None, data.resist_r89,
-            data.rmr_input.gsi_visual if data.rmr_input else None,
-            data.rmr_input.control_estructural if data.rmr_input else None,
-            data.rmr_input.efectos_voladura if data.rmr_input else None,
-            data.rqd_r89, data.rqd_pct, data.jv,
-            (data.espac_prom ** 3) if data.espac_prom else None,
-            data.espac_prom, data.spacing_r89, data.condisc_r89, data.rmr_89,
-            data.rmr_input.ucs_mpa if data.rmr_input else None,
-            data.rmr_input.is50_mpa if data.rmr_input else None,
-            data.rmr_input.comentario if data.rmr_input else None,
-            d.tipo, d.dip, d.dipdir, d.numero_estructura, d.nstr,
-            d.aber, d.esp, d.cont, d.espac,
-            d.next, d.term, d.r1, d.r2, d.jrc, d.rug, d.forma, d.alt,
-            d.altR76, d.relR76, d.contR76, d.abR76, d.rugR76, d.totalR76,
-            d.altR89, d.relR89, d.contR89, d.abR89, d.rugR89, d.totalR89,
-            d.teta, d.alfa, d.x, d.y, d.z,
-        ])
+    try:
+        from app.services.excel_exporter import export_ventanas_to_excel
+        output = export_ventanas_to_excel(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando exportación Excel: {str(e)}")
 
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=mapeo_ventana_{code_up}.xlsx"}
     )
+
+
+@router.post("/ventanas/exportar-template")
+def exportar_ventanas_template_post(payload: Dict[str, Any]):
+    """
+    Exporta datos de ventana(s) en memoria directamente a la plantilla Excel.
+    Acepta:
+      - { "items": [ {...}, {...} ] } para múltiples celdas.
+      - { "codigo": "...", "excel_data": {...}, "estructuras": [...] }
+      - { "header": {...}, "joints": [...] } (formato WindowData de frontend)
+    """
+    try:
+        from app.services.excel_exporter import export_ventanas_to_excel
+        items = payload.get("items")
+        if items is None:
+            items = [payload]
+
+        output = export_ventanas_to_excel(items)
+
+        # Determinar nombre de archivo
+        first_code = "VENTANA"
+        if items and isinstance(items[0], dict):
+            first_code = (
+                items[0].get("codigo")
+                or items[0].get("codigo_final")
+                or (items[0].get("header") or {}).get("celda")
+                or (items[0].get("excel_data") or {}).get("codigo")
+                or "VENTANA"
+            )
+        filename = f"mapeo_ventana_{first_code}.xlsx" if len(items) == 1 else "mapeo_ventanas_export.xlsx"
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando exportación Excel: {str(e)}")
 
 
 # ============================================================================

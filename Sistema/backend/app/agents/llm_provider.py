@@ -17,7 +17,7 @@ import base64
 import io
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -202,7 +202,7 @@ class OpenRouterProvider(LLMProvider):
 
             issue = self._validate_response(data)
             if issue is None:
-                return data
+                return OpenRouterProvider._normalize_raw_json(data)
             last_issue = issue
             last_raw = data
             logger.warning(
@@ -287,22 +287,48 @@ class OpenRouterProvider(LLMProvider):
             raise LLMQuotaError(str(e)) from e
 
     @staticmethod
+    def _normalize_raw_json(data: Any) -> Dict:
+        """Normaliza y auto-envuelve la salida del LLM para tolerar formatos
+        planos, listas directas y sinónimos de claves comunes."""
+        if isinstance(data, list):
+            return {"tipo_resultado": "datos", "celdas": data}
+        if not isinstance(data, dict):
+            return {}
+
+        res = dict(data)
+        if "celdas" not in res:
+            for alias in ("estaciones", "stations", "cells", "datos", "items", "station_list", "resultados"):
+                if isinstance(res.get(alias), list):
+                    res["celdas"] = res[alias]
+                    break
+
+        if "celdas" not in res and res.get("tipo_resultado") != "no_mapping_form":
+            # Si el objeto raíz parece una celda individual (tiene estructuras, excel_data o campos geomecánicos)
+            if any(k in res for k in ("estructuras", "discontinuidades", "joints", "structures", "excel_data", "sector", "dip", "largo_m", "azimut_hole", "codigo")):
+                res = {"tipo_resultado": "datos", "celdas": [res]}
+
+        return res
+
+    @staticmethod
     def _validate_response(data: Dict) -> Optional[str]:
         """Valida la estructura mínima de la respuesta del LLM.
 
         Devuelve None si es aceptable, o un string describiendo el problema
         (usado en el prompt de corrección del siguiente intento).
         """
-        if not isinstance(data, dict):
+        if not isinstance(data, (dict, list)):
+            return "la respuesta no es un objeto JSON"
+        norm = OpenRouterProvider._normalize_raw_json(data)
+        if not isinstance(norm, dict):
             return "la respuesta no es un objeto JSON"
         # Marca explícita de imagen no relacionada: respuesta VÁLIDA (no reintentar)
-        tipo = data.get("tipo_resultado")
+        tipo = norm.get("tipo_resultado")
         if tipo == "no_mapping_form":
             return None
-        celdas = data.get("celdas")
+        celdas = norm.get("celdas")
         if celdas is None:
             # Aceptar respuestas sin "tipo_resultado" pero con "celdas" (legacy)
-            if "celdas" in data:
+            if "celdas" in norm:
                 return None if isinstance(celdas, list) else "el campo 'celdas' no es una lista"
             return "falta el campo 'celdas' en la respuesta"
         if not isinstance(celdas, list):
@@ -319,6 +345,8 @@ class OpenRouterProvider(LLMProvider):
     @staticmethod
     def _celda_tiene_datos(celda: dict) -> bool:
         """True si la celda tiene al menos un dato aprovechable del modelo."""
+        if not isinstance(celda, dict):
+            return False
         ed = celda.get("excel_data")
         if isinstance(ed, dict):
             for k, v in ed.items():
@@ -326,7 +354,17 @@ class OpenRouterProvider(LLMProvider):
                     continue
                 if v is not None and str(v).strip() not in ("", "-1", "None", "null"):
                     return True
-        est = celda.get("estructuras")
+        for k, v in celda.items():
+            if k in ("campania", "codigo", "excel_data", "estructuras", "discontinuidades", "joints", "structures", "tipo_resultado"):
+                continue
+            if v is not None and str(v).strip() not in ("", "-1", "None", "null"):
+                return True
+        est = (
+            celda.get("estructuras")
+            or celda.get("discontinuidades")
+            or celda.get("joints")
+            or celda.get("structures")
+        )
         if isinstance(est, list) and est:
             return True
         return False
@@ -514,51 +552,58 @@ class OpenRouterProvider(LLMProvider):
 
         # 1. Directo
         data = _parse(text)
-        if isinstance(data, dict):
-            return data, model
+        if isinstance(data, (dict, list)):
+            return OpenRouterProvider._normalize_raw_json(data), model
 
         # 2. Buscar el objeto balanceado más largo que parsee.
-        #    Para cada '{', probar desde ahí hasta el final; quedarse con el
+        #    Para cada '{' o '[', probar desde ahí hasta el final; quedarse con el
         #    más largo que parsea y que parece nuestro contrato.
         candidatos = []
         for i, ch in enumerate(text):
-            if ch != "{":
+            if ch not in ("{", "["):
                 continue
+            closing_ch = "}" if ch == "{" else "]"
             for end in range(len(text) - 1, i - 1, -1):
-                if text[end] != "}":
+                if text[end] != closing_ch:
                     continue
                 sub = text[i : end + 1]
                 d = _parse(sub)
-                if isinstance(d, dict):
+                if isinstance(d, (dict, list)):
                     score = 0
-                    if "celdas" in d:
-                        score += 100
-                    if "tipo_resultado" in d:
-                        score += 50
+                    if isinstance(d, list):
+                        score += 80
+                    elif isinstance(d, dict):
+                        if "celdas" in d:
+                            score += 100
+                        if "tipo_resultado" in d:
+                            score += 50
+                        if any(k in d for k in ("estructuras", "discontinuidades", "excel_data", "sector", "dip")):
+                            score += 40
                     candidatos.append((len(sub), score, d))
-                    break  # el más largo desde esta '{' ya está
+                    break  # el más largo desde esta apertura ya está
 
         if candidatos:
             candidatos.sort(key=lambda x: (x[1], x[0]), reverse=True)
             data = candidatos[0][2]
-            return data, model
+            return OpenRouterProvider._normalize_raw_json(data), model
 
         # 3. Mini-corrección: trailing commas (modelos suelen dejarlos)
         import re as _re
         fixed = _re.sub(r",\s*([}\]])", r"\1", text)
         data = _parse(fixed)
-        if isinstance(data, dict):
-            return data, model
+        if isinstance(data, (dict, list)):
+            return OpenRouterProvider._normalize_raw_json(data), model
         # También probar los candidatos con la limpieza aplicada
         for i, ch in enumerate(fixed):
-            if ch != "{":
+            if ch not in ("{", "["):
                 continue
+            closing_ch = "}" if ch == "{" else "]"
             for end in range(len(fixed) - 1, i - 1, -1):
-                if fixed[end] != "}":
+                if fixed[end] != closing_ch:
                     continue
                 d = _parse(fixed[i : end + 1])
-                if isinstance(d, dict) and ("celdas" in d or "tipo_resultado" in d):
-                    return d, model
+                if isinstance(d, (dict, list)):
+                    return OpenRouterProvider._normalize_raw_json(d), model
 
         raise LLMProviderError(
             f"El modelo {model} no devolvió JSON válido: {text[:400]}"

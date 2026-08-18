@@ -6,9 +6,10 @@ docs/
 
 # Archivos pesados y de usuario
 backend/uploads/
-Sistema/backend/uploads/
 *.xlsx
-*.csvgi
+!Sistema/backend/templates/*.xlsx
+!backend/templates/*.xlsx
+*.csv
 
 # Base de datos local (SQLite)
 *.db
@@ -33,6 +34,3 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-# Tests - cache de compilacion
-tests/.cache/
-Sistema/tests/.cache/

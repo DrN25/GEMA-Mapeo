@@ -13,6 +13,7 @@ import ConnectionLostOverlay from './components/Common/ConnectionLostOverlay';
 import ExcelImportModal, { type ImportedCellItem } from './components/modals/ExcelImportModal';
 import ScanImportModal from './features/scan/ScanImportModal';
 import type { ScanImportedCellItem } from './features/scan/types';
+import { exportVentanaFromMemory } from './services/excelExportService';
 
 import CatalogsView from './components/views/CatalogsView';
 import CommentsPhotos from './components/views/CommentsPhotos';
@@ -676,10 +677,18 @@ const [connectionLost, setConnectionLost] = useState(false);
     setCaptions(newCaptions);
   };
 
-  const handleExportExcel = () => {
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+  const handleExportExcel = async () => {
     if (!activeWindow) return;
-    const celda = activeWindow.header.celda;
-    window.location.href = `${API_BASE}/api/ventanas/${celda}/exportar`;
+    try {
+      setIsExportingExcel(true);
+      await exportVentanaFromMemory(activeWindow, undefined, API_BASE);
+    } catch (err: any) {
+      console.error('Error al exportar ventana a Excel:', err);
+    } finally {
+      setIsExportingExcel(false);
+    }
   };
 
   const fetchWindows = async (p?: number, ps?: number, dr?: string, searchTerm?: string, isGlobalSearch?: boolean, advFilters?: typeof advancedFilters) => {
@@ -1962,11 +1971,12 @@ const [connectionLost, setConnectionLost] = useState(false);
               {activeWindow && (
                 <button
                   onClick={handleExportExcel}
-                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95 shrink-0"
-                  title="Exportar Mapeo de esta Ventana en Formato Excel DB"
+                  disabled={isExportingExcel}
+                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95 shrink-0 disabled:opacity-50"
+                  title="Exportar Mapeo de esta Ventana en Plantilla Excel"
                 >
-                  <FileSpreadsheet size={14} className="text-emerald-400" />
-                  <span className="hidden md:inline">Exportar</span>
+                  {isExportingExcel ? <Loader2 size={14} className="text-emerald-400 animate-spin" /> : <FileSpreadsheet size={14} className="text-emerald-400" />}
+                  <span className="hidden md:inline">{isExportingExcel ? 'Exportando...' : 'Exportar Excel'}</span>
                 </button>
               )}
 
