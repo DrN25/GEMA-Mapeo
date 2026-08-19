@@ -357,11 +357,12 @@ input[type=number] {
 .light header [class*="text-indigo-700"],
 .light .view-dashboard [class*="text-indigo-700"], .light .view-mapeo [class*="text-indigo-700"], .light .view-modal [class*="text-indigo-700"] { color: #3730a3; }
 .light aside [class*="border-indigo-500/"],
-.light header [class*="border-indigo-500/"],
-.light .view-dashboard [class*="border-indigo-500/"], .light .view-mapeo [class*="border-indigo-500/"], .light .view-modal [class*="border-indigo-500/"] { border-color: #818cf8; }
 .light aside [class*="bg-emerald-500/10"],
 .light header [class*="bg-emerald-500/10"],
-.light .view-dashboard [class*="bg-emerald-500/10"], .light .view-mapeo [class*="bg-emerald-500/10"], .light .view-modal [class*="bg-emerald-500/10"] { background-color: #a7f3d0; }
+.light .view-dashboard [class*="bg-emerald-500/10"], .light .view-mapeo [class*="bg-emerald-500/10"], .light .view-modal [class*="bg-emerald-500/10"],
+.light aside [class*="bg-emerald-500/15"],
+.light header [class*="bg-emerald-500/15"],
+.light .view-dashboard [class*="bg-emerald-500/15"], .light .view-mapeo [class*="bg-emerald-500/15"], .light .view-modal [class*="bg-emerald-500/15"] { background-color: #a7f3d0; }
 .light aside [class*="hover:bg-emerald-500/20"]:hover,
 .light header [class*="hover:bg-emerald-500/20"]:hover,
 .light .view-dashboard [class*="hover:bg-emerald-500/20"], .light .view-mapeo [class*="hover:bg-emerald-500/20"]:hover , .light .view-modal [class*="hover:bg-emerald-500/20"]:hover { background-color: #6ee7b7; }

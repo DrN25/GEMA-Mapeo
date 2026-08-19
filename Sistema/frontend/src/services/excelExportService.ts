@@ -7,6 +7,9 @@
  */
 
 import { getAuthHeaders } from '../utils/apiClient';
+import type { WindowData } from '../utils/diffUtils';
+import { calculateWindowGeomec, suggestGsiVisual } from '../utils/rmrCalculator';
+import { windowFromServerResponse } from '../utils/windowTransform';
 
 const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || (
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -23,6 +26,16 @@ function triggerBlobDownload(blob: Blob, filename: string) {
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+}
+
+function getLocalWindowData(celda: string): WindowData | null {
+  try {
+    const raw = localStorage.getItem(`geolog_window_${celda}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as WindowData;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -98,4 +111,67 @@ export async function exportMultipleVentanas(
   apiBase?: string
 ): Promise<void> {
   return exportVentanaFromMemory({ items }, filename || 'mapeo_ventanas_export.xlsx', apiBase);
+}
+
+/**
+ * Recopila los datos completos de una celda para exportar, siguiendo la jerarquía:
+ * 1. Celda Activa en memoria (React state con GSI Visual en vivo)
+ * 2. Borrador / Cambios locales en LocalStorage (geolog_window_X)
+ * 3. Base de Datos (GET /api/ventanas/X transformado a WindowData)
+ */
+export async function gatherVentanaData(
+  celdaName: string,
+  activeWindow: WindowData | null,
+  apiBase?: string
+): Promise<any> {
+  const up = celdaName.trim().toUpperCase();
+
+  // 1. ¿Es la celda activa actualmente en pantalla?
+  if (activeWindow && activeWindow.header?.celda?.trim().toUpperCase() === up) {
+    const calc = calculateWindowGeomec(activeWindow.header, activeWindow.joints || []);
+    const liveGsi = suggestGsiVisual(calc.rqd_est, calc.condicion_rating_89);
+    return {
+      codigo: up,
+      header: {
+        ...activeWindow.header,
+        gsi_visual: liveGsi ?? activeWindow.header.gsi_visual
+      },
+      joints: activeWindow.joints || []
+    };
+  }
+
+  // 2. ¿Tiene borrador o cambios locales en LocalStorage?
+  const cachedData = getLocalWindowData(up);
+  if (cachedData && cachedData.header) {
+    const calc = calculateWindowGeomec(cachedData.header, cachedData.joints || []);
+    const liveGsi = suggestGsiVisual(calc.rqd_est, calc.condicion_rating_89);
+    return {
+      codigo: up,
+      header: {
+        ...cachedData.header,
+        gsi_visual: liveGsi ?? cachedData.header.gsi_visual
+      },
+      joints: cachedData.joints || []
+    };
+  }
+
+  // 3. Obtener de Base de Datos
+  const base = apiBase || DEFAULT_API_BASE;
+  const url = `${base}/api/ventanas/${encodeURIComponent(up)}`;
+  const resp = await fetch(url, { headers: getAuthHeaders() });
+  if (!resp.ok) {
+    throw new Error(`No se pudo obtener la celda ${up} desde el servidor (${resp.status})`);
+  }
+  const dbJson = await resp.json();
+  const winData = windowFromServerResponse(dbJson);
+  const calc = calculateWindowGeomec(winData.header, winData.joints || []);
+  const liveGsi = suggestGsiVisual(calc.rqd_est, calc.condicion_rating_89);
+  return {
+    codigo: up,
+    header: {
+      ...winData.header,
+      gsi_visual: liveGsi ?? winData.header.gsi_visual
+    },
+    joints: winData.joints || []
+  };
 }

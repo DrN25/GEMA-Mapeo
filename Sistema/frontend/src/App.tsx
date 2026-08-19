@@ -28,6 +28,7 @@ import DiscardModal from './components/modals/DiscardModal';
 import SaveResultModal from './components/modals/SaveResultModal';
 import SaveErrorModal from './components/modals/SaveErrorModal';
 import RenameCellModal from './components/modals/RenameCellModal';
+import ExcelExportModal from './components/modals/ExcelExportModal';
 
 import { fastHashObject, canonicalEqual } from './utils/hashUtils';
 import { getStoredDarkMode, persistTheme } from './utils/theme';
@@ -262,6 +263,7 @@ function AppContent() {
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
+  const [isExportExcelModalOpen, setIsExportExcelModalOpen] = useState<boolean>(false);
 
   // Backend Sync Status
 const [syncStatus, setSyncStatus] = useState<'synced' | 'unsaved' | 'saving' | 'offline'>('synced');
@@ -1982,17 +1984,14 @@ const [connectionLost, setConnectionLost] = useState(false);
                 <span className="hidden md:inline">Catálogo de Ensayos PLT</span>
               </button>
 
-              {activeWindow && (
-                <button
-                  onClick={handleExportExcel}
-                  disabled={isExportingExcel}
-                  className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95 shrink-0 disabled:opacity-50"
-                  title="Exportar Mapeo de esta Ventana en Plantilla Excel"
-                >
-                  {isExportingExcel ? <Loader2 size={14} className="text-emerald-400 animate-spin" /> : <FileSpreadsheet size={14} className="text-emerald-400" />}
-                  <span className="hidden md:inline">{isExportingExcel ? 'Exportando...' : 'Exportar Excel'}</span>
-                </button>
-              )}
+              <button
+                onClick={() => setIsExportExcelModalOpen(true)}
+                className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 hover:border-emerald-400 text-emerald-400 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.12)] active:scale-95 shrink-0"
+                title="Exportar Mapeo a Plantilla Excel (Individual o Lote de Celdas)"
+              >
+                <FileSpreadsheet size={14} className="text-emerald-400" />
+                <span className="hidden md:inline">Exportar Excel</span>
+              </button>
 
               {/* Botón Descartar Cambios: se activa con cambios BD (unsavedCount)
                   O con coordenadas proyectadas locales (proyectadasDirty) */}
@@ -2066,6 +2065,7 @@ const [connectionLost, setConnectionLost] = useState(false);
               onDeleteWindow={handleDeleteWindow}
               onOpenImportModal={() => setIsImportModalOpen(true)}
               onOpenScanModal={() => setIsScanModalOpen(true)}
+              onOpenExportModal={() => setIsExportExcelModalOpen(true)}
             />
           )}
 
@@ -2460,6 +2460,28 @@ const [connectionLost, setConnectionLost] = useState(false);
         currentCelda={activeWindow?.header?.celda || ''}
         existingCeldas={getAllKnownCellNames(windows.map(w => w.name))}
         onRename={handleRenameActiveCelda}
+      />
+
+      {/* Modal de Exportación Excel Multi-Celda */}
+      <ExcelExportModal
+        isOpen={isExportExcelModalOpen}
+        onClose={() => setIsExportExcelModalOpen(false)}
+        windows={windows}
+        loading={loading}
+        page={page}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        totalFiltered={totalFiltered}
+        pendingCells={pendingCellSummaries}
+        pendingCellNames={pendingCellNames}
+        activeDateRange={activeDateRange}
+        advancedFilters={advancedFilters}
+        onFilterChange={handleFilterChange}
+        onAdvancedFilterChange={handleAdvancedFilterChange}
+        onClearAdvancedFilters={handleClearAdvancedFilters}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        activeWindow={activeWindow}
       />
 
       {/* Glassmorphic UI Loading Lock Overlay */}
