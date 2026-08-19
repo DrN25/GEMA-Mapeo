@@ -415,37 +415,67 @@ def _fill_sheet_ventana_block(
             for col_letter in aux_fill_formulas_template.keys():
                 ws[f"{col_letter}{curr_row}"] = None
 
-    # Normalizar contornos y bordes en cajas laterales AJ..BB y BD..BT
-    last_struct_row = start_struct_row + total_struct_slots - 1
-    for slot_r in range(start_struct_row, last_struct_row + 1):
-        is_last = (slot_r == last_struct_row)
+        # Asegurar color de texto blanco en columna AI para todas las filas de estructuras (activas, inactivas o vacías)
+        ws[f"AI{curr_row}"].font = openpyxl.styles.Font(name="Arial", size=7.0, color="FFFFFFFF")
 
-        # Caja RMR (columnas AJ a BB): borde izquierdo en AJ, borde derecho en BB
-        for col_idx in range(openpyxl.utils.column_index_from_string("AJ"), openpyxl.utils.column_index_from_string("BB") + 1):
-            col_let = openpyxl.utils.get_column_letter(col_idx)
-            cell = ws[f"{col_let}{slot_r}"]
-            left_s = "medium" if col_let == "AJ" else None
-            right_s = "medium" if col_let == "BB" else None
-            bottom_s = "medium" if is_last else None
-            cell.border = openpyxl.styles.Border(
-                left=openpyxl.styles.Side(style=left_s) if left_s else None,
-                right=openpyxl.styles.Side(style=right_s) if right_s else None,
-                top=None,
-                bottom=openpyxl.styles.Side(style=bottom_s) if bottom_s else None,
+    # Normalizar contornos y bordes en cajas laterales AJ..BB y BD..BT respetando la plantilla
+    # 1. Caja Foto / Esquema (BD..BT, filas base_row + 1 a base_row + 15 -> ej. 5 a 19): contorno NEGRO MEDIO
+    photo_top = base_row + 1
+    photo_bottom = base_row + 15
+    for r in range(photo_top, photo_bottom + 1):
+        is_top = (r == photo_top)
+        is_bottom = (r == photo_bottom)
+        for c_idx in range(openpyxl.utils.column_index_from_string("BD"), openpyxl.utils.column_index_from_string("BT") + 1):
+            col_let = openpyxl.utils.get_column_letter(c_idx)
+            is_left = (col_let == "BD")
+            is_right = (col_let == "BT")
+            ws[f"{col_let}{r}"].border = openpyxl.styles.Border(
+                left=openpyxl.styles.Side(style="medium") if is_left else None,
+                right=openpyxl.styles.Side(style="medium") if is_right else None,
+                top=openpyxl.styles.Side(style="medium") if is_top else None,
+                bottom=openpyxl.styles.Side(style="medium") if is_bottom else None
             )
 
-        # Caja Leyenda/Notas (columnas BD a BT): borde izquierdo punteado en BD, borde derecho en BT
-        for col_idx in range(openpyxl.utils.column_index_from_string("BD"), openpyxl.utils.column_index_from_string("BT") + 1):
-            col_let = openpyxl.utils.get_column_letter(col_idx)
-            cell = ws[f"{col_let}{slot_r}"]
-            left_s = "dotted" if col_let == "BD" else None
-            right_s = "dotted" if col_let == "BT" else None
-            bottom_s = "dotted" if is_last else None
-            cell.border = openpyxl.styles.Border(
-                left=openpyxl.styles.Side(style=left_s) if left_s else None,
-                right=openpyxl.styles.Side(style=right_s) if right_s else None,
-                top=None,
-                bottom=openpyxl.styles.Side(style=bottom_s) if bottom_s else None,
+    # 2. Caja Comentarios (BD..BT, filas base_row + 17 a base_row + 24 + extra_struct_rows -> ej. 21 a 28): contorno PUNTEADO
+    coment_top = base_row + 17
+    coment_bottom = base_row + 24 + extra_struct_rows
+    for r in range(coment_top, coment_bottom + 1):
+        is_top = (r == coment_top)
+        is_bottom = (r == coment_bottom)
+        for c_idx in range(openpyxl.utils.column_index_from_string("BD"), openpyxl.utils.column_index_from_string("BT") + 1):
+            col_let = openpyxl.utils.get_column_letter(c_idx)
+            is_left = (col_let == "BD")
+            is_right = (col_let == "BT")
+            if r == coment_top and is_left:
+                ws[f"{col_let}{r}"].border = openpyxl.styles.Border(
+                    left=openpyxl.styles.Side(style="dotted"),
+                    right=openpyxl.styles.Side(style="dotted"),
+                    top=openpyxl.styles.Side(style="dotted"),
+                    bottom=openpyxl.styles.Side(style="dotted")
+                )
+            else:
+                ws[f"{col_let}{r}"].border = openpyxl.styles.Border(
+                    left=openpyxl.styles.Side(style="dotted") if is_left else None,
+                    right=openpyxl.styles.Side(style="dotted") if is_right else None,
+                    top=openpyxl.styles.Side(style="dotted") if is_top else None,
+                    bottom=openpyxl.styles.Side(style="dotted") if is_bottom else None
+                )
+
+    # 3. Caja RMR (AJ..BB, filas base_row + 9 a base_row + 24 + extra_struct_rows -> ej. 13 a 28): contorno NEGRO MEDIO
+    rmr_top = base_row + 9
+    rmr_bottom = base_row + 24 + extra_struct_rows
+    for r in range(rmr_top, rmr_bottom + 1):
+        is_top = (r == rmr_top)
+        is_bottom = (r == rmr_bottom)
+        for c_idx in range(openpyxl.utils.column_index_from_string("AJ"), openpyxl.utils.column_index_from_string("BB") + 1):
+            col_let = openpyxl.utils.get_column_letter(c_idx)
+            is_left = (col_let == "AJ")
+            is_right = (col_let == "BB")
+            ws[f"{col_let}{r}"].border = openpyxl.styles.Border(
+                left=openpyxl.styles.Side(style="medium") if is_left else None,
+                right=openpyxl.styles.Side(style="medium") if is_right else None,
+                top=openpyxl.styles.Side(style="medium") if is_top else None,
+                bottom=openpyxl.styles.Side(style="medium") if is_bottom else None
             )
 
     # =========================================================================
@@ -579,7 +609,7 @@ def _populate_sheet_bd(ws_bd: Worksheet, ventanas_meta: List[Dict[str, Any]]):
                 ws_bd[f"AP{r}"] = base_v_row + 8     # RMR 89 AJ{AP}..AZ{AP}
                 ws_bd[f"BF{r}"] = base_v_row         # Fecha AK{BF}
                 ws_bd[f"BH{r}"] = base_v_row + 17    # Comentarios BD{BH}
-                ws_bd[f"CF{r}"] = base_v_row + 1     # Alteración V{CF}
+                ws_bd[f"CF{r}"] = base_v_row + 4     # Mapeador / Geotécnico P{CF}
                 ws_bd[f"CH{r}"] = base_v_row + 7     # Is50 BB{CH}
                 ws_bd[f"CJ{r}"] = base_v_row + 3     # Lito Modelo P{CJ}
                 ws_bd[f"CL{r}"] = base_v_row         # Lito-3 P{CL}
@@ -636,7 +666,7 @@ def _populate_sheet_bd(ws_bd: Worksheet, ventanas_meta: List[Dict[str, Any]]):
                 ws_bd[f"BE{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!AZ"&AP{r})'
                 ws_bd[f"BG{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!AK"&BF{r})'
                 ws_bd[f"BI{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!BD"&BH{r})'
-                ws_bd[f"CG{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!V"&CF{r})'
+                ws_bd[f"CG{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!P"&CF{r})'
                 ws_bd[f"CI{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!BB"&CH{r})'
                 ws_bd[f"CK{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!P"&CJ{r})'
                 ws_bd[f"CM{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!P"&CL{r})'
@@ -660,7 +690,7 @@ def _populate_sheet_bd(ws_bd: Worksheet, ventanas_meta: List[Dict[str, Any]]):
             # =================================================================
             ws_bd[f"BJ{r}"] = struct_v_row
             ws_bd[f"BK{r}"] = f'=INDIRECT("\'" & "ventana" & "\'!B"&BJ{r})'
-            ws_bd[f"BL{r}"] = f'=_xlfn.ACOT((J{r}-F{r})/(K{r}-G{r}))'
+            ws_bd[f"BL{r}"] = f'=_xlfn.ACOT((K{r}-G{r})/(J{r}-F{r}))'
             ws_bd[f"BM{r}"] = f'=IF(L{r}=H{r},0,_xlfn.ACOT((J{r}-F{r})/(L{r}-H{r})))'
             ws_bd[f"BN{r}"] = f'=BK{r}*COS(BL{r})+F{r}'
             ws_bd[f"BO{r}"] = f'=BK{r}*SIN(BL{r})+G{r}'
