@@ -27,4 +27,8 @@ Write-Host "`n=== 5/5 Test de helpers de import PLT (agrupación y re-etiquetado
 & node (Join-Path $root "test_plt_import.mjs")
 if ($LASTEXITCODE -ne 0) { Write-Host "FALLO en test_plt_import.mjs" -ForegroundColor Red; exit 1 }
 
+Write-Host "`n=== 6/6 Test de Coordenadas PROYECTADAS (solo locales) ===" -ForegroundColor Cyan
+& node (Join-Path $root "test_proyectadas.mjs")
+if ($LASTEXITCODE -ne 0) { Write-Host "FALLO en test_proyectadas.mjs" -ForegroundColor Red; exit 1 }
+
 Write-Host "`nTodos los tests pasaron OK" -ForegroundColor Green

@@ -53,3 +53,7 @@ cloudflared.exe
 
 # Cache de tests
 tests/.cache/
+
+# Scripts y configs temporales de verificación
+frontend/scripts/
+frontend/tsconfig.verify.json

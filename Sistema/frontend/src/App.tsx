@@ -683,7 +683,21 @@ const [connectionLost, setConnectionLost] = useState(false);
     if (!activeWindow) return;
     try {
       setIsExportingExcel(true);
-      await exportVentanaFromMemory(activeWindow, undefined, API_BASE);
+      const liveGsi = GSI_VISUAL_AUTO && calculated
+        ? (suggestGsiVisual(calculated.rqd_est, calculated.condicion_rating_89) ?? activeWindow.header.gsi_visual)
+        : activeWindow.header.gsi_visual;
+
+      const exportData = {
+        codigo: activeWindow.header.celda || 'VENTANA',
+        header: {
+          ...activeWindow.header,
+          gsi_visual: liveGsi,
+          gsi_visual_rmr76: liveGsi,
+          gsi_visual_rmr89: liveGsi,
+        },
+        joints: activeWindow.joints,
+      };
+      await exportVentanaFromMemory(exportData, undefined, API_BASE);
     } catch (err: any) {
       console.error('Error al exportar ventana a Excel:', err);
     } finally {

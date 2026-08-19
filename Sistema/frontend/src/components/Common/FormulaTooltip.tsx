@@ -42,7 +42,8 @@ export const COLUMN_NAMES = {
     rqd_rating_r89: "RQD Valor (R89)",
     rqd_rating_r76: "RQD Valor (R76)",
     rqd_est: "RQD (%)",
-    jv: "Frec. Frac. (Jv)",
+    jv: "Índice Volumétrico (Jv)",
+    frecuencia_fracturamiento: "Frec. Fracturamiento (x m)",
     block_size: "Tam. Bloque",
     global_spacing: "Espac. Prom",
     spacing_rating_r89: "Espac. Val (R89)",
@@ -279,9 +280,20 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
     jv: {
         title: `Índice Volumétrico de Juntas (Jv)`,
         equation: `Jv = 1/Prom1 + 1/Prom2 + ... + 1/PromN`,
-        description: "Suma de las inversas del espaciamiento promedio de cada familia de discontinuidades mapeada.",
+        description: "Suma de las inversas del espaciamiento promedio de cada familia de discontinuidades mapeada (utilizado para estimar RQD = 115 - 3.3 * Jv).",
         inputs: [COLUMN_NAMES.espac_prom],
-        calcExplanation: (params) => `Jv total: ${params?.val !== undefined ? params.val.toFixed(2) : '—'}`
+        calcExplanation: (params) => `Jv total: ${params?.val !== undefined ? params.val.toFixed(4) : '—'}`
+    },
+    frecuencia_fracturamiento: {
+        title: `Frecuencia de Fracturamiento (x m)`,
+        equation: `Frecuencia = (1 / Espaciamiento_prom) + 1`,
+        description: "Frecuencia de fracturas por metro lineal calculada mediante la fórmula =(1/Espaciamiento_prom)+1 (equivalente a =(1/AW11)+1 en Excel).",
+        inputs: [COLUMN_NAMES.global_spacing],
+        calcExplanation: (params) => {
+            if (!params) return "";
+            const { spacing, val } = params;
+            return `Espaciamiento prom: ${spacing !== undefined ? `${Number(spacing).toFixed(2)} m` : '—'} ➔ (1 / ${spacing !== undefined ? Number(spacing).toFixed(2) : '0'}) + 1 = ${val !== undefined ? Number(val).toFixed(2) : '—'}`;
+        }
     },
     block_size: {
         title: `Tamaño de Bloque (m³)`,

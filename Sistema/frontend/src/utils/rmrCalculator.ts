@@ -124,6 +124,7 @@ export interface CalculatorResult {
   dip_dir_talud: number;
   familias_spacing: Record<number, number>;
   jv: number;
+  frecuencia_fracturamiento: number;
   rqd_est: number;
   rqd_rating_76: number;
   rqd_rating_89: number;
@@ -469,6 +470,8 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
   const rmr_76 = (!hasStructures && !hasWater && !hasStrength) ? 0 : ucs_rating_76 + rqd_rating_76 + spacing_rating_76 + condicion_rating_76 + water_rating_76;
   const rmr_89 = (!hasStructures && !hasWater && !hasStrength) ? 0 : ucs_rating_89 + rqd_rating_89 + spacing_rating_89 + condicion_rating_89 + water_rating_89;
 
+  const frecuencia_fracturamiento = global_spacing > 0 ? Math.round(((1 / global_spacing) + 1) * 100) / 100 : 0;
+
   return {
     largo,
     dip_hole,
@@ -476,6 +479,7 @@ export function calculateWindowGeomec(header: WindowHeader, joints: JointRow[]):
     dip_dir_talud,
     familias_spacing,
     jv,
+    frecuencia_fracturamiento,
     rqd_est: Math.round(rqd_est * 100) / 100,
     rqd_rating_76,
     rqd_rating_89,

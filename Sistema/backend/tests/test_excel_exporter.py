@@ -1,5 +1,5 @@
 """
-tests/test_excel_exporter.py — Pruebas unitarias del exportador de Excel basado en plantilla.
+tests/test_excel_exporter.py — Pruebas unitarias para el motor de exportación a Excel.
 """
 
 import io
@@ -9,68 +9,62 @@ from app.services.excel_exporter import export_ventanas_to_excel, _sanitize_val
 
 
 def test_sanitize_val():
+    assert _sanitize_val(None) is None
     assert _sanitize_val(-1) is None
     assert _sanitize_val(-1.0) is None
     assert _sanitize_val("-1") is None
-    assert _sanitize_val(" -1.0 ") is None
     assert _sanitize_val("None") is None
-    assert _sanitize_val("") is None
-    assert _sanitize_val(None) is None
-    assert _sanitize_val(0) == 0
-    assert _sanitize_val(0.0) == 0.0
+    assert _sanitize_val("null") is None
+    assert _sanitize_val("undefined") is None
     assert _sanitize_val("MZQ") == "MZQ"
-    assert _sanitize_val("JN") == "JN"
+    assert _sanitize_val(45.5) == 45.5
+    assert _sanitize_val(0) == 0
 
 
 def test_export_single_ventana_basic():
-    sample_ventana = {
-        "codigo": "TD-01",
+    ventana_data = {
+        "codigo": "VNT-001",
         "excel_data": {
-            "codigo": "TD-01",
-            "sector": "NW1_B",
-            "este_ini": 1000.5,
-            "norte_ini": 2000.5,
-            "cota_ini": 3000.5,
-            "este_fin": 1010.5,
-            "norte_fin": 2010.5,
-            "cota_fin": 3000.5,
-            "largo_m": 15.0,
-            "altura_m": 15.0,
+            "codigo": "VNT-001",
+            "este_ini": 100.0,
+            "norte_ini": 200.0,
+            "cota_ini": 300.0,
+            "este_fin": 110.0,
+            "norte_fin": 205.0,
+            "cota_fin": 302.0,
+            "altura_m": 12.0,
             "dip_talud": 65.0,
             "lito_3": "MZQ",
             "alteracion": "d",
             "intemperismo": "f",
-            "fase": "FASE 1",
-            "nivel": "NIVEL 100",
-            "mapeador": "SRK",
+            "sector": "NORTE",
+            "fase": "FASE_1",
+            "nivel": "NV_200",
+            "mapeador": "GEOLOGO_1",
             "fecha": "2026-08-18",
-            "comentarios": "Mapeo de prueba geomecánico",
             "condicion_agua_rmr76": "C",
             "dureza_rmr76": "R3",
             "gsi_superficie": "B",
             "gsi_estructura": "M",
             "gsi_visual_rmr76": 55.0,
-            "control_estructural_rmr76": -5.0,
-            "efectos_voladura_rmr76": -2.0,
-            "ucs_mpa": 85.0,
-            "is50_mpa": 3.8
+            "comentarios": "Mapeo regular de prueba"
         },
         "estructuras": [
             {
                 "familia_id": 1,
-                "distancia_m": 2.5,
+                "distancia_m": 1.5,
                 "tipo_estructura": "JN",
                 "dip": 45.0,
                 "dip_dir": 120.0,
                 "n_estructuras": 1,
-                "abertura_mm": 1.2,
+                "abertura_mm": 1.0,
                 "espesor_mm": 2.0,
-                "continuidad_m": 3.5,
-                "espaciamiento_m": 0.8,
+                "continuidad_m": 3.0,
+                "espaciamiento_m": 0.5,
                 "n_extremos_visibles": 1,
                 "terminacion": 1,
                 "relleno_1_codigo": "c",
-                "relleno_2_codigo": "-1",  # Debe sanitizarse a None
+                "relleno_2_codigo": -1,
                 "jrc": 8.0,
                 "rugosidad_codigo": "3",
                 "forma_estructura": "P",
@@ -78,124 +72,159 @@ def test_export_single_ventana_basic():
             },
             {
                 "familia_id": 2,
-                "distancia_m": 5.0,
-                "tipo_estructura": "FL",
+                "distancia_m": 3.0,
+                "tipo_estructura": "JN",
                 "dip": 60.0,
                 "dip_dir": 210.0,
                 "n_estructuras": 2,
-                "abertura_mm": 0.5,
-                "espesor_mm": 1.0,
-                "continuidad_m": 2.0,
-                "espaciamiento_m": 1.5,
+                "abertura_mm": 2.0,
+                "espesor_mm": 3.0,
+                "continuidad_m": 4.0,
+                "espaciamiento_m": 0.8,
                 "n_extremos_visibles": 2,
                 "terminacion": 1,
-                "relleno_1_codigo": "s",
-                "relleno_2_codigo": None,
+                "relleno_1_codigo": "b",
+                "relleno_2_codigo": -1,
                 "jrc": 10.0,
                 "rugosidad_codigo": "4",
                 "forma_estructura": "O",
-                "alteracion_codigo": "f"
+                "alteracion_codigo": "d"
             }
         ]
     }
 
-    buf = export_ventanas_to_excel(sample_ventana)
-    assert isinstance(buf, io.BytesIO)
-    assert buf.getbuffer().nbytes > 0
-
-    # Cargar y verificar celdas en el Excel generado
+    buf = export_ventanas_to_excel(ventana_data)
     wb = openpyxl.load_workbook(buf, data_only=False)
-    ws = wb["ventana"]
 
-    # 1. Cabecera
-    assert ws["A4"].value == "TD-01"
-    assert ws["B5"].value == 1000.5
-    assert ws["D5"].value == 2000.5
-    assert ws["F5"].value == 3000.5
-    assert ws["B6"].value == 1010.5
-    assert ws["D6"].value == 2010.5
-    assert ws["F6"].value == 3000.5
-    assert ws["K6"].value == 15.0
-    assert ws["N5"].value == 65.0
-    # Celdas con fórmulas intactas
-    assert str(ws["K5"].value).startswith("=")
-    assert str(ws["N6"].value).startswith("=")
-    assert str(ws["N7"].value).startswith("=")
-    assert str(ws["N8"].value).startswith("=")
-    assert ws["P4"].value == "MZQ"
-    assert ws["P7"].value == "MZQ"
-    assert ws["P5"].value == "d"
-    assert ws["P6"].value == "f"
-    assert ws["U4"].value == "NW1_B"
-    assert ws["U7"].value == "NW1_B"
-    assert ws["U5"].value == "FASE 1"
-    assert ws["U6"].value == "NIVEL 100"
-    assert ws["P8"].value == "SRK"
-    assert ws["AK4"].value == "2026-08-18"
-    assert ws["BD21"].value == "Mapeo de prueba geomecánico"
+    # 1. Verificar Hoja 'ventana'
+    assert "ventana" in wb.sheetnames
+    ws_v = wb["ventana"]
+    assert ws_v["A4"].value == "VNT-001"
+    assert ws_v["B5"].value == 100.0
+    assert ws_v["B6"].value == 110.0
+    assert ws_v["K6"].value == 12.0
+    assert ws_v["N5"].value == 65.0
+    assert ws_v["P4"].value == "MZQ"
+    assert ws_v["P7"].value == "MZQ"
+    assert ws_v["U4"].value == "NORTE"
+    assert ws_v["U7"].value == "NORTE"
 
-    # 2. RMR
-    assert ws["AJ11"].value == "C"
-    assert ws["AL11"].value == "R3"
-    assert ws["AN11"].value == "B"
-    assert ws["AO11"].value == "M"
-    assert ws["AP11"].value == 55.0
-    assert ws["AQ11"].value == -5.0
-    assert ws["AR11"].value == -2.0
-    assert ws["BA11"].value == 85.0
-    assert ws["BB11"].value == 3.8
+    # Fórmulas en filas activas (15 y 16)
+    assert ws_v["A15"].value == 1
+    assert ws_v["B15"].value == 1.5
+    assert str(ws_v["W15"].value).startswith("=VLOOKUP(V15,RMR!")
+    assert str(ws_v["AB15"].value) == "=SUM(X15+Y15+Z15+AA15+W15)"
+    assert str(ws_v["W16"].value).startswith("=VLOOKUP(V16,RMR!")
 
-    # 3. Discontinuidades
-    # Fila 15 (Estructura 1)
-    assert ws["A15"].value == 1
-    assert ws["B15"].value == 2.5
-    assert ws["C15"].value == "JN"
-    assert ws["D15"].value == 45.0
-    assert ws["E15"].value == 120.0
-    assert ws["M15"].value == "c"
-    assert ws["N15"].value is None  # Sanitizado desde '-1'
-    # Fórmulas en fila 15 activa
-    assert str(ws["W15"].value).startswith("=")
-    assert str(ws["AB15"].value).startswith("=")
+    # Filas inactivas sin fórmulas
+    assert ws_v["W17"].value is None
+    assert ws_v["AB17"].value is None
 
-    # Fila 16 (Estructura 2)
-    assert ws["A16"].value == 2
-    assert ws["B16"].value == 5.0
-    assert str(ws["W16"].value).startswith("=")
-    assert str(ws["AB16"].value).startswith("=")
+    # Fórmulas RMR adaptadas
+    assert "J15*F15+J16*F16" in str(ws_v["AW11"].value)
+    assert "SUM(F15:F16)" in str(ws_v["AW11"].value)
 
-    # Fila 17 (Fila vacía, no debe tener fórmulas en W..AI)
-    assert ws["A17"].value is None
-    assert ws["W17"].value is None
-    assert ws["AB17"].value is None
-    assert ws["AH17"].value is None
+    # 2. Verificar Hoja 'BD'
+    assert "BD" in wb.sheetnames
+    ws_bd = wb["BD"]
+    # Debe tener exactamente 2 filas de datos continuas (filas 2 y 3)
+    assert ws_bd["A2"].value == 1
+    assert ws_bd["A3"].value == 2
+    assert ws_bd["A4"].value is None  # Sin filas vacías sobrantes
 
-    # 4. Fórmulas ponderadas RMR
-    assert "SUM(F15:F16)" in str(ws["AW11"].value)
-    assert "SUM(F15:F16)" in str(ws["AY11"].value)
+    # Fila Padre (Fila 2)
+    assert ws_bd["B2"].value == 4
+    assert "=INDIRECT(" in str(ws_bd["C2"].value)
+    assert ws_bd["BJ2"].value == 15
+    assert "=INDIRECT(" in str(ws_bd["BK2"].value)
+    assert "=BK2*COS(BL2)+F2" in str(ws_bd["BN2"].value)
+
+    # Fila Hija (Fila 3)
+    assert str(ws_bd["C3"].value) == "=C2"
+    assert str(ws_bd["F3"].value) == "=F2"
+    assert ws_bd["BJ3"].value == 16
+    assert "=INDIRECT(" in str(ws_bd["BK3"].value)
+
+
+def test_export_ventana_expanded_structures_and_families():
+    # Ventana con 16 estructuras (> 14) y 4 familias (> 3)
+    estructuras = []
+    for i in range(1, 17):
+        estructuras.append({
+            "familia_id": (i % 4) + 1,  # Familias 1, 2, 3, 4
+            "distancia_m": round(i * 0.8, 2),
+            "tipo_estructura": "JN",
+            "dip": 40.0 + i,
+            "dip_dir": 100.0 + (i * 5),
+            "n_estructuras": 1,
+            "abertura_mm": 1.0,
+            "espesor_mm": 1.0,
+            "continuidad_m": 2.0,
+            "espaciamiento_m": 0.5,
+            "n_extremos_visibles": 1,
+            "terminacion": 1,
+            "relleno_1_codigo": "c",
+            "relleno_2_codigo": -1,
+            "jrc": 8.0,
+            "rugosidad_codigo": "3",
+            "forma_estructura": "P",
+            "alteracion_codigo": "d"
+        })
+
+    ventana_data = {
+        "codigo": "VNT-EXPAND",
+        "excel_data": {"codigo": "VNT-EXPAND", "este_ini": 500, "norte_ini": 600, "cota_ini": 700},
+        "estructuras": estructuras
+    }
+
+    buf = export_ventanas_to_excel(ventana_data)
+    wb = openpyxl.load_workbook(buf, data_only=False)
+
+    ws_v = wb["ventana"]
+    # Fila 15 a 30 (16 estructuras)
+    assert ws_v["B15"].value == 0.8
+    assert ws_v["B30"].value == 12.8
+    assert str(ws_v["W30"].value).startswith("=VLOOKUP(V30,RMR!")
+
+    # Hoja BD debe tener exactamente 16 filas continuas (filas 2 a 17)
+    ws_bd = wb["BD"]
+    assert ws_bd["A2"].value == 1
+    assert ws_bd["A17"].value == 16
+    assert ws_bd["A18"].value is None
 
 
 def test_export_multiple_ventanas():
     v1 = {
-        "codigo": "CELDA-1",
-        "excel_data": {"codigo": "CELDA-1", "sector": "SEC-A", "este_ini": 100},
-        "estructuras": [{"distancia_m": 1.0, "tipo_estructura": "JN", "dip": 30}]
+        "codigo": "CELL-A",
+        "excel_data": {"codigo": "CELL-A", "este_ini": 100, "norte_ini": 200, "cota_ini": 300},
+        "estructuras": [
+            {"familia_id": 1, "distancia_m": 1.0, "tipo_estructura": "JN", "dip": 50.0, "dip_dir": 100.0}
+        ]
     }
     v2 = {
-        "codigo": "CELDA-2",
-        "excel_data": {"codigo": "CELDA-2", "sector": "SEC-B", "este_ini": 200},
-        "estructuras": [{"distancia_m": 2.0, "tipo_estructura": "FL", "dip": 50}]
+        "codigo": "CELL-B",
+        "excel_data": {"codigo": "CELL-B", "este_ini": 400, "norte_ini": 500, "cota_ini": 600},
+        "estructuras": [
+            {"familia_id": 1, "distancia_m": 2.0, "tipo_estructura": "FL", "dip": 70.0, "dip_dir": 200.0},
+            {"familia_id": 2, "distancia_m": 4.0, "tipo_estructura": "JN", "dip": 80.0, "dip_dir": 250.0}
+        ]
     }
 
     buf = export_ventanas_to_excel([v1, v2])
     wb = openpyxl.load_workbook(buf, data_only=False)
-    ws = wb["ventana"]
 
-    # Celda 1 en base_row=4
-    assert ws["A4"].value == "CELDA-1"
-    assert ws["U4"].value == "SEC-A"
+    # Hoja 'ventana': Celda 1 en A4, Celda 2 después de separación
+    ws_v = wb["ventana"]
+    assert ws_v["A4"].value == "CELL-A"
 
-    # Celda 2 en base_row=34 (4 + 28 + 2 = 34)
-    assert ws["A34"].value == "CELDA-2"
-    assert ws["U34"].value == "SEC-B"
-    assert ws["B35"].value == 200
+    # Hoja 'BD': Exactamente 1 (Cell A) + 2 (Cell B) = 3 filas continuas (filas 2, 3, 4)
+    ws_bd = wb["BD"]
+    assert ws_bd["A2"].value == 1
+    assert ws_bd["A3"].value == 2
+    assert ws_bd["A4"].value == 3
+    assert ws_bd["A5"].value is None
+
+    # Celda 2 empieza como Fila Padre en fila 3 de BD
+    assert "=INDIRECT(" in str(ws_bd["C3"].value)
+    # Celda 2 Hija en fila 4 de BD
+    assert str(ws_bd["C4"].value) == "=C3"

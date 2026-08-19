@@ -404,7 +404,7 @@ export default function RmrAnalysis({
               <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.efectos_voladura_short}</th>
               <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.rqd_valor_sub}</th>
               <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.rqd_est}</th>
-              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.jv}</th>
+              <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.frecuencia_fracturamiento}</th>
               <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.block_size}</th>
               <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.global_spacing}</th>
               <th className="py-3 px-2 text-center border-r border-b border-navy-800/80 bg-navy-900/20">{COLUMN_LABELS.espac_val_sub}</th>
@@ -450,8 +450,8 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
-                <FormulaTooltipTrigger formulaId="jv" params={{ val: calculated.jv }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(4) : '0.0000'}</span>
+                <FormulaTooltipTrigger formulaId="frecuencia_fracturamiento" params={{ spacing: calculated.global_spacing, val: calculated.frecuencia_fracturamiento }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.frecuencia_fracturamiento > 0 ? calculated.frecuencia_fracturamiento.toFixed(2) : '0.00'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
@@ -514,6 +514,7 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiCond}</td>
+              <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">{gsiEstruc}</td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80">
                 <FormulaTooltipTrigger
                   formulaId="gsi_visual"
@@ -547,8 +548,8 @@ export default function RmrAnalysis({
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">
-                <FormulaTooltipTrigger formulaId="jv" params={{ val: calculated.jv }} position="bottom" enabled={showFormulas}>
-                  <span>{calculated.jv > 0 ? calculated.jv.toFixed(4) : '0.0000'}</span>
+                <FormulaTooltipTrigger formulaId="frecuencia_fracturamiento" params={{ spacing: calculated.global_spacing, val: calculated.frecuencia_fracturamiento }} position="bottom" enabled={showFormulas}>
+                  <span>{calculated.frecuencia_fracturamiento > 0 ? calculated.frecuencia_fracturamiento.toFixed(2) : '0.00'}</span>
                 </FormulaTooltipTrigger>
               </td>
               <td className="py-3 px-2 text-center border-r border-b border-navy-800/80 font-mono text-slate-400">

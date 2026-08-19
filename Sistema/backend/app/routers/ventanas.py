@@ -455,10 +455,9 @@ def calculate_and_persist_subratings(db: Session, v: models.Ventana):
     v.resistencia_estimada_valor_rmr89 = res["resist_r89"]
     v.rqd_valor_rmr76 = res["rqd_r76"]
     v.rqd_valor_rmr89 = res["rqd_r89"]
-    v.rqd_rmr76 = res["rqd_pct"]
-    v.rqd_rmr89 = res["rqd_pct"]
-    v.frecuencia_fracturamiento_rmr76 = res["jv"]
-    v.frecuencia_fracturamiento_rmr89 = res["jv"]
+    frec_frac = round((1.0 / res["espac_prom"]) + 1.0, 2) if res.get("espac_prom") and res["espac_prom"] > 0 else 0.0
+    v.frecuencia_fracturamiento_rmr76 = frec_frac
+    v.frecuencia_fracturamiento_rmr89 = frec_frac
     v.espaciamiento_promedio_rmr76 = res["espac_prom"]
     v.espaciamiento_promedio_rmr89 = res["espac_prom"]
     v.espaciamiento_valor_rmr76 = res["spacing_r76"]
