@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, ChevronDown } from 'lucide-react';
+import { Filter, ChevronDown, Trash2 } from 'lucide-react';
 import { limitNumberWithMax } from '../../utils/inputLimits';
 
 export interface AdvancedFiltersState {
@@ -235,9 +235,11 @@ export const CellFilters: React.FC<CellFiltersProps> = ({
               {hasAdvancedFilters && (
                 <button
                   onClick={onClearAdvancedFilters}
-                  className="px-3 py-1.5 rounded-lg border border-navy-700 text-slate-500 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95 text-xs font-bold"
+                  className="flex items-center gap-1.5 text-xs font-bold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 px-3 py-1.5 rounded-lg transition-all active:scale-95 shadow-sm"
+                  title="Limpiar todos los filtros avanzados"
                 >
-                  Limpiar filtros
+                  <Trash2 size={13} />
+                  <span>Limpiar filtros</span>
                 </button>
               )}
               <button

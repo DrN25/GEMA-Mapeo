@@ -132,10 +132,10 @@ export const CellTable: React.FC<CellTableProps> = ({
                   {isSelectMode ? (
                     <button
                       onClick={() => onToggleSelectCell && onToggleSelectCell(pc.name)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 mx-auto active:scale-95 ${
+                      className={`font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1.5 mx-auto ${
                         selected
-                          ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-rose-500/20 hover:border-rose-500/50 hover:text-rose-400'
-                          : 'bg-navy-800/80 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-400 border border-navy-700/80 hover:border-emerald-500/40'
+                          ? 'bg-rose-500/15 border border-rose-500/40 text-rose-400 hover:bg-rose-500/25 hover:border-rose-400 hover:text-rose-300'
+                          : 'bg-emerald-600/15 border border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/25 hover:border-emerald-500 hover:text-emerald-300'
                       }`}
                     >
                       {selected ? (
@@ -222,10 +222,10 @@ export const CellTable: React.FC<CellTableProps> = ({
                   {isSelectMode ? (
                     <button
                       onClick={() => onToggleSelectCell && onToggleSelectCell(w.name)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 mx-auto active:scale-95 ${
+                      className={`font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1.5 mx-auto ${
                         selected
-                          ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-rose-500/20 hover:border-rose-500/50 hover:text-rose-400'
-                          : 'bg-navy-800/80 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-400 border border-navy-700/80 hover:border-emerald-500/40'
+                          ? 'bg-rose-500/15 border border-rose-500/40 text-rose-400 hover:bg-rose-500/25 hover:border-rose-400 hover:text-rose-300'
+                          : 'bg-emerald-600/15 border border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/25 hover:border-emerald-500 hover:text-emerald-300'
                       }`}
                     >
                       {selected ? (

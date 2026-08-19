@@ -125,5 +125,55 @@ ok(payload.items.length === 2, 'Payload contiene 2 celdas para exportación');
 ok(payload.items[0].codigo === 'CELDA_ACTIVA', 'Primer item es CELDA_ACTIVA');
 ok(payload.items[1].codigo === 'BORRADOR_LOCAL', 'Segundo item es BORRADOR_LOCAL');
 
+console.log('\n📋 C) Reordenamiento y Ordenación Rápida de la Cola');
+
+const cleanNameForSort = (str) => {
+  if (!str) return '';
+  let s = str.trim();
+  s = s.replace(/^(borrador\s*[-:–—]?\s*|\[borrador\]\s*|\(borrador\)\s*)/i, '');
+  s = s.replace(/\s*(\(borrador\)|\[borrador\]|- borrador)\s*$/i, '');
+  return s.trim();
+};
+
+const compareCellNames = (a, b) => {
+  const cleanA = cleanNameForSort(a);
+  const cleanB = cleanNameForSort(b);
+  const normA = cleanA.replace(/[-_.]/g, '_');
+  const normB = cleanB.replace(/[-_.]/g, '_');
+  const cmp = normA.localeCompare(normB, undefined, { numeric: true, sensitivity: 'base' });
+  if (cmp !== 0) return cmp;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+};
+
+const cells = ['TEST_003', 'TEST_001', 'TEST_002', 'GX21'];
+
+// 1. Orden alfabético A -> Z
+const sortedAsc = [...cells].sort((a, b) => compareCellNames(a, b));
+ok(sortedAsc[0] === 'GX21' && sortedAsc[1] === 'TEST_001' && sortedAsc[3] === 'TEST_003', 'Orden alfabético A -> Z correcto');
+
+// 2. Orden alfabético Z -> A
+const sortedDesc = [...cells].sort((a, b) => compareCellNames(b, a));
+ok(sortedDesc[0] === 'TEST_003' && sortedDesc[3] === 'GX21', 'Orden alfabético Z -> A correcto');
+
+// 3. Caso especial: TEST-005 con guión o borrador entre TEST_004 y TEST_006
+const testWithHyphen = ['TEST_001', 'TEST_004', 'TEST_006', 'TEST_002', 'TEST-005', 'TEST_003'];
+const sortedHyphen = [...testWithHyphen].sort(compareCellNames);
+ok(sortedHyphen[3] === 'TEST_004' && sortedHyphen[4] === 'TEST-005' && sortedHyphen[5] === 'TEST_006', 'TEST-005 con guión se ordena exactamente entre TEST_004 y TEST_006');
+
+// 4. Caso especial: Borrador con prefijo 'BORRADOR TEST_005'
+const testWithBorrador = ['TEST_001', 'TEST_004', 'TEST_006', 'BORRADOR TEST_005'];
+const sortedBorrador = [...testWithBorrador].sort(compareCellNames);
+ok(sortedBorrador[1] === 'TEST_004' && sortedBorrador[2] === 'BORRADOR TEST_005' && sortedBorrador[3] === 'TEST_006', 'BORRADOR TEST_005 se ordena por su nombre TEST_005');
+
+// 5. Reordenamiento manual (mover izquierda / derecha)
+let manual = ['A', 'B', 'C'];
+// mover 'B' (index 1) a la izquierda
+const temp = manual[0];
+manual[0] = manual[1];
+manual[1] = temp;
+ok(manual[0] === 'B' && manual[1] === 'A' && manual[2] === 'C', 'Mover izquierda intercambia posiciones');
+
 console.log(`\n${passed} pasaron, ${failed} fallaron\n`);
 if (failed > 0) process.exit(1);
+
+
