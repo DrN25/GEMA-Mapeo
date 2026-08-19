@@ -87,8 +87,12 @@ import { resetTouchedFields, subscribeTouched } from './utils/qaQcTouch';
 import { validateMapeoWindow, validatePltEnsayosList, toVacioAlerts, isBlockingValidationAlert, type MissingFieldIssue } from './utils/mandatoryRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
-const RESOLVED_API_BASE = API_BASE || `${window.location.protocol}//${window.location.hostname}:8001`;
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8001`
+    : ''
+);
+const RESOLVED_API_BASE = API_BASE;
 
 import { normalizeJoints, windowFromServerResponse, excelDataToWindowData, applyDistanceCascade } from './utils/windowTransform';
 import { HOLE_AUTO } from './utils/rmrCalculator';

@@ -43,7 +43,8 @@ export default function CommentsPhotos({
     formData.append('index', String(index));
 
     try {
-      const res = await fetch(`${apiBase}/api/ventanas/${celda}/fotos?index=${index}`, {
+      const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+      const res = await fetch(`${cleanBase}/api/ventanas/${encodeURIComponent(celda)}/fotos?index=${index}`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: formData
@@ -55,7 +56,8 @@ export default function CommentsPhotos({
         const updatedCaptions = [...captions];
 
         // Se concatena una estampa de tiempo para evadir la caché persistente del navegador
-        updatedPhotos[index] = `${apiBase}${data.url}?t=${Date.now()}`;
+        const fullUrl = data.url.startsWith('http') ? data.url : `${cleanBase}${data.url}`;
+        updatedPhotos[index] = `${fullUrl}?t=${Date.now()}`;
         if (!updatedCaptions[index]) {
           updatedCaptions[index] = `Fotografía ${index + 1}`;
         }
@@ -63,10 +65,11 @@ export default function CommentsPhotos({
         onPhotosChange(updatedPhotos, updatedCaptions);
         saveMetadata(updatedCaptions);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         alert(err.detail || "Error al subir la fotografía.");
       }
     } catch (err) {
+      console.error("Error al subir la fotografía:", err);
       alert("Error de conexión con el servidor al subir la fotografía.");
     }
   };
@@ -85,7 +88,8 @@ export default function CommentsPhotos({
     }
 
     try {
-      await fetch(`${apiBase}/api/ventanas/${celda}/fotos/${index}`, {
+      const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+      await fetch(`${cleanBase}/api/ventanas/${encodeURIComponent(celda)}/fotos/${index}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -97,7 +101,8 @@ export default function CommentsPhotos({
 
   const saveMetadata = async (currentCaptions: string[]) => {
     try {
-      await fetch(`${apiBase}/api/ventanas/${celda}/fotos/meta`, {
+      const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+      await fetch(`${cleanBase}/api/ventanas/${encodeURIComponent(celda)}/fotos/meta`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ captions: currentCaptions })

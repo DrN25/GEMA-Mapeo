@@ -24,10 +24,16 @@ import io
 import os
 import re
 import copy
+import base64
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Union
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.drawing.image import Image as OpenpyxlImage
+from PIL import Image as PILImage
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # CONSTANTES DE CONFIGURACIÓN
@@ -50,39 +56,39 @@ def _sanitize_val(val: Any) -> Any:
     if val is None:
         return None
     if isinstance(val, (int, float)):
-        if val in (-1, -1.0):
+        return None if val == -1 else val
+    if isinstance(val, str):
+        v = val.strip()
+        if v in ["-1", "-1.0", "-1.00", "None", "NONE", "null", "NULL", ""]:
             return None
-        return val
-    if isinstance(val, (date, datetime)):
-        return val.strftime("%Y-%m-%d")
-    s = str(val).strip()
-    if s in ("", "-1", "-1.0", "None", "nan", "NaN", "null", "NULL", "undefined"):
-        return None
-    return s
+        return v
+    return val
 
 
-def _shift_formula_rows(formula: str, delta: int) -> str:
+def _shift_formula_rows(formula: str, delta: int, min_row: int = 1) -> str:
     """
-    Desplaza todas las referencias de fila de una fórmula de Excel por `delta` filas.
-    Preserva referencias absolutas ($row) y referencias a otras hojas (RMR!$A$5:$D$11).
+    Desplaza las referencias a filas dentro de una fórmula de Excel sumando `delta`,
+    solo si el número de fila es >= `min_row`.
     """
     if not formula or not isinstance(formula, str) or not formula.startswith("="):
         return formula
 
-    pattern = r"([A-Za-z0-9_\'\"]+!)?(\$?)([A-Z]{1,3})(\$?)([0-9]+)"
+    pattern = r"('(?:[^']|'')*'!|[A-Za-z0-9_]+!)?(\$?)([A-Z]{1,3})(\$?)(\d+)"
 
-    def repl_token(match):
+    def repl_token(match: re.Match) -> str:
         sheet_prefix = match.group(1) or ""
         col_abs = match.group(2) or ""
         col = match.group(3)
         row_abs = match.group(4) or ""
-        row = int(match.group(5))
+        row_num_str = match.group(5)
+        row = int(row_num_str)
 
-        # Si pertenece a otra hoja (ej: RMR!$A$5), no desplazar
+        if row < min_row:
+            return match.group(0)
+
         if sheet_prefix:
             return match.group(0)
 
-        # Si la fila es absoluta ($5), no desplazar
         if row_abs == "$":
             return match.group(0)
 
@@ -91,12 +97,165 @@ def _shift_formula_rows(formula: str, delta: int) -> str:
     return re.sub(pattern, repl_token, formula)
 
 
+def _load_pil_image(item: Any, uploads_dir: str) -> Optional[PILImage.Image]:
+    """Carga una imagen en objeto PIL.Image desde archivo, URL, Base64 o BytesIO."""
+    if item is None:
+        return None
+    try:
+        if isinstance(item, PILImage.Image):
+            return item
+        if isinstance(item, bytes):
+            return PILImage.open(io.BytesIO(item))
+        if isinstance(item, io.BytesIO):
+            item.seek(0)
+            return PILImage.open(item)
+        if isinstance(item, str):
+            item_clean = item.strip()
+            if not item_clean:
+                return None
+            if item_clean.startswith("data:image"):
+                b64_data = item_clean.split(",", 1)[-1]
+                decoded = base64.b64decode(b64_data)
+                return PILImage.open(io.BytesIO(decoded))
+            if "api/uploads/" in item_clean:
+                rel_path = item_clean.split("api/uploads/", 1)[-1].split("?")[0]
+                local_path = os.path.join(uploads_dir, rel_path)
+                if os.path.exists(local_path):
+                    return PILImage.open(local_path)
+            if os.path.exists(item_clean):
+                return PILImage.open(item_clean)
+    except Exception as e:
+        logger.warning(f"Error cargando imagen para exportación Excel: {e}")
+    return None
+
+
+def _get_cell_photos(codigo: str, fotos_input: Optional[List[Any]] = None) -> List[PILImage.Image]:
+    """Obtiene hasta 2 imágenes PIL para la celda dada (del payload o del almacenamiento en disco)."""
+    results: List[PILImage.Image] = []
+    uploads_dir = os.path.join(BASE_DIR, "uploads")
+
+    # 1. Si se pasaron fotos explícitas en el payload
+    if fotos_input:
+        for f in fotos_input[:2]:
+            pil_img = _load_pil_image(f, uploads_dir)
+            if pil_img:
+                results.append(pil_img)
+
+    # 2. Si faltan fotos, buscar en disco en uploads/{codigo}
+    if len(results) < 2 and codigo:
+        code_up = str(codigo).strip().upper()
+        cell_dir = os.path.join(uploads_dir, code_up)
+        if os.path.exists(cell_dir):
+            allowed_exts = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "svg", "tiff"]
+            for i in range(2):
+                if len(results) > i:
+                    continue
+                found_img = None
+                for ext in allowed_exts:
+                    path_a = os.path.join(cell_dir, f"{code_up}-VENTANA-{i+1}.{ext}")
+                    if os.path.exists(path_a):
+                        found_img = _load_pil_image(path_a, uploads_dir)
+                        if found_img:
+                            break
+                    path_b = os.path.join(cell_dir, f"foto_{i}.{ext}")
+                    if os.path.exists(path_b):
+                        found_img = _load_pil_image(path_b, uploads_dir)
+                        if found_img:
+                            break
+                if found_img:
+                    results.append(found_img)
+
+    return results[:2]
+
+
+def _insert_photos_into_box(
+    ws: Worksheet,
+    base_row: int,
+    codigo: str,
+    fotos_input: Optional[List[Any]] = None
+):
+    """
+    Inserta hasta 2 imágenes dentro del cuadro BD5:BT19 (filas base_row + 1 a base_row + 15),
+    manteniendo su relación de aspecto. Si hay 2 fotos, la primera va arriba y la segunda abajo.
+    """
+    try:
+        pil_images = _get_cell_photos(codigo, fotos_input)
+        if not pil_images:
+            return
+
+        box_top_row = base_row + 1      # ej. 5
+        box_mid_row = base_row + 9      # ej. 13
+        max_box_w = 1350
+
+        if len(pil_images) == 1:
+            img = pil_images[0]
+            w, h = img.size
+            if w <= 0 or h <= 0:
+                return
+            max_h = 310
+            scale = min(max_box_w / w, max_h / h)
+            final_w = max(1, int(w * scale))
+            final_h = max(1, int(h * scale))
+
+            img_buf = io.BytesIO()
+            img.convert("RGB").save(img_buf, format="PNG")
+            img_buf.seek(0)
+
+            xl_img = OpenpyxlImage(img_buf)
+            xl_img.width = final_w
+            xl_img.height = final_h
+            xl_img.anchor = f"BD{box_top_row}"
+            ws.add_image(xl_img)
+
+        elif len(pil_images) >= 2:
+            # 1. Foto 1 (Superior)
+            img1 = pil_images[0]
+            w1, h1 = img1.size
+            if w1 > 0 and h1 > 0:
+                max_h1 = 145
+                scale1 = min(max_box_w / w1, max_h1 / h1)
+                final_w1 = max(1, int(w1 * scale1))
+                final_h1 = max(1, int(h1 * scale1))
+
+                img1_buf = io.BytesIO()
+                img1.convert("RGB").save(img1_buf, format="PNG")
+                img1_buf.seek(0)
+
+                xl_img1 = OpenpyxlImage(img1_buf)
+                xl_img1.width = final_w1
+                xl_img1.height = final_h1
+                xl_img1.anchor = f"BD{box_top_row}"
+                ws.add_image(xl_img1)
+
+            # 2. Foto 2 (Inferior)
+            img2 = pil_images[1]
+            w2, h2 = img2.size
+            if w2 > 0 and h2 > 0:
+                max_h2 = 155
+                scale2 = min(max_box_w / w2, max_h2 / h2)
+                final_w2 = max(1, int(w2 * scale2))
+                final_h2 = max(1, int(h2 * scale2))
+
+                img2_buf = io.BytesIO()
+                img2.convert("RGB").save(img2_buf, format="PNG")
+                img2_buf.seek(0)
+
+                xl_img2 = OpenpyxlImage(img2_buf)
+                xl_img2.width = final_w2
+                xl_img2.height = final_h2
+                xl_img2.anchor = f"BD{box_mid_row}"
+                ws.add_image(xl_img2)
+    except Exception as err:
+        logger.warning(f"No se pudieron insertar imágenes en celda {codigo}: {err}")
+
+
 def _normalize_ventana_input(item: Any) -> Dict[str, Any]:
     """
     Normaliza cualquier objeto de entrada (ORM models.Ventana, schemas.VentanaResponseSchema,
     diccionario con excel_data + estructuras, o WindowData con header + joints) a una estructura unificada.
     """
     if isinstance(item, dict):
+        fotos = item.get("fotos") or item.get("photos") or []
         # 1. Si tiene 'header' o 'joints' (formato WindowData de la interfaz activa de mapeo)
         if "header" in item or "joints" in item:
             header = item.get("header") or {}
@@ -108,11 +267,14 @@ def _normalize_ventana_input(item: Any) -> Dict[str, Any]:
 
             codigo = item.get("codigo") or item.get("codigo_final") or merged_header.get("celda") or merged_header.get("codigo") or "VENTANA"
             comentarios = item.get("comentarios") or merged_header.get("comentario") or merged_header.get("comentarios") or ""
+            if not fotos:
+                fotos = merged_header.get("fotos") or merged_header.get("photos") or []
             return {
                 "codigo": codigo,
                 "header": merged_header,
                 "estructuras": joints,
-                "comentarios": comentarios
+                "comentarios": comentarios,
+                "fotos": fotos
             }
 
         # 2. Si tiene 'excel_data' y 'estructuras' (formato escáner IA / importador)
@@ -121,11 +283,14 @@ def _normalize_ventana_input(item: Any) -> Dict[str, Any]:
             estructuras = item.get("estructuras") or item.get("discontinuidades") or item.get("joints") or []
             codigo = item.get("codigo_final") or item.get("codigo") or excel_data.get("codigo") or excel_data.get("celda") or "VENTANA"
             comentarios = excel_data.get("comentarios") or excel_data.get("comentario") or ""
+            if not fotos:
+                fotos = excel_data.get("fotos") or excel_data.get("photos") or []
             return {
                 "codigo": codigo,
                 "header": excel_data,
                 "estructuras": estructuras,
-                "comentarios": comentarios
+                "comentarios": comentarios,
+                "fotos": fotos
             }
 
         # 3. Formato plano (diccionario genérico)
@@ -136,21 +301,24 @@ def _normalize_ventana_input(item: Any) -> Dict[str, Any]:
             "codigo": codigo,
             "header": item,
             "estructuras": estructuras,
-            "comentarios": comentarios
+            "comentarios": comentarios,
+            "fotos": fotos
         }
 
     if hasattr(item, "codigo"):
         discs = getattr(item, "discontinuidades", []) or []
         rmr_in = getattr(item, "rmr_input", None)
         coment = getattr(rmr_in, "comentario", "") if rmr_in else ""
+        fotos = getattr(item, "fotos", []) or []
         return {
             "codigo": getattr(item, "codigo", "VENTANA"),
             "header": item,
             "estructuras": discs,
-            "comentarios": coment or ""
+            "comentarios": coment or "",
+            "fotos": fotos
         }
 
-    return {"codigo": "VENTANA", "header": {}, "estructuras": [], "comentarios": ""}
+    return {"codigo": "VENTANA", "header": {}, "estructuras": [], "comentarios": "", "fotos": []}
 
 
 def _get_val(source: Any, *keys: str, default: Any = None) -> Any:
@@ -557,6 +725,15 @@ def _fill_sheet_ventana_block(
         # AY12: Condición Discontinuidad 89 =(AH15*F15+...+AHn*Fn)/SUMA(F15:Fn)
         prod_ah_f = "+".join([f"AH{r}*F{r}" for r in range(start_struct_row, end_calc_row + 1)])
         ws[f"AY{r_89}"] = f"=({prod_ah_f})/SUM(F{start_struct_row}:F{end_calc_row})"
+
+    # Insertar fotografías de la celda en la caja BD..BT (filas 5 a 19)
+    fotos = (
+        ventana_dict.get("fotos")
+        or ventana_dict.get("photos")
+        or (header.get("fotos") if isinstance(header, dict) else None)
+        or []
+    )
+    _insert_photos_into_box(ws, base_row, codigo, fotos)
 
     return {
         "base_row": base_row,
