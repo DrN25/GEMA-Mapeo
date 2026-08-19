@@ -61,17 +61,34 @@ def _sanitize_val(val: Any) -> Any:
     return s
 
 
-def _adapt_row_in_formula(formula: str, from_row: int, to_row: int) -> str:
+def _shift_formula_rows(formula: str, delta: int) -> str:
     """
-    Desplaza las referencias de fila de una fórmula de Excel.
-    Ejemplo: 'V15' con from_row=15, to_row=16 -> 'V16'
-             'IF(O15="","",MIN(O15:P15))' -> 'IF(O16="","",MIN(O16:P16))'
+    Desplaza todas las referencias de fila de una fórmula de Excel por `delta` filas.
+    Preserva referencias absolutas ($row) y referencias a otras hojas (RMR!$A$5:$D$11).
     """
-    if not formula or not isinstance(formula, str):
+    if not formula or not isinstance(formula, str) or not formula.startswith("="):
         return formula
-    # Reemplaza letras de columna + from_row por letras de columna + to_row
-    pattern = rf"([A-Z]+){from_row}(?!\d)"
-    return re.sub(pattern, rf"\g<1>{to_row}", formula)
+
+    pattern = r"([A-Za-z0-9_\'\"]+!)?(\$?)([A-Z]{1,3})(\$?)([0-9]+)"
+
+    def repl_token(match):
+        sheet_prefix = match.group(1) or ""
+        col_abs = match.group(2) or ""
+        col = match.group(3)
+        row_abs = match.group(4) or ""
+        row = int(match.group(5))
+
+        # Si pertenece a otra hoja (ej: RMR!$A$5), no desplazar
+        if sheet_prefix:
+            return match.group(0)
+
+        # Si la fila es absoluta ($5), no desplazar
+        if row_abs == "$":
+            return match.group(0)
+
+        return f"{sheet_prefix}{col_abs}{col}{row + delta}"
+
+    return re.sub(pattern, repl_token, formula)
 
 
 def _normalize_ventana_input(item: Any) -> Dict[str, Any]:
@@ -707,7 +724,34 @@ def export_ventanas_to_excel(
     ws_ventana = wb["ventana"]
 
     # =========================================================================
-    # INYECTAR HOJA 1: 'ventana'
+    # 1. SNAPSHOT PRÍSTINO DEL BLOQUE MAESTRO (FILAS 4..31)
+    # =========================================================================
+    template_row_heights: Dict[int, Optional[float]] = {}
+    for r in range(4, 32):
+        template_row_heights[r] = ws_ventana.row_dimensions[r].height
+
+    template_cells: Dict[tuple, Dict[str, Any]] = {}
+    for r in range(4, 32):
+        for c in range(1, ws_ventana.max_column + 1):
+            cell = ws_ventana.cell(row=r, column=c)
+            template_cells[(r, c)] = {
+                "value": cell.value,
+                "font": copy.copy(cell.font) if cell.has_style else None,
+                "border": copy.copy(cell.border) if cell.has_style else None,
+                "fill": copy.copy(cell.fill) if cell.has_style else None,
+                "number_format": cell.number_format,
+                "protection": copy.copy(cell.protection) if cell.has_style else None,
+                "alignment": copy.copy(cell.alignment) if cell.has_style else None,
+            }
+
+    # Snapshot de todas las celdas combinadas de la plantilla en filas 4..31
+    template_merges = []
+    for rng in list(ws_ventana.merged_cells.ranges):
+        if rng.min_row >= 4 and rng.max_row <= 31:
+            template_merges.append((rng.min_row - 4, rng.max_row - 4, rng.min_col, rng.max_col))
+
+    # =========================================================================
+    # 2. INYECTAR HOJA 1: 'ventana'
     # =========================================================================
     ventanas_meta: List[Dict[str, Any]] = []
 
@@ -719,35 +763,50 @@ def export_ventanas_to_excel(
     spacing = 2  # 2 filas en blanco de separación
 
     for v_idx in range(1, len(normalized_ventanas)):
+        # Dejamos 2 filas vacías exactas (current_end_row + 1, current_end_row + 2)
         next_base_row = current_end_row + spacing + 1
         row_offset = next_base_row - 4
 
-        # Copiar plantilla estándar de filas 4..31 al nuevo bloque
-        for r in range(4, 32):
-            target_r = r + row_offset
-            for c in range(1, ws_ventana.max_column + 1):
-                src_cell = ws_ventana.cell(row=r, column=c)
-                tgt_cell = ws_ventana.cell(row=target_r, column=c)
-                if src_cell.value is not None:
-                    if str(src_cell.value).startswith("="):
-                        tgt_cell.value = _adapt_row_in_formula(src_cell.value, r, target_r)
-                    else:
-                        tgt_cell.value = src_cell.value
-                if src_cell.has_style:
-                    tgt_cell.font = copy.copy(src_cell.font)
-                    tgt_cell.border = copy.copy(src_cell.border)
-                    tgt_cell.fill = copy.copy(src_cell.fill)
-                    tgt_cell.number_format = src_cell.number_format
-                    tgt_cell.protection = copy.copy(src_cell.protection)
-                    tgt_cell.alignment = copy.copy(src_cell.alignment)
+        # A) Clonar alturas exactas de fila de la plantilla
+        for r_orig in range(4, 32):
+            tgt_r = next_base_row + (r_orig - 4)
+            ws_ventana.row_dimensions[tgt_r].height = template_row_heights[r_orig]
 
-        # Inyectar datos en el nuevo bloque
+        # B) Clonar celdas, fórmulas con desplazamiento seguro y estilos
+        for (r_orig, c), record in template_cells.items():
+            tgt_r = next_base_row + (r_orig - 4)
+            tgt_cell = ws_ventana.cell(row=tgt_r, column=c)
+
+            val = record["value"]
+            if val is not None:
+                if str(val).startswith("="):
+                    tgt_cell.value = _shift_formula_rows(val, row_offset)
+                else:
+                    tgt_cell.value = val
+
+            if record["font"]: tgt_cell.font = copy.copy(record["font"])
+            if record["border"]: tgt_cell.border = copy.copy(record["border"])
+            if record["fill"]: tgt_cell.fill = copy.copy(record["fill"])
+            if record["number_format"]: tgt_cell.number_format = record["number_format"]
+            if record["protection"]: tgt_cell.protection = copy.copy(record["protection"])
+            if record["alignment"]: tgt_cell.alignment = copy.copy(record["alignment"])
+
+        # C) Replicar todas las celdas combinadas (merged_cells) de la plantilla
+        for r_start_off, r_end_off, min_col, max_col in template_merges:
+            ws_ventana.merge_cells(
+                start_row=next_base_row + r_start_off,
+                end_row=next_base_row + r_end_off,
+                start_column=min_col,
+                end_column=max_col
+            )
+
+        # D) Inyectar datos en el nuevo bloque limpio
         meta_next = _fill_sheet_ventana_block(ws_ventana, next_base_row, normalized_ventanas[v_idx])
         ventanas_meta.append(meta_next)
         current_end_row = meta_next["end_cell_row"]
 
     # =========================================================================
-    # INYECTAR HOJA 2: 'BD'
+    # 3. INYECTAR HOJA 2: 'BD'
     # =========================================================================
     if "BD" in wb.sheetnames:
         _populate_sheet_bd(wb["BD"], ventanas_meta)
