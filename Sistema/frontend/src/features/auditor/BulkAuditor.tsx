@@ -386,7 +386,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         formData.append('file', payload.file);
 
         try {
-            const res = await fetch(`${apiBase}/api/geomecanica/importar-excel-bulk`, {
+            const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+            const res = await fetch(`${cleanBase}/api/geomecanica/importar-excel-bulk`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: formData
@@ -397,13 +398,26 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                 setProcessingAuditId(data.audit_id);
                 setProcessingFileName(data.filename || payload.file.name);
             } else {
-                const err = await res.json();
+                let errorMsg = `Error del servidor (HTTP ${res.status})`;
+                if (res.status === 413) {
+                    errorMsg = "El archivo supera el límite de tamaño permitido por el túnel público (máximo 100 MB en Cloudflare). Para archivos mayores a 100 MB, ejecútelo directamente en la red local (localhost).";
+                } else if (res.status === 524 || res.status === 504) {
+                    errorMsg = "Tiempo de espera agotado al transferir el archivo al servidor. Verifique la velocidad de subida de su conexión.";
+                } else {
+                    try {
+                        const err = await res.json();
+                        if (err.detail) errorMsg = err.detail;
+                    } catch {
+                        const textErr = await res.text().catch(() => '');
+                        if (textErr) errorMsg = textErr.slice(0, 200);
+                    }
+                }
                 setStatus('error');
-                setMessage(err.detail || 'Fallo de procesamiento en el servidor.');
+                setMessage(errorMsg);
             }
-        } catch (e) {
+        } catch (e: any) {
             setStatus('error');
-            setMessage('Error de red al intentar conectar con el servidor.');
+            setMessage('Error de red al intentar conectar con el servidor: ' + (e.message || 'Sin conexión'));
         }
     };
 

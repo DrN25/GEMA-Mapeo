@@ -36,7 +36,8 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
     formData.append('file', fileAudit);
 
     try {
-      const res = await fetch(`${apiBase}/api/congruencia/auditar`, {
+      const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+      const res = await fetch(`${cleanBase}/api/congruencia/auditar`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: formData,
@@ -79,7 +80,8 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
     formData.append('despues', fileDespues);
 
     try {
-      const res = await fetch(`${apiBase}/api/congruencia/comparar`, {
+      const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+      const res = await fetch(`${cleanBase}/api/congruencia/comparar`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: formData,

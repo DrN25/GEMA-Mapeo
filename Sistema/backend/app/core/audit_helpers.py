@@ -240,8 +240,14 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
     observaciones_por_año: dict = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
     top_stations_por_año: dict = defaultdict(lambda: defaultdict(lambda: Counter()))
 
+    # Inicializar todas las campañas presentes en las estaciones evaluadas (para que campañas 100% limpias aparezcan en métricas)
+    for c_info in resumen_celdas.values():
+        camp_name = str(c_info.get("campania", "N/A"))
+        if camp_name and camp_name not in ("N/A", "None", ""):
+            _ = camp_stats[camp_name]
+
     for i in incidencias:
-        c = i.get("campania", "N/A")
+        c = str(i.get("campania", "N/A"))
         obs_key = get_incidence_category_name(i)
         celda = i.get("celda_padre", "N/A")
         g = i.get("geotecnico", "N/A")
@@ -273,7 +279,11 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
             sector_stats[s]["alertas"] += 1
 
     consolidado_tabla: dict = {}
-    for year, types in observaciones_por_año.items():
+    all_known_years = set(camp_stats.keys()) | set(observaciones_por_año.keys())
+    for year in sorted(all_known_years, key=lambda x: str(x)):
+        if year in ("N/A", "None", "") and len(all_known_years) > 1:
+            continue
+        types = observaciones_por_año.get(year, {})
         consolidado_tabla[year] = {}
         total_inc_año = sum(v["incidents"] for v in types.values())
         severity = "LEVE" if total_inc_año < 100 else ("MODERADO" if total_inc_año < 1000 else "CRÍTICO")
@@ -289,14 +299,19 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
 
     def _build_dist(stats_dict: dict, key_name: str) -> list:
         rows = []
-        for key_val, stats in stats_dict.items():
+        for key_val, stats in sorted(stats_dict.items(), key=lambda x: str(x[0])):
             rows_count = len(stats["filas"])
+            celdas_afectadas = len(stats["celdas"])
+            if rows_count == 0 and key_name == "campania":
+                celdas_de_camp = [v for v in resumen_celdas.values() if str(v.get("campania")) == str(key_val)]
+                rows_count = sum(c.get("total_hijas", 0) for c in celdas_de_camp)
+
             total_fields_g = rows_count * MANDATORY_COLS_COUNT
             rows.append({
                 key_name: key_val,
                 "discontinuidades": rows_count,
-                "celdas_afectadas": len(stats["celdas"]),
-                "estructuras_afectadas": rows_count,
+                "celdas_afectadas": celdas_afectadas,
+                "estructuras_afectadas": len(stats["filas"]),
                 "vacios_cant": stats["vacios"],
                 "vacios_pct": (stats["vacios"] / max(1, total_fields_g)) * 100,
                 "advertencias_cant": stats["advertencias"],

@@ -269,11 +269,11 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_cat.cell(row=2, column=2, value="REGISTRO MAESTRO DE REGLAS DE CONSISTENCIA").font = font_title
     ws_cat.cell(row=3, column=2, value="Catálogo completo de validación geomecánica ordenado por frecuencia. Use los hipervínculos para navegar.").font = font_subtitle
     
-    # Recopilar los años únicos de campaña presentes en todas las incidencias
+    # Recopilar los años únicos de campaña presentes en toda la auditoría (incluyendo campañas limpias)
     all_campaigns = sorted(set(
-        str(inc.get("campania", "N/A")) for inc in filtered
-        if inc.get("campania") and str(inc.get("campania")) not in ["N/A", "None", ""]
-    ))
+        [str(row.get("campania")) for row in compact.get("distribucion_campania", []) if row.get("campania") and str(row.get("campania")) not in ["N/A", "None", ""]] +
+        [str(inc.get("campania")) for inc in filtered if inc.get("campania") and str(inc.get("campania")) not in ["N/A", "None", ""]]
+    ), key=lambda x: str(x))
 
     headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Total (N)"] + [f"Año {c}" for c in all_campaigns] + ["Enlace Directo"]
     for idx, col in enumerate(headers_cat, start=2):
@@ -784,31 +784,51 @@ def _cleanup_audit_files(audit_id: str) -> None:
 
 def _acquire_lock(audit_id: str) -> bool:
     lock_path = _lock_file_path()
+    history_dir = os.path.join(uploads_dir, "history")
     if os.path.exists(lock_path):
         try:
             with open(lock_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            age = time.time() - data.get("started_at", 0)
-            if age < 3 * 3600:  # 3 horas: cubre validaciones de archivos muy grandes
-                return False
+            old_audit_id = data.get("audit_id")
+            # 1. Si la auditoría anterior fue cancelada o tiene el flag .cancel
+            if old_audit_id and _is_cancelled(old_audit_id):
+                _cleanup_audit_files(old_audit_id)
+                try: os.remove(lock_path)
+                except OSError: pass
+            # 2. Si la auditoría anterior ya terminó (existe _compact.json)
+            elif old_audit_id and os.path.exists(os.path.join(history_dir, f"{old_audit_id}_compact.json")):
+                try: os.remove(lock_path)
+                except OSError: pass
+            # 3. Si no existe ningún archivo de trabajo de la auditoría anterior (proceso huérfano)
+            elif old_audit_id and not os.path.exists(os.path.join(history_dir, f"{old_audit_id}.xlsx")) and not os.path.exists(os.path.join(history_dir, f"{old_audit_id}_diagnostico.json")):
+                try: os.remove(lock_path)
+                except OSError: pass
+            else:
+                age = time.time() - data.get("started_at", 0)
+                if age < 3 * 3600:  # 3 horas máximo
+                    return False
         except Exception:
             pass
         try:
-            os.remove(lock_path)
+            if os.path.exists(lock_path):
+                os.remove(lock_path)
         except OSError:
             pass
     with open(lock_path, "w", encoding="utf-8") as f:
         json.dump({"audit_id": audit_id, "started_at": time.time()}, f)
     return True
 
-def _release_lock(audit_id: str) -> None:
+def _release_lock(audit_id: str = None) -> None:
     lock_path = _lock_file_path()
     try:
         if os.path.exists(lock_path):
-            with open(lock_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if data.get("audit_id") == audit_id:
+            if audit_id is None:
                 os.remove(lock_path)
+            else:
+                with open(lock_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if data.get("audit_id") == audit_id:
+                    os.remove(lock_path)
     except Exception:
         pass
 
@@ -939,11 +959,22 @@ def cancelar_auditoria(audit_id: str = None):
     y limpiar los archivos parciales.
     """
     if not audit_id:
-        raise HTTPException(status_code=400, detail="Parámetro 'audit_id' requerido.")
+        lock_path = _lock_file_path()
+        if os.path.exists(lock_path):
+            try:
+                with open(lock_path, "r", encoding="utf-8") as f:
+                    audit_id = json.load(f).get("audit_id")
+            except Exception:
+                pass
+        if not audit_id:
+            # Si no hay lock ni audit_id, liberar cualquier lock residual
+            _release_lock()
+            return {"status": "cancelado", "audit_id": None}
+
     with open(_cancel_flag_path(audit_id), "w", encoding="utf-8") as f:
         f.write("1")
-    # NO se libera el lock aquí: se libera cuando el pipeline viejo realmente salga
-    # (finally), evitando que una auditoría nueva se solape con la que aún termina.
+    _cleanup_audit_files(audit_id)
+    _release_lock(audit_id)
     return {"status": "cancelado", "audit_id": audit_id}
 
 @router.post("/geomecanica/importar-excel-bulk")
