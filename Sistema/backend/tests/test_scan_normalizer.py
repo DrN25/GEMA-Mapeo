@@ -36,13 +36,13 @@ class TestNormalizeHeader:
         assert out["excel_data"]["este_ini"] == 812345.679
         assert out["excel_data"]["norte_ini"] == 8432101.556
 
-    def test_sector_default_pendiente(self):
+    def test_sector_sin_fallback_es_none(self):
         out = normalize_raw_cell({})
-        assert out["excel_data"]["sector"] == "PENDIENTE"
+        assert out["excel_data"]["sector"] is None
 
-    def test_mapeador_default_srk(self):
+    def test_mapeador_sin_fallback_es_none(self):
         out = normalize_raw_cell({})
-        assert out["excel_data"]["mapeador"] == "SRK"
+        assert out["excel_data"]["mapeador"] is None
 
     def test_campania_derivada_de_fecha(self):
         out = normalize_raw_cell({"fecha": "2025-03-15"})
@@ -89,10 +89,43 @@ class TestNormalizeJoints:
         out = normalize_raw_cell({"estructuras": [{"tipo_estructura": "J"}]})
         assert out["estructuras"][0]["tipo_estructura"] == "JN"
 
+    def test_tipo_e_se_normaliza_a_bed(self):
+        out = normalize_raw_cell({"estructuras": [{"tipo_estructura": "E"}]})
+        assert out["estructuras"][0]["tipo_estructura"] == "BED"
+
+    def test_tipo_f1_se_normaliza_a_f(self):
+        out = normalize_raw_cell({"estructuras": [{"tipo_estructura": "F1"}]})
+        assert out["estructuras"][0]["tipo_estructura"] == "F"
+
+    def test_forma_i_minuscula_o_mayuscula(self):
+        out1 = normalize_raw_cell({"estructuras": [{"forma_estructura": "i"}]})
+        assert out1["estructuras"][0]["forma_estructura"] == "I"
+        out2 = normalize_raw_cell({"estructuras": [{"forma_estructura": "I"}]})
+        assert out2["estructuras"][0]["forma_estructura"] == "I"
+
+    def test_alteracion_f_mayuscula_o_minuscula(self):
+        out1 = normalize_raw_cell({"estructuras": [{"alteracion_codigo": "F"}]})
+        assert out1["estructuras"][0]["alteracion_codigo"] == "f"
+        out2 = normalize_raw_cell({"estructuras": [{"alteracion_codigo": "f"}]})
+        assert out2["estructuras"][0]["alteracion_codigo"] == "f"
+
     def test_rugosidad_fuera_de_rango_null(self):
         out = normalize_raw_cell({"estructuras": [{"rugosidad_codigo": 12}]})
         assert out["estructuras"][0]["rugosidad_codigo"] is None
         assert "rugosidad_codigo" in out["missing_joints"][0]
+
+    def test_rugosidad_compuesta_asigna_jrc_y_rugosidad(self):
+        out1 = normalize_raw_cell({"estructuras": [{"rugosidad_codigo": "11-5"}]})
+        assert out1["estructuras"][0]["jrc"] == 11.0
+        assert out1["estructuras"][0]["rugosidad_codigo"] == "5"
+
+        out2 = normalize_raw_cell({"estructuras": [{"rugosidad_codigo": "3-8"}]})
+        assert out2["estructuras"][0]["jrc"] == 3.0
+        assert out2["estructuras"][0]["rugosidad_codigo"] == "8"
+
+    def test_abertura_rango_se_convierte_a_promedio(self):
+        out = normalize_raw_cell({"estructuras": [{"abertura_mm": "2-4"}]})
+        assert out["estructuras"][0]["abertura_mm"] == 3.0
 
     def test_jrc_recien_21_es_missing(self):
         out = normalize_raw_cell({"estructuras": [{"jrc": 21}]})
@@ -108,15 +141,18 @@ class TestNormalizeJoints:
         out = normalize_raw_cell({"estructuras": [{"relleno_1_codigo": "CL"}]})
         assert out["estructuras"][0]["relleno_1_codigo"] == "cl"
 
+    def test_relleno_cq_se_normaliza_a_ca(self):
+        out = normalize_raw_cell({"estructuras": [{"relleno_1_codigo": "CQ"}]})
+        assert out["estructuras"][0]["relleno_1_codigo"] == "ca"
+
 
 class TestMissingFields:
     def test_celda_vacia_marca_campos_esperados(self):
         out = normalize_raw_cell({})
         assert "largo_m" in out["missing_header"]
         assert "este_ini" not in out["missing_header"]  # default 0.0, no missing
-        assert "sector" not in out["missing_header"]  # default PENDIENTE
-        assert "mapeador" not in out["missing_header"]  # default SRK
-        assert "fecha" not in out["missing_header"]  # default hoy
+        assert "sector" in out["missing_header"]  # sin fallback
+        assert "mapeador" in out["missing_header"]  # sin fallback
 
     def test_confianza_menor_a_1_con_datos_parciales(self):
         out = normalize_raw_cell({"codigo": "TD1", "largo_m": 15})

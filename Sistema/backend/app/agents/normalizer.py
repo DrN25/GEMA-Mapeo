@@ -33,6 +33,15 @@ def _clean_num(val: Any) -> Optional[float]:
         s = val.strip().replace(",", ".")
         if not s:
             return None
+        # Soporte para rangos manuscritos (ej. "3-8" -> 5.5, "1-5" -> 3.0)
+        if "-" in s:
+            parts = s.split("-")
+            if len(parts) == 2:
+                try:
+                    a, b = float(parts[0].strip()), float(parts[1].strip())
+                    return (a + b) / 2.0
+                except (ValueError, TypeError):
+                    pass
         val = s
     try:
         f = float(val)
@@ -47,7 +56,7 @@ def _clean_int(val: Any) -> Optional[int]:
     f = _clean_num(val)
     if f is None:
         return None
-    return int(f)  # trunca, igual que sanitize_value(val, int)
+    return int(round(f))  # redondea si viene de rango o float
 
 
 def _clean_str(val: Any) -> Optional[str]:
@@ -87,12 +96,8 @@ EXPECTED_HEADER_FIELDS: List[str] = [
     "efectos_voladura_rmr76", "ucs_mpa", "is50_mpa", "rmr_76", "rmr_89",
 ]
 
-# Campos con default del sistema (no se marcan missing aunque estén vacíos).
-DEFAULTED_HEADER_FIELDS = {
-    "sector": "PENDIENTE",
-    "mapeador": "SRK",
-    "campania": None,  # se deriva de la fecha
-}
+# Campos con default del sistema (vacío para no forzar fallbacks).
+DEFAULTED_HEADER_FIELDS: Dict[str, Any] = {}
 
 EXPECTED_JOINT_FIELDS: List[str] = [
     "tipo_estructura", "dip", "dip_dir", "distancia_m", "abertura_mm",
@@ -116,17 +121,74 @@ def _norm_code(val: Any, valid: set, default: Optional[str] = None) -> Optional[
     if s is None:
         return default
     up = s.upper()
+    low = s.lower()
+
     if up in valid:
         return up
-    # Sinónimos comunes de los formularios
-    if up in ("J", "JS"):
-        return "JN" if "JN" in valid else default
-    if up in ("SKARN",):
-        return "GSK" if "GSK" in valid else default
-    # Relleno en mayúscula
-    low = s.lower()
     if low in valid:
         return low
+
+    # Sinónimos de tipo_estructura
+    if up in ("J", "JS", "J1", "J2", "J3", "J4", "J5", "JUNTA", "DIACLASA"):
+        return "JN" if "JN" in valid else default
+    if up in ("E", "E1", "E2", "ESTRAT", "ESTRATIFICACION", "ESTRATIFICACIÓN"):
+        return "BED" if "BED" in valid else default
+    if up in ("F", "F1", "F2", "F3", "FALLA"):
+        return "F" if "F" in valid else default
+    if up in ("SZ", "CIZALLA", "ZONA CIZALLA"):
+        return "SZ" if "SZ" in valid else default
+    if up in ("CON", "CONTACTO"):
+        return "CON" if "CON" in valid else default
+    if up in ("DQ", "DIQUE"):
+        return "DQ" if "DQ" in valid else default
+    if up in ("SKARN",):
+        return "GSK" if "GSK" in valid else default
+
+    # Sinónimos de forma_estructura (P, C, O, E, I)
+    if up in ("I", "IRREGULAR", "IRR"):
+        return "I" if "I" in valid else default
+    if up in ("P", "PLANA", "PLAN"):
+        return "P" if "P" in valid else default
+    if up in ("O", "ONDULADA", "OND"):
+        return "O" if "O" in valid else default
+    if up in ("C", "CURVA", "CURV"):
+        return "C" if "C" in valid else default
+    if up in ("E", "ESCALONADA", "ESC"):
+        return "E" if "E" in valid else default
+
+    # Sinónimos de alteración (f, d, m, a, c, s)
+    if low in ("f", "fresca", "fresh"):
+        return "f" if "f" in valid else default
+    if low in ("d", "débil", "debil", "w", "weak"):
+        return "d" if "d" in valid else default
+    if low in ("m", "moderada", "mod"):
+        return "m" if "m" in valid else default
+    if low in ("a", "alta", "high"):
+        return "a" if "a" in valid else default
+    if low in ("c", "completa", "comp"):
+        return "c" if "c" in valid else default
+    if low in ("s", "suelo", "soil"):
+        return "s" if "s" in valid else default
+
+    # Sinónimos de relleno
+    if up in ("CQ", "CA", "CALCITA"):
+        return "ca" if "ca" in valid else default
+    if up in ("OX", "OXIDOS", "ÓXIDOS"):
+        return "ox" if "ox" in valid else default
+    if up in ("CL", "CLORITA"):
+        return "cl" if "cl" in valid else default
+    if up in ("QZ", "CUARZO"):
+        return "qz" if "qz" in valid else default
+    if up in ("G", "PANIZO", "GOUGE", "ARCILLA"):
+        return "g" if "g" in valid else default
+    if up in ("PA",):
+        return "d" if "d" in valid else default
+
+    # Búsqueda case-insensitive final en el set de válidos
+    for v in valid:
+        if v.upper() == up:
+            return v
+
     return default
 
 
@@ -170,10 +232,12 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
     norte_fin = _clamp(_round(_clean_num(d.get("norte_fin")), 3), -1e12, 1e12)
     cota_fin = _clamp(_round(_clean_num(d.get("cota_fin")), 3), -1e12, 1e12)
 
+    rqd_val = _clean_num(d.get("rqd") or d.get("rqd_pct") or d.get("rmr_76"))
+
     return {
         "codigo": codigo_raw,
         "campania": campania_val,
-        "sector": _clean_str(d.get("sector")) or "PENDIENTE",
+        "sector": _clean_str(d.get("sector")),
         "este_ini": este_ini if este_ini is not None else 0.0,
         "norte_ini": norte_ini if norte_ini is not None else 0.0,
         "cota_ini": cota_ini if cota_ini is not None else 0.0,
@@ -194,7 +258,7 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
         "lito_2": _clean_str(d.get("lito_2")),
         "lito_3": _clean_str(d.get("lito_3")),
         "unidad_litologica": _clean_str(d.get("unidad_litologica")),
-        "mapeador": _clean_str(d.get("mapeador")) or "SRK",
+        "mapeador": _clean_str(d.get("mapeador")),
         "fecha": fecha_str or datetime.now().strftime("%Y-%m-%d"),
         "comentarios": _clean_str(d.get("comentarios")),
         "gsi_superficie": _clean_str(d.get("gsi_superficie")),
@@ -210,7 +274,7 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
         "efectos_voladura_rmr89": _clean_int(d.get("efectos_voladura_rmr89")),
         "ucs_mpa": _round(_clean_num(d.get("ucs_mpa")), 3),
         "is50_mpa": _round(_clean_num(d.get("is50_mpa")), 3),
-        "rmr_76": _clean_num(d.get("rmr_76")),
+        "rmr_76": rqd_val,
         "rmr_89": _clean_num(d.get("rmr_89")),
     }
 
@@ -223,15 +287,56 @@ def _normalize_header(raw: Dict[str, Any]) -> Dict[str, Any]:
 def _normalize_joint(raw: Any, idx: int) -> Dict[str, Any]:
     d = raw if isinstance(raw, dict) else {}
 
-    tipo = _norm_code(d.get("tipo_estructura") or d.get("tipo"), TIPO_ESTRUCTURA_VALID, default="JN")
-    rug = _clean_int(d.get("rugosidad_codigo") or d.get("rugosidad"))
-    if rug is not None and not (1 <= rug <= 9):
-        rug = None
+    jrc_val = _clamp(_round(_clean_num(d.get("jrc")), 2), 0.0, 20.0)
+    rug_raw = d.get("rugosidad_codigo") or d.get("rugosidad")
+    rug_val = None
+
+    # Caso especial: Formato compuesto tipo "11-5" (JRC = 11, Rugosidad = 5)
+    if isinstance(rug_raw, str) and "-" in rug_raw:
+        parts = rug_raw.split("-")
+        if len(parts) == 2:
+            p1 = _clean_num(parts[0].strip())
+            p2 = _clean_int(parts[1].strip())
+            if p1 is not None and jrc_val is None:
+                jrc_val = _clamp(_round(p1, 2), 0.0, 20.0)
+            if p2 is not None and 1 <= p2 <= 9:
+                rug_val = str(p2)
+    else:
+        rug_num = _clean_int(rug_raw)
+        if rug_num is not None and 1 <= rug_num <= 9:
+            rug_val = str(rug_num)
+
     dipdir = d.get("dip_dir") if d.get("dip_dir") is not None else d.get("dipdir")
+
+    # Identificación de ID y deducción de tipo / familia
+    fam_val = _clean_int(d.get("familia_id") or d.get("familia"))
+    id_str = _clean_str(d.get("id") or d.get("ID") or d.get("familia") or d.get("tipo_estructura"))
+    if id_str:
+        m = re.search(r"^[jJfFeE](\d+)", id_str)
+        if m:
+            fam_val = int(m.group(1))
+    if not fam_val or fam_val <= 0:
+        fam_val = math.ceil((idx + 1) / 3.0)
+
+    # Tipo de estructura (E/E1 -> BED, J/J1 -> JN, F/F1 -> F, SZ -> SZ)
+    tipo_raw = d.get("tipo_estructura") or d.get("tipo")
+    tipo = _norm_code(tipo_raw, TIPO_ESTRUCTURA_VALID, default=None)
+    if not tipo and id_str:
+        id_up = id_str.upper()
+        if id_up.startswith("E"):
+            tipo = "BED"
+        elif id_up.startswith("F"):
+            tipo = "F"
+        elif id_up.startswith("SZ"):
+            tipo = "SZ"
+        elif id_up.startswith("J"):
+            tipo = "JN"
+    tipo = tipo or "JN"
+
     return {
         "numero_estructura": idx + 1,
-        "familia_id": _clean_int(d.get("familia_id")) or math.ceil((idx + 1) / 3.0),
-        "tipo_estructura": tipo or "JN",
+        "familia_id": fam_val,
+        "tipo_estructura": tipo,
         "dip": _clamp(_round(_clean_num(d.get("dip")), 2), 0.0, 90.0) or 0.0,
         "dip_dir": _clamp(_round(_clean_num(dipdir), 2), 0.0, 360.0) or 0.0,
         "distancia_m": _round(_clean_num(d.get("distancia_m") or d.get("distancia")), 3),
@@ -244,8 +349,8 @@ def _normalize_joint(raw: Any, idx: int) -> Dict[str, Any]:
         "terminacion": _clean_int(d.get("terminacion")),
         "relleno_1_codigo": _norm_code(d.get("relleno_1_codigo") or d.get("relleno_1"), RELLENO_VALID),
         "relleno_2_codigo": _norm_code(d.get("relleno_2_codigo") or d.get("relleno_2"), RELLENO_VALID),
-        "jrc": _clamp(_round(_clean_num(d.get("jrc")), 2), 0.0, 20.0),
-        "rugosidad_codigo": _clean_str(rug),
+        "jrc": jrc_val,
+        "rugosidad_codigo": rug_val,
         "forma_estructura": _norm_code(d.get("forma_estructura") or d.get("forma"), FORMA_VALID),
         "alteracion_codigo": _norm_code(d.get("alteracion_codigo") or d.get("alteracion"), ALTERACION_VALID),
     }

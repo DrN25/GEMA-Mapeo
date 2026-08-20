@@ -59,7 +59,7 @@ def _sanitize_val(val: Any) -> Any:
         return None if val == -1 else val
     if isinstance(val, str):
         v = val.strip()
-        if v in ["-1", "-1.0", "-1.00", "None", "NONE", "null", "NULL", ""]:
+        if v in ["-1", "-1.0", "-1.00", "None", "NONE", "null", "NULL", "undefined", "UNDEFINED", ""]:
             return None
         return v
     return val
