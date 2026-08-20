@@ -125,27 +125,38 @@ A. ANCLAJE FILA POR FILA:
 
 B. COLUMNAS DERECHAS (RELLENO 1/2, JRC, RUGOSIDAD, FORMA, ALTERACIÓN):
    - En la primera fila de cada familia (Estructuras 1, 4, 7, 10), el geólogo escribe explícitamente el Relleno 1 y 2 (ej. ox/cl, ca/ox, ox/ca, g/ox), la Rugosidad y la Alteración (ej. m, a, d).
-   - ¡FORMATO JRC-RUGOSIDAD EN CASILLA DE RUGOSIDAD!: Si en la casilla de rugosidad está escrito un valor compuesto como "11-5", "13-6", "3-8", "5-7", el primer número es el valor JRC (0-20) y el segundo número es la Rugosidad ISRM (1-9) (ej. "11-5" -> JRC: 11.0, Rugosidad: 5; "13-6" -> JRC: 13.0, Rugosidad: 6; "3-8" -> JRC: 3.0, Rugosidad: 8; "5-7" -> JRC: 5.0, Rugosidad: 7).
+   - ¡FORMATO JRC-RUGOSIDAD EN CASILLA DE RUGOSIDAD!: Si en la casilla de rugosidad está escrito un valor compuesto como "11-5", "13-6", "3-8", "5-7", "7-6", "19-1", el primer número es el valor JRC (0-20) y el segundo número es la Rugosidad ISRM (1-9) (ej. "11-5" -> JRC: 11.0, Rugosidad: 5; "13-6" -> JRC: 13.0, Rugosidad: 6; "3-8" -> JRC: 3.0, Rugosidad: 8; "7-6" -> JRC: 7.0, Rugosidad: 6; "19-1" -> JRC: 19.0, Rugosidad: 1).
    - En las filas 2 y 3 de esa familia (y en familias continuas que no cambian de propiedades), hay rayas verticales '|' que REPITEN exactamente esos mismos datos.
    - NUNCA devuelvas null en Relleno, Rugosidad o Alteración si la fila tiene una raya vertical o si la familia de arriba definió el relleno. Rellena siempre el código explícito (ej. ox, cl, ca, m, a, d) en TODAS las filas de esa familia.
 
 C. REGLA CONTUNDENTE PARA RAYAS VERTICALES (|) EN ABERTURA Y ESPESOR:
    - En las columnas Abertura (mm) y Espesor (mm), los geólogos dibujan trazos verticales '|' en las filas 2 y 3 de cada familia.
-   - ¡PROHIBICIÓN ESTRICTA!: Un trazo vertical '|' NO es el número 1. Si la estructura 1 tiene Abertura = 3, en las estructuras 2 y 3 con trazo '|' el valor ES 3 (TERMINANTEMENTE PROHIBIDO PONER 1). Si la estructura 1 tiene 4, en las filas 2 y 3 con trazo '|' el valor ES 4 (NUNCA 1). Si tiene 0.5, es 0.5. Si tiene 2, es 2.
+   - ¡PROHIBICIÓN ESTRICTA!: Un trazo vertical '|' NO es el número 1. Si la estructura 1 tiene Abertura = 3, en las estructuras 2 y 3 con trazo '|' el valor ES 3 (TERMINANTEMENTE PROHIBIDO PONER 1). Si la estructura 1 tiene 4, en las filas 2 y 3 con trazo '|' el valor ES 4 (NUNCA 1). Si tiene 0.5, es 0.5. Si tiene 2, es 2. Si tiene 1, es 1.
    - Si una familia posterior (ej. Familia 2) continúa con rayas '|' hacia abajo sin un nuevo número, HEREDA el valor numérico activo de la familia anterior (ej. 3).
 
 D. GUÍA CALIGRÁFICA Y DESAMBIGUACIÓN DE CARACTERES (CONVENCIÓN DE CAMPO):
    Los caracteres manuscritos en estos formularios siguen un formato tipográfico estricto para evitar confusiones:
    * DÍGITO 1: Se escribe SIEMPRE con serifa/palo superior inclinado y base horizontal inferior (estilo clásico con pie y cabeza).
-   * DÍGITO 4: Se escribe en formato de triángulo cerrado arriba.
-   * DÍGITO 7: Se escribe con una raya horizontal transversal al medio (7 tachado).
+   * DÍGITO 4 vs 1: El '4' se escribe en formato de triángulo cerrado arriba (con trazo transversal horizontal y palo vertical que cruza). NUNCA confundas un '4' con un '1' (ej. 45° es 45°, NUNCA 15°; 44° es 44°, NUNCA 14°).
+   * DÍGITO 7: Se escribe con una barra horizontal superior y una línea diagonal descendente SIN raya horizontal transversal al medio (estilo clásico limpio sin tachar).
    * REGLA DE ORO (| vs 1): Un trazo vertical simple solitario '|' (sin serifa arriba ni base abajo) NUNCA ES EL NÚMERO 1. Es un indicador inequívoco de VALOR REPETIDO que hereda el valor superior.
+   * DÍGITO 5 vs 9:
+     - El '5' tiene un techo/barra horizontal recta arriba, un cuello vertical corto a la izquierda y una panza/barriga abierta hacia la izquierda abajo (sin cerrar bucle arriba).
+     - El '9' tiene un bucle/cabeza completamente cerrado arriba y una pata/cola descendente a la derecha.
+     - CUIDADO: En números terminados en 5 (ej. 165°, 175°, 55°, 65°, 45°), la panza es abierta y el techo es plano; NUNCA lo transcribas como 9 (ej. 165° es 165°, NUNCA 169°; 175° es 175°, NUNCA 179°).
    * DÍGITO 0 vs DÍGITO 9:
-     - El '0' es un círculo u óvalo cerrado, a veces con una pequeña colita/raya saliente MÍNIMA al cerrar el trazo.
-     - El '9' tiene un lazo cerrado arriba y una cola vertical u oblicua descendente prominente.
-     - ¡REGLA DE REEVALUACIÓN DEL '0'!: Si en cualquier celda reconoces un valor exactamente como '0', RE-ANALIZA cuidadosamente: normalmente no se anota '0' (en ese caso se dejaría la casilla vacía), por lo que un '0' suele ser un '9' o un dígito con cola descendente malinterpretado. Reevalúa la casilla para asegurarte si es realmente un 0, un 9, o si debe quedar vacía.
-   * LETRAS 'I' / 'i' y 'F' / 'f' (MAYÚSCULAS Y MINÚSCULAS):
-     - La letra 'I' / 'i' (Forma Irregular) puede aparecer como 'i' minúscula con PUNTO, o como 'I' mayúscula con dos barras horizontales (arriba y abajo).
+     - El '0' (Cero) es un óvalo o círculo cerrado continuo (sin cola vertical descendente).
+       * En direcciones de buzamiento (Dip Dir / Azimut), los ángulos menores a 100° se escriben habitualmente con 3 dígitos llevando un CERO inicial (ej. 029, 056, 071, 099, 090). Ese '0' a la izquierda es un CERO LEGÍTIMO.
+     - El '9' (Nueve) tiene una cabeza redonda cerrada arriba y una pata/cola vertical u oblicua que desciende por la derecha.
+     - Transcribe cada dígito según sus trazos físicos (ej. 099 es 099; 351 es 351; 301 es 301; 071 es 071; 19 es 19; 29 es 29). No sustituyas ceros por nueves ni nueves por ceros.
+   * FORMA 'I' vs 'F':
+     - La forma de estructura es ÚNICAMENTE P | C | O | E | I. 'F' NO existe como forma.
+     - La forma 'I' (Irregular) se escribe como 'I' mayúscula con dos barras horizontales (arriba y abajo) o 'i' minúscula con punto. NUNCA emitas 'F' en forma de estructura.
+   * ALTERACIÓN 'a' (alta) vs 'd' (débil):
+     - La letra 'a' es un círculo bajo con una patita corta a la derecha (sin asta vertical alta que suba).
+     - La letra 'd' tiene una barra/asta vertical larga hacia arriba (ascendente).
+     - Si el trazo es redondo y bajo sin palo alto que suba, es 'a' (alta), NUNCA 'd'.
+   * LETRAS 'F' / 'f' (MAYÚSCULAS Y MINÚSCULAS):
      - La letra 'F' / 'f' puede aparecer en mayúscula o minúscula. En alteración representa 'f' (fresca), y en tipo representa 'F' (falla).
      - Reconoce e interpreta siempre tanto mayúsculas como minúsculas en todas las columnas de texto (forma, alteración, relleno, tipo).
 

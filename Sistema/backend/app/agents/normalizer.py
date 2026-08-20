@@ -311,12 +311,13 @@ def _normalize_joint(raw: Any, idx: int) -> Dict[str, Any]:
     # Identificación de ID y deducción de tipo / familia
     fam_val = _clean_int(d.get("familia_id") or d.get("familia"))
     id_str = _clean_str(d.get("id") or d.get("ID") or d.get("familia") or d.get("tipo_estructura"))
+    expected_fam = math.ceil((idx + 1) / 3.0)
     if id_str:
         m = re.search(r"^[jJfFeE](\d+)", id_str)
         if m:
             fam_val = int(m.group(1))
-    if not fam_val or fam_val <= 0:
-        fam_val = math.ceil((idx + 1) / 3.0)
+    if not fam_val or fam_val <= 0 or (idx >= 3 and fam_val == 1):
+        fam_val = expected_fam
 
     # Tipo de estructura (E/E1 -> BED, J/J1 -> JN, F/F1 -> F, SZ -> SZ)
     tipo_raw = d.get("tipo_estructura") or d.get("tipo")
@@ -344,7 +345,7 @@ def _normalize_joint(raw: Any, idx: int) -> Dict[str, Any]:
         "espesor_mm": _round(_clean_num(d.get("espesor_mm") or d.get("espesor")), 3),
         "continuidad_m": _round(_clean_num(d.get("continuidad_m") or d.get("continuidad")), 3),
         "espaciamiento_m": _round(_clean_num(d.get("espaciamiento_m") or d.get("espaciamiento")), 3),
-        "n_estructuras": _clean_int(d.get("n_estructuras") or d.get("n_est")),
+        "n_estructuras": _clean_int(d.get("n_estructuras") or d.get("n_de_estructuras")),
         "n_extremos_visibles": _clean_int(d.get("n_extremos_visibles")),
         "terminacion": _clean_int(d.get("terminacion")),
         "relleno_1_codigo": _norm_code(d.get("relleno_1_codigo") or d.get("relleno_1"), RELLENO_VALID),
@@ -370,6 +371,7 @@ def _is_missing(val: Any) -> bool:
 
 
 def _detect_missing_header(excel_data: Dict[str, Any]) -> List[str]:
+    """Detecta qué campos de cabecera obligatorios no tienen valor."""
     missing = []
     for key in EXPECTED_HEADER_FIELDS:
         if key in DEFAULTED_HEADER_FIELDS:
@@ -386,6 +388,77 @@ def _detect_missing_joints(estructuras: List[Dict[str, Any]]) -> List[List[str]]
         missing = [key for key in EXPECTED_JOINT_FIELDS if _is_missing(e.get(key))]
         result.append(missing)
     return result
+
+
+def _propagate_joint_properties(estructuras: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Propaga valores de discontinuidades hacia abajo (herencia determinista de líneas verticales |)."""
+    if not estructuras:
+        return estructuras
+
+    last_abertura = None
+    last_espesor = None
+    last_relleno_1 = None
+    last_relleno_2 = None
+    last_jrc = None
+    last_rug = None
+    last_forma = None
+    last_alt = None
+
+    family_tipo = {}
+
+    for e in estructuras:
+        fam = e.get("familia_id")
+        tipo = e.get("tipo_estructura")
+        if fam not in family_tipo and tipo and tipo != "JN":
+            family_tipo[fam] = tipo
+        elif fam in family_tipo and (not tipo or tipo == "JN"):
+            e["tipo_estructura"] = family_tipo[fam]
+
+        # Abertura / Espesor
+        if e.get("abertura_mm") is not None:
+            last_abertura = e["abertura_mm"]
+        elif last_abertura is not None:
+            e["abertura_mm"] = last_abertura
+
+        if e.get("espesor_mm") is not None:
+            last_espesor = e["espesor_mm"]
+        elif last_espesor is not None:
+            e["espesor_mm"] = last_espesor
+
+        # Relleno 1 y 2
+        if e.get("relleno_1_codigo") is not None:
+            last_relleno_1 = e["relleno_1_codigo"]
+        elif last_relleno_1 is not None:
+            e["relleno_1_codigo"] = last_relleno_1
+
+        if e.get("relleno_2_codigo") is not None:
+            last_relleno_2 = e["relleno_2_codigo"]
+        elif last_relleno_2 is not None:
+            e["relleno_2_codigo"] = last_relleno_2
+
+        # JRC y Rugosidad
+        if e.get("jrc") is not None:
+            last_jrc = e["jrc"]
+        elif last_jrc is not None:
+            e["jrc"] = last_jrc
+
+        if e.get("rugosidad_codigo") is not None:
+            last_rug = e["rugosidad_codigo"]
+        elif last_rug is not None:
+            e["rugosidad_codigo"] = last_rug
+
+        # Forma y Alteración
+        if e.get("forma_estructura") is not None:
+            last_forma = e["forma_estructura"]
+        elif last_forma is not None:
+            e["forma_estructura"] = last_forma
+
+        if e.get("alteracion_codigo") is not None:
+            last_alt = e["alteracion_codigo"]
+        elif last_alt is not None:
+            e["alteracion_codigo"] = last_alt
+
+    return estructuras
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +488,7 @@ def normalize_raw_cell(raw_cell: Dict[str, Any], default_index: int = 1) -> Dict
         or raw.get("structures")
     ) if isinstance(raw, dict) else None
     estructuras = [_normalize_joint(j, i) for i, j in enumerate(raw_joints or [])]
+    estructuras = _propagate_joint_properties(estructuras)
 
     missing_header = _detect_missing_header(excel_data)
     missing_joints = _detect_missing_joints(estructuras)
