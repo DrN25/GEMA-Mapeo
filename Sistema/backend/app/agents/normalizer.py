@@ -397,6 +397,8 @@ def _propagate_joint_properties(estructuras: List[Dict[str, Any]]) -> List[Dict[
 
     last_abertura = None
     last_espesor = None
+    last_n_extremos = None
+    last_terminacion = None
     last_relleno_1 = None
     last_relleno_2 = None
     last_jrc = None
@@ -424,6 +426,17 @@ def _propagate_joint_properties(estructuras: List[Dict[str, Any]]) -> List[Dict[
             last_espesor = e["espesor_mm"]
         elif last_espesor is not None:
             e["espesor_mm"] = last_espesor
+
+        # N° Extremos Visibles y Terminación
+        if e.get("n_extremos_visibles") is not None:
+            last_n_extremos = e["n_extremos_visibles"]
+        elif last_n_extremos is not None:
+            e["n_extremos_visibles"] = last_n_extremos
+
+        if e.get("terminacion") is not None:
+            last_terminacion = e["terminacion"]
+        elif last_terminacion is not None:
+            e["terminacion"] = last_terminacion
 
         # Relleno 1 y 2
         if e.get("relleno_1_codigo") is not None:

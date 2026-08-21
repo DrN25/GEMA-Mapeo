@@ -123,11 +123,11 @@ A. ANCLAJE FILA POR FILA:
    - Cada fila física contiene una discontinuidad con su orientación (Dip y Dip Dir).
    - Recorre cada fila horizontalmente de izquierda a derecha sin mezclar datos con filas de arriba o abajo.
 
-B. COLUMNAS DERECHAS (RELLENO 1/2, JRC, RUGOSIDAD, FORMA, ALTERACIÓN):
-   - En la primera fila de cada familia (Estructuras 1, 4, 7, 10), el geólogo escribe explícitamente el Relleno 1 y 2 (ej. ox/cl, ca/ox, ox/ca, g/ox), la Rugosidad y la Alteración (ej. m, a, d).
+B. COLUMNAS DERECHAS Y REPETICIONES (RELLENO 1/2, JRC, RUGOSIDAD, FORMA, ALTERACIÓN, N° EXTREMOS VISIBLES Y TERMINACIÓN):
+   - En la primera fila de cada familia (Estructuras 1, 4, 7, 10), el geólogo escribe explícitamente el Relleno 1 y 2 (ej. ox/cl, ca/ox, ox/ca, g/ox), la Rugosidad, la Alteración (ej. m, a, d), así como el N° de Extremos Visibles (0, 1, 2) y la Terminación (0, 1, 2, 3).
    - ¡FORMATO JRC-RUGOSIDAD EN CASILLA DE RUGOSIDAD!: Si en la casilla de rugosidad está escrito un valor compuesto como "11-5", "13-6", "3-8", "5-7", "7-6", "19-1", el primer número es el valor JRC (0-20) y el segundo número es la Rugosidad ISRM (1-9) (ej. "11-5" -> JRC: 11.0, Rugosidad: 5; "13-6" -> JRC: 13.0, Rugosidad: 6; "3-8" -> JRC: 3.0, Rugosidad: 8; "7-6" -> JRC: 7.0, Rugosidad: 6; "19-1" -> JRC: 19.0, Rugosidad: 1).
    - En las filas 2 y 3 de esa familia (y en familias continuas que no cambian de propiedades), hay rayas verticales '|' que REPITEN exactamente esos mismos datos.
-   - NUNCA devuelvas null en Relleno, Rugosidad o Alteración si la fila tiene una raya vertical o si la familia de arriba definió el relleno. Rellena siempre el código explícito (ej. ox, cl, ca, m, a, d) en TODAS las filas de esa familia.
+   - NUNCA devuelvas null en Relleno, Rugosidad, Alteración, N° Extremos Visibles o Terminación si la fila tiene una raya vertical o si la familia de arriba definió los valores. Rellena siempre el código o valor explícito en TODAS las filas de esa familia.
 
 C. REGLA CONTUNDENTE PARA RAYAS VERTICALES (|) EN ABERTURA Y ESPESOR:
    - En las columnas Abertura (mm) y Espesor (mm), los geólogos dibujan trazos verticales '|' en las filas 2 y 3 de cada familia.

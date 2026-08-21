@@ -145,6 +145,29 @@ class TestNormalizeJoints:
         out = normalize_raw_cell({"estructuras": [{"relleno_1_codigo": "CQ"}]})
         assert out["estructuras"][0]["relleno_1_codigo"] == "ca"
 
+    def test_extremos_y_terminacion_propagacion(self):
+        raw = {
+            "estructuras": [
+                {"familia_id": 1, "n_extremos_visibles": 2, "terminacion": 1},
+                {"familia_id": 1, "n_extremos_visibles": None, "terminacion": None},
+                {"familia_id": 1, "n_extremos_visibles": None, "terminacion": None},
+                {"familia_id": 2, "n_extremos_visibles": 0, "terminacion": 0},
+                {"familia_id": 2, "n_extremos_visibles": None, "terminacion": None},
+            ]
+        }
+        out = normalize_raw_cell(raw)
+        structs = out["estructuras"]
+        assert structs[0]["n_extremos_visibles"] == 2
+        assert structs[0]["terminacion"] == 1
+        assert structs[1]["n_extremos_visibles"] == 2
+        assert structs[1]["terminacion"] == 1
+        assert structs[2]["n_extremos_visibles"] == 2
+        assert structs[2]["terminacion"] == 1
+        assert structs[3]["n_extremos_visibles"] == 0
+        assert structs[3]["terminacion"] == 0
+        assert structs[4]["n_extremos_visibles"] == 0
+        assert structs[4]["terminacion"] == 0
+
 
 class TestMissingFields:
     def test_celda_vacia_marca_campos_esperados(self):
