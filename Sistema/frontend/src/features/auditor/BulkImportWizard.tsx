@@ -42,7 +42,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
-            <div className="w-full max-w-lg bg-[#090f1d] border border-navy-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
+            <div className="w-full max-w-lg bg-navy-900 border border-navy-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
 
                 {/* Cabecera */}
                 <div className="shrink-0 border-b border-navy-800 bg-navy-900/30 p-5 flex justify-between items-center">

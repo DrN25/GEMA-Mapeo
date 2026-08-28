@@ -43,7 +43,7 @@ export default function PltKpiMetrics({
             {/* AUDITORÍA GENERAL / FAMILIA 1 */}
             {kpis.familia1 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-5 space-y-2 relative overflow-hidden">
+                    <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-5 space-y-2 relative overflow-hidden">
                         <div className="flex justify-between items-center text-slate-400">
                             <span className="text-xs font-black uppercase tracking-wider">Total Ensayos / Muestras</span>
                             <Layers size={16} className="text-cyan-400" />
@@ -56,7 +56,7 @@ export default function PltKpiMetrics({
                         </p>
                     </div>
 
-                    <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-5 space-y-2 relative overflow-hidden">
+                    <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-5 space-y-2 relative overflow-hidden">
                         <div className="flex justify-between items-center text-slate-400">
                             <span className="text-xs font-black uppercase tracking-wider">Celdas de Mapeo</span>
                             <Activity size={16} className="text-cyan-400" />
@@ -69,7 +69,7 @@ export default function PltKpiMetrics({
                         </p>
                     </div>
 
-                    <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-5 space-y-2 relative overflow-hidden">
+                    <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-5 space-y-2 relative overflow-hidden">
                         <div className="flex justify-between items-center text-slate-400">
                             <span className="text-xs font-black uppercase tracking-wider">Muestras / Celda Promedio</span>
                             <Layers size={16} className="text-cyan-400" />
@@ -86,21 +86,21 @@ export default function PltKpiMetrics({
 
             {/* AUDITORÍA DE CAMPOS INDIVIDUALES (FAMILIA 2) */}
             {kpis.familia2 && (
-                <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-6 space-y-4">
+                <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                     <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
                         <span>Auditoría de Datos por Celdas Individuales (34 Columnas)</span>
-                        <span className="text-xs bg-slate-900 text-slate-500 px-2 py-0.5 rounded font-mono">
+                        <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Total: {kpis.familia2.total_fields?.toLocaleString() ?? 0} campos
                         </span>
                     </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center shadow-inner">
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl text-center shadow-inner">
                             <span className="text-xs font-black text-slate-500 uppercase block">Campos OK</span>
-                            <span className="text-2xl font-black text-[#10b981] block mt-2 font-mono">
+                            <span className="text-2xl font-black text-emerald-500 dark:text-emerald-400 block mt-2 font-mono">
                                 {kpis.familia2.total_correctos?.toLocaleString() ?? 0}
                             </span>
-                            <span className="text-xs font-extrabold text-[#10b981] block mt-2 bg-[#10b981]/15 border border-[#10b981]/30 py-0.5 rounded">
+                            <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 block mt-2 bg-emerald-500/15 border border-emerald-500/30 py-0.5 rounded">
                                 {pctFieldsCorrectos}%
                             </span>
                         </div>
@@ -155,21 +155,21 @@ export default function PltKpiMetrics({
 
             {/* AUDITORÍA DE FILAS (FAMILIA 3) */}
             {kpis.familia3 && (
-                <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-6 space-y-4">
+                <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                     <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
                         <span>Auditoría a Nivel de Registro (Filas de Muestra)</span>
-                        <span className="text-xs bg-slate-900 text-slate-500 px-2 py-0.5 rounded font-mono">
+                        <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Total: {kpis.familia3.total_registros?.toLocaleString() ?? 0} filas
                         </span>
                     </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center">
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl text-center">
                             <span className="text-xs font-black text-slate-500 uppercase block">Filas Sin Errores</span>
-                            <span className="text-2xl font-black text-[#10b981] block mt-2 font-mono">
+                            <span className="text-2xl font-black text-emerald-500 dark:text-emerald-400 block mt-2 font-mono">
                                 {kpis.familia3.registros_correctos?.toLocaleString() ?? 0}
                             </span>
-                            <span className="text-xs font-extrabold text-[#10b981] block mt-2 bg-[#10b981]/15 border border-[#10b981]/30 py-0.5 rounded">
+                            <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 block mt-2 bg-emerald-500/15 border border-emerald-500/30 py-0.5 rounded">
                                 {pctFilasCorrectas}%
                             </span>
                         </div>
@@ -209,13 +209,13 @@ export default function PltKpiMetrics({
 
             {/* AUDITORÍA DE INTEGRIDAD DE SECUENCIAS ABCD */}
             {kpis.integridad_celdas && (
-                <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-6 space-y-4">
+                <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                     <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between items-center">
                         <div className="flex items-center gap-2">
                             <ShieldCheck size={16} className="text-cyan-400" />
                             <span>Integridad de Secuencias A-B-C-D por Celda</span>
                         </div>
-                        <span className="text-xs bg-slate-900 text-slate-500 px-2 py-0.5 rounded font-mono">
+                        <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Total: {totalCeldas} celdas
                         </span>
                     </h3>
@@ -224,12 +224,12 @@ export default function PltKpiMetrics({
                         <button
                             onClick={() => onFilterSecuencia && onFilterSecuencia(filterSecuencia === 'CORRECTO' ? '' : 'CORRECTO')}
                             className={`p-3 rounded-xl border text-center transition-all ${
-                                filterSecuencia === 'CORRECTO' ? 'bg-[#10b981]/20 border-[#10b981] shadow-md' : 'bg-[#10b981]/5 border-[#10b981]/20 hover:bg-[#10b981]/10'
+                                filterSecuencia === 'CORRECTO' ? 'bg-emerald-500/20 border-emerald-500 shadow-md' : 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10'
                             }`}
                         >
                             <span className="text-[10px] font-black text-slate-400 uppercase block">Correctas (4/4)</span>
-                            <span className="text-xl font-black text-[#10b981] block mt-1 font-mono">{integ.correctas_abcd ?? 0}</span>
-                            <span className="text-[10px] font-extrabold text-[#10b981] block mt-1 bg-[#10b981]/15 py-0.5 rounded">
+                            <span className="text-xl font-black text-emerald-500 dark:text-emerald-400 block mt-1 font-mono">{integ.correctas_abcd ?? 0}</span>
+                            <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 block mt-1 bg-emerald-500/15 py-0.5 rounded">
                                 {((integ.correctas_abcd || 0) / totalCeldas * 100).toFixed(1)}%
                             </span>
                         </button>

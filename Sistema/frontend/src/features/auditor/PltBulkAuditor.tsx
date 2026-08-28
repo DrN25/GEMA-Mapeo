@@ -257,7 +257,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
     const uniqueYears = kpis?.distribucion_campania?.map((c: any) => String(c.campania)) || [];
 
     return (
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 text-slate-200 select-none font-sans bg-[#060a14]">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 text-slate-200 select-none font-sans bg-navy-950">
             {/* Modal de Importación */}
             <PltImportWizard
                 isOpen={isWizardOpen}
@@ -265,57 +265,55 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 onConfirm={handleConfirmImport}
             />
 
+            {/* Historial de Auditorías */}
+            {status !== 'uploading' && (
+                <PltAuditHistory
+                    history={history}
+                    selectedAuditId={selectedAuditId}
+                    onSelectAudit={(auditId) => {
+                        setSelectedAuditId(auditId);
+                        fetchKpis();
+                    }}
+                />
+            )}
+
             {/* ESTADO IDLE / VACÍO */}
             {status !== 'loaded' && !selectedAuditId && status !== 'uploading' && status !== 'error' && (
-                <div className="space-y-8">
-                    <div className="rounded-2xl border border-cyan-500/15 p-10 space-y-8 max-w-xl mx-auto bg-gradient-to-b from-[#0e172a]/60 to-[#090f1d]/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md">
-                        <div className="text-center space-y-3 relative z-10">
-                            <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-md">
-                                <Database size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
-                                    Nueva Auditoría PLT Irregular
-                                </h3>
-                                <p className="text-xs text-slate-400 max-w-sm mx-auto mt-2 leading-relaxed font-semibold">
-                                    Sube una planilla de Ensayos de Carga Puntual (PLT) para evaluar 34 columnas obligatorias, fórmulas con tolerancia e integridad de secuencias A-B-C-D.
-                                </p>
-                            </div>
+                <div className="rounded-2xl border border-cyan-500/15 p-10 space-y-8 max-w-xl mx-auto bg-gradient-to-b from-navy-900/60 to-navy-950/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md">
+                    <div className="text-center space-y-3 relative z-10">
+                        <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-md">
+                            <Database size={24} />
                         </div>
-
-                        <button
-                            onClick={() => setIsWizardOpen(true)}
-                            className="w-full border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/5 hover:bg-cyan-500/10 rounded-2xl p-8 text-center transition-all cursor-pointer relative group flex flex-col items-center gap-3"
-                        >
-                            <FileSpreadsheet size={36} className="text-cyan-500 group-hover:text-cyan-300 transition-colors" />
-                            <div>
-                                <span className="text-sm font-black text-slate-200 block group-hover:text-cyan-300 transition-colors">
-                                    Iniciar Asistente de Carga PLT
-                                </span>
-                                <span className="text-xs text-slate-500 block mt-1 font-bold">
-                                    Carga un libro Excel (.xlsx / .xlsm) de ensayos PLT o BD consolidada.
-                                </span>
-                            </div>
-                        </button>
+                        <div>
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
+                                Nueva Auditoría PLT Irregular
+                            </h3>
+                            <p className="text-xs text-slate-400 max-w-sm mx-auto mt-2 leading-relaxed font-semibold">
+                                Sube una planilla de Ensayos de Carga Puntual (PLT) para evaluar 34 columnas obligatorias, fórmulas con tolerancia e integridad de secuencias A-B-C-D.
+                            </p>
+                        </div>
                     </div>
 
-                    {/* Historial de Auditorías */}
-                    <div className="max-w-4xl mx-auto">
-                        <PltAuditHistory
-                            history={history}
-                            selectedAuditId={selectedAuditId}
-                            onSelectAudit={(auditId) => {
-                                setSelectedAuditId(auditId);
-                                fetchKpis();
-                            }}
-                        />
-                    </div>
+                    <button
+                        onClick={() => setIsWizardOpen(true)}
+                        className="w-full border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/5 hover:bg-cyan-500/10 rounded-2xl p-8 text-center transition-all cursor-pointer relative group flex flex-col items-center gap-3"
+                    >
+                        <FileSpreadsheet size={36} className="text-cyan-500 group-hover:text-cyan-300 transition-colors" />
+                        <div>
+                            <span className="text-sm font-black text-slate-200 block group-hover:text-cyan-300 transition-colors">
+                                Iniciar Asistente de Carga PLT
+                            </span>
+                            <span className="text-xs text-slate-500 block mt-1 font-bold">
+                                Carga un libro Excel (.xlsx / .xlsm) de ensayos PLT o BD consolidada.
+                            </span>
+                        </div>
+                    </button>
                 </div>
             )}
 
             {/* ESTADO ERROR */}
             {status === 'error' && (
-                <div className="rounded-2xl border border-red-500/25 p-8 max-w-xl mx-auto bg-[#170d12]/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md">
+                <div className="rounded-2xl border border-red-500/25 p-8 max-w-xl mx-auto bg-red-950/20 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md">
                     <div className="text-center space-y-4">
                         <div className="p-3 bg-red-500/10 border border-red-500/25 text-red-400 rounded-full w-14 h-14 flex items-center justify-center mx-auto shadow-md">
                             <AlertTriangle size={24} />
@@ -331,7 +329,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                         <div className="flex gap-2 justify-center pt-2">
                             <button
                                 onClick={handleCloseView}
-                                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-black transition-all active:scale-95"
+                                className="bg-navy-800 hover:bg-navy-750 border border-navy-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-black transition-all active:scale-95"
                             >
                                 Volver al inicio
                             </button>
@@ -342,7 +340,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
 
             {/* ESTADO CARGANDO / PROCESANDO */}
             {status === 'uploading' && (
-                <div className="rounded-2xl border border-cyan-500/15 text-center space-y-6 max-w-lg mx-auto bg-[#090f1d]/90 p-10 shadow-2xl mt-12 animate-fade-in">
+                <div className="rounded-2xl border border-cyan-500/15 text-center space-y-6 max-w-lg mx-auto bg-navy-900/90 p-10 shadow-2xl mt-12 animate-fade-in">
                     <div className="relative w-16 h-16 mx-auto">
                         <div className="absolute inset-0 border-4 border-cyan-500/20 rounded-full"></div>
                         <div className="absolute inset-0 border-4 border-t-cyan-400 border-r-cyan-400 rounded-full animate-spin"></div>
@@ -363,7 +361,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
             {(status === 'loaded' || selectedAuditId) && kpis && status !== 'uploading' && status !== 'error' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* Barra de Cabecera Activa */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#090f1d]/60 p-4 border border-cyan-500/10 rounded-xl gap-4 shadow-md backdrop-blur-sm">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-navy-900/60 p-4 border border-cyan-500/10 rounded-xl gap-4 shadow-md backdrop-blur-sm">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-lg">
@@ -381,7 +379,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
 
                             {/* Selector de Campañas */}
                             {uniqueYears.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 border border-navy-900 rounded-xl p-1">
+                                <div className="flex flex-wrap items-center gap-1.5 bg-navy-950 border border-navy-800 rounded-xl p-1">
                                     <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest px-2">Campañas:</span>
                                     <button
                                         onClick={() => setSelectedYears([])}
@@ -417,7 +415,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                         <div className="flex gap-2.5 w-full sm:w-auto shrink-0 justify-end">
                             <button
                                 onClick={handleCloseView}
-                                className="flex items-center gap-1.5 bg-[#0f172a]/80 hover:bg-slate-900 border border-slate-800 text-slate-350 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95"
+                                className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 border border-navy-800 text-slate-300 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95"
                             >
                                 <Trash2 size={14} className="text-red-400" />
                                 <span>Cerrar</span>
@@ -429,7 +427,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                                 className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 ${
                                     excelReady
                                         ? 'bg-cyan-500 hover:bg-cyan-600 border-cyan-400/30 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                                        : 'bg-[#0f172a]/50 border-navy-850 text-slate-500 cursor-not-allowed opacity-60'
+                                        : 'bg-navy-900/50 border-navy-850 text-slate-500 cursor-not-allowed opacity-60'
                                 }`}
                             >
                                 {!excelReady ? (

@@ -110,8 +110,8 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
     };
 
     return (
-        <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-[#090f1d] border border-cyan-500/15 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 view-modal z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-navy-900 border border-cyan-500/15 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex justify-between items-center px-6 py-4 border-b border-cyan-500/10">
                     <div className="flex items-center gap-2">
@@ -130,14 +130,14 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-cyan-500/10 bg-[#060c18]">
+                <div className="flex border-b border-cyan-500/10 bg-navy-950">
                     <button
                         onClick={() => { setTab('history'); setError(''); }}
                         disabled={loading}
                         className={`flex-1 py-3 text-xs font-black uppercase tracking-wider text-center transition-all ${
                             tab === 'history' 
                                 ? 'text-cyan-400 border-b-2 border-cyan-500 bg-cyan-500/5' 
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-navy-800/30'
                         }`}
                     >
                         Desde Historial
@@ -148,7 +148,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                         className={`flex-1 py-3 text-xs font-black uppercase tracking-wider text-center transition-all ${
                             tab === 'files' 
                                 ? 'text-cyan-400 border-b-2 border-cyan-500 bg-cyan-500/5' 
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-navy-800/30'
                         }`}
                     >
                         Importar Nuevos Excels
@@ -179,7 +179,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                         value={auditA}
                                         onChange={(e) => setAuditA(e.target.value)}
                                         disabled={loading}
-                                        className="w-full bg-[#0d1527] border border-cyan-500/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
+                                        className="w-full bg-navy-950 border border-cyan-500/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
                                     >
                                         <option value="">-- Seleccionar auditoría base --</option>
                                         {history.map((h) => (
@@ -191,7 +191,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                 </div>
 
                                 <div className="flex justify-center py-1">
-                                    <div className="w-8 h-8 rounded-full border border-cyan-500/10 bg-[#0d1527] flex items-center justify-center text-cyan-400">
+                                    <div className="w-8 h-8 rounded-full border border-cyan-500/10 bg-navy-950 flex items-center justify-center text-cyan-400">
                                         <ArrowRight size={14} className="rotate-90" />
                                     </div>
                                 </div>
@@ -204,7 +204,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                         value={auditB}
                                         onChange={(e) => setAuditB(e.target.value)}
                                         disabled={loading}
-                                        className="w-full bg-[#0d1527] border border-cyan-500/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
+                                        className="w-full bg-navy-950 border border-cyan-500/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
                                     >
                                         <option value="">-- Seleccionar auditoría actual --</option>
                                         {history.map((h) => (
@@ -219,7 +219,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                             <button
                                 type="submit"
                                 disabled={loading || !auditA || !auditB}
-                                className="w-full bg-cyan-500 hover:bg-cyan-600 disabled:bg-[#0d1527] disabled:border-cyan-500/10 text-slate-950 disabled:text-slate-500 border border-cyan-400/20 px-4 py-3 rounded-xl text-xs font-black transition-all active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                                className="w-full bg-cyan-500 hover:bg-cyan-600 disabled:bg-navy-950 disabled:border-cyan-500/10 text-slate-950 disabled:text-slate-500 border border-cyan-400/20 px-4 py-3 rounded-xl text-xs font-black transition-all active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>
@@ -246,7 +246,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
                                         Planilla Base (A - Referencia)
                                     </label>
-                                    <div className="flex items-center gap-2 bg-[#0d1527] border border-cyan-500/10 rounded-xl px-3 py-2">
+                                    <div className="flex items-center gap-2 bg-navy-950 border border-cyan-500/10 rounded-xl px-3 py-2">
                                         <Upload size={14} className="text-cyan-400 shrink-0" />
                                         <input
                                             type="file"
@@ -276,7 +276,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
                                         Planilla Actual (B - Comparar)
                                     </label>
-                                    <div className="flex items-center gap-2 bg-[#0d1527] border border-cyan-500/10 rounded-xl px-3 py-2">
+                                    <div className="flex items-center gap-2 bg-navy-950 border border-cyan-500/10 rounded-xl px-3 py-2">
                                         <Upload size={14} className="text-cyan-400 shrink-0" />
                                         <input
                                             type="file"

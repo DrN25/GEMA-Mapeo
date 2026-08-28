@@ -110,17 +110,22 @@
 /* ================================================================
  * LIGHT MODE - FONDOS FIJOS OSCUROS
  * Muchos componentes usan fondos arbitrarios oscuros (bg-[#...]).
- * En modo claro (.light en el <html>) se reemplazan por su versiÃ³n
+ * En modo claro (.light en el <html>) se reemplazan por su versión
  * clara equivalente. El modo oscuro NO se ve afectado: estas reglas
  * solo aplican bajo el selector .light.
  * ================================================================ */
 .light [class*="bg-[#02040a]"] { background-color: #eef2f6; }
+.light [class*="bg-[#060a14]"] { background-color: #f1f5f9; }
+.light [class*="bg-[#060c18]"] { background-color: #eef2f6; }
+.light [class*="bg-[#080d1a]"] { background-color: #f8fafc; }
 .light [class*="bg-[#090f1d]"] { background-color: #ffffff; }
+.light [class*="bg-[#0a0f1d]"] { background-color: #ffffff; }
 .light [class*="bg-[#0d1527]"] { background-color: #f1f5f9; }
 .light [class*="bg-[#0f172a]"] { background-color: #f1f5f9; }
 .light [class*="bg-[#170d12]"] { background-color: #fef2f2; }
 .light [class*="bg-[#0e172a]"] { background-color: #f1f5f9; }
-.light [class*="bg-[#060c18]"] { background-color: #eef2f6; }
+.light [class*="from-[#060a14]"] { --tw-gradient-from: #f1f5f9; }
+.light [class*="to-[#060a14]"] { --tw-gradient-to: #f1f5f9; }
 .light [class*="from-[#0e172a]"] { --tw-gradient-from: #f1f5f9; }
 .light [class*="to-[#090f1d]"] { --tw-gradient-to: #ffffff; }
 

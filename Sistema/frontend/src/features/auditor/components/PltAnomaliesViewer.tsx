@@ -43,7 +43,7 @@ export default function PltAnomaliesViewer({
             {/* Top 2 Box Grid: Alertas y Advertencias */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Fallas Críticas */}
-                <div className="rounded-xl border border-navy-800 bg-[#090f1d]/30 p-5 space-y-4 shadow-lg">
+                <div className="rounded-xl border border-navy-800 bg-navy-900/30 p-5 space-y-4 shadow-lg">
                     <h3 className="text-xs font-black uppercase tracking-wider text-slate-350 border-b border-navy-850 pb-2 flex items-center gap-2">
                         <AlertTriangle size={14} className="text-red-400" />
                         <span>Fallas Críticas con Mayor Ocurrencia</span>
@@ -61,7 +61,7 @@ export default function PltAnomaliesViewer({
                                         className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
                                             isFiltered
                                                 ? 'bg-red-500/10 border-red-500 shadow-md ring-1 ring-red-500/30'
-                                                : 'bg-[#0f172a]/30 border-navy-800 hover:bg-slate-900/30 hover:border-slate-700'
+                                                : 'bg-navy-900/40 border-navy-800 hover:bg-navy-850/60 hover:border-navy-700'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -80,7 +80,7 @@ export default function PltAnomaliesViewer({
                 </div>
 
                 {/* Advertencias */}
-                <div className="rounded-xl border border-navy-800 bg-[#090f1d]/30 p-5 space-y-4 shadow-lg">
+                <div className="rounded-xl border border-navy-800 bg-navy-900/30 p-5 space-y-4 shadow-lg">
                     <h3 className="text-xs font-black uppercase tracking-wider text-slate-350 border-b border-navy-850 pb-2 flex items-center gap-2">
                         <Settings size={14} className="text-orange-400" />
                         <span>Advertencias y Desviaciones Secuenciales</span>
@@ -98,7 +98,7 @@ export default function PltAnomaliesViewer({
                                         className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
                                             isFiltered
                                                 ? 'bg-orange-500/10 border-orange-500 shadow-md ring-1 ring-orange-500/30'
-                                                : 'bg-[#0f172a]/30 border-navy-800 hover:bg-slate-900/30 hover:border-slate-700'
+                                                : 'bg-navy-900/40 border-navy-800 hover:bg-navy-850/60 hover:border-navy-700'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -118,7 +118,7 @@ export default function PltAnomaliesViewer({
             </div>
 
             {/* Monitor de Anomalías Paginado */}
-            <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-6 space-y-4 shadow-xl">
+            <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4 shadow-xl">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h3 className="text-xs font-black uppercase tracking-widest text-slate-100 flex items-center gap-2">
@@ -134,7 +134,7 @@ export default function PltAnomaliesViewer({
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-950 border border-navy-800 rounded-lg px-3 py-1.5 w-full sm:w-64">
+                    <div className="flex items-center gap-2 bg-navy-950 border border-navy-800 rounded-lg px-3 py-1.5 w-full sm:w-64">
                         <Search size={14} className="text-slate-500 shrink-0" />
                         <input
                             type="text"
@@ -152,10 +152,10 @@ export default function PltAnomaliesViewer({
                 </div>
 
                 {/* Tabla */}
-                <div className={`overflow-x-auto rounded-xl border border-navy-850 bg-[#090f1d]/20 transition-all duration-350 ${isLoading ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className={`overflow-x-auto rounded-xl border border-navy-850 bg-navy-950/20 transition-all duration-350 ${isLoading ? 'opacity-40 pointer-events-none' : ''}`}>
                     <table className="w-full text-xs text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-950 text-slate-400 font-extrabold uppercase border-b border-navy-850 tracking-wider text-xs">
+                            <tr className="bg-navy-900 text-slate-400 font-extrabold uppercase border-b border-navy-850 tracking-wider text-xs">
                                 <th className="py-3 px-3 text-center w-16">Fila</th>
                                 <th className="py-3 px-3">Celda Mapeo</th>
                                 <th className="py-3 px-3 text-center w-24">Campaña</th>
@@ -187,7 +187,7 @@ export default function PltAnomaliesViewer({
                                         : String(rawVal);
 
                                     return (
-                                        <tr key={idx} className="border-b border-navy-900/60 hover:bg-slate-900/30 transition-all font-normal">
+                                        <tr key={idx} className="border-b border-navy-900/60 hover:bg-navy-850/40 transition-all font-normal">
                                             <td className="py-2.5 px-3 text-center font-mono text-slate-500">{item.fila_excel}</td>
                                             <td className="py-2.5 px-3 font-bold text-slate-200">{item.celda_mapeo || item.celda_padre || '—'}</td>
                                             <td className="py-2.5 px-3 text-center text-slate-400 font-mono">{item.campania || '—'}</td>
@@ -218,14 +218,14 @@ export default function PltAnomaliesViewer({
                         <button
                             disabled={page <= 1 || isLoading}
                             onClick={() => onPageChange(page - 1)}
-                            className="p-1.5 rounded-lg bg-[#090f1d] hover:bg-slate-900 border border-navy-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
+                            className="p-1.5 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
                         >
                             <ChevronLeft size={16} />
                         </button>
                         <button
                             disabled={page >= totalPages || isLoading}
                             onClick={() => onPageChange(page + 1)}
-                            className="p-1.5 rounded-lg bg-[#090f1d] hover:bg-slate-900 border border-navy-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
+                            className="p-1.5 rounded-lg bg-navy-900 hover:bg-navy-850 border border-navy-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
                         >
                             <ChevronRight size={16} />
                         </button>

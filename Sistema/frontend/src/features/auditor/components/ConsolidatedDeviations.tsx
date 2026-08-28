@@ -22,7 +22,7 @@ export default function ConsolidatedDeviations({
     if (!kpis || !kpis.consolidado_observaciones) return null;
 
     return (
-        <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-6 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-6 space-y-6 shadow-xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-2">
                     <BarChart3 size={16} className="text-cyan-400 shrink-0" />
@@ -67,7 +67,7 @@ export default function ConsolidatedDeviations({
                             <div className="overflow-x-auto rounded-lg border border-navy-800">
                                 <table className="w-full text-xs text-left border-collapse">
                                     <thead>
-                                        <tr className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
+                                        <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
                                             <th className="py-3 px-4 text-xs">Tipo de Inconsistencia Geomecánica</th>
                                             {uniqueYears.map(yr => {
                                                 const sev = kpis.consolidado_observaciones[yr].severity;
@@ -87,7 +87,7 @@ export default function ConsolidatedDeviations({
                                             })}
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-navy-850 text-slate-300 font-semibold text-xs bg-slate-900/20">
+                                    <tbody className="divide-y divide-navy-850 text-slate-300 font-semibold text-xs bg-navy-900/20">
                                         {coreObservationTypes.map((obsType, oIdx) => (
                                             <tr
                                                 key={oIdx}
@@ -105,7 +105,7 @@ export default function ConsolidatedDeviations({
                                                                     ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
                                                                     : val > 0
                                                                         ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                                                        : 'bg-slate-900/30 text-slate-650 border-transparent'
+                                                                        : 'bg-navy-900/30 text-slate-500 border-transparent'
                                                                 }`}>
                                                                 {val.toLocaleString()}
                                                             </span>
@@ -136,7 +136,7 @@ export default function ConsolidatedDeviations({
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-slate-900/30 border border-navy-850 p-4 rounded-xl space-y-3">
+                                <div className="bg-navy-900/30 border border-navy-850 p-4 rounded-xl space-y-3">
                                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
                                         Ocurrencias por Campaña
                                     </h4>
@@ -160,7 +160,7 @@ export default function ConsolidatedDeviations({
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-900/30 border border-navy-850 p-4 rounded-xl space-y-3">
+                                <div className="bg-navy-900/30 border border-navy-850 p-4 rounded-xl space-y-3">
                                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
                                         Estaciones (Celdas Padre) Afectadas por Año
                                     </h4>
@@ -189,10 +189,10 @@ export default function ConsolidatedDeviations({
                                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
                                     TOP 3 ESTACIONES CON MAYOR RECURRENCIA DEL ERROR
                                 </h4>
-                                <div className="overflow-x-auto rounded-lg border border-navy-800 bg-[#090f1d]/20">
+                                <div className="overflow-x-auto rounded-lg border border-navy-800 bg-navy-950/20">
                                     <table className="w-full text-xs text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-navy-800">
+                                            <tr className="bg-navy-900 text-slate-400 font-bold uppercase tracking-wider border-b border-navy-800">
                                                 <th className="py-2.5 px-3 text-center w-24 text-xs">Campaña</th>
                                                 <th className="py-2.5 px-3 text-xs">1° Crítica</th>
                                                 <th className="py-2.5 px-3 text-xs">2° Crítica</th>

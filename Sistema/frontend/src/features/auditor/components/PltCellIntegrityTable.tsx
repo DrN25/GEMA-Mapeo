@@ -89,7 +89,7 @@ export default function PltCellIntegrityTable({
     };
 
     return (
-        <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-6 space-y-4 shadow-xl select-none">
+        <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-6 space-y-4 shadow-xl select-none">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h3 className="text-xs font-black uppercase tracking-wider text-slate-100 flex items-center gap-2">
@@ -103,7 +103,7 @@ export default function PltCellIntegrityTable({
 
                 <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
                     {/* Búsqueda */}
-                    <div className="flex items-center gap-2 bg-slate-950 border border-navy-800 rounded-lg px-3 py-1.5 w-full sm:w-56">
+                    <div className="flex items-center gap-2 bg-navy-950 border border-navy-800 rounded-lg px-3 py-1.5 w-full sm:w-56">
                         <Search size={14} className="text-slate-500 shrink-0" />
                         <input
                             type="text"
@@ -123,7 +123,7 @@ export default function PltCellIntegrityTable({
                     <select
                         value={stateFilter}
                         onChange={(e) => setStateFilter(e.target.value)}
-                        className="bg-slate-950 border border-navy-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 font-bold focus:outline-none"
+                        className="bg-navy-950 border border-navy-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 font-bold focus:outline-none"
                     >
                         <option value="ALL">Todos los Estados</option>
                         <option value="CORRECTO">Solo Correctas (ABCD)</option>
@@ -136,10 +136,10 @@ export default function PltCellIntegrityTable({
             </div>
 
             {/* Tabla */}
-            <div className="rounded-xl border border-navy-850 bg-[#090f1d]/20 overflow-hidden">
+            <div className="rounded-xl border border-navy-850 bg-navy-950/20 overflow-hidden">
                 <div className="max-h-72 overflow-y-auto overflow-x-auto scrollbar-thin">
                     <table className="w-full text-xs text-left border-collapse">
-                        <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-850 uppercase tracking-wider text-xs">
+                        <thead className="sticky top-0 z-10 bg-navy-900 text-slate-400 font-extrabold border-b border-navy-850 uppercase tracking-wider text-xs">
                             <tr>
                                 <th className="py-2.5 px-3">Celda Mapeo</th>
                                 <th className="py-2.5 px-3">Fecha Ensayo</th>
@@ -166,7 +166,7 @@ export default function PltCellIntegrityTable({
                                     <tr
                                         key={idx}
                                         onClick={() => onSelectCell && onSelectCell(row.celda)}
-                                        className="border-b border-navy-900/60 hover:bg-slate-900/30 cursor-pointer transition-all font-normal"
+                                        className="border-b border-navy-900/60 hover:bg-navy-850/40 cursor-pointer transition-all font-normal"
                                     >
                                         <td className="py-2 px-3 font-bold text-slate-200">{row.celda}</td>
                                         <td className="py-2 px-3 font-mono text-slate-400">{row.fecha || '—'}</td>

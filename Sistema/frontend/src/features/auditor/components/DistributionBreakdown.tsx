@@ -24,15 +24,15 @@ export default function DistributionBreakdown({
     return (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* DISTRIBUCIÓN POR CAMPAÑA */}
-            <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-5 space-y-4 shadow-md shadow-[0_0_20px_rgba(6,182,212,0.01)]">
+            <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-5 space-y-4 shadow-md shadow-[0_0_20px_rgba(6,182,212,0.01)]">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-350 border-b border-navy-850 pb-2 flex items-center gap-2">
                     <Calendar size={14} className="text-cyan-400" />
                     <span>Distribución por Campaña Geotécnica</span>
                 </h3>
-                <div className="rounded-xl border border-navy-800 overflow-hidden bg-slate-950">
+                <div className="rounded-xl border border-navy-800 overflow-hidden bg-navy-950">
                     <div className="max-h-56 overflow-y-auto overflow-x-auto scrollbar-thin">
                         <table className="w-full text-xs text-left border-collapse">
-                            <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-900">
+                            <thead className="sticky top-0 z-10 bg-navy-900 text-slate-400 font-extrabold border-b border-navy-800">
                                 <tr>
                                     <th className="py-2.5 px-3">Campaña</th>
                                     <th className="py-2.5 px-3 text-center">Filas (N)</th>
@@ -48,7 +48,7 @@ export default function DistributionBreakdown({
                                         <tr
                                             key={idx}
                                             onClick={() => onFilterCampania(row.campania)}
-                                            className={`border-b border-slate-900/60 cursor-pointer transition-colors ${isFiltered ? 'bg-indigo-500/15 ring-2 ring-indigo-500/40' : 'hover:bg-slate-900/30'}`}
+                                            className={`border-b border-navy-900/60 cursor-pointer transition-colors ${isFiltered ? 'bg-indigo-500/15 ring-2 ring-indigo-500/40' : 'hover:bg-navy-800/30'}`}
                                         >
                                             <td className="py-2 px-3 font-bold text-slate-200">{row.campania}</td>
                                             <td className="py-2 px-3 text-center font-mono">{row.discontinuidades}</td>
@@ -71,15 +71,15 @@ export default function DistributionBreakdown({
             </div>
 
             {/* DISTRIBUCIÓN POR CELDAS MÁS AFECTADAS */}
-            <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-5 space-y-4 shadow-md shadow-[0_0_20px_rgba(6,182,212,0.01)]">
+            <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-5 space-y-4 shadow-md shadow-[0_0_20px_rgba(6,182,212,0.01)]">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-350 border-b border-navy-850 pb-2 flex items-center gap-2">
                     <BarChart3 size={14} className="text-cyan-400" />
                     <span>Estaciones Geomecánicas con Más Fallas</span>
                 </h3>
-                <div className="rounded-xl border border-navy-800 overflow-hidden bg-slate-950">
+                <div className="rounded-xl border border-navy-800 overflow-hidden bg-navy-950">
                     <div className="max-h-56 overflow-y-auto overflow-x-auto scrollbar-thin">
                         <table className="w-full text-xs text-left border-collapse">
-                            <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-900">
+                            <thead className="sticky top-0 z-10 bg-navy-900 text-slate-400 font-extrabold border-b border-navy-800">
                                 <tr>
                                     <th className="py-2.5 px-3">Celda Padre</th>
                                     <th className="py-2.5 px-3 text-center">Filas (N)</th>
@@ -95,7 +95,7 @@ export default function DistributionBreakdown({
                                         <tr
                                             key={idx}
                                             onClick={() => onFilterCelda(row.celda)}
-                                            className={`border-b border-navy-900/60 cursor-pointer hover:bg-slate-900/30 ${isFiltered ? 'bg-cyan-500/15' : ''}`}
+                                            className={`border-b border-navy-900/60 cursor-pointer hover:bg-navy-800/30 ${isFiltered ? 'bg-cyan-500/15' : ''}`}
                                         >
                                             <td className="py-2 px-3 font-bold text-slate-200">{row.celda}</td>
                                             <td className="py-2 px-3 text-center font-mono">{row.total_hijas}</td>
@@ -112,15 +112,15 @@ export default function DistributionBreakdown({
             </div>
 
             {/* RESPONSABLE / GEÓLOGOS */}
-            <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-5 space-y-4 shadow-md shadow-[0_0_20px_rgba(6,182,212,0.01)]">
+            <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-5 space-y-4 shadow-md shadow-[0_0_20px_rgba(6,182,212,0.01)]">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-350 border-b border-navy-850 pb-2 flex items-center gap-2">
                     <User size={14} className="text-cyan-400" />
                     <span>Fallas Agrupadas por Geotecnista</span>
                 </h3>
-                <div className="rounded-xl border border-navy-800 overflow-hidden bg-slate-950">
+                <div className="rounded-xl border border-navy-800 overflow-hidden bg-navy-950">
                     <div className="max-h-56 overflow-y-auto overflow-x-auto scrollbar-thin">
                         <table className="w-full text-xs text-left border-collapse">
-                            <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-extrabold border-b border-navy-900">
+                            <thead className="sticky top-0 z-10 bg-navy-900 text-slate-400 font-extrabold border-b border-navy-800">
                                 <tr>
                                     <th className="py-2.5 px-3">Geotécnico</th>
                                     <th className="py-2.5 px-3 text-center">Registros (N)</th>
@@ -136,7 +136,7 @@ export default function DistributionBreakdown({
                                         <tr
                                             key={idx}
                                             onClick={() => onFilterGeotecnico(row.geotecnico)}
-                                            className={`border-b border-navy-900/60 cursor-pointer hover:bg-slate-900/30 ${isFiltered ? 'bg-cyan-500/15' : ''}`}
+                                            className={`border-b border-navy-900/60 cursor-pointer hover:bg-navy-800/30 ${isFiltered ? 'bg-cyan-500/15' : ''}`}
                                         >
                                             <td className="py-2 px-3 font-bold text-slate-200 truncate max-w-[100px]">{row.geotecnico}</td>
                                             <td className="py-2 px-3 text-center font-mono">{row.discontinuidades}</td>

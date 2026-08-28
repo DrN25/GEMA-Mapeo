@@ -28,7 +28,7 @@ export default function PltConsolidatedDeviations({
     const displayedItems = isConsolidatedExpanded ? allItems : allItems.slice(0, 5);
 
     return (
-        <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-6 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-6 space-y-6 shadow-xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-2">
                     <BarChart3 size={16} className="text-cyan-400 shrink-0" />
@@ -79,7 +79,7 @@ export default function PltConsolidatedDeviations({
                             className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
                                 isSelected
                                     ? 'bg-cyan-500/10 border-cyan-500 shadow-md ring-1 ring-cyan-500/30'
-                                    : 'bg-[#0f172a]/30 border-navy-800 hover:bg-slate-900/30 hover:border-slate-700'
+                                    : 'bg-navy-900/40 border-navy-800 hover:bg-navy-850/60 hover:border-navy-700'
                             }`}
                         >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
@@ -100,7 +100,7 @@ export default function PltConsolidatedDeviations({
                             </div>
 
                             {/* Barra de Progreso */}
-                            <div className="w-full bg-slate-950 rounded-full h-1.5 mt-2.5 overflow-hidden border border-navy-900">
+                            <div className="w-full bg-navy-950 rounded-full h-1.5 mt-2.5 overflow-hidden border border-navy-800">
                                 <div
                                     className={`h-full rounded-full transition-all duration-500 ${
                                         isAlert ? 'bg-gradient-to-r from-red-600 to-rose-400' : 'bg-gradient-to-r from-amber-600 to-orange-400'

@@ -41,7 +41,7 @@ export default function KpiMetrics({
         <div className="space-y-6">
             {/* MONITOR KPIS METRICAS GENERALES */}
             {kpis.familia1 && (
-                <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-5 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-md">
+                <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-5 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-md">
                     <div className="flex items-center justify-between p-2">
                         <div className="space-y-1">
                             <span className="text-xs font-black text-slate-500 uppercase tracking-widest block">Estaciones Evaluadas</span>
@@ -87,19 +87,19 @@ export default function KpiMetrics({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* AUDITORÍA DE CAMPOS */}
                 {kpis.familia2 && (
-                    <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-6 space-y-4">
+                    <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                         <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
                             <span>Auditoría de Datos por Celdas Individuales</span>
-                            <span className="text-xs bg-slate-900 text-slate-500 px-2 py-0.5 rounded font-mono">
+                            <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                                 Total: {kpis.familia2.total_fields.toLocaleString()} campos
                             </span>
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                            <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center shadow-inner">
+                            <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl text-center shadow-inner">
                                 <span className="text-xs font-black text-slate-500 uppercase block">Campos OK</span>
-                                <span className="text-2xl font-black text-[#10b981] block mt-2 font-mono">{kpis.familia2.total_correctos.toLocaleString()}</span>
-                                <span className="text-xs font-extrabold text-[#10b981] block mt-2 bg-[#10b981]/15 border border-[#10b981]/30 py-0.5 rounded">
+                                <span className="text-2xl font-black text-emerald-500 dark:text-emerald-400 block mt-2 font-mono">{kpis.familia2.total_correctos.toLocaleString()}</span>
+                                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 block mt-2 bg-emerald-500/15 border border-emerald-500/30 py-0.5 rounded">
                                     {pctFieldsCorrectos}%
                                 </span>
                             </div>
@@ -145,19 +145,19 @@ export default function KpiMetrics({
 
                 {/* AUDITORÍA DE REGISTROS (FILAS) */}
                 {kpis.familia3 && (
-                    <div className="rounded-xl border border-navy-800 bg-[#090f1d]/50 p-6 space-y-4">
+                    <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                         <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
                             <span>Auditoría de Filas de Registro (Corridas/Juntas)</span>
-                            <span className="text-xs bg-slate-900 text-slate-500 px-2 py-0.5 rounded font-mono">
+                            <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                                 Total: {kpis.familia3.total_discontinuidades.toLocaleString()} filas
                             </span>
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                            <div className="bg-[#10b981]/5 border border-[#10b981]/20 p-4 rounded-xl text-center">
+                            <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl text-center">
                                 <span className="text-xs font-black text-slate-500 uppercase block">Filas Correctas</span>
-                                <span className="text-2xl font-black text-[#10b981] block mt-2 font-mono">{kpis.familia3.discontinuidades_correctas.toLocaleString()}</span>
-                                <span className="text-xs font-extrabold text-[#10b981] block mt-2 bg-[#10b981]/15 border border-[#10b981]/30 py-0.5 rounded">
+                                <span className="text-2xl font-black text-emerald-500 dark:text-emerald-400 block mt-2 font-mono">{kpis.familia3.discontinuidades_correctas.toLocaleString()}</span>
+                                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 block mt-2 bg-emerald-500/15 border border-emerald-500/30 py-0.5 rounded">
                                     {pctDiscsCorrectas}%
                                 </span>
                             </div>

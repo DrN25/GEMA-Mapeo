@@ -23,7 +23,7 @@ export default function PltAuditHistory({
     onSelectAudit,
 }: PltAuditHistoryProps) {
     return (
-        <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-4 shadow-xl select-none">
+        <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-4 shadow-xl select-none">
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
                     <Folder size={14} className="text-cyan-400" />
@@ -42,14 +42,14 @@ export default function PltAuditHistory({
                                 onClick={() => onSelectAudit(audit.id)}
                                 className={`flex-shrink-0 p-3 rounded-lg border text-left transition-all ${isActive
                                     ? 'bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
-                                    : 'bg-[#0f172a]/40 border-navy-800 hover:border-slate-700 hover:bg-slate-900/40'
+                                    : 'bg-navy-900/40 border-navy-800 hover:border-navy-700 hover:bg-navy-850/50'
                                     }`}
                             >
                                 <div className="flex items-center justify-between gap-4">
                                     <span className="text-xs font-black text-slate-100 truncate max-w-[180px]" title={audit.archivo}>
                                         {audit.archivo}
                                     </span>
-                                    <span className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-450 font-bold">
+                                    <span className="text-xs bg-navy-800 px-2 py-0.5 rounded text-slate-300 font-bold">
                                         {audit.total_registros} filas
                                     </span>
                                 </div>

@@ -44,7 +44,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left font-sans select-none">
-            <div className="w-full max-w-lg bg-[#090f1d] border border-navy-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
+            <div className="w-full max-w-lg bg-navy-900 border border-navy-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
 
                 {/* Cabecera */}
                 <div className="shrink-0 border-b border-navy-800 bg-navy-900/30 p-5 flex justify-between items-center">
@@ -54,7 +54,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800/50 transition-all"
+                        className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-navy-800/50 transition-all"
                     >
                         <X size={18} />
                     </button>
