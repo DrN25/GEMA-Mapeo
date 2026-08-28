@@ -1,394 +1,812 @@
 """
-app/services/plt_excel_exporter.py — Generador de Reportes Excel QAQC para Ensayos PLT.
-Construye un libro .xlsx multi-hoja con Dashboard Ejecutivo, Integridad ABCD,
-Catálogo de Errores con enlaces bidireccionales, y Detalle de Incidencias.
-Reutiliza la paleta y funciones de app.core.excel_styles.
+app/services/plt_excel_exporter.py — Generador de Reporte Excel Profesional Multi-Hoja QA/QC para PLT.
+Estructura y estilos 100% calcados del motor de auditoría de Mapeo Geomecánico (generar_excel_reporte_core).
 """
 
-import io
-import re
-from collections import defaultdict
-from typing import Dict, List, Optional
-
+from collections import Counter, defaultdict
+import os
 import openpyxl
+from openpyxl.chart import BarChart, Reference
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from app.core.audit_plt_helpers import get_plt_incidence_category_name, aggregate_plt_audit_metrics
 from app.core.excel_styles import get_styles, write_kpi_card
+from app.core.audit_helpers import safe_int, safe_float, get_safe_sheet_name
+from app.core.audit_plt_helpers import get_plt_incidence_category_name
 from app.core.rules_plt import CATEGORIES_REGISTRY_PLT, RULES_REGISTRY_PLT
 
 
-def _safe_sheet_title(name: str) -> str:
-    """Sanea el nombre para cumplir los límites de nombres de hoja en Excel (máx 31 caracteres)."""
-    clean = re.sub(r'[:\\/?*\[\]]', '_', name)
-    return clean[:31].strip()
-
-
-def generar_excel_reporte_plt(diag: dict, compact: Optional[dict] = None, years_filter: Optional[str] = None) -> io.BytesIO:
+def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> openpyxl.Workbook:
     """
-    Genera el archivo Excel binario (.xlsx) con el reporte completo de auditoría QAQC PLT.
+    Genera el libro Excel (.xlsx) completo de auditoría QA/QC para Ensayos PLT.
+    Calcado 1:1 de la estructura, jerarquía, hipervínculos, estilos y gráficos de Mapeo Geomecánico.
     """
-    if compact is None:
-        compact = aggregate_plt_audit_metrics(diag, years_filter)
-
     s = get_styles()
+    font_title = s["font_title"]
+    font_subtitle = s["font_subtitle"]
+    font_section = s["font_section"]
+    font_header = s["font_header"]
+    font_bold = s["font_bold"]
+    font_regular = s["font_regular"]
+    font_kpi_lbl = s["font_kpi_lbl"]
+
+    font_kpi_val_blue = s["font_kpi_blue"]
+    font_kpi_val_green = s["font_kpi_green"]
+    font_kpi_val_red = s["font_kpi_red"]
+    font_kpi_val_orange = s["font_kpi_orange"]
+
+    fill_primary = s["fill_primary"]
+    fill_accent_green = s["fill_green"]
+    fill_accent_yellow = s["fill_yellow"]
+    fill_accent_orange = s["fill_orange"]
+    fill_accent_red = s["fill_red"]
+    fill_zebra = s["fill_zebra"]
+    fill_kpi_gray = s["fill_kpi_gray"]
+
+    border_thin = s["border_thin"]
+    border_kpi = s["border_kpi"]
+
+    alignment_center = s["align_center"]
+    alignment_left = s["align_left"]
+    alignment_right = s["align_right"]
+
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)  # Eliminar hoja default
 
-    incidencias_raw = diag.get("incidencias", [])
-    if years_filter and years_filter not in ("TODOS", "", "None", None):
-        years_list = [y.strip() for y in str(years_filter).split(",") if y.strip()]
-        incidencias = [i for i in incidencias_raw if str(i.get("campania")) in years_list]
-    else:
-        incidencias = incidencias_raw
+    def write_kpi_card_opt(ws, start_row, start_col, label, value, bg_fill, val_font):
+        write_kpi_card(ws, start_row, start_col, label, value, bg_fill, val_font, s)
 
     # =========================================================================
-    # HOJA 1: Dashboard Ejecutivo PLT
+    # --- HOJA 1: DASHBOARD EJECUTIVO ---
     # =========================================================================
-    ws_dash = wb.create_sheet(title="Dashboard Ejecutivo PLT")
+    ws_dash = wb.active
+    ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
 
-    # Banner Título
-    ws_dash.cell(row=2, column=2, value="AUDITORÍA QA/QC — ENSAYOS DE CARGA PUNTUAL (PLT)").font = s["font_title"]
-    ws_dash.cell(row=3, column=2, value=f"Archivo: {diag.get('nombre_archivo', 'N/A')}  |  Fecha Evaluación: {compact.get('fecha_auditoria', '')}").font = s["font_subtitle"]
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA — ENSAYOS PLT").font = font_title
+    ws_dash.cell(
+        row=3,
+        column=2,
+        value="Dashboard Ejecutivo de Control de Calidad, Consistencia de 34 Columnas y Secuencias ABCD",
+    ).font = font_subtitle
 
-    # Tarjetas KPI (Fila 5 a 6)
-    fam1 = compact.get("familia1", {})
-    fam2 = compact.get("familia2", {})
-    fam3 = compact.get("familia3", {})
-    pct_int = fam2.get("pct_integridad", 100.0)
+    total_filas = compact.get("familia1", {}).get("total_registros", diag.get("total_filas_procesadas", 0))
+    total_fields = compact.get("familia2", {}).get("total_fields", total_filas * 34)
+    total_vacios = sum(1 for i in filtered if i.get("tipo_incidencia") == "VACIO")
+    total_advertencias = sum(1 for i in filtered if i.get("tipo_incidencia") == "ADVERTENCIA")
+    total_alertas = sum(1 for i in filtered if i.get("tipo_incidencia") == "ALERTA")
+    total_correctos = max(0, total_fields - (total_vacios + total_advertencias + total_alertas))
+    pct_integridad = (total_correctos / max(1, total_fields)) * 100
 
-    font_kpi_pct = s["font_kpi_green"] if pct_int >= 95.0 else (s["font_kpi_orange"] if pct_int >= 80.0 else s["font_kpi_red"])
+    total_celdas = len(compact.get("resumen_por_celda", diag.get("resumen_por_celda", {})))
 
-    write_kpi_card(ws_dash, 5, 2, "TOTAL REGISTROS", fam1.get("total_registros", 0), s["fill_kpi_gray"], s["font_kpi_blue"], s)
-    write_kpi_card(ws_dash, 5, 4, "TOTAL CELDAS", fam1.get("total_celdas", 0), s["fill_kpi_gray"], s["font_kpi_blue"], s)
-    write_kpi_card(ws_dash, 5, 6, "% INTEGRIDAD GLOBAL", f"{pct_int:.1f}%", s["fill_kpi_gray"], font_kpi_pct, s)
-    write_kpi_card(ws_dash, 5, 8, "TOTAL ALERTAS", fam2.get("total_alertas", 0), s["fill_kpi_gray"], s["font_kpi_red"], s)
-    write_kpi_card(ws_dash, 5, 10, "TOTAL ADVERTENCIAS", fam2.get("total_advertencias", 0), s["fill_kpi_gray"], s["font_kpi_orange"], s)
-    write_kpi_card(ws_dash, 5, 12, "TOTAL VACÍOS", fam2.get("total_vacios", 0), s["fill_kpi_gray"], s["font_kpi_blue"], s)
+    # Tarjetas KPI Superiores
+    write_kpi_card_opt(ws_dash, 5, 2, "CELDAS EVALUADAS", total_celdas, fill_kpi_gray, font_kpi_val_blue)
+    write_kpi_card_opt(ws_dash, 5, 4, "MUESTRAS REGISTRADAS", total_filas, fill_kpi_gray, font_kpi_val_blue)
+    write_kpi_card_opt(ws_dash, 5, 6, "INTEGRIDAD GLOBAL", f"{pct_integridad:.2f}%", fill_accent_green, font_kpi_val_green)
+    write_kpi_card_opt(ws_dash, 5, 8, "ALERTAS CRÍTICAS", total_alertas, fill_accent_red, font_kpi_val_red)
+    write_kpi_card_opt(ws_dash, 5, 10, "ADVERTENCIAS", total_advertencias, fill_accent_orange, font_kpi_val_orange)
 
-    # Tarjetas Integridad Celdas ABCD (Fila 8 a 9)
+    # 1. Tabla: Desempeño por Campaña
+    ws_dash.cell(row=9, column=2, value="DESEMPEÑO DE CONTROL POR CAMPAÑA").font = font_section
+    headers_camp = ["Campaña", "Muestras", "Celdas Afectadas", "Muestras Afectadas", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
+    for idx, col in enumerate(headers_camp, start=2):
+        cell = ws_dash.cell(row=10, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
+    r_camp = 11
+    for row in compact.get("distribucion_campania", []):
+        ws_dash.cell(row=r_camp, column=2, value=str(row.get("campania"))).font = font_bold
+        ws_dash.cell(row=r_camp, column=2).alignment = alignment_center
+
+        ws_dash.cell(row=r_camp, column=3, value=safe_int(row.get("registros"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=3).alignment = alignment_right
+
+        ws_dash.cell(row=r_camp, column=4, value=safe_int(row.get("celdas_afectadas"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=4).alignment = alignment_right
+
+        ws_dash.cell(row=r_camp, column=5, value=safe_int(row.get("registros_afectados", row.get("registros")))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=5).alignment = alignment_right
+
+        ws_dash.cell(row=r_camp, column=6, value=safe_int(row.get("alertas_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=6).alignment = alignment_right
+
+        ws_dash.cell(row=r_camp, column=7, value=safe_float(row.get("alertas_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=r_camp, column=7).alignment = alignment_right
+
+        ws_dash.cell(row=r_camp, column=8, value=safe_int(row.get("vacios_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=r_camp, column=8).alignment = alignment_right
+
+        ws_dash.cell(row=r_camp, column=9, value=safe_float(row.get("vacios_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=r_camp, column=9).alignment = alignment_right
+
+        for col_idx in range(2, 10):
+            ws_dash.cell(row=r_camp, column=col_idx).border = border_thin
+            if r_camp % 2 == 0:
+                ws_dash.cell(row=r_camp, column=col_idx).fill = fill_zebra
+        r_camp += 1
+
+    # 2. Tabla: Distribución por Tipo Litológico
+    r_lito = r_camp + 2
+    ws_dash.cell(row=r_lito, column=2, value="DISTRIBUCIÓN POR TIPO LITOLÓGICO").font = font_section
+    headers_lito = ["Tipo Litológico", "Muestras", "Celdas Afectadas", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
+    for idx, col in enumerate(headers_lito, start=2):
+        cell = ws_dash.cell(row=r_lito + 1, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
+    curr_l_r = r_lito + 2
+    for row in compact.get("distribucion_litologia", []):
+        ws_dash.cell(row=curr_l_r, column=2, value=str(row.get("tipo_litologico"))).font = font_bold
+        ws_dash.cell(row=curr_l_r, column=2).alignment = alignment_left
+
+        ws_dash.cell(row=curr_l_r, column=3, value=safe_int(row.get("registros"))).number_format = '#,##0'
+        ws_dash.cell(row=curr_l_r, column=3).alignment = alignment_right
+
+        ws_dash.cell(row=curr_l_r, column=4, value=safe_int(row.get("celdas_afectadas", 0))).number_format = '#,##0'
+        ws_dash.cell(row=curr_l_r, column=4).alignment = alignment_right
+
+        ws_dash.cell(row=curr_l_r, column=5, value=safe_int(row.get("alertas_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=curr_l_r, column=5).alignment = alignment_right
+
+        ws_dash.cell(row=curr_l_r, column=6, value=safe_float(row.get("alertas_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=curr_l_r, column=6).alignment = alignment_right
+
+        ws_dash.cell(row=curr_l_r, column=7, value=safe_int(row.get("vacios_cant"))).number_format = '#,##0'
+        ws_dash.cell(row=curr_l_r, column=7).alignment = alignment_right
+
+        ws_dash.cell(row=curr_l_r, column=8, value=safe_float(row.get("vacios_pct")) / 100.0).number_format = '0.00%'
+        ws_dash.cell(row=curr_l_r, column=8).alignment = alignment_right
+
+        for col_idx in range(2, 9):
+            ws_dash.cell(row=curr_l_r, column=col_idx).border = border_thin
+            if curr_l_r % 2 == 0:
+                ws_dash.cell(row=curr_l_r, column=col_idx).fill = fill_zebra
+        curr_l_r += 1
+
+    # 3. Tabla: Top 5 Celdas con Mayor Incidencia
+    r_worst = curr_l_r + 2
+    ws_dash.cell(row=r_worst, column=2, value="TOP 5 CELDAS CON MAYOR INCIDENCIA").font = font_section
+    headers_worst = ["Celda Mapeo", "Muestras", "Alertas (N)", "Advertencias (N)", "Vacíos (N)"]
+    for idx, col in enumerate(headers_worst, start=2):
+        cell = ws_dash.cell(row=r_worst + 1, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
+    curr_w_r = r_worst + 2
+    for row in compact.get("worst_cells", [])[:5]:
+        ws_dash.cell(row=curr_w_r, column=2, value=str(row.get("celda"))).font = font_bold
+        ws_dash.cell(row=curr_w_r, column=2).alignment = alignment_left
+
+        ws_dash.cell(row=curr_w_r, column=3, value=safe_int(row.get("total_muestras", row.get("total_hijas", 4)))).number_format = '#,##0'
+        ws_dash.cell(row=curr_w_r, column=3).alignment = alignment_right
+
+        ws_dash.cell(row=curr_w_r, column=4, value=safe_int(row.get("alertas"))).number_format = '#,##0'
+        ws_dash.cell(row=curr_w_r, column=4).alignment = alignment_right
+
+        ws_dash.cell(row=curr_w_r, column=5, value=safe_int(row.get("advertencias"))).number_format = '#,##0'
+        ws_dash.cell(row=curr_w_r, column=5).alignment = alignment_right
+
+        ws_dash.cell(row=curr_w_r, column=6, value=safe_int(row.get("vacios"))).number_format = '#,##0'
+        ws_dash.cell(row=curr_w_r, column=6).alignment = alignment_right
+
+        for col_idx in range(2, 7):
+            ws_dash.cell(row=curr_w_r, column=col_idx).border = border_thin
+            if curr_w_r % 2 == 0:
+                ws_dash.cell(row=curr_w_r, column=col_idx).fill = fill_zebra
+        curr_w_r += 1
+
+    # 4. Tabla: Integridad de Secuencias ABCD por Celda
+    r_abcd = curr_w_r + 2
+    ws_dash.cell(row=r_abcd, column=2, value="INTEGRIDAD DE SECUENCIAS ABCD POR CELDA").font = font_section
+    headers_abcd = ["Estado de Secuencia", "Total Celdas (N)", "% Cumplimiento"]
+    for idx, col in enumerate(headers_abcd, start=2):
+        cell = ws_dash.cell(row=r_abcd + 1, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
     integ = compact.get("integridad_celdas", {})
-    write_kpi_card(ws_dash, 8, 2, "CELDAS ABCD OK (4)", integ.get("correctas_abcd", 0), s["fill_green"], s["font_kpi_green"], s)
-    write_kpi_card(ws_dash, 8, 4, "CELDAS EN DESORDEN", integ.get("desorden_abcd", 0), s["fill_yellow"], s["font_kpi_orange"], s)
-    write_kpi_card(ws_dash, 8, 6, "CELDAS INCOMPLETAS (<4)", integ.get("incompletas_abcd", 0), s["fill_orange"], s["font_kpi_orange"], s)
-    write_kpi_card(ws_dash, 8, 8, "CELDAS EXCEDENTES (>4)", integ.get("excedentes_abcd", 0), s["fill_red"], s["font_kpi_red"], s)
-    write_kpi_card(ws_dash, 8, 10, "CELDAS ANÓMALAS", integ.get("anomalas_abcd", 0), s["fill_red"], s["font_kpi_red"], s)
+    tot_c = max(1, total_celdas)
+    abcd_rows = [
+        ("Correctas (4/4 ABCD)", integ.get("correctas_abcd", 0)),
+        ("En Desorden", integ.get("desorden_abcd", 0)),
+        ("Incompletas (< 4)", integ.get("incompletas_abcd", 0)),
+        ("Excedentes (> 4)", integ.get("excedentes_abcd", 0)),
+        ("Anómalas (#ERR)", integ.get("anomalas_abcd", 0)),
+    ]
 
-    curr_row = 12
+    curr_a_r = r_abcd + 2
+    for label, count in abcd_rows:
+        ws_dash.cell(row=curr_a_r, column=2, value=label).font = font_bold
+        ws_dash.cell(row=curr_a_r, column=2).alignment = alignment_left
 
-    # Tabla: Distribución por Campaña
-    ws_dash.cell(row=curr_row, column=2, value="1. DISTRIBUCIÓN Y CALIDAD POR CAMPAÑA").font = s["font_section"]
-    curr_row += 1
+        ws_dash.cell(row=curr_a_r, column=3, value=safe_int(count)).number_format = '#,##0'
+        ws_dash.cell(row=curr_a_r, column=3).alignment = alignment_right
 
-    headers_camp = ["Campaña", "Registros", "Celdas Afectadas", "Vacíos", "% Vacíos", "Advertencias", "% Advert.", "Alertas", "% Alertas"]
-    for col_idx, h in enumerate(headers_camp, start=2):
-        c = ws_dash.cell(row=curr_row, column=col_idx, value=h)
-        c.font = s["font_header"]
-        c.fill = s["fill_primary"]
-        c.alignment = s["align_center"]
-    curr_row += 1
+        ws_dash.cell(row=curr_a_r, column=4, value=count / tot_c).number_format = '0.00%'
+        ws_dash.cell(row=curr_a_r, column=4).alignment = alignment_right
 
-    for row_data in compact.get("distribucion_campania", []):
-        ws_dash.cell(row=curr_row, column=2, value=str(row_data.get("campania", ""))).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=3, value=row_data.get("registros", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=4, value=row_data.get("celdas_afectadas", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=5, value=row_data.get("vacios_cant", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=6, value=f"{row_data.get('vacios_pct', 0.0):.1f}%").alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=7, value=row_data.get("advertencias_cant", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=8, value=f"{row_data.get('advertencias_pct', 0.0):.1f}%").alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=9, value=row_data.get("alertas_cant", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=10, value=f"{row_data.get('alertas_pct', 0.0):.1f}%").alignment = s["align_center"]
-        for c_idx in range(2, 11):
-            ws_dash.cell(row=curr_row, column=c_idx).border = s["border_thin"]
-            ws_dash.cell(row=curr_row, column=c_idx).font = s["font_regular"]
-        curr_row += 1
+        for col_idx in range(2, 5):
+            ws_dash.cell(row=curr_a_r, column=col_idx).border = border_thin
+            if curr_a_r % 2 == 0:
+                ws_dash.cell(row=curr_a_r, column=col_idx).fill = fill_zebra
+        curr_a_r += 1
 
-    curr_row += 2
+    # 5. Tabla: Principales Desviaciones Críticas (Columna Derecha)
+    ws_dash.cell(row=9, column=10, value="PRINCIPALES DESVIACIONES CRÍTICAS").font = font_section
+    headers_top = ["Regla de Consistencia", "Cantidad (N)", "% Incidencia"]
+    for idx, col in enumerate(headers_top, start=10):
+        cell = ws_dash.cell(row=10, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
 
-    # Tabla: Distribución por Tipo Litológico
-    ws_dash.cell(row=curr_row, column=2, value="2. DISTRIBUCIÓN POR TIPO LITOLÓGICO").font = s["font_section"]
-    curr_row += 1
+    top_alertas = compact.get("top_5_alertas", [])
+    if not top_alertas:
+        top_alertas = compact.get("error_types_detailed", {}).get("alertas", [])[:5]
 
-    headers_lito = ["Tipo Litológico", "Registros", "Celdas Afectadas", "Vacíos", "% Vacíos", "Advertencias", "% Advert.", "Alertas", "% Alertas"]
-    for col_idx, h in enumerate(headers_lito, start=2):
-        c = ws_dash.cell(row=curr_row, column=col_idx, value=h)
-        c.font = s["font_header"]
-        c.fill = s["fill_primary"]
-        c.alignment = s["align_center"]
-    curr_row += 1
+    for idx, a in enumerate(top_alertas[:5]):
+        r_top = 11 + idx
+        ws_dash.cell(row=r_top, column=10, value=a.get("mensaje", "Desviación Crítica")).font = font_regular
+        ws_dash.cell(row=r_top, column=10).alignment = alignment_left
 
-    for row_data in compact.get("distribucion_litologia", []):
-        ws_dash.cell(row=curr_row, column=2, value=str(row_data.get("tipo_litologico", ""))).alignment = s["align_left"]
-        ws_dash.cell(row=curr_row, column=3, value=row_data.get("registros", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=4, value=row_data.get("celdas_afectadas", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=5, value=row_data.get("vacios_cant", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=6, value=f"{row_data.get('vacios_pct', 0.0):.1f}%").alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=7, value=row_data.get("advertencias_cant", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=8, value=f"{row_data.get('advertencias_pct', 0.0):.1f}%").alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=9, value=row_data.get("alertas_cant", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=10, value=f"{row_data.get('alertas_pct', 0.0):.1f}%").alignment = s["align_center"]
-        for c_idx in range(2, 11):
-            ws_dash.cell(row=curr_row, column=c_idx).border = s["border_thin"]
-            ws_dash.cell(row=curr_row, column=c_idx).font = s["font_regular"]
-        curr_row += 1
+        ws_dash.cell(row=r_top, column=11, value=safe_int(a.get("cantidad"))).number_format = '#,##0'
+        ws_dash.cell(row=r_top, column=11).alignment = alignment_right
 
-    curr_row += 2
+        pct = safe_float(a.get("pct", a.get("cantidad", 0) / max(1, total_alertas) * 100)) / 100.0
+        ws_dash.cell(row=r_top, column=12, value=pct).number_format = '0.00%'
+        ws_dash.cell(row=r_top, column=12).alignment = alignment_right
 
-    # Tabla: Top 5 Alertas Críticas
-    ws_dash.cell(row=curr_row, column=2, value="3. PRINCIPALES ALERTAS DETECTADAS").font = s["font_section"]
-    curr_row += 1
+        for col_idx in range(10, 13):
+            ws_dash.cell(row=r_top, column=col_idx).border = border_thin
+            if r_top % 2 == 0:
+                ws_dash.cell(row=r_top, column=col_idx).fill = fill_zebra
 
-    ws_dash.cell(row=curr_row, column=2, value="Regla / Mensaje de Alerta").font = s["font_header"]
-    ws_dash.cell(row=curr_row, column=2).fill = s["fill_primary"]
-    ws_dash.cell(row=curr_row, column=7, value="Cantidad").font = s["font_header"]
-    ws_dash.cell(row=curr_row, column=7).fill = s["fill_primary"]
-    ws_dash.cell(row=curr_row, column=8, value="% del Total").font = s["font_header"]
-    ws_dash.cell(row=curr_row, column=8).fill = s["fill_primary"]
-    ws_dash.merge_cells(start_row=curr_row, start_column=2, end_row=curr_row, end_column=6)
-    curr_row += 1
-
-    for a in compact.get("top_5_alertas", []):
-        c_msg = ws_dash.cell(row=curr_row, column=2, value=a.get("mensaje", ""))
-        c_msg.alignment = s["align_left"]
-        ws_dash.cell(row=curr_row, column=7, value=a.get("cantidad", 0)).alignment = s["align_center"]
-        ws_dash.cell(row=curr_row, column=8, value=f"{a.get('pct', 0.0):.1f}%").alignment = s["align_center"]
-        ws_dash.merge_cells(start_row=curr_row, start_column=2, end_row=curr_row, end_column=6)
-        for c_idx in range(2, 9):
-            ws_dash.cell(row=curr_row, column=c_idx).border = s["border_thin"]
-            ws_dash.cell(row=curr_row, column=c_idx).font = s["font_regular"]
-        curr_row += 1
-
-    # Auto-ajuste de columnas para Dashboard
-    for col in ws_dash.columns:
-        col_letter = get_column_letter(col[0].column)
-        ws_dash.column_dimensions[col_letter].width = 18
+    # Gráfica Nativa de Excel
+    if len(top_alertas) > 0:
+        chart = BarChart()
+        chart.type = "col"
+        chart.style = 10
+        chart.title = "Frecuencia de Desviaciones Críticas Detectadas"
+        chart.y_axis.title = "Cantidad de Ocurrencias"
+        chart.x_axis.title = "Regla de Consistencia"
+        max_r_chart = 10 + len(top_alertas[:5])
+        chart_data = Reference(ws_dash, min_col=11, min_row=10, max_row=max_r_chart)
+        chart_cats = Reference(ws_dash, min_col=10, min_row=11, max_row=max_r_chart)
+        chart.add_data(chart_data, titles_from_data=True)
+        chart.set_categories(chart_cats)
+        chart.legend = None
+        chart.width = 16
+        chart.height = 10
+        ws_dash.add_chart(chart, "J18")
 
     # =========================================================================
-    # HOJA 2: Integridad Celdas (ABCD)
+    # --- HOJA 2: REGISTRO MAESTRO DE ERRORES (CATÁLOGO / ÍNDICE) ---
     # =========================================================================
-    ws_cells = wb.create_sheet(title="Integridad Celdas (ABCD)")
-    ws_cells.views.sheetView[0].showGridLines = True
-
-    ws_cells.cell(row=1, column=1, value="EVALUACIÓN DE INTEGRIDAD DE SECUENCIAS ABCD POR CELDA").font = s["font_title"]
-    ws_cells.cell(row=2, column=1, value="Verifica que cada celda de mapeo contenga exactamente 4 muestras en secuencia estricta A-B-C-D").font = s["font_subtitle"]
-
-    headers_int = ["Celda Mapeo", "Fecha Ensayo", "Campaña", "Tipo Litológico", "Nivel", "Muestras", "Secuencia", "Estado Secuencia", "Alertas", "Advertencias", "Vacíos"]
-    for c_idx, h in enumerate(headers_int, start=1):
-        c = ws_cells.cell(row=4, column=c_idx, value=h)
-        c.font = s["font_header"]
-        c.fill = s["fill_primary"]
-        c.alignment = s["align_center"]
-
-    r_cell = 5
-    resumen_celdas = compact.get("resumen_por_celda", {})
-    for c_key, c_val in resumen_celdas.items():
-        est = c_val.get("estado_secuencia", "")
-        fill_color = s["fill_green"] if "CORRECTO" in est else (s["fill_yellow"] if "ORDEN" in est else s["fill_orange"])
-
-        ws_cells.cell(row=r_cell, column=1, value=c_val.get("celda", "")).alignment = s["align_left"]
-        ws_cells.cell(row=r_cell, column=2, value=c_val.get("fecha", "")).alignment = s["align_center"]
-        ws_cells.cell(row=r_cell, column=3, value=str(c_val.get("campania", ""))).alignment = s["align_center"]
-        ws_cells.cell(row=r_cell, column=4, value=str(c_val.get("tipo_litologico", ""))).alignment = s["align_left"]
-        ws_cells.cell(row=r_cell, column=5, value=c_val.get("nivel", "")).alignment = s["align_center"]
-        ws_cells.cell(row=r_cell, column=6, value=c_val.get("total_muestras", 0)).alignment = s["align_center"]
-        ws_cells.cell(row=r_cell, column=7, value=c_val.get("secuencia", "")).alignment = s["align_center"]
-
-        c_est = ws_cells.cell(row=r_cell, column=8, value=est)
-        c_est.alignment = s["align_center"]
-        c_est.fill = fill_color
-        c_est.font = s["font_bold"]
-
-        ws_cells.cell(row=r_cell, column=9, value=c_val.get("alertas", 0)).alignment = s["align_center"]
-        ws_cells.cell(row=r_cell, column=10, value=c_val.get("advertencias", 0)).alignment = s["align_center"]
-        ws_cells.cell(row=r_cell, column=11, value=c_val.get("vacios", 0)).alignment = s["align_center"]
-
-        for c_idx in range(1, 12):
-            ws_cells.cell(row=r_cell, column=c_idx).border = s["border_thin"]
-            if c_idx != 8:
-                ws_cells.cell(row=r_cell, column=c_idx).font = s["font_regular"]
-        r_cell += 1
-
-    for col in ws_cells.columns:
-        col_letter = get_column_letter(col[0].column)
-        ws_cells.column_dimensions[col_letter].width = 16
-
-    # =========================================================================
-    # Agrupación por Regla / Categoría de Incidencias
-    # =========================================================================
-    cat_incidencias: Dict[str, List[dict]] = defaultdict(list)
-    for inc in incidencias:
-        cat_name = get_plt_incidence_category_name(inc)
-        cat_incidencias[cat_name].append(inc)
-
-    # Identificar campañas disponibles
-    campanias_disponibles = sorted(list({str(i.get("campania")) for i in incidencias if i.get("campania") not in (None, "", "None")}))
-    if not campanias_disponibles:
-        campanias_disponibles = ["General"]
-
-    # =========================================================================
-    # HOJA 3: Catálogo de Errores (Índice SSOT)
-    # =========================================================================
-    ws_cat = wb.create_sheet(title="Catálogo de Errores")
+    ws_cat = wb.create_sheet(title="📋 Catálogo de Errores")
     ws_cat.views.sheetView[0].showGridLines = True
 
-    ws_cat.cell(row=1, column=1, value="CATÁLOGO CONSOLIDADO DE REGLAS QA/QC — PLT").font = s["font_title"]
-    ws_cat.cell(row=2, column=1, value="Índice maestro de reglas evaluadas con conteo de incidencias y enlaces a hojas de detalle").font = s["font_subtitle"]
+    ws_cat.cell(row=2, column=2, value="REGISTRO MAESTRO DE REGLAS DE CONSISTENCIA PLT").font = font_title
+    ws_cat.cell(
+        row=3,
+        column=2,
+        value="Catálogo completo de validación geomecánica ordenado por frecuencia. Use los hipervínculos para navegar.",
+    ).font = font_subtitle
 
-    headers_cat = ["Cód. Regla", "Regla / Mensaje Canónico", "Severidad"] + [f"Camp. {c}" for c in campanias_disponibles] + ["Total Incidencias", "Celdas Afectadas", "Enlace Hoja Detalle"]
-    for c_idx, h in enumerate(headers_cat, start=1):
-        c = ws_cat.cell(row=4, column=c_idx, value=h)
-        c.font = s["font_header"]
-        c.fill = s["fill_primary"]
-        c.alignment = s["align_center"]
+    # Campañas únicas
+    all_campaigns = sorted(
+        set(
+            [str(row.get("campania")) for row in compact.get("distribucion_campania", []) if row.get("campania") and str(row.get("campania")) not in ["N/A", "None", ""]]
+            + [str(inc.get("campania")) for inc in filtered if inc.get("campania") and str(inc.get("campania")) not in ["N/A", "None", ""]]
+        ),
+        key=lambda x: str(x),
+    )
 
-    r_cat = 5
-    # Iterar sobre las categorías canónicas del SSOT
-    for cat_code, cat_obj in CATEGORIES_REGISTRY_PLT.items():
-        cat_name = cat_obj.name
-        inc_list = cat_incidencias.get(cat_name, [])
-        total_inc = len(inc_list)
+    headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Total (N)"] + [f"Año {c}" for c in all_campaigns] + ["Enlace Directo"]
+    for idx, col in enumerate(headers_cat, start=2):
+        cell = ws_cat.cell(row=5, column=idx, value=col)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
 
-        celdas_afectadas = len({i.get("celda_mapeo") for i in inc_list if i.get("celda_mapeo")})
+    incidencias_por_error = defaultdict(list)
+    for inc in filtered:
+        msg_simplificado = get_plt_incidence_category_name(inc)
+        incidencias_por_error[msg_simplificado].append(inc)
 
-        ws_cat.cell(row=r_cat, column=1, value=cat_code).alignment = s["align_center"]
-        ws_cat.cell(row=r_cat, column=2, value=cat_name).alignment = s["align_left"]
+    catalog_frequencies = []
+    for cat in CATEGORIES_REGISTRY_PLT.values():
+        rule_msg = cat.name
+        matches = incidencias_por_error[rule_msg]
+        camp_counts = {}
+        for c in all_campaigns:
+            camp_counts[c] = sum(1 for m in matches if str(m.get("campania", "N/A")) == c)
+        catalog_frequencies.append({
+            "msg": rule_msg,
+            "severity": cat.severity,
+            "matches": matches,
+            "count": len(matches),
+            "camp_counts": camp_counts,
+        })
 
-        c_sev = ws_cat.cell(row=r_cat, column=3, value=cat_obj.severity)
-        c_sev.alignment = s["align_center"]
-        c_sev.fill = s["fill_red"] if cat_obj.severity == "ALERTA" else (s["fill_yellow"] if cat_obj.severity == "ADVERTENCIA" else s["fill_kpi_gray"])
-        c_sev.font = s["font_bold"]
+    catalog_frequencies = sorted(catalog_frequencies, key=lambda x: x["count"], reverse=True)
 
-        col_curr = 4
-        for camp in campanias_disponibles:
-            c_count = sum(1 for i in inc_list if str(i.get("campania")) == camp)
-            ws_cat.cell(row=r_cat, column=col_curr, value=c_count).alignment = s["align_center"]
-            col_curr += 1
+    r_cat = 6
+    active_sheets_mapping = {}
 
-        ws_cat.cell(row=r_cat, column=col_curr, value=total_inc).alignment = s["align_center"]
-        ws_cat.cell(row=r_cat, column=col_curr + 1, value=celdas_afectadas).alignment = s["align_center"]
+    for c_idx, rule in enumerate(catalog_frequencies, start=1):
+        ws_cat.cell(row=r_cat, column=2, value=c_idx).font = font_regular
+        ws_cat.cell(row=r_cat, column=2).alignment = alignment_center
+        ws_cat.cell(row=r_cat, column=2).border = border_thin
 
-        # Enlace a hoja individual si tiene incidencias
-        if total_inc > 0:
-            safe_title = _safe_sheet_title(cat_code)
-            c_link = ws_cat.cell(row=r_cat, column=col_curr + 2, value=f"Ver Detalle ({total_inc}) ->")
-            c_link.hyperlink = f"#'{safe_title}'!A1"
-            c_link.font = s["font_link"]
-            c_link.alignment = s["align_center"]
+        c_sev = ws_cat.cell(row=r_cat, column=3, value=rule["severity"])
+        c_sev.font = font_bold
+        c_sev.alignment = alignment_center
+        c_sev.border = border_thin
+        if rule["severity"] == "ALERTA":
+            c_sev.fill = fill_accent_red
+        elif rule["severity"] == "ADVERTENCIA":
+            c_sev.fill = fill_accent_orange
         else:
-            ws_cat.cell(row=r_cat, column=col_curr + 2, value="Sin incidencias").alignment = s["align_center"]
+            c_sev.fill = fill_accent_yellow
 
-        for c_idx in range(1, col_curr + 3):
-            ws_cat.cell(row=r_cat, column=c_idx).border = s["border_thin"]
-            if c_idx not in (3, col_curr + 2):
-                ws_cat.cell(row=r_cat, column=c_idx).font = s["font_regular"]
+        ws_cat.cell(row=r_cat, column=4, value=rule["msg"]).font = font_bold if rule["count"] > 0 else font_regular
+        ws_cat.cell(row=r_cat, column=4).border = border_thin
 
+        c_count = ws_cat.cell(row=r_cat, column=5, value=rule["count"])
+        c_count.font = font_bold
+        c_count.alignment = alignment_right
+        c_count.number_format = '#,##0'
+        c_count.border = border_thin
+
+        # Columnas por campaña
+        for y_offset, camp_key in enumerate(all_campaigns):
+            c_yr = ws_cat.cell(row=r_cat, column=6 + y_offset, value=rule["camp_counts"].get(camp_key, 0))
+            c_yr.font = font_regular
+            c_yr.alignment = alignment_right
+            c_yr.number_format = '#,##0'
+            c_yr.border = border_thin
+            if rule["camp_counts"].get(camp_key, 0) == 0:
+                c_yr.font = Font(name="Segoe UI", size=9, color="AAAAAA")
+
+        link_col = 6 + len(all_campaigns)
+        c_link = ws_cat.cell(row=r_cat, column=link_col)
+        if rule["count"] > 0:
+            tab_name = get_safe_sheet_name(rule["msg"], c_idx)
+            active_sheets_mapping[rule["msg"]] = {"tab_name": tab_name, "records": rule["matches"]}
+
+            c_link.value = f'=HYPERLINK("#{chr(39)}{tab_name}{chr(39)}!B2", "👉 Navegar a Registros")'
+            c_link.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+            c_link.alignment = alignment_center
+        else:
+            c_link.value = "Limpio / 0 Incidencias"
+            c_link.font = Font(name="Segoe UI", size=9, italic=True, color="7F8C8D")
+            c_link.alignment = alignment_center
+            c_link.fill = fill_accent_green
+
+        c_link.border = border_thin
         r_cat += 1
 
-    ws_cat.column_dimensions["A"].width = 20
-    ws_cat.column_dimensions["B"].width = 50
-    ws_cat.column_dimensions["C"].width = 16
-    for c_i in range(4, col_curr + 3):
-        ws_cat.column_dimensions[get_column_letter(c_i)].width = 18
+    # AutoFilter para permitir filtrar por año directamente en Excel
+    last_col_letter = get_column_letter(5 + len(all_campaigns) + 1)
+    ws_cat.auto_filter.ref = f"B5:{last_col_letter}{r_cat - 1}"
 
     # =========================================================================
-    # HOJA 4: Detalle de Incidencias (Tabla Completa)
+    # --- HOJA 3: DETALLE PLANO COMPLETO DE INCIDENCIAS ---
     # =========================================================================
-    ws_det = wb.create_sheet(title="Detalle de Incidencias")
-    ws_det.views.sheetView[0].showGridLines = True
+    chunk_size = 1000000
+    detail_chunks = [filtered[i:i + chunk_size] for i in range(0, len(filtered), chunk_size)]
+    if not detail_chunks:
+        detail_chunks = [[]]
 
-    ws_det.cell(row=1, column=1, value="LISTADO COMPLETO DE INCIDENCIAS QA/QC — PLT").font = s["font_title"]
-    headers_det = ["Fila Excel", "Tipo Incidencia", "Cód. Regla", "Celda Mapeo", "Campaña", "Columna Evaluada", "Valor Actual", "Mensaje de Inconsistencia"]
-    for c_idx, h in enumerate(headers_det, start=1):
-        c = ws_det.cell(row=3, column=c_idx, value=h)
-        c.font = s["font_header"]
-        c.fill = s["fill_primary"]
-        c.alignment = s["align_center"]
+    for chunk_idx, chunk_data in enumerate(detail_chunks):
+        title = "📑 Detalle de Incidencias"
+        if len(detail_chunks) > 1:
+            title = f"📑 Detalle Incidencias ({chunk_idx + 1})"
 
-    r_det = 4
-    for inc in incidencias:
-        sev = inc.get("tipo_incidencia", "ALERTA")
-        fill_sev = s["fill_red"] if sev == "ALERTA" else (s["fill_yellow"] if sev == "ADVERTENCIA" else s["fill_kpi_gray"])
+        ws_detail = wb.create_sheet(title=title)
+        ws_detail.views.sheetView[0].showGridLines = True
 
-        ws_det.cell(row=r_det, column=1, value=inc.get("fila_excel", "")).alignment = s["align_center"]
-        c_s = ws_det.cell(row=r_det, column=2, value=sev)
-        c_s.alignment = s["align_center"]
-        c_s.fill = fill_sev
-        c_s.font = s["font_bold"]
+        ws_detail.cell(row=2, column=2, value="REGISTRO DETALLADO DE TODAS LAS INCIDENCIAS DETECTADAS").font = font_title
+        ws_detail.cell(
+            row=3,
+            column=2,
+            value="Base de datos plana de inconsistencias. Utilice los filtros en los encabezados para auditar registros específicos.",
+        ).font = font_subtitle
 
-        ws_det.cell(row=r_det, column=3, value=inc.get("rule_code", "")).alignment = s["align_center"]
-        ws_det.cell(row=r_det, column=4, value=inc.get("celda_mapeo", "")).alignment = s["align_left"]
-        ws_det.cell(row=r_det, column=5, value=str(inc.get("campania", ""))).alignment = s["align_center"]
-        ws_det.cell(row=r_det, column=6, value=inc.get("columna", "")).alignment = s["align_left"]
-        ws_det.cell(row=r_det, column=7, value=str(inc.get("valor_actual", "—"))).alignment = s["align_center"]
-        ws_det.cell(row=r_det, column=8, value=inc.get("mensaje", "")).alignment = s["align_left"]
+        headers_detail = [
+            "ID",
+            "Fila Excel",
+            "Gravedad",
+            "Celda Mapeo",
+            "Muestra",
+            "Campaña",
+            "Tipo Litológico",
+            "Nivel",
+            "Columna de Falla",
+            "Valor Actual",
+            "Código Regla",
+            "Mensaje de Inconsistencia Geomecánica",
+        ]
 
-        for c_idx in range(1, 9):
-            ws_det.cell(row=r_det, column=c_idx).border = s["border_thin"]
-            if c_idx != 2:
-                ws_det.cell(row=r_det, column=c_idx).font = s["font_regular"]
-        r_det += 1
+        grid_heading_row = 5
+        for idx, col in enumerate(headers_detail, start=2):
+            cell = ws_detail.cell(row=grid_heading_row, column=idx, value=col)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
 
-    ws_det.column_dimensions["A"].width = 12
-    ws_det.column_dimensions["B"].width = 16
-    ws_det.column_dimensions["C"].width = 25
-    ws_det.column_dimensions["D"].width = 18
-    ws_det.column_dimensions["E"].width = 14
-    ws_det.column_dimensions["F"].width = 25
-    ws_det.column_dimensions["G"].width = 20
-    ws_det.column_dimensions["H"].width = 60
+        r_detail_start = 6
+        for d_idx, inc in enumerate(chunk_data, start=1):
+            r_detail = r_detail_start + d_idx - 1
+            ws_detail.cell(row=r_detail, column=2, value=d_idx).font = font_regular
+            ws_detail.cell(row=r_detail, column=2).alignment = alignment_center
+
+            ws_detail.cell(row=r_detail, column=3, value=safe_int(inc.get("fila_excel"))).alignment = alignment_center
+
+            c_sev = ws_detail.cell(row=r_detail, column=4, value=inc.get("tipo_incidencia", "ALERTA"))
+            c_sev.font = font_bold
+            c_sev.alignment = alignment_center
+            if inc.get("tipo_incidencia") == "ALERTA":
+                c_sev.fill = fill_accent_red
+            elif inc.get("tipo_incidencia") == "ADVERTENCIA":
+                c_sev.fill = fill_accent_orange
+            else:
+                c_sev.fill = fill_accent_yellow
+
+            ws_detail.cell(row=r_detail, column=5, value=str(inc.get("celda_mapeo", inc.get("celda_padre", "—")))).alignment = alignment_left
+            ws_detail.cell(row=r_detail, column=6, value=str(inc.get("muestra", inc.get("celda_hija", "—")))).alignment = alignment_center
+            ws_detail.cell(row=r_detail, column=7, value=str(inc.get("campania", "—"))).alignment = alignment_center
+            ws_detail.cell(row=r_detail, column=8, value=str(inc.get("tipo_litologico", "—"))).alignment = alignment_left
+            ws_detail.cell(row=r_detail, column=9, value=str(inc.get("nivel", "—"))).alignment = alignment_center
+            ws_detail.cell(row=r_detail, column=10, value=str(inc.get("columna", "—"))).alignment = alignment_left
+
+            raw_val = inc.get("valor_actual")
+            val_str = "—" if raw_val is None or str(raw_val).strip() in ["", "-1"] else str(raw_val)
+            ws_detail.cell(row=r_detail, column=11, value=val_str).alignment = alignment_center
+
+            ws_detail.cell(row=r_detail, column=12, value=str(inc.get("rule_code", "—"))).alignment = alignment_center
+            ws_detail.cell(row=r_detail, column=13, value=str(inc.get("mensaje", "—"))).alignment = alignment_left
+
+            for col_idx in range(2, 14):
+                cell_d = ws_detail.cell(row=r_detail, column=col_idx)
+                cell_d.border = border_thin
+                if r_detail % 2 == 0:
+                    if col_idx != 4:  # Respetar color de severidad
+                        cell_d.fill = fill_zebra
+
+        end_detail_row = r_detail_start + len(chunk_data) - 1
+        ws_detail.auto_filter.ref = f"B{grid_heading_row}:M{end_detail_row}"
 
     # =========================================================================
-    # HOJAS ESPECÍFICAS: Una hoja por cada regla activa con hipervínculo de retorno
+    # --- HOJAS 4+: DETALLES INDIVIDUALES POR REGLA DE ERROR ---
     # =========================================================================
-    for cat_code, cat_obj in CATEGORIES_REGISTRY_PLT.items():
-        cat_name = cat_obj.name
-        inc_list = cat_incidencias.get(cat_name, [])
-        if not inc_list:
-            continue
+    for orig_msg, mapping_data in active_sheets_mapping.items():
+        sh_name = mapping_data["tab_name"]
+        err_records = mapping_data["records"]
 
-        sheet_title = _safe_sheet_title(cat_code)
-        ws_rule = wb.create_sheet(title=sheet_title)
-        ws_rule.views.sheetView[0].showGridLines = True
+        ws_err = wb.create_sheet(title=sh_name)
+        ws_err.views.sheetView[0].showGridLines = True
 
-        # Botón de retorno al Catálogo
-        c_back = ws_rule.cell(row=1, column=1, value="<- Volver al Catálogo de Errores")
-        c_back.hyperlink = "#'Catálogo de Errores'!A1"
-        c_back.font = s["font_link"]
+        c_back = ws_err.cell(row=2, column=2)
+        c_back.value = '=HYPERLINK("#\'📋 Catálogo de Errores\'!B2", "⬅️ Volver al Registro Maestro de Errores")'
+        c_back.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+        c_back.alignment = alignment_left
 
-        ws_rule.cell(row=3, column=1, value=f"REGLA: {cat_name}").font = s["font_title"]
-        ws_rule.cell(row=4, column=1, value=f"Código: {cat_code}  |  Severidad: {cat_obj.severity}  |  Total Afectados: {len(inc_list)}").font = s["font_subtitle"]
+        ws_err.cell(row=4, column=2, value="ANÁLISIS DE INCIDENCIA EN BASE DE DATOS").font = font_section
+        cell_err_desc = ws_err.cell(row=5, column=2, value=f"Regla: {orig_msg.upper()}")
+        cell_err_desc.font = Font(name="Segoe UI", size=11, bold=True, color="7F1D1D")
+        cell_err_desc.fill = fill_accent_red
+        cell_err_desc.border = border_thin
+        ws_err.merge_cells(start_row=5, start_column=2, end_row=5, end_column=7)
 
-        headers_rule = ["Fila Excel", "Celda Mapeo", "Campaña", "Columna Evaluada", "Valor Actual", "Mensaje Detallado"]
-        for c_idx, h in enumerate(headers_rule, start=1):
-            c = ws_rule.cell(row=6, column=c_idx, value=h)
-            c.font = s["font_header"]
-            c.fill = s["fill_primary"]
-            c.alignment = s["align_center"]
+        st_affected = len(set(x.get("celda_mapeo", x.get("celda_padre", "N/A")) for x in err_records))
+        tot_affected = len(err_records)
 
-        r_r = 7
-        for inc in inc_list:
-            ws_rule.cell(row=r_r, column=1, value=inc.get("fila_excel", "")).alignment = s["align_center"]
-            ws_rule.cell(row=r_r, column=2, value=inc.get("celda_mapeo", "")).alignment = s["align_left"]
-            ws_rule.cell(row=r_r, column=3, value=str(inc.get("campania", ""))).alignment = s["align_center"]
-            ws_rule.cell(row=r_r, column=4, value=inc.get("columna", "")).alignment = s["align_left"]
-            ws_rule.cell(row=r_r, column=5, value=str(inc.get("valor_actual", "—"))).alignment = s["align_center"]
-            ws_rule.cell(row=r_r, column=6, value=inc.get("mensaje", "")).alignment = s["align_left"]
+        write_kpi_card_opt(ws_err, 7, 2, "CELDAS AFECTADAS", st_affected, fill_kpi_gray, font_kpi_val_blue)
+        write_kpi_card_opt(ws_err, 7, 4, "MUESTRAS AFECTADAS (CANTIDAD)", tot_affected, fill_kpi_gray, font_kpi_val_blue)
 
-            for c_idx in range(1, 7):
-                ws_rule.cell(row=r_r, column=c_idx).border = s["border_thin"]
-                ws_rule.cell(row=r_r, column=c_idx).font = s["font_regular"]
-            r_r += 1
+        # Distribución por Campaña
+        ws_err.cell(row=10, column=2, value="DISTRIBUCIÓN POR CAMPAÑA").font = font_section
+        for idx, col in enumerate(["Campaña / Año", "Ocurrencias (N)", "% Contribución"], start=2):
+            cell = ws_err.cell(row=11, column=idx, value=col)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
 
-        ws_rule.column_dimensions["A"].width = 12
-        ws_rule.column_dimensions["B"].width = 18
-        ws_rule.column_dimensions["C"].width = 14
-        ws_rule.column_dimensions["D"].width = 25
-        ws_rule.column_dimensions["E"].width = 20
-        ws_rule.column_dimensions["F"].width = 60
+        r_dist_yr = defaultdict(int)
+        for r in err_records:
+            r_dist_yr[str(r.get("campania", "N/A"))] += 1
 
-    # Guardar en memoria
-    output_stream = io.BytesIO()
-    wb.save(output_stream)
-    output_stream.seek(0)
-    return output_stream
+        curr_y_r = 12
+        for yr, y_qty in sorted(r_dist_yr.items()):
+            ws_err.cell(row=curr_y_r, column=2, value=yr).font = font_bold
+            ws_err.cell(row=curr_y_r, column=2).alignment = alignment_center
+            ws_err.cell(row=curr_y_r, column=2).border = border_thin
+
+            c_yq = ws_err.cell(row=curr_y_r, column=3, value=y_qty)
+            c_yq.font = font_regular
+            c_yq.alignment = alignment_right
+            c_yq.number_format = '#,##0'
+            c_yq.border = border_thin
+
+            c_yp = ws_err.cell(row=curr_y_r, column=4, value=y_qty / max(1, tot_affected))
+            c_yp.font = font_regular
+            c_yp.alignment = alignment_right
+            c_yp.number_format = '0.00%'
+            c_yp.border = border_thin
+
+            curr_y_r += 1
+
+        unique_years = sorted(list(set(str(r.get("campania", "N/A")) for r in err_records)))
+
+        # 1. Agrupar por Código de Regla
+        rule_group = defaultdict(list)
+        for r in err_records:
+            rule_group[r.get("rule_code", "Desconocido")].append(r)
+
+        rule_stats = []
+        for rule_code, recs in rule_group.items():
+            yr_counts = defaultdict(int)
+            for r in recs:
+                yr_counts[str(r.get("campania", "N/A"))] += 1
+            rule_stats.append({
+                "rule_code": rule_code,
+                "total": len(recs),
+                "yr_counts": yr_counts,
+            })
+        rule_stats.sort(key=lambda x: x["total"], reverse=True)
+
+        # 2. Agrupar por Mensaje Único (Tabla B)
+        msg_group = defaultdict(list)
+        for r in err_records:
+            msg_group[r.get("mensaje", "Desconocido")].append(r)
+
+        msg_stats = []
+        for msg_val, recs in msg_group.items():
+            yr_counts = defaultdict(int)
+            for r in recs:
+                yr_counts[str(r.get("campania", "N/A"))] += 1
+            msg_stats.append({
+                "message": msg_val,
+                "total": len(recs),
+                "yr_counts": yr_counts,
+            })
+        msg_stats.sort(key=lambda x: x["total"], reverse=True)
+
+        # Precalcular coordenadas de las secciones
+        dist_table_height = len(r_dist_yr)
+        jump_link_row = 12 + dist_table_height + 1
+
+        table_a_start = jump_link_row + 2
+        table_a_height = 2 + len(rule_stats)
+
+        max_allowed_err = 1000000
+        truncated_err = len(err_records) > max_allowed_err
+        err_records_to_write = err_records[:max_allowed_err]
+
+        indiv_start = table_a_start + table_a_height + 2
+        indiv_height = 2 + len(err_records_to_write) + (1 if truncated_err else 0)
+
+        table_b_start = indiv_start + indiv_height + 2
+
+        # Enlace directo de salto rápido
+        c_jump = ws_err.cell(row=jump_link_row, column=2)
+        c_jump.value = f'=HYPERLINK("#\'{sh_name}\'!B{table_b_start}", "⬇️ Ir a Métricas de Mensajes de Inconsistencia Únicos (al final de la hoja)")'
+        c_jump.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+        c_jump.alignment = alignment_left
+
+        # --- TABLA A: RESUMEN POR REGLA ESPECÍFICA (CÓDIGO) ---
+        ws_err.cell(row=table_a_start, column=2, value="MÉTRICAS POR REGLA ESPECÍFICA (CÓDIGO)").font = font_section
+
+        ws_err.cell(row=table_a_start + 1, column=2, value="Código de Regla").font = font_header
+        ws_err.cell(row=table_a_start + 1, column=2).fill = fill_primary
+        ws_err.cell(row=table_a_start + 1, column=2).alignment = alignment_center
+        ws_err.merge_cells(start_row=table_a_start + 1, start_column=2, end_row=table_a_start + 1, end_column=4)
+        for c_idx in [3, 4]:
+            ws_err.cell(row=table_a_start + 1, column=c_idx).fill = fill_primary
+
+        headers_a = ["Ocurrencias Totales"] + [f"Año {y}" if y != "N/A" else "N/A" for y in unique_years]
+        for col_offset, h_name in enumerate(headers_a, start=5):
+            cell = ws_err.cell(row=table_a_start + 1, column=col_offset, value=h_name)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+
+        for col_idx in range(2, 5 + len(unique_years) + 1):
+            ws_err.cell(row=table_a_start + 1, column=col_idx).border = border_thin
+
+        for idx, stat in enumerate(rule_stats):
+            r_row = table_a_start + 2 + idx
+            ws_err.cell(row=r_row, column=2, value=stat["rule_code"]).font = font_bold
+            ws_err.cell(row=r_row, column=2).alignment = alignment_center
+            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=4)
+
+            c_tot = ws_err.cell(row=r_row, column=5, value=stat["total"])
+            c_tot.font = font_bold
+            c_tot.alignment = alignment_right
+            c_tot.number_format = '#,##0'
+
+            for y_idx, yr in enumerate(unique_years):
+                val = stat["yr_counts"].get(yr, 0)
+                c_val = ws_err.cell(row=r_row, column=6 + y_idx, value=val)
+                c_val.font = font_regular
+                c_val.alignment = alignment_right
+                c_val.number_format = '#,##0'
+
+            for col_idx in range(2, 5 + len(unique_years) + 1):
+                cell = ws_err.cell(row=r_row, column=col_idx)
+                cell.border = border_thin
+                if r_row % 2 == 0:
+                    cell.fill = fill_zebra
+
+        # --- TABLA B: REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO) ---
+        ws_err.cell(row=indiv_start, column=2, value="REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)").font = font_section
+
+        headers_inc = [
+            "Fila Excel",
+            "Celda Mapeo",
+            "Muestra",
+            "Campaña",
+            "Tipo Litológico",
+            "Nivel",
+            "Columna de Falla",
+            "Valor Actual",
+            "Mensaje de Inconsistencia",
+        ]
+        header_row_idx = indiv_start + 1
+        for col_idx, h_name in enumerate(headers_inc, start=2):
+            cell = ws_err.cell(row=header_row_idx, column=col_idx, value=h_name)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
+
+        start_data_row = indiv_start + 2
+        for idx, inc_item in enumerate(err_records_to_write):
+            curr_row = start_data_row + idx
+            ws_err.cell(row=curr_row, column=2, value=safe_int(inc_item.get("fila_excel")))
+            ws_err.cell(row=curr_row, column=3, value=str(inc_item.get("celda_mapeo", inc_item.get("celda_padre", "—"))))
+            ws_err.cell(row=curr_row, column=4, value=str(inc_item.get("muestra", inc_item.get("celda_hija", "—"))))
+            ws_err.cell(row=curr_row, column=5, value=str(inc_item.get("campania", "—")))
+            ws_err.cell(row=curr_row, column=6, value=str(inc_item.get("tipo_litologico", "—")))
+            ws_err.cell(row=curr_row, column=7, value=str(inc_item.get("nivel", "—")))
+            ws_err.cell(row=curr_row, column=8, value=str(inc_item.get("columna", "—")))
+
+            raw_val = inc_item.get("valor_actual")
+            val_str = "—" if raw_val is None or str(raw_val).strip() in ["", "-1"] else str(raw_val)
+            ws_err.cell(row=curr_row, column=9, value=val_str)
+
+            ws_err.cell(row=curr_row, column=10, value=str(inc_item.get("mensaje", "—")))
+
+        if truncated_err:
+            curr_row = start_data_row + len(err_records_to_write)
+            ws_err.cell(row=curr_row, column=3, value="--- REPORTE TRUNCADO: SE SUPERÓ EL LÍMITE DE FILAS DE EXCEL (1,048,576) ---")
+
+        end_data_row = start_data_row + len(err_records_to_write) - 1 + (1 if truncated_err else 0)
+
+        for r_idx in range(start_data_row, end_data_row + 1):
+            if r_idx <= start_data_row + 150:
+                ws_err.cell(row=r_idx, column=2).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=3).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=4).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=5).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=6).alignment = alignment_left
+                ws_err.cell(row=r_idx, column=7).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=8).alignment = alignment_left
+                ws_err.cell(row=r_idx, column=9).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=10).alignment = alignment_left
+
+                if r_idx % 2 == 0:
+                    for col_idx in range(2, 11):
+                        ws_err.cell(row=r_idx, column=col_idx).fill = fill_zebra
+            else:
+                ws_err.cell(row=r_idx, column=2).alignment = alignment_center
+                ws_err.cell(row=r_idx, column=3).alignment = alignment_center
+
+            for col_idx in range(2, 11):
+                ws_err.cell(row=r_idx, column=col_idx).border = border_thin
+
+        ws_err.auto_filter.ref = f"B{header_row_idx}:J{end_data_row}"
+
+        # --- TABLA C: RESUMEN POR MENSAJE DE INCONSISTENCIA ÚNICO ---
+        ws_err.cell(row=table_b_start, column=2, value="MÉTRICAS POR MENSAJE DE INCONSISTENCIA GEOMECÁNICA ÚNICO").font = font_section
+
+        c_ret = ws_err.cell(row=table_b_start, column=5)
+        c_ret.value = f'=HYPERLINK("#\'{sh_name}\'!B2", "⬆️ Volver al Inicio de la Hoja")'
+        c_ret.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+        c_ret.alignment = alignment_left
+
+        ws_err.cell(row=table_b_start + 1, column=2, value="Mensaje de Inconsistencia Geomecánica Único").font = font_header
+        ws_err.cell(row=table_b_start + 1, column=2).fill = fill_primary
+        ws_err.cell(row=table_b_start + 1, column=2).alignment = alignment_center
+
+        ws_err.merge_cells(start_row=table_b_start + 1, start_column=2, end_row=table_b_start + 1, end_column=7)
+        for c_idx in range(3, 8):
+            ws_err.cell(row=table_b_start + 1, column=c_idx).fill = fill_primary
+
+        headers_b = ["Ocurrencias Totales"] + [f"Año {y}" if y != "N/A" else "N/A" for y in unique_years]
+        for col_offset, h_name in enumerate(headers_b, start=8):
+            cell = ws_err.cell(row=table_b_start + 1, column=col_offset, value=h_name)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+
+        for col_idx in range(2, 8 + len(unique_years) + 1):
+            ws_err.cell(row=table_b_start + 1, column=col_idx).border = border_thin
+
+        for idx, stat in enumerate(msg_stats):
+            r_row = table_b_start + 2 + idx
+            ws_err.cell(row=r_row, column=2, value=stat["message"]).font = font_regular
+            ws_err.cell(row=r_row, column=2).alignment = alignment_left
+            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=7)
+
+            c_tot = ws_err.cell(row=r_row, column=8, value=stat["total"])
+            c_tot.font = font_bold
+            c_tot.alignment = alignment_right
+            c_tot.number_format = '#,##0'
+
+            for y_idx, yr in enumerate(unique_years):
+                val = stat["yr_counts"].get(yr, 0)
+                c_val = ws_err.cell(row=r_row, column=9 + y_idx, value=val)
+                c_val.font = font_regular
+                c_val.alignment = alignment_right
+                c_val.number_format = '#,##0'
+
+            for col_idx in range(2, 8 + len(unique_years) + 1):
+                cell = ws_err.cell(row=r_row, column=col_idx)
+                cell.border = border_thin
+                if r_row % 2 == 0:
+                    cell.fill = fill_zebra
+
+    # =========================================================================
+    # --- AUTO-AJUSTE DINÁMICO DE COLUMNAS ---
+    # =========================================================================
+    for ws in wb.worksheets:
+        ws.column_dimensions['A'].width = 3
+        if ws.title not in ["📋 Catálogo de Errores", "📑 Detalle de Incidencias", "📊 Dashboard Ejecutivo"]:
+            # Hojas de error con anchos específicos optimizados para PLT
+            ws.column_dimensions['B'].width = 11  # Fila Excel
+            ws.column_dimensions['C'].width = 14  # Celda Mapeo
+            ws.column_dimensions['D'].width = 14  # Muestra
+            ws.column_dimensions['E'].width = 10  # Campaña
+            ws.column_dimensions['F'].width = 18  # Tipo Litológico
+            ws.column_dimensions['G'].width = 10  # Nivel
+            ws.column_dimensions['H'].width = 24  # Columna de Falla
+            ws.column_dimensions['I'].width = 14  # Valor Actual
+            ws.column_dimensions['J'].width = 60  # Mensaje de Inconsistencia
+        else:
+            for col_idx in range(2, ws.max_column + 1):
+                vals = []
+                for row_idx in range(1, min(20, ws.max_row + 1)):
+                    val = ws.cell(row=row_idx, column=col_idx).value
+                    if val is not None:
+                        val_str = str(val)
+                        if val_str.startswith("=HYPERLINK"):
+                            vals.append("Ver Registros")
+                        else:
+                            vals.append(val_str)
+                if not vals:
+                    continue
+                max_len = max(len(v) for v in vals)
+                col_letter = get_column_letter(col_idx)
+                ws.column_dimensions[col_letter].width = min(max(max_len + 4, 11), 52)
+
+    return wb
+
+
+# Alias para retrocompatibilidad
+generar_excel_reporte_plt = export_plt_audit_to_excel
+generar_excel_reporte_core_plt = export_plt_audit_to_excel

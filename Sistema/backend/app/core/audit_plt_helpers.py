@@ -50,147 +50,159 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
     integrity_summary_raw = diag.get("integrity_summary", {})
 
     # Filtrado por campañas si aplica
-    if years_filter and years_filter not in ("TODOS", "", "None", None):
-        years_list = [y.strip() for y in str(years_filter).split(",") if y.strip()]
-        incidencias = [i for i in incidencias_raw if str(i.get("campania")) in years_list]
-        resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if str(v.get("campania")) in years_list}
-        total_filas = sum(len(v.get("filas", [])) for v in resumen_celdas.values()) if resumen_celdas else len(incidencias)
+    if years_filter:
+        years_list = [y.strip().upper() for y in years_filter.split(",") if y.strip()]
+        incidencias = [i for i in incidencias_raw if str(i.get("campania", "")).strip().upper() in years_list]
+        resumen_celdas = {
+            k: v for k, v in resumen_celdas_raw.items()
+            if str(v.get("campania", "")).strip().upper() in years_list
+        }
+        total_filas = sum(v.get("total_muestras", 0) for v in resumen_celdas.values())
     else:
         incidencias = incidencias_raw
         resumen_celdas = resumen_celdas_raw
         total_filas = total_filas_original
 
+    # 1. Indicadores Familia 1: Muestras y Celdas
     num_celdas = len(resumen_celdas)
-    promedio_muestras = (total_filas / max(1, num_celdas)) if num_celdas > 0 else 0.0
+    promedio_muestras = (total_filas / max(1, num_celdas)) if num_celdas > 0 else 4.0
 
-    # Total campos evaluados
+    # 2. Indicadores Familia 2: Campos individuales (34 columnas obligatorias)
     total_fields = total_filas * PLT_MANDATORY_COLS_COUNT
     total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
     total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
     total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
     total_correctos = max(0, total_fields - (total_vacios + total_advertencias + total_alertas))
-    pct_integridad = (total_correctos / max(1, total_fields)) * 100.0
+    pct_integridad = (total_correctos / max(1, total_fields)) * 100 if total_fields > 0 else 100.0
 
-    # Clasificación a nivel de registro (fila)
-    row_errors: Dict[int, set] = defaultdict(set)
-    for i in incidencias:
-        row_idx = i.get("fila_excel")
-        if row_idx is not None:
-            row_errors[row_idx].add(i.get("tipo_incidencia"))
+    # 3. Indicadores Familia 3: Registros/Filas
+    filas_con_alerta = set()
+    filas_con_advertencia = set()
+    filas_con_vacio = set()
 
-    registros_alerta = sum(1 for errs in row_errors.values() if "ALERTA" in errs)
-    registros_advertencia = sum(1 for errs in row_errors.values() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
-    registros_vacio = sum(1 for errs in row_errors.values() if "VACIO" in errs and "ALERTA" not in errs and "ADVERTENCIA" not in errs)
-    registros_correctos = max(0, total_filas - len(row_errors))
-
-    # Agrupaciones estadísticas
-    camp_stats: Dict[str, dict] = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
-    lito_stats: Dict[str, dict] = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
-    nivel_stats: Dict[str, dict] = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set(), "celdas": set()})
-
-    # Inicializar con todas las celdas presentes
-    for c_key, c_info in resumen_celdas.items():
-        camp_name = str(c_info.get("campania", "N/A"))
-        if camp_name and camp_name not in ("N/A", "None", ""):
-            camp_stats[camp_name]["celdas"].add(c_key)
-            for f_num in c_info.get("filas", []):
-                camp_stats[camp_name]["filas"].add(f_num)
-
-        lito_name = str(c_info.get("tipo_litologico", "N/A"))
-        if lito_name and lito_name not in ("N/A", "None", ""):
-            lito_stats[lito_name]["celdas"].add(c_key)
-            for f_num in c_info.get("filas", []):
-                lito_stats[lito_name]["filas"].add(f_num)
-
-        nivel_val = str(c_info.get("nivel", "N/A"))
-        if nivel_val and nivel_val not in ("N/A", "None", ""):
-            nivel_stats[nivel_val]["celdas"].add(c_key)
-            for f_num in c_info.get("filas", []):
-                nivel_stats[nivel_val]["filas"].add(f_num)
-
-    for i in incidencias:
-        c = str(i.get("campania", "N/A"))
-        l = str(i.get("tipo_litologico", "N/A"))
-        n = str(i.get("nivel", "N/A"))
-        celda = i.get("celda_mapeo", "N/A")
-        fila = i.get("fila_excel")
-        tipo = i.get("tipo_incidencia")
-
-        camp_stats[c]["filas"].add(fila)
-        camp_stats[c]["celdas"].add(celda)
-        lito_stats[l]["filas"].add(fila)
-        lito_stats[l]["celdas"].add(celda)
-        nivel_stats[n]["filas"].add(fila)
-        nivel_stats[n]["celdas"].add(celda)
-
-        if tipo == "VACIO":
-            camp_stats[c]["vacios"] += 1
-            lito_stats[l]["vacios"] += 1
-            nivel_stats[n]["vacios"] += 1
+    for inc in incidencias:
+        fila_idx = inc.get("fila_excel")
+        tipo = inc.get("tipo_incidencia")
+        if tipo == "ALERTA":
+            filas_con_alerta.add(fila_idx)
         elif tipo == "ADVERTENCIA":
-            camp_stats[c]["advertencias"] += 1
-            lito_stats[l]["advertencias"] += 1
-            nivel_stats[n]["advertencias"] += 1
-        elif tipo == "ALERTA":
-            camp_stats[c]["alertas"] += 1
-            lito_stats[l]["alertas"] += 1
-            nivel_stats[n]["alertas"] += 1
+            filas_con_advertencia.add(fila_idx)
+        elif tipo == "VACIO":
+            filas_con_vacio.add(fila_idx)
 
-    def _build_dist(stats_dict: dict, key_name: str) -> List[dict]:
-        rows = []
-        for key_val, stats in sorted(stats_dict.items(), key=lambda x: str(x[0])):
-            if str(key_val) in ("None", ""):
-                continue
-            rows_count = len(stats["filas"])
-            celdas_afectadas = len(stats["celdas"])
-            total_fields_g = max(1, rows_count * PLT_MANDATORY_COLS_COUNT)
-            rows.append({
-                key_name: key_val,
-                "registros": rows_count,
-                "celdas_afectadas": celdas_afectadas,
-                "vacios_cant": stats["vacios"],
-                "vacios_pct": round((stats["vacios"] / total_fields_g) * 100, 2),
-                "advertencias_cant": stats["advertencias"],
-                "advertencias_pct": round((stats["advertencias"] / total_fields_g) * 100, 2),
-                "alertas_cant": stats["alertas"],
-                "alertas_pct": round((stats["alertas"] / total_fields_g) * 100, 2),
-            })
-        return rows
+    registros_alerta = len(filas_con_alerta)
+    registros_advertencia = len(filas_con_advertencia - filas_con_alerta)
+    registros_vacio = len(filas_con_vacio - filas_con_alerta - filas_con_advertencia)
+    registros_correctos = max(0, total_filas - len(filas_con_alerta | filas_con_advertencia | filas_con_vacio))
 
-    distribucion_campania = _build_dist(camp_stats, "campania")
-    distribucion_litologia = _build_dist(lito_stats, "tipo_litologico")
-    distribucion_nivel = _build_dist(nivel_stats, "nivel")
+    # 4. Integridad de Celdas y Secuencias ABCD
+    correctas_abcd = sum(1 for v in resumen_celdas.values() if v.get("estado_secuencia") == "CORRECTO (A-B-C-D)")
+    desorden_abcd = sum(1 for v in resumen_celdas.values() if "ORDEN" in str(v.get("estado_secuencia", "")))
+    incompletas_abcd = sum(1 for v in resumen_celdas.values() if "INCOMPLETA" in str(v.get("estado_secuencia", "")))
+    excedentes_abcd = sum(1 for v in resumen_celdas.values() if "EXCEDENTE" in str(v.get("estado_secuencia", "")))
+    anomalas_abcd = sum(1 for v in resumen_celdas.values() if "ANÓMALA" in str(v.get("estado_secuencia", "")))
 
-    # Top Alertas y Advertencias
-    msg_alertas = Counter(get_plt_incidence_category_name(i) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(get_plt_incidence_category_name(i) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    # 5. Distribución por Campaña
+    campanias_data = defaultdict(lambda: {"registros": 0, "celdas": set(), "alertas": 0, "advertencias": 0, "vacios": 0})
+    for c_key, c_val in resumen_celdas.items():
+        c_name = str(c_val.get("campania", "Sin Campaña"))
+        campanias_data[c_name]["registros"] += c_val.get("total_muestras", 0)
+        campanias_data[c_name]["celdas"].add(c_key)
+        campanias_data[c_name]["alertas"] += c_val.get("alertas", 0)
+        campanias_data[c_name]["advertencias"] += c_val.get("advertencias", 0)
+        campanias_data[c_name]["vacios"] += c_val.get("vacios", 0)
 
-    top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
-    lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
-    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
+    distribucion_campania = []
+    for c_name, data in sorted(campanias_data.items(), key=lambda x: str(x[0])):
+        total_regs = data["registros"]
+        total_fields_camp = total_regs * PLT_MANDATORY_COLS_COUNT if total_regs > 0 else 1
+        distribucion_campania.append({
+            "campania": c_name,
+            "registros": total_regs,
+            "celdas_afectadas": len(data["celdas"]),
+            "alertas_cant": data["alertas"],
+            "alertas_pct": round((data["alertas"] / total_fields_camp) * 100, 2),
+            "advertencias_cant": data["advertencias"],
+            "advertencias_pct": round((data["advertencias"] / total_fields_camp) * 100, 2),
+            "vacios_cant": data["vacios"],
+            "vacios_pct": round((data["vacios"] / total_fields_camp) * 100, 2),
+        })
 
-    # Peores celdas
-    sorted_worst = sorted(
-        resumen_celdas.items(),
-        key=lambda x: (x[1].get("alertas", 0), x[1].get("vacios", 0), x[1].get("advertencias", 0)),
-        reverse=True
-    )[:20]
-    worst_cells = [{"celda": k, **v} for k, v in sorted_worst]
+    # 6. Distribución por Tipo Litológico
+    lito_data = defaultdict(lambda: {"registros": 0, "celdas": set(), "alertas": 0, "advertencias": 0, "vacios": 0})
+    for c_key, c_val in resumen_celdas.items():
+        lito_name = str(c_val.get("tipo_litologico", "Sin Litología"))
+        lito_data[lito_name]["registros"] += c_val.get("total_muestras", 0)
+        lito_data[lito_name]["celdas"].add(c_key)
+        lito_data[lito_name]["alertas"] += c_val.get("alertas", 0)
+        lito_data[lito_name]["advertencias"] += c_val.get("advertencias", 0)
+        lito_data[lito_name]["vacios"] += c_val.get("vacios", 0)
 
-    # Top columnas con errores
-    col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
-    top_column_errors = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
+    distribucion_litologia = []
+    for l_name, data in sorted(lito_data.items(), key=lambda x: x[1]["alertas"], reverse=True):
+        total_regs = data["registros"]
+        total_fields_lito = total_regs * PLT_MANDATORY_COLS_COUNT if total_regs > 0 else 1
+        distribucion_litologia.append({
+            "tipo_litologico": l_name,
+            "registros": total_regs,
+            "celdas_afectadas": len(data["celdas"]),
+            "alertas_cant": data["alertas"],
+            "alertas_pct": round((data["alertas"] / total_fields_lito) * 100, 2),
+            "advertencias_cant": data["advertencias"],
+            "advertencias_pct": round((data["advertencias"] / total_fields_lito) * 100, 2),
+            "vacios_cant": data["vacios"],
+            "vacios_pct": round((data["vacios"] / total_fields_lito) * 100, 2),
+        })
 
-    # Resumen de Integridad ABCD
-    correctas_abcd = sum(1 for c in resumen_celdas.values() if c.get("estado_secuencia") == "CORRECTO (A-B-C-D)")
-    desorden_abcd = sum(1 for c in resumen_celdas.values() if c.get("estado_secuencia") == "ORDEN INCORRECTO")
-    incompletas_abcd = sum(1 for c in resumen_celdas.values() if c.get("estado_secuencia") == "INCOMPLETA (< 4)")
-    excedentes_abcd = sum(1 for c in resumen_celdas.values() if c.get("estado_secuencia") == "EXCEDENTE (> 4)")
-    anomalas_abcd = sum(1 for c in resumen_celdas.values() if c.get("estado_secuencia") == "ANÓMALA")
+    # 7. Celdas con más fallas (Worst Cells)
+    worst_cells = []
+    for c_key, c_val in sorted(resumen_celdas.items(), key=lambda x: (x[1].get("alertas", 0), x[1].get("advertencias", 0)), reverse=True):
+        worst_cells.append({
+            "celda": c_key,
+            "total_muestras": c_val.get("total_muestras", 0),
+            "campania": c_val.get("campania", "—"),
+            "tipo_litologico": c_val.get("tipo_litologico", "—"),
+            "nivel": c_val.get("nivel", "—"),
+            "secuencia": c_val.get("secuencia", "—"),
+            "estado_secuencia": c_val.get("estado_secuencia", "—"),
+            "alertas": c_val.get("alertas", 0),
+            "advertencias": c_val.get("advertencias", 0),
+            "vacios": c_val.get("vacios", 0),
+        })
+
+    # 8. Agrupación por Reglas / Observaciones Detalladas
+    obs_alertas = Counter()
+    obs_advertencias = Counter()
+    for inc in incidencias:
+        tipo = inc.get("tipo_incidencia")
+        msg = inc.get("mensaje", "Inconsistencia no categorizada")
+        if tipo == "ALERTA":
+            obs_alertas[msg] += 1
+        elif tipo == "ADVERTENCIA":
+            obs_advertencias[msg] += 1
+
+    error_types_detailed = {
+        "alertas": [
+            {"mensaje": k, "cantidad": v, "pct": round((v / max(1, total_alertas)) * 100, 2)}
+            for k, v in obs_alertas.most_common()
+        ],
+        "advertencias": [
+            {"mensaje": k, "cantidad": v, "pct": round((v / max(1, total_advertencias)) * 100, 2)}
+            for k, v in obs_advertencias.most_common()
+        ],
+    }
+
+    top_5_alertas = error_types_detailed["alertas"][:5]
 
     return {
         "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "status": "completado",
+        "total_registros_evaluados": total_filas,
+        "total_alertas": total_alertas,
+        "total_advertencias": total_advertencias,
+        "total_vacios": total_vacios,
+        "total_correctos": total_correctos,
+        "integridad_global_pct": round(pct_integridad, 2),
         "familia1": {
             "total_registros": total_filas,
             "total_celdas": num_celdas,
@@ -221,13 +233,8 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
         },
         "distribucion_campania": distribucion_campania,
         "distribucion_litologia": distribucion_litologia,
-        "distribucion_nivel": distribucion_nivel,
-        "top_5_alertas": top_5_alertas,
-        "error_types_detailed": {
-            "alertas": lista_alertas,
-            "advertencias": lista_advertencias,
-        },
         "worst_cells": worst_cells,
-        "top_column_errors": top_column_errors,
+        "error_types_detailed": error_types_detailed,
+        "top_5_alertas": top_5_alertas,
         "resumen_por_celda": resumen_celdas,
     }
