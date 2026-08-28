@@ -67,7 +67,7 @@ import {
 } from './utils/diffUtils';
 
 // --- MIGRACIÓN AL NUEVO BULK AUDITOR MODULAR ---
-import BulkAuditor from './features/auditor/BulkAuditor';
+import AuditoriaHub from './features/auditor/AuditoriaHub';
 import CongruenceAuditor from './features/auditor/CongruenceAuditor';
 import { initCatalogs } from './utils/catalogData';
 
@@ -2075,7 +2075,7 @@ const [connectionLost, setConnectionLost] = useState(false);
 
           {currentView === 'auditoria_masiva' && (
             <div className="view-mapeo animate-fade-in">
-              <BulkAuditor apiBase={RESOLVED_API_BASE} />
+              <AuditoriaHub apiBase={RESOLVED_API_BASE} />
             </div>
           )}
 
