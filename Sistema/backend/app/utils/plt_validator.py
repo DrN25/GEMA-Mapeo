@@ -25,12 +25,17 @@ from app.core.catalogs import (
     LITHOLOGY_FULL_CATALOG,
     LITHOLOGY_GROUP_SYNONYMS,
 )
-from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT
+from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT, COMPACT_FIELD_CATEGORIES
 
 
 PLT_MANDATORY_COLS_COUNT = 34
 CAT_DIRECCION_ROTURA = ["Pa", "Pe", "NA"]
 CAT_TIPO_FRACTURA = ["M", "E", "C"]
+
+INTRUSIVE_LITOS = {
+    "MZB", "MZQ", "MZM", "GRD", "TON", "DIO", "POR", "AND", "DAC", "MZD",
+    "INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS", "INTRUS"
+}
 
 # ---------------------------------------------------------------------------
 # Catálogo oficial ISRM (SSOT)
@@ -170,12 +175,27 @@ def normalize_lithology_group(group_val: Any) -> str:
 def resolve_expected_lithology(l1: str, l2: str, l3: str) -> Tuple[Optional[str], Optional[float]]:
     """
     Resuelve la combinación litológica según la cascada oficial de Ensayos PLT.
+    Soporta sinónimos intrusivos en Lito 1 (ej. MZB, MZQ, MZM, Intrusivo, etc.).
     Retorna (tipo_litologico_esperado, factor_k_esperado).
     """
+    l1_norm = _norm_str(l1)
+    l2_norm = _norm_str(l2)
+    l3_norm = _norm_str(l3)
+
     for item in LITHOLOGY_FULL_CATALOG:
-        m1 = _norm_str(item.get("lito1")) == _norm_str(l1) if item.get("lito1") else True
-        m2 = _norm_str(item.get("lito2")) == _norm_str(l2) if item.get("lito2") else True
-        m3 = _norm_str(item.get("lito3")) == _norm_str(l3) if item.get("lito3") else True
+        cat_l1 = _norm_str(item.get("lito1"))
+        cat_l2 = _norm_str(item.get("lito2"))
+        cat_l3 = _norm_str(item.get("lito3"))
+
+        if cat_l1 in ("INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS"):
+            m1 = (l1_norm in INTRUSIVE_LITOS) or (l1_norm == cat_l1)
+        elif cat_l1:
+            m1 = (l1_norm == cat_l1)
+        else:
+            m1 = True
+
+        m2 = (l2_norm == cat_l2) if cat_l2 else True
+        m3 = (l3_norm == cat_l3) if cat_l3 else True
 
         if m1 and m2 and m3:
             tipo_lito = item.get("grupo") or item.get("tipo_litologico")
@@ -252,15 +272,15 @@ def detect_plt_file_format(file_path: str) -> Tuple[str, int]:
         if len(sample_rows) >= 3:
             r3_text = " ".join([_norm_str(v) for v in sample_rows[2] if v is not None])
             if ("CODIGO DE MUESTRA" in r3_text or "MUESTRA VALIDA" in r3_text) and ("ESPESOR" in r3_text or "LITO" in r3_text):
-                return "COMPACT_FIELD", 2
+                return "FORMAT_COMPACT_FIELD", 2
 
         # Chequear formato estándar
         for idx in range(min(4, len(sample_rows))):
             r_text = " ".join([_norm_str(v) for v in sample_rows[idx] if v is not None])
             if "CAMPANA" in r_text or "FECHA DE ENSAYO" in r_text or "LABORATORIO" in r_text:
-                return "STANDARD_34", idx
+                return "FORMAT_STANDARD_34", idx
 
-        return "STANDARD_34", 1
+        return "FORMAT_STANDARD_34", 1
     except Exception:
         return "STANDARD_34", 1
 
@@ -284,7 +304,6 @@ def validate_plt_standard_34(
     """
     df_raw = pd.read_excel(file_path, sheet_name=0, header=header_row_idx)
 
-    # Mapeo dinámico de columnas del Excel a las claves canónicas
     col_map: Dict[str, str] = {}
     for canon_key, synonyms in PLT_CANONICAL_COLUMNS.items():
         found = False
@@ -304,11 +323,9 @@ def validate_plt_standard_34(
     incidencias: List[dict] = []
     total_filas = len(df_raw)
 
-    # 1. Agrupamiento cronológico por (Fecha, Celda) para evaluar Integridad ABCD
     cell_groups: Dict[Tuple[str, str], List[dict]] = defaultdict(list)
-
     for idx, row in df_raw.iterrows():
-        fila_excel = idx + header_row_idx + 2  # 1-indexed en Excel
+        fila_excel = idx + header_row_idx + 2
         fecha_raw = row.get(col_map.get("fecha_ensayo"))
         _, fecha_str = sanitize_date(fecha_raw)
         celda_raw = str(row.get(col_map.get("celda_mapeo"), "") or "").strip().upper()
@@ -321,9 +338,7 @@ def validate_plt_standard_34(
             "row_data": row
         })
 
-    # Resumen de celdas y evaluación de secuencia ABCD
     resumen_celdas: Dict[str, dict] = {}
-
     for (fecha_k, celda_k), group_rows in cell_groups.items():
         count_muestras = len(group_rows)
         muestras_secuencia = [r["muestra"] for r in group_rows]
@@ -420,7 +435,7 @@ def validate_plt_standard_34(
             "vacios": 0,
         }
 
-    # 2. Validación fila a fila
+    # Validación fila a fila
     valid_litos_set = set(
         [_norm_str(x.get("lito1")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito1")]
         + [_norm_str(x.get("lito2")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito2")]
@@ -471,7 +486,7 @@ def validate_plt_standard_34(
                 elif sev == "VACIO":
                     resumen_celdas[cell_key]["vacios"] += 1
 
-        # --- GRUPO 1: Metadata Administrativa y Proyecto ---
+        # 1. Metadata Administrativa y Proyecto
         if camp_raw is None or str(camp_raw).strip() == "":
             reg_err("campania", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Campaña")
         else:
@@ -496,7 +511,7 @@ def validate_plt_standard_34(
         elif nivel_num < 0:
             reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_RANGO", value=nivel_num)
 
-        # --- GRUPO 2: Identificación Geomecánica y Muestras ---
+        # 2. Identificación Geomecánica y Muestras
         if not celda_raw:
             reg_err("celda_mapeo", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Celda de mapeo")
 
@@ -514,7 +529,7 @@ def validate_plt_standard_34(
                 reg_err("codigo_muestra", cod_muestra_raw, "ERR_PLT_CODIGO_MUESTRA_INCONGRUENTE",
                         actual=cod_muestra_raw, celda=celda_raw, muestra=muestra_raw)
 
-        # --- GRUPO 3: Clasificación Litológica y Factor K ---
+        # 3. Clasificación Litológica y Factor K
         l1 = _norm_str(get_val("litologia_1"))
         l2 = _norm_str(get_val("litologia_2"))
         l3 = _norm_str(get_val("litologia_3"))
@@ -523,7 +538,7 @@ def validate_plt_standard_34(
 
         if not l1:
             reg_err("litologia_1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Litología 1")
-        elif l1 not in valid_litos_set:
+        elif l1 not in valid_litos_set and l1 not in INTRUSIVE_LITOS:
             reg_err("litologia_1", l1, "ERR_PLT_LITO1_NO_RECONOCIDO", value=l1)
 
         if not l2:
@@ -548,7 +563,7 @@ def validate_plt_standard_34(
                     reg_err("tipo_litologico", tipo_lito_raw, "ERR_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
                             actual=tipo_lito_raw, expected=exp_tipo)
 
-        # --- GRUPO 4: Coordenadas Espaciales WGS84 ---
+        # 4. Coordenadas Espaciales WGS84
         este_num = sanitize_number(get_val("este"))
         norte_num = sanitize_number(get_val("norte"))
         elev_num = sanitize_number(get_val("elevacion"))
@@ -568,7 +583,7 @@ def validate_plt_standard_34(
         elif not (0.0 <= elev_num <= 6000.0):
             reg_err("elevacion", elev_num, "ERR_PLT_ELEVACION_RANGO", value=elev_num)
 
-        # --- GRUPO 5: Geometría de Probeta y Criterios de Validez ---
+        # 5. Geometría de Probeta y Criterios de Validez
         d_num = sanitize_number(get_val("espesor_d"))
         l_num = sanitize_number(get_val("longitud_l"))
         w1_num = sanitize_number(get_val("ancho_w1"))
@@ -627,7 +642,7 @@ def validate_plt_standard_34(
                 reg_err("muestra_valida_ancho", valida_w_raw, "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
                         actual=valida_w_raw, expected=exp_val_w)
 
-        # --- GRUPO 6: Ensayo Físico, Fractura y Parámetros PLT ---
+        # 6. Ensayo Físico, Fractura y Parámetros PLT
         fuerza_p = sanitize_number(get_val("fuerza_p"))
         dir_rot = _norm_str(get_val("direccion_rotura"))
         tipo_frac = _norm_str(get_val("tipo_fractura"))
@@ -692,7 +707,7 @@ def validate_plt_standard_34(
         elif valida_w_norm == "NO" and is50_num is not None:
             reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE", actual=is50_num, expected="NULL (Muestra Inválida)")
 
-        # --- GRUPO 7: Resistencia de Roca (K, UCS, ISRM) ---
+        # 7. Resistencia de Roca (K, UCS, ISRM)
         factor_k_num = sanitize_number(get_val("factor_k"))
         ucs_num = sanitize_number(get_val("ucs_mpa"))
         isrm_raw = _norm_str(get_val("resistencia_isrm"))
@@ -959,7 +974,7 @@ def validate_plt_compact_field(
 
         if not lito1_val:
             reg_err_comp("Lito 1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Lito 1")
-        elif lito1_val not in valid_litos_set:
+        elif lito1_val not in valid_litos_set and lito1_val not in INTRUSIVE_LITOS:
             reg_err_comp("Lito 1", lito1_val, "ERR_PLT_LITO1_NO_RECONOCIDO", value=lito1_val)
 
         if not lito2_val:
@@ -1172,7 +1187,7 @@ def validate_plt_excel(
 
     formato_tipo, header_row_idx = detect_plt_file_format(file_path)
 
-    if formato_tipo == "COMPACT_FIELD":
+    if "COMPACT" in str(formato_tipo):
         diag = validate_plt_compact_field(file_path, header_row_idx=header_row_idx, tolerance=tolerance)
     else:
         diag = validate_plt_standard_34(file_path, header_row_idx=header_row_idx, tolerance=tolerance)
@@ -1188,7 +1203,7 @@ def validate_plt_excel(
         "nombre_archivo": os.path.basename(file_path),
         "formato_detectado": formato_tipo,
         "total_filas_procesadas": total_filas,
-        "total_celdas_evaluadas": total_filas * PLT_MANDATORY_COLS_COUNT,
+        "total_celdas_evaluadas": total_filas * (24 if "COMPACT" in str(formato_tipo) else PLT_MANDATORY_COLS_COUNT),
         "metricas_globales": {
             "total_registros": total_filas,
             "total_celdas": len(diag.get("resumen_por_celda", {})),

@@ -1,19 +1,21 @@
 """
-app/core/rules_plt.py — SSOT de Reglas de Validación QA/QC para Ensayos PLT Irregulares.
-Centraliza la definición de categorías y reglas de inconsistencia con severidad y mensajes parametrizados.
+app/core/rules_plt.py — Catálogo Oficial de Reglas de Consistencia Geomecánica para Ensayos PLT.
+Define las categorías canónicas de error y las reglas específicas evaluadas por el sistema.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Set
 
 
 class RuleCategoryPLT:
+    """Categoría canónica mostrada en el Catálogo de Errores del Excel y Dashboard."""
     def __init__(self, code: str, name: str, severity: str):
         self.code = code
-        self.name = name  # Título canónico mostrado en la hoja "Catálogo de Errores"
+        self.name = name
         self.severity = severity  # 'ALERTA', 'ADVERTENCIA', 'VACIO'
 
 
 class ErrorRulePLT:
+    """Regla específica de validación geomecánica."""
     def __init__(self, code: str, category_code: str, columns: List[str], message_template: str):
         self.code = code
         self.category_code = category_code
@@ -28,492 +30,418 @@ class ErrorRulePLT:
 
 
 # ===========================================================================
-# 1. CATEGORÍAS MAESTRAS PLT (SSOT)
+# 1. CATEGORÍAS CANÓNICAS DE ERROR (SSOT)
 # ===========================================================================
 CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
-    # Vacíos
     "CAT_CAMPO_OBLIGATORIO_VACIO": RuleCategoryPLT(
-        "CAT_CAMPO_OBLIGATORIO_VACIO",
-        "Campo obligatorio se encuentra vacío.",
-        "VACIO"
+        "CAT_CAMPO_OBLIGATORIO_VACIO", "Campo obligatorio se encuentra vacío.", "VACIO"
     ),
-
-    # Grupo 1: Información General
     "CAT_PLT_CAMPANA_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_CAMPANA_INVALIDA",
-        "Año de campaña no válido (debe ser un año entre 2000 y 2035).",
-        "ALERTA"
+        "CAT_PLT_CAMPANA_INVALIDA", "Año de campaña no válido (debe ser un año entre 2000 y 2035).", "ALERTA"
     ),
     "CAT_PLT_FECHA_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_FECHA_INVALIDA",
-        "Fecha de ensayo con formato no válido o no parseable.",
-        "ALERTA"
+        "CAT_PLT_FECHA_INVALIDA", "Fecha de ensayo con formato no válido o no parseable.", "ALERTA"
     ),
     "CAT_PLT_FECHA_FUTURA": RuleCategoryPLT(
-        "CAT_PLT_FECHA_FUTURA",
-        "Fecha de ensayo posterior a la fecha actual del sistema.",
-        "ALERTA"
+        "CAT_PLT_FECHA_FUTURA", "Fecha de ensayo posterior a la fecha actual del sistema.", "ALERTA"
     ),
     "CAT_PLT_TIPO_ENSAYO_INVALIDO": RuleCategoryPLT(
-        "CAT_PLT_TIPO_ENSAYO_INVALIDO",
-        "Tipo de ensayo no admitido (debe ser 'i' para irregular).",
-        "ALERTA"
+        "CAT_PLT_TIPO_ENSAYO_INVALIDO", "Tipo de ensayo no admitido (debe ser 'i' para irregular).", "ALERTA"
     ),
-
-    # Grupo 2: Identificación y Litología
     "CAT_PLT_NIVEL_NO_NUMERICO": RuleCategoryPLT(
-        "CAT_PLT_NIVEL_NO_NUMERICO",
-        "Valor de nivel contiene caracteres no numéricos.",
-        "ALERTA"
+        "CAT_PLT_NIVEL_NO_NUMERICO", "Valor de nivel contiene caracteres no numéricos.", "ALERTA"
     ),
     "CAT_PLT_NIVEL_NEGATIVO": RuleCategoryPLT(
-        "CAT_PLT_NIVEL_NEGATIVO",
-        "Valor de nivel no puede ser negativo.",
-        "ALERTA"
+        "CAT_PLT_NIVEL_NEGATIVO", "Valor de nivel no puede ser negativo.", "ALERTA"
     ),
     "CAT_PLT_NIVEL_LIMITE_EXCEDIDO": RuleCategoryPLT(
-        "CAT_PLT_NIVEL_LIMITE_EXCEDIDO",
-        "Valor de nivel supera el límite máximo permitido (> 4999).",
-        "ALERTA"
+        "CAT_PLT_NIVEL_LIMITE_EXCEDIDO", "Valor de nivel supera el límite máximo permitido (> 4999).", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_INVALIDA",
-        "Letra de muestra inválida (debe ser A, B, C o D).",
-        "ALERTA"
+        "CAT_PLT_MUESTRA_INVALIDA", "Letra de muestra inválida (debe ser A, B, C o D).", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_DUPLICADA": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_DUPLICADA",
-        "Muestra duplicada dentro de la misma celda de mapeo en la misma fecha.",
-        "ALERTA"
+        "CAT_PLT_MUESTRA_DUPLICADA", "Muestra duplicada dentro de la misma celda de mapeo en la misma fecha.", "ALERTA"
     ),
     "CAT_PLT_CODIGO_MUESTRA_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_CODIGO_MUESTRA_INCONGRUENTE",
-        "Código de muestra no coincide con la celda y muestra correspondiente.",
-        "ALERTA"
+        "CAT_PLT_CODIGO_MUESTRA_INCONGRUENTE", "Código de muestra no coincide con la celda y muestra correspondiente.", "ALERTA"
     ),
     "CAT_PLT_LITO1_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_LITO1_INVALIDA",
-        "Litología 1 no existe en el catálogo de litologías.",
-        "ALERTA"
+        "CAT_PLT_LITO1_INVALIDA", "Litología no existe en el catálogo de litologías oficiales.", "ALERTA"
     ),
     "CAT_PLT_LITOLOGIA_COMBINACION_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_LITOLOGIA_COMBINACION_INVALIDA",
-        "Combinación litológica (Lito 1-2-3) no pertenece al catálogo geológico.",
-        "ALERTA"
+        "CAT_PLT_LITOLOGIA_COMBINACION_INVALIDA", "Combinación litológica (Lito 1-2-3) no pertenece al catálogo geológico.", "ALERTA"
     ),
     "CAT_PLT_TIPO_LITOLOGICO_INVALIDO": RuleCategoryPLT(
-        "CAT_PLT_TIPO_LITOLOGICO_INVALIDO",
-        "Tipo litológico no pertenece a los 5 grupos admitidos.",
-        "ALERTA"
+        "CAT_PLT_TIPO_LITOLOGICO_INVALIDO", "Tipo litológico no pertenece a los 5 grupos admitidos.", "ALERTA"
     ),
     "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
-        "Tipo litológico es incongruente con la combinación Lito 1-2-3.",
-        "ALERTA"
+        "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE", "Tipo litológico es incongruente con la combinación Lito 1-2-3.", "ALERTA"
     ),
-
-    # Grupo 3: Coordenadas WGS84
     "CAT_PLT_COORD_ESTE_RANGO": RuleCategoryPLT(
-        "CAT_PLT_COORD_ESTE_RANGO",
-        "Coordenada Este no puede ser menor o igual a cero.",
-        "ALERTA"
+        "CAT_PLT_COORD_ESTE_RANGO", "Coordenada Este no puede ser menor o igual a cero.", "ALERTA"
     ),
     "CAT_PLT_COORD_NORTE_RANGO": RuleCategoryPLT(
-        "CAT_PLT_COORD_NORTE_RANGO",
-        "Coordenada Norte no puede ser menor o igual a cero.",
-        "ALERTA"
+        "CAT_PLT_COORD_NORTE_RANGO", "Coordenada Norte no puede ser menor o igual a cero.", "ALERTA"
     ),
     "CAT_PLT_ELEVACION_RANGO": RuleCategoryPLT(
-        "CAT_PLT_ELEVACION_RANGO",
-        "Elevación (msnm) no puede ser menor o igual a cero.",
-        "ALERTA"
+        "CAT_PLT_ELEVACION_RANGO", "Elevación (msnm) no puede ser menor o igual a cero.", "ALERTA"
     ),
-
-    # Grupo 4: Geometría
     "CAT_PLT_ESPESOR_D_RANGO": RuleCategoryPLT(
-        "CAT_PLT_ESPESOR_D_RANGO",
-        "Espesor D (cm) debe ser un valor positivo mayor a cero.",
-        "ALERTA"
+        "CAT_PLT_ESPESOR_D_RANGO", "Espesor D (cm) debe ser un valor positivo mayor a cero.", "ALERTA"
     ),
     "CAT_PLT_LONGITUD_L_RANGO": RuleCategoryPLT(
-        "CAT_PLT_LONGITUD_L_RANGO",
-        "Longitud L (cm) debe ser un valor positivo mayor a cero.",
-        "ALERTA"
+        "CAT_PLT_LONGITUD_L_RANGO", "Longitud L (cm) debe ser un valor positivo mayor a cero.", "ALERTA"
     ),
     "CAT_PLT_ANCHO_W1_RANGO": RuleCategoryPLT(
-        "CAT_PLT_ANCHO_W1_RANGO",
-        "Ancho W1 (cm) debe ser un valor positivo mayor a cero.",
-        "ALERTA"
+        "CAT_PLT_ANCHO_W1_RANGO", "Ancho W1 (cm) debe ser un valor positivo mayor a cero.", "ALERTA"
     ),
     "CAT_PLT_ANCHO_W2_RANGO": RuleCategoryPLT(
-        "CAT_PLT_ANCHO_W2_RANGO",
-        "Ancho W2 (cm) debe ser un valor positivo mayor a cero.",
-        "ALERTA"
+        "CAT_PLT_ANCHO_W2_RANGO", "Ancho W2 (cm) debe ser un valor positivo mayor a cero.", "ALERTA"
     ),
     "CAT_PLT_ANCHO_W_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_ANCHO_W_INCONGRUENTE",
-        "Ancho W (cm) no coincide con el promedio de W1 y W2.",
-        "ALERTA"
+        "CAT_PLT_ANCHO_W_INCONGRUENTE", "Ancho W (cm) no coincide con el promedio de W1 y W2.", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
-        "Validación de longitud de muestra (L >= D) es incongruente.",
-        "ALERTA"
+        "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE", "Validación de longitud de muestra (L >= D) es incongruente.", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
-        "Validación de ancho de muestra (0.3W < D < W) es incongruente.",
-        "ALERTA"
+        "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE", "Validación de ancho de muestra (0.3W < D < W) es incongruente.", "ALERTA"
     ),
-
-    # Grupo 5: Datos de Ensayo
     "CAT_PLT_FUERZA_P_RANGO": RuleCategoryPLT(
-        "CAT_PLT_FUERZA_P_RANGO",
-        "Fuerza P (kN) debe ser un valor positivo mayor a cero.",
-        "ALERTA"
+        "CAT_PLT_FUERZA_P_RANGO", "Fuerza P (kN) debe ser un valor positivo mayor a cero.", "ALERTA"
     ),
     "CAT_PLT_DIRECCION_ROTURA_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_DIRECCION_ROTURA_INVALIDA",
-        "Dirección de rotura no admitida (debe ser Pa, Pe o NA).",
-        "ALERTA"
+        "CAT_PLT_DIRECCION_ROTURA_INVALIDA", "Dirección de rotura no admitida (debe ser Pa, Pe o NA).", "ALERTA"
     ),
     "CAT_PLT_TIPO_FRACTURA_INVALIDO": RuleCategoryPLT(
-        "CAT_PLT_TIPO_FRACTURA_INVALIDO",
-        "Tipo de fractura no admitido (debe ser M, E o C).",
-        "ALERTA"
+        "CAT_PLT_TIPO_FRACTURA_INVALIDO", "Tipo de fractura no admitido (debe ser M, E o C).", "ALERTA"
     ),
-
-    # Grupo 6: Cálculo Is
     "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
-        "Diámetro equivalente De (cm) no coincide con la fórmula sqrt(4*D*W/pi).",
-        "ALERTA"
+        "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE", "Diámetro equivalente De (cm) no coincide con la fórmula sqrt(4*D*W/pi).", "ALERTA"
     ),
     "CAT_PLT_FACTOR_F_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_FACTOR_F_INCONGRUENTE",
-        "Factor de corrección F no coincide con la fórmula ((De*10)/50)^0.45.",
-        "ALERTA"
+        "CAT_PLT_FACTOR_F_INCONGRUENTE", "Factor de corrección F no coincide con la fórmula ((De*10)/50)^0.45.", "ALERTA"
     ),
     "CAT_PLT_IS_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_IS_INCONGRUENTE",
-        "Índice Is (MPa) no coincide con la fórmula P*1000/(De*10)^2.",
-        "ALERTA"
+        "CAT_PLT_IS_INCONGRUENTE", "Índice Is (MPa) no coincide con la fórmula P*1000/(De*10)^2.", "ALERTA"
     ),
     "CAT_PLT_IS50_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_IS50_INCONGRUENTE",
-        "Índice Is(50) (MPa) no coincide con la fórmula Is * F.",
-        "ALERTA"
+        "CAT_PLT_IS50_INCONGRUENTE", "Índice Is(50) (MPa) no coincide con la fórmula Is * F.", "ALERTA"
     ),
-
-    # Grupo 7: Resistencia de Roca
     "CAT_PLT_FACTOR_K_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_FACTOR_K_INCONGRUENTE",
-        "Factor de conversión K no coincide con el valor asignado por el catálogo litológico.",
-        "ALERTA"
+        "CAT_PLT_FACTOR_K_INCONGRUENTE", "Factor de conversión K no coincide con el valor asignado por el catálogo litológico.", "ALERTA"
     ),
     "CAT_PLT_FACTOR_K_RANGO": RuleCategoryPLT(
-        "CAT_PLT_FACTOR_K_RANGO",
-        "Factor de conversión K fuera de rango razonable [5, 30].",
-        "ALERTA"
+        "CAT_PLT_FACTOR_K_RANGO", "Factor de conversión K fuera de rango razonable [5, 30].", "ALERTA"
     ),
     "CAT_PLT_UCS_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_UCS_INCONGRUENTE",
-        "Resistencia UCS (MPa) no coincide con la fórmula Is(50) * K.",
-        "ALERTA"
+        "CAT_PLT_UCS_INCONGRUENTE", "Resistencia UCS (MPa) no coincide con la fórmula Is(50) * K.", "ALERTA"
     ),
     "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
-        "Clasificación de resistencia ISRM no corresponde al rango de UCS según tabla oficial.",
-        "ALERTA"
+        "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE", "Clasificación de resistencia ISRM no corresponde al rango de UCS según tabla oficial.", "ALERTA"
     ),
-
-    # Global / Excel
     "CAT_PLT_FORMULA_ERROR": RuleCategoryPLT(
-        "CAT_PLT_FORMULA_ERROR",
-        "La celda contiene un error de evaluación de fórmula (#VALUE!, #REF!, #DIV/0!).",
-        "ALERTA"
+        "CAT_PLT_FORMULA_ERROR", "La celda contiene un error de evaluación de fórmula (#VALUE!, #REF!, #DIV/0!).", "ALERTA"
     ),
-
-    # Integridad de Celdas (Advertencias)
     "CAT_PLT_SECUENCIA_DESORDEN": RuleCategoryPLT(
-        "CAT_PLT_SECUENCIA_DESORDEN",
-        "Las muestras de la celda de mapeo no se encuentran en orden canónico (A-B-C-D).",
-        "ADVERTENCIA"
+        "CAT_PLT_SECUENCIA_DESORDEN", "Las muestras de la celda de mapeo no se encuentran en orden canónico (A-B-C-D).", "ADVERTENCIA"
     ),
     "CAT_PLT_CELDA_INCOMPLETA": RuleCategoryPLT(
-        "CAT_PLT_CELDA_INCOMPLETA",
-        "La celda de mapeo se encuentra incompleta (posee menos de 4 muestras).",
-        "ADVERTENCIA"
+        "CAT_PLT_CELDA_INCOMPLETA", "La celda de mapeo se encuentra incompleta (posee menos de 4 muestras).", "ADVERTENCIA"
     ),
     "CAT_PLT_CELDA_EXCEDENTE": RuleCategoryPLT(
-        "CAT_PLT_CELDA_EXCEDENTE",
-        "La celda de mapeo posee más de 4 muestras registradas.",
-        "ADVERTENCIA"
+        "CAT_PLT_CELDA_EXCEDENTE", "La celda de mapeo posee más de 4 muestras registradas.", "ADVERTENCIA"
     ),
+}
+
+# Categorías que aplican exclusivamente al Formato de Campo Compacto (03 feb1.xlsx)
+COMPACT_FIELD_CATEGORIES: Set[str] = {
+    "CAT_CAMPO_OBLIGATORIO_VACIO",
+    "CAT_PLT_MUESTRA_INVALIDA",
+    "CAT_PLT_CODIGO_MUESTRA_INCONGRUENTE",
+    "CAT_PLT_LITO1_INVALIDA",
+    "CAT_PLT_LITOLOGIA_COMBINACION_INVALIDA",
+    "CAT_PLT_COORD_ESTE_RANGO",
+    "CAT_PLT_COORD_NORTE_RANGO",
+    "CAT_PLT_ELEVACION_RANGO",
+    "CAT_PLT_ESPESOR_D_RANGO",
+    "CAT_PLT_LONGITUD_L_RANGO",
+    "CAT_PLT_ANCHO_W1_RANGO",
+    "CAT_PLT_ANCHO_W2_RANGO",
+    "CAT_PLT_ANCHO_W_INCONGRUENTE",
+    "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
+    "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
+    "CAT_PLT_FUERZA_P_RANGO",
+    "CAT_PLT_DIRECCION_ROTURA_INVALIDA",
+    "CAT_PLT_TIPO_FRACTURA_INVALIDO",
+    "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
+    "CAT_PLT_FACTOR_F_INCONGRUENTE",
+    "CAT_PLT_IS_INCONGRUENTE",
+    "CAT_PLT_IS50_INCONGRUENTE",
+    "CAT_PLT_UCS_INCONGRUENTE",
+    "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
+    "CAT_PLT_FORMULA_ERROR",
+    "CAT_PLT_SECUENCIA_DESORDEN",
+    "CAT_PLT_CELDA_INCOMPLETA",
+    "CAT_PLT_CELDA_EXCEDENTE",
 }
 
 
 # ===========================================================================
-# 2. REGLAS ESPECÍFICAS PLT (RULES_REGISTRY_PLT)
+# 2. REGLAS DETALLADAS DE ERROR
 # ===========================================================================
 RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
-    # Vacío
     "ERR_PLT_CAMPO_OBLIGATORIO_VACIO": ErrorRulePLT(
         "ERR_PLT_CAMPO_OBLIGATORIO_VACIO",
         "CAT_CAMPO_OBLIGATORIO_VACIO",
-        [],
-        "Campo obligatorio se encuentra vacío: '{col_name}'."
+        ["Campaña", "Fecha de ensayo", "Tipo de ensayo", "Ejecutado por", "Zona de mapeo", "Nivel", "Celda de mapeo", "Muestra", "Código de muestra", "Litología 1", "Litología 2", "Litología 3", "Tipo litológico", "Este (m)", "Norte (m)", "Elevación (msnm)", "Espesor D (cm)", "Longitud L (cm)", "Ancho W1 (cm)", "Ancho W2 (cm)", "Ancho W (cm)", "Muestra válida - Longitud", "Muestra válida - Ancho", "Fuerza P (kN)", "Dirección de rotura", "Tipo de fractura", "Diámetro equivalente (cm)", "Factor F", "Is (MPa)", "Is(50) (MPa)", "Factor de conversión K", "RCS/UCS (MPa)", "Resistencia ISRM"],
+        "Campo obligatorio se encuentra vacío: '{col_name}'.",
     ),
-
-    # Grupo 1: General
-    "ERR_PLT_CAMPANA_INVALIDA": ErrorRulePLT(
-        "ERR_PLT_CAMPANA_INVALIDA",
+    "ERR_PLT_CAMPANIA_RANGO": ErrorRulePLT(
+        "ERR_PLT_CAMPANIA_RANGO",
         "CAT_PLT_CAMPANA_INVALIDA",
         ["Campaña"],
-        "Año de campaña inválido: '{value}'. Debe ser un año de 4 dígitos entre 2000 y 2035."
+        "Campaña con valor '{value}' fuera de rango. Debe ser un año entre 2000 y 2035.",
     ),
-    "ERR_PLT_FECHA_INVALIDA": ErrorRulePLT(
-        "ERR_PLT_FECHA_INVALIDA",
+    "ERR_PLT_FORMATO_FECHA_INVALIDO": ErrorRulePLT(
+        "ERR_PLT_FORMATO_FECHA_INVALIDO",
         "CAT_PLT_FECHA_INVALIDA",
         ["Fecha de ensayo"],
-        "Formato de fecha de ensayo no válido o no parseable: '{value}'."
+        "Fecha de ensayo '{value}' tiene un formato no válido o no parseable.",
     ),
     "ERR_PLT_FECHA_FUTURA": ErrorRulePLT(
         "ERR_PLT_FECHA_FUTURA",
         "CAT_PLT_FECHA_FUTURA",
         ["Fecha de ensayo"],
-        "La fecha de ensayo '{value}' es posterior a la fecha actual del sistema."
+        "Fecha de ensayo '{value}' es posterior a la fecha actual del sistema.",
     ),
-    "ERR_PLT_TIPO_ENSAYO_INVALIDO": ErrorRulePLT(
-        "ERR_PLT_TIPO_ENSAYO_INVALIDO",
+    "ERR_PLT_TIPO_ENSAYO_CATALOGO": ErrorRulePLT(
+        "ERR_PLT_TIPO_ENSAYO_CATALOGO",
         "CAT_PLT_TIPO_ENSAYO_INVALIDO",
         ["Tipo de ensayo"],
-        "Tipo de ensayo no admitido: '{value}'. Debe ser 'i' (Irregular)."
+        "Tipo de ensayo '{value}' no admitido. Debe ser 'i' (irregular).",
     ),
-
-    # Grupo 2: Muestra y Litología
     "ERR_PLT_NIVEL_NO_NUMERICO": ErrorRulePLT(
         "ERR_PLT_NIVEL_NO_NUMERICO",
         "CAT_PLT_NIVEL_NO_NUMERICO",
         ["Nivel"],
-        "El nivel ingresado '{value}' no es un valor numérico válido."
+        "Nivel '{value}' contiene caracteres no numéricos o no es un entero válido.",
     ),
-    "ERR_PLT_NIVEL_NEGATIVO": ErrorRulePLT(
-        "ERR_PLT_NIVEL_NEGATIVO",
+    "ERR_PLT_NIVEL_RANGO": ErrorRulePLT(
+        "ERR_PLT_NIVEL_RANGO",
         "CAT_PLT_NIVEL_NEGATIVO",
         ["Nivel"],
-        "El nivel ingresado ({value}) no puede ser un valor negativo."
+        "Nivel con valor '{value}' no puede ser negativo.",
     ),
-    "ERR_PLT_NIVEL_LIMITE_EXCEDIDO": ErrorRulePLT(
-        "ERR_PLT_NIVEL_LIMITE_EXCEDIDO",
-        "CAT_PLT_NIVEL_LIMITE_EXCEDIDO",
-        ["Nivel"],
-        "El nivel ingresado ({value}) supera el límite máximo permitido (4999)."
-    ),
-    "ERR_PLT_MUESTRA_INVALIDA": ErrorRulePLT(
-        "ERR_PLT_MUESTRA_INVALIDA",
+    "ERR_PLT_MUESTRA_LETRA_INVALIDA": ErrorRulePLT(
+        "ERR_PLT_MUESTRA_LETRA_INVALIDA",
         "CAT_PLT_MUESTRA_INVALIDA",
         ["Muestra"],
-        "Letra de muestra inválida: '{value}'. Debe ser A, B, C o D."
+        "Letra de muestra '{value}' inválida. Debe ser A, B, C o D.",
     ),
     "ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA": ErrorRulePLT(
         "ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA",
         "CAT_PLT_MUESTRA_DUPLICADA",
-        ["Muestra", "Celda de mapeo"],
-        "Muestra duplicada '{muestra}' para la celda '{celda}' en fecha '{fecha}'."
+        ["Muestra"],
+        "Muestra '{muestra}' duplicada en celda '{celda}'.",
     ),
     "ERR_PLT_CODIGO_MUESTRA_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_CODIGO_MUESTRA_INCONGRUENTE",
         "CAT_PLT_CODIGO_MUESTRA_INCONGRUENTE",
         ["Código de muestra"],
-        "Código de muestra '{actual}' no coincide con la celda '{celda}' y muestra '{muestra}' (esperado: '{expected}')."
+        "Código de muestra '{actual}' no coincide con celda '{celda}' y muestra '{muestra}'.",
     ),
-    "ERR_PLT_LITO1_INVALIDA": ErrorRulePLT(
-        "ERR_PLT_LITO1_INVALIDA",
+    "ERR_PLT_LITO1_NO_RECONOCIDO": ErrorRulePLT(
+        "ERR_PLT_LITO1_NO_RECONOCIDO",
         "CAT_PLT_LITO1_INVALIDA",
         ["Litología 1"],
-        "Litología 1 '{value}' no existe en el catálogo geológico de litologías."
+        "Litología '{value}' no existe en el catálogo geológico oficial.",
     ),
-    "ERR_PLT_LITOLOGIA_COMBINACION_INVALIDA": ErrorRulePLT(
-        "ERR_PLT_LITOLOGIA_COMBINACION_INVALIDA",
+    "ERR_PLT_LITO2_NO_RECONOCIDO": ErrorRulePLT(
+        "ERR_PLT_LITO2_NO_RECONOCIDO",
+        "CAT_PLT_LITO1_INVALIDA",
+        ["Litología 2"],
+        "Litología '{value}' no existe en el catálogo geológico oficial.",
+    ),
+    "ERR_PLT_LITO3_NO_RECONOCIDO": ErrorRulePLT(
+        "ERR_PLT_LITO3_NO_RECONOCIDO",
+        "CAT_PLT_LITO1_INVALIDA",
+        ["Litología 3"],
+        "Litología '{value}' no existe en el catálogo geológico oficial.",
+    ),
+    "ERR_PLT_COMBINACION_LITOLOGICA_NO_VALIDA": ErrorRulePLT(
+        "ERR_PLT_COMBINACION_LITOLOGICA_NO_VALIDA",
         "CAT_PLT_LITOLOGIA_COMBINACION_INVALIDA",
         ["Litología 1", "Litología 2", "Litología 3"],
-        "Combinación litológica (Lito 1: '{l1}', Lito 2: '{l2}', Lito 3: '{l3}') no existe en el catálogo."
+        "Combinación ({lito1}, {lito2}, {lito3}) no pertenece al catálogo geológico.",
     ),
-    "ERR_PLT_TIPO_LITOLOGICO_INVALIDO": ErrorRulePLT(
-        "ERR_PLT_TIPO_LITOLOGICO_INVALIDO",
+    "ERR_PLT_TIPO_LITOLOGICO_CATALOGO": ErrorRulePLT(
+        "ERR_PLT_TIPO_LITOLOGICO_CATALOGO",
         "CAT_PLT_TIPO_LITOLOGICO_INVALIDO",
         ["Tipo litológico"],
-        "Tipo litológico '{value}' no pertenece a los 5 grupos admitidos (INTRUSIVOS, SEDIMENTARIOS, METAMORFICAS, BRECHAS, ENDOSKARN)."
+        "Tipo litológico '{value}' no pertenece a los 5 grupos admitidos.",
     ),
     "ERR_PLT_TIPO_LITOLOGICO_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
         "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
         ["Tipo litológico"],
-        "Tipo litológico '{actual}' no coincide con el grupo geológico '{expected}' correspondiente a la litología."
+        "Tipo litológico '{actual}' es incongruente con la combinación litológica (esperado: '{expected}').",
     ),
-
-    # Grupo 3: Coordenadas
-    "ERR_PLT_COORD_ESTE_RANGO": ErrorRulePLT(
-        "ERR_PLT_COORD_ESTE_RANGO",
+    "ERR_PLT_ESTE_RANGO": ErrorRulePLT(
+        "ERR_PLT_ESTE_RANGO",
         "CAT_PLT_COORD_ESTE_RANGO",
         ["Este (m)"],
-        "Coordenada Este ({value}) no puede ser menor o igual a cero."
+        "Coordenada Este ({value}) fuera de rango válido.",
     ),
-    "ERR_PLT_COORD_NORTE_RANGO": ErrorRulePLT(
-        "ERR_PLT_COORD_NORTE_RANGO",
+    "ERR_PLT_NORTE_RANGO": ErrorRulePLT(
+        "ERR_PLT_NORTE_RANGO",
         "CAT_PLT_COORD_NORTE_RANGO",
         ["Norte (m)"],
-        "Coordenada Norte ({value}) no puede ser menor o igual a cero."
+        "Coordenada Norte ({value}) fuera de rango válido.",
     ),
     "ERR_PLT_ELEVACION_RANGO": ErrorRulePLT(
         "ERR_PLT_ELEVACION_RANGO",
         "CAT_PLT_ELEVACION_RANGO",
         ["Elevación (msnm)"],
-        "Elevación ({value} msnm) no puede ser menor o igual a cero."
+        "Elevación ({value}) fuera de rango válido (0 a 6000 msnm).",
     ),
-
-    # Grupo 4: Geometría
     "ERR_PLT_ESPESOR_D_RANGO": ErrorRulePLT(
         "ERR_PLT_ESPESOR_D_RANGO",
         "CAT_PLT_ESPESOR_D_RANGO",
         ["Espesor D (cm)"],
-        "Espesor D ({value} cm) debe ser mayor a cero."
+        "Espesor D ({value}) fuera de rango (1.0 a 20.0 cm).",
     ),
     "ERR_PLT_LONGITUD_L_RANGO": ErrorRulePLT(
         "ERR_PLT_LONGITUD_L_RANGO",
         "CAT_PLT_LONGITUD_L_RANGO",
         ["Longitud L (cm)"],
-        "Longitud L ({value} cm) debe ser mayor a cero."
+        "Longitud L ({value}) fuera de rango (1.0 a 50.0 cm).",
     ),
     "ERR_PLT_ANCHO_W1_RANGO": ErrorRulePLT(
         "ERR_PLT_ANCHO_W1_RANGO",
         "CAT_PLT_ANCHO_W1_RANGO",
         ["Ancho W1 (cm)"],
-        "Ancho W1 ({value} cm) debe ser mayor a cero."
+        "Ancho W1 ({value}) fuera de rango (1.0 a 30.0 cm).",
     ),
     "ERR_PLT_ANCHO_W2_RANGO": ErrorRulePLT(
         "ERR_PLT_ANCHO_W2_RANGO",
         "CAT_PLT_ANCHO_W2_RANGO",
         ["Ancho W2 (cm)"],
-        "Ancho W2 ({value} cm) debe ser mayor a cero."
+        "Ancho W2 ({value}) fuera de rango (1.0 a 30.0 cm).",
+    ),
+    "ERR_PLT_ANCHO_W_RANGO": ErrorRulePLT(
+        "ERR_PLT_ANCHO_W_RANGO",
+        "CAT_PLT_ANCHO_W1_RANGO",
+        ["Ancho W (cm)"],
+        "Ancho W ({value}) fuera de rango (1.0 a 30.0 cm).",
     ),
     "ERR_PLT_ANCHO_W_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_ANCHO_W_INCONGRUENTE",
         "CAT_PLT_ANCHO_W_INCONGRUENTE",
         ["Ancho W (cm)"],
-        "Ancho W ingresado ({actual} cm) difiere del promedio de W1 ({w1}) y W2 ({w2}) -> esperado: {expected} cm."
+        "Ancho W ({actual}) diverge del promedio (W1+W2)/2 = {expected:.2f}.",
     ),
     "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
         "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
-        ["Muestra válida - longitud"],
-        "Muestra válida longitud ingresada '{actual}' es incongruente con L={l_val} y D={d_val} (esperado: '{expected}')."
+        ["Muestra válida - Longitud"],
+        "Validación de longitud '{actual}' no coincide con la condición L >= D (esperado '{expected}').",
     ),
     "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
         "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
-        ["Muestra válida - ancho"],
-        "Muestra válida ancho ingresada '{actual}' es incongruente con D={d_val} y W={w_val} (esperado: '{expected}')."
+        ["Muestra válida - Ancho"],
+        "Validación de ancho '{actual}' no coincide con la condición 0.3W < D < W (esperado '{expected}').",
     ),
-
-    # Grupo 5: Datos Ensayo
     "ERR_PLT_FUERZA_P_RANGO": ErrorRulePLT(
         "ERR_PLT_FUERZA_P_RANGO",
         "CAT_PLT_FUERZA_P_RANGO",
         ["Fuerza P (kN)"],
-        "Fuerza P ({value} kN) debe ser un valor mayor a cero."
+        "Fuerza P ({value}) fuera de rango (0.01 a 200.0 kN).",
     ),
-    "ERR_PLT_DIRECCION_ROTURA_INVALIDA": ErrorRulePLT(
-        "ERR_PLT_DIRECCION_ROTURA_INVALIDA",
+    "ERR_PLT_DIRECCION_ROTURA_CATALOGO": ErrorRulePLT(
+        "ERR_PLT_DIRECCION_ROTURA_CATALOGO",
         "CAT_PLT_DIRECCION_ROTURA_INVALIDA",
         ["Dirección de rotura"],
-        "Dirección de rotura '{value}' no admitida. Debe ser Pa, Pe o NA."
+        "Dirección de rotura '{value}' no admitida (debe ser Pa, Pe o NA).",
     ),
-    "ERR_PLT_TIPO_FRACTURA_INVALIDO": ErrorRulePLT(
-        "ERR_PLT_TIPO_FRACTURA_INVALIDO",
+    "ERR_PLT_TIPO_FRACTURA_CATALOGO": ErrorRulePLT(
+        "ERR_PLT_TIPO_FRACTURA_CATALOGO",
         "CAT_PLT_TIPO_FRACTURA_INVALIDO",
         ["Tipo de fractura"],
-        "Tipo de fractura '{value}' no admitido. Debe ser M, E o C."
+        "Tipo de fractura '{value}' no admitido (debe ser M, E o C).",
     ),
-
-    # Grupo 6: Cálculo Is
     "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
-        ["Diametro equivalente (cm)"],
-        "Diámetro equivalente De ingresado ({actual} cm) difiere del cálculo sqrt(4*D*W/pi) -> esperado: {expected} cm."
+        ["Diámetro equivalente (cm)"],
+        "Diámetro equivalente De ({actual}) diverge de sqrt(4*W*D/pi) = {expected:.2f}.",
     ),
     "ERR_PLT_FACTOR_F_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_FACTOR_F_INCONGRUENTE",
         "CAT_PLT_FACTOR_F_INCONGRUENTE",
-        ["F"],
-        "Factor de corrección F ingresado ({actual}) difiere del cálculo ((De*10)/50)^0.45 -> esperado: {expected}."
+        ["Factor F"],
+        "Factor F ({actual:.3f}) diverge del valor teórico ({expected:.3f}).",
     ),
     "ERR_PLT_IS_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_IS_INCONGRUENTE",
         "CAT_PLT_IS_INCONGRUENTE",
         ["Is (MPa)"],
-        "Índice Is ingresado ({actual} MPa) difiere del cálculo P*1000/(De*10)^2 -> esperado: {expected} MPa."
+        "Índice Is ({actual:.2f}) diverge del cálculo teórico ({expected:.2f}).",
     ),
     "ERR_PLT_IS50_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_IS50_INCONGRUENTE",
         "CAT_PLT_IS50_INCONGRUENTE",
         ["Is(50) (MPa)"],
-        "Índice Is(50) ingresado ({actual} MPa) difiere del cálculo Is * F -> esperado: {expected}."
+        "Índice Is(50) ({actual:.2f}) diverge de F * Is ({expected:.2f}).",
     ),
-
-    # Grupo 7: Resistencia de Roca
-    "ERR_PLT_FACTOR_K_INCONGRUENTE": ErrorRulePLT(
-        "ERR_PLT_FACTOR_K_INCONGRUENTE",
+    "ERR_PLT_FACTOR_K_INCORRECTO": ErrorRulePLT(
+        "ERR_PLT_FACTOR_K_INCORRECTO",
         "CAT_PLT_FACTOR_K_INCONGRUENTE",
         ["Factor de conversión K"],
-        "Factor K ingresado ({actual}) difiere del valor teórico asignado por el catálogo litológico ({expected})."
+        "Factor K ({actual}) no coincide con el asignado por catálogo ({expected}).",
     ),
     "ERR_PLT_FACTOR_K_RANGO": ErrorRulePLT(
         "ERR_PLT_FACTOR_K_RANGO",
         "CAT_PLT_FACTOR_K_RANGO",
         ["Factor de conversión K"],
-        "Factor K ingresado ({value}) fuera de rango permitido [5, 30]."
+        "Factor K ({value}) fuera de rango razonable [5, 30].",
     ),
     "ERR_PLT_UCS_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_UCS_INCONGRUENTE",
         "CAT_PLT_UCS_INCONGRUENTE",
         ["RCS/UCS (MPa)"],
-        "Resistencia UCS ingresada ({actual} MPa) difiere del cálculo Is(50) * K -> esperado: {expected} MPa."
+        "Resistencia UCS ({actual:.2f}) diverge de K * Is(50) = {expected:.2f}.",
     ),
-    "ERR_PLT_RESISTENCIA_ISRM_INCONGRUENTE": ErrorRulePLT(
-        "ERR_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
+    "ERR_PLT_RESISTENCIA_ISRM_CATALOGO": ErrorRulePLT(
+        "ERR_PLT_RESISTENCIA_ISRM_CATALOGO",
         "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
         ["Resistencia ISRM"],
-        "Resistencia ISRM ingresada '{actual}' no corresponde al rango de UCS ({ucs_val} MPa) -> esperado: '{expected}'."
+        "Resistencia ISRM '{actual}' no coincide con rango esperado '{expected}' para UCS={ucs_val:.1f} MPa.",
     ),
-
-    # Global / Excel
-    "ERR_PLT_FORMULA_ERROR": ErrorRulePLT(
-        "ERR_PLT_FORMULA_ERROR",
+    "ERR_PLT_CELDA_ANOMALA": ErrorRulePLT(
+        "ERR_PLT_CELDA_ANOMALA",
         "CAT_PLT_FORMULA_ERROR",
-        [],
-        "Celda con error de fórmula de Excel en columna '{col_name}': '{value}'."
+        ["Celda de mapeo"],
+        "Celda '{celda}': Contiene errores críticos de fórmula (#VALUE!, #REF!, etc.).",
     ),
-
-    # Integridad Celdas ABCD
     "WRN_PLT_SECUENCIA_DESORDEN": ErrorRulePLT(
         "WRN_PLT_SECUENCIA_DESORDEN",
         "CAT_PLT_SECUENCIA_DESORDEN",
-        ["Celda de mapeo", "Muestra"],
-        "Celda '{celda}': Orden de muestras alterado ({secuencia}). Debe ser A-B-C-D."
+        ["Muestra", "Código de muestra"],
+        "Celda '{celda}': Secuencia de muestras en desorden ({secuencia}). Esperado A-B-C-D.",
     ),
     "WRN_PLT_CELDA_INCOMPLETA": ErrorRulePLT(
         "WRN_PLT_CELDA_INCOMPLETA",
         "CAT_PLT_CELDA_INCOMPLETA",
-        ["Celda de mapeo", "Muestra"],
-        "Celda '{celda}': Registro incompleto con {count}/4 muestras ({secuencia})."
+        ["Celda de mapeo", "Código de muestra"],
+        "Celda '{celda}': Registro incompleto con {count}/4 muestras ({secuencia}).",
     ),
     "WRN_PLT_CELDA_EXCEDENTE": ErrorRulePLT(
         "WRN_PLT_CELDA_EXCEDENTE",
         "CAT_PLT_CELDA_EXCEDENTE",
-        ["Celda de mapeo", "Muestra"],
-        "Celda '{celda}': Posee más de 4 muestras ({count}/4) ({secuencia})."
+        ["Celda de mapeo", "Código de muestra"],
+        "Celda '{celda}': Registro excedente con {count}/4 muestras ({secuencia}).",
     ),
 }

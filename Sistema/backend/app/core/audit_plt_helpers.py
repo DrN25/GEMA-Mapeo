@@ -8,10 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from app.core.audit_helpers import safe_float, safe_int
-from app.core.rules_plt import CATEGORIES_REGISTRY_PLT, RULES_REGISTRY_PLT
-
-# Cantidad de columnas obligatorias evaluadas en PLT (34 columnas estándar)
-PLT_MANDATORY_COLS_COUNT = 34
+from app.core.rules_plt import CATEGORIES_REGISTRY_PLT, RULES_REGISTRY_PLT, COMPACT_FIELD_CATEGORIES
 
 
 def get_plt_incidence_category_name(i: dict) -> str:
@@ -27,7 +24,6 @@ def get_plt_incidence_category_name(i: dict) -> str:
         if cat:
             return cat.name
 
-    # Fallback si no viene rule_code
     msg = str(i.get("mensaje", "")).upper()
     for cat in CATEGORIES_REGISTRY_PLT.values():
         if cat.name.upper() in msg:
@@ -42,12 +38,14 @@ def get_plt_incidence_category_name(i: dict) -> str:
 def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) -> dict:
     """
     Calcula todas las métricas estadísticas, KPIs y cruces de variables para la auditoría PLT.
-    Soporta filtrado opcional por años de campaña.
+    Soporta filtrado opcional por años de campaña y ajuste dinámico por formato detectado.
     """
+    formato_tipo = diag.get("formato_detectado", "FORMAT_STANDARD_34")
+    mandatory_cols_count = 24 if "COMPACT" in str(formato_tipo) else 34
+
     incidencias_raw = diag.get("incidencias", [])
     total_filas_original = diag.get("total_filas_procesadas", 0)
     resumen_celdas_raw = diag.get("resumen_por_celda", {})
-    integrity_summary_raw = diag.get("integrity_summary", {})
 
     # Filtrado por campañas si aplica
     if years_filter:
@@ -67,8 +65,8 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
     num_celdas = len(resumen_celdas)
     promedio_muestras = (total_filas / max(1, num_celdas)) if num_celdas > 0 else 4.0
 
-    # 2. Indicadores Familia 2: Campos individuales (34 columnas obligatorias)
-    total_fields = total_filas * PLT_MANDATORY_COLS_COUNT
+    # 2. Indicadores Familia 2: Campos individuales (24 para compacto, 34 para estándar)
+    total_fields = total_filas * mandatory_cols_count
     total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
     total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
     total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
@@ -115,7 +113,7 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
     distribucion_campania = []
     for c_name, data in sorted(campanias_data.items(), key=lambda x: str(x[0])):
         total_regs = data["registros"]
-        total_fields_camp = total_regs * PLT_MANDATORY_COLS_COUNT if total_regs > 0 else 1
+        total_fields_camp = total_regs * mandatory_cols_count if total_regs > 0 else 1
         distribucion_campania.append({
             "campania": c_name,
             "registros": total_regs,
@@ -141,7 +139,7 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
     distribucion_litologia = []
     for l_name, data in sorted(lito_data.items(), key=lambda x: x[1]["alertas"], reverse=True):
         total_regs = data["registros"]
-        total_fields_lito = total_regs * PLT_MANDATORY_COLS_COUNT if total_regs > 0 else 1
+        total_fields_lito = total_regs * mandatory_cols_count if total_regs > 0 else 1
         distribucion_litologia.append({
             "tipo_litologico": l_name,
             "registros": total_regs,
@@ -197,6 +195,7 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
     return {
         "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "status": "completado",
+        "formato_detectado": formato_tipo,
         "total_registros_evaluados": total_filas,
         "total_alertas": total_alertas,
         "total_advertencias": total_advertencias,

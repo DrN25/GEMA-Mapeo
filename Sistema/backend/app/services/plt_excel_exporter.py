@@ -13,7 +13,7 @@ from openpyxl.utils import get_column_letter
 from app.core.excel_styles import get_styles, write_kpi_card
 from app.core.audit_helpers import safe_int, safe_float, get_safe_sheet_name
 from app.core.audit_plt_helpers import get_plt_incidence_category_name
-from app.core.rules_plt import CATEGORIES_REGISTRY_PLT, RULES_REGISTRY_PLT
+from app.core.rules_plt import CATEGORIES_REGISTRY_PLT, RULES_REGISTRY_PLT, COMPACT_FIELD_CATEGORIES
 
 
 def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> openpyxl.Workbook:
@@ -50,6 +50,8 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
     alignment_left = s["align_left"]
     alignment_right = s["align_right"]
 
+    formato_tipo = diag.get("formato_detectado", "FORMAT_STANDARD_34")
+
     wb = openpyxl.Workbook()
 
     def write_kpi_card_opt(ws, start_row, start_col, label, value, bg_fill, val_font):
@@ -63,14 +65,15 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
     ws_dash.views.sheetView[0].showGridLines = True
 
     ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA — ENSAYOS PLT").font = font_title
-    ws_dash.cell(
-        row=3,
-        column=2,
-        value="Dashboard Ejecutivo de Control de Calidad, Consistencia de 34 Columnas y Secuencias ABCD",
-    ).font = font_subtitle
+    subtitle_txt = (
+        "Dashboard Ejecutivo de Control de Calidad, Consistencia Geomecánica y Secuencias ABCD (Formato de Campo)"
+        if "COMPACT" in str(formato_tipo)
+        else "Dashboard Ejecutivo de Control de Calidad, Consistencia de 34 Columnas y Secuencias ABCD"
+    )
+    ws_dash.cell(row=3, column=2, value=subtitle_txt).font = font_subtitle
 
     total_filas = compact.get("familia1", {}).get("total_registros", diag.get("total_filas_procesadas", 0))
-    total_fields = compact.get("familia2", {}).get("total_fields", total_filas * 34)
+    total_fields = compact.get("familia2", {}).get("total_fields", total_filas * (24 if "COMPACT" in str(formato_tipo) else 34))
     total_vacios = sum(1 for i in filtered if i.get("tipo_incidencia") == "VACIO")
     total_advertencias = sum(1 for i in filtered if i.get("tipo_incidencia") == "ADVERTENCIA")
     total_alertas = sum(1 for i in filtered if i.get("tipo_incidencia") == "ALERTA")
@@ -86,50 +89,56 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
     write_kpi_card_opt(ws_dash, 5, 8, "ALERTAS CRÍTICAS", total_alertas, fill_accent_red, font_kpi_val_red)
     write_kpi_card_opt(ws_dash, 5, 10, "ADVERTENCIAS", total_advertencias, fill_accent_orange, font_kpi_val_orange)
 
-    # 1. Tabla: Desempeño por Campaña
-    ws_dash.cell(row=9, column=2, value="DESEMPEÑO DE CONTROL POR CAMPAÑA").font = font_section
-    headers_camp = ["Campaña", "Muestras", "Celdas Afectadas", "Muestras Afectadas", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
-    for idx, col in enumerate(headers_camp, start=2):
-        cell = ws_dash.cell(row=10, column=idx, value=col)
-        cell.font = font_header
-        cell.fill = fill_primary
-        cell.alignment = alignment_center
-        cell.border = border_thin
+    # 1. Tabla: Desempeño por Campaña (solo si existen campañas registradas)
+    dist_camp = compact.get("distribucion_campania", [])
+    has_real_campaigns = any(str(r.get("campania", "")).strip() not in ["N/A", "Sin Campaña", ""] for r in dist_camp)
 
     r_camp = 11
-    for row in compact.get("distribucion_campania", []):
-        ws_dash.cell(row=r_camp, column=2, value=str(row.get("campania"))).font = font_bold
-        ws_dash.cell(row=r_camp, column=2).alignment = alignment_center
+    if has_real_campaigns:
+        ws_dash.cell(row=9, column=2, value="DESEMPEÑO DE CONTROL POR CAMPAÑA").font = font_section
+        headers_camp = ["Campaña", "Muestras", "Celdas Afectadas", "Muestras Afectadas", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
+        for idx, col in enumerate(headers_camp, start=2):
+            cell = ws_dash.cell(row=10, column=idx, value=col)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
 
-        ws_dash.cell(row=r_camp, column=3, value=safe_int(row.get("registros"))).number_format = '#,##0'
-        ws_dash.cell(row=r_camp, column=3).alignment = alignment_right
+        for row in dist_camp:
+            ws_dash.cell(row=r_camp, column=2, value=str(row.get("campania"))).font = font_bold
+            ws_dash.cell(row=r_camp, column=2).alignment = alignment_center
 
-        ws_dash.cell(row=r_camp, column=4, value=safe_int(row.get("celdas_afectadas"))).number_format = '#,##0'
-        ws_dash.cell(row=r_camp, column=4).alignment = alignment_right
+            ws_dash.cell(row=r_camp, column=3, value=safe_int(row.get("registros"))).number_format = '#,##0'
+            ws_dash.cell(row=r_camp, column=3).alignment = alignment_right
 
-        ws_dash.cell(row=r_camp, column=5, value=safe_int(row.get("registros_afectados", row.get("registros")))).number_format = '#,##0'
-        ws_dash.cell(row=r_camp, column=5).alignment = alignment_right
+            ws_dash.cell(row=r_camp, column=4, value=safe_int(row.get("celdas_afectadas"))).number_format = '#,##0'
+            ws_dash.cell(row=r_camp, column=4).alignment = alignment_right
 
-        ws_dash.cell(row=r_camp, column=6, value=safe_int(row.get("alertas_cant"))).number_format = '#,##0'
-        ws_dash.cell(row=r_camp, column=6).alignment = alignment_right
+            ws_dash.cell(row=r_camp, column=5, value=safe_int(row.get("registros_afectados", row.get("registros")))).number_format = '#,##0'
+            ws_dash.cell(row=r_camp, column=5).alignment = alignment_right
 
-        ws_dash.cell(row=r_camp, column=7, value=safe_float(row.get("alertas_pct")) / 100.0).number_format = '0.00%'
-        ws_dash.cell(row=r_camp, column=7).alignment = alignment_right
+            ws_dash.cell(row=r_camp, column=6, value=safe_int(row.get("alertas_cant"))).number_format = '#,##0'
+            ws_dash.cell(row=r_camp, column=6).alignment = alignment_right
 
-        ws_dash.cell(row=r_camp, column=8, value=safe_int(row.get("vacios_cant"))).number_format = '#,##0'
-        ws_dash.cell(row=r_camp, column=8).alignment = alignment_right
+            ws_dash.cell(row=r_camp, column=7, value=safe_float(row.get("alertas_pct")) / 100.0).number_format = '0.00%'
+            ws_dash.cell(row=r_camp, column=7).alignment = alignment_right
 
-        ws_dash.cell(row=r_camp, column=9, value=safe_float(row.get("vacios_pct")) / 100.0).number_format = '0.00%'
-        ws_dash.cell(row=r_camp, column=9).alignment = alignment_right
+            ws_dash.cell(row=r_camp, column=8, value=safe_int(row.get("vacios_cant"))).number_format = '#,##0'
+            ws_dash.cell(row=r_camp, column=8).alignment = alignment_right
 
-        for col_idx in range(2, 10):
-            ws_dash.cell(row=r_camp, column=col_idx).border = border_thin
-            if r_camp % 2 == 0:
-                ws_dash.cell(row=r_camp, column=col_idx).fill = fill_zebra
-        r_camp += 1
+            ws_dash.cell(row=r_camp, column=9, value=safe_float(row.get("vacios_pct")) / 100.0).number_format = '0.00%'
+            ws_dash.cell(row=r_camp, column=9).alignment = alignment_right
+
+            for col_idx in range(2, 10):
+                ws_dash.cell(row=r_camp, column=col_idx).border = border_thin
+                if r_camp % 2 == 0:
+                    ws_dash.cell(row=r_camp, column=col_idx).fill = fill_zebra
+            r_camp += 1
+    else:
+        r_camp = 9
 
     # 2. Tabla: Distribución por Tipo Litológico
-    r_lito = r_camp + 2
+    r_lito = r_camp + (2 if has_real_campaigns else 0)
     ws_dash.cell(row=r_lito, column=2, value="DISTRIBUCIÓN POR TIPO LITOLÓGICO").font = font_section
     headers_lito = ["Tipo Litológico", "Muestras", "Celdas Afectadas", "Alertas (N)", "% Alertas", "Vacíos (N)", "% Vacíos"]
     for idx, col in enumerate(headers_lito, start=2):
@@ -184,7 +193,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         ws_dash.cell(row=curr_w_r, column=2, value=str(row.get("celda"))).font = font_bold
         ws_dash.cell(row=curr_w_r, column=2).alignment = alignment_left
 
-        ws_dash.cell(row=curr_w_r, column=3, value=safe_int(row.get("total_muestras", row.get("total_hijas", 4)))).number_format = '#,##0'
+        ws_dash.cell(row=curr_w_r, column=3, value=safe_int(row.get("total_muestras", 4))).number_format = '#,##0'
         ws_dash.cell(row=curr_w_r, column=3).alignment = alignment_right
 
         ws_dash.cell(row=curr_w_r, column=4, value=safe_int(row.get("alertas"))).number_format = '#,##0'
@@ -305,13 +314,17 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
     # Campañas únicas
     all_campaigns = sorted(
         set(
-            [str(row.get("campania")) for row in compact.get("distribucion_campania", []) if row.get("campania") and str(row.get("campania")) not in ["N/A", "None", ""]]
-            + [str(inc.get("campania")) for inc in filtered if inc.get("campania") and str(inc.get("campania")) not in ["N/A", "None", ""]]
+            [str(row.get("campania")) for row in compact.get("distribucion_campania", []) if row.get("campania") and str(row.get("campania")) not in ["N/A", "None", "", "Sin Campaña"]]
+            + [str(inc.get("campania")) for inc in filtered if inc.get("campania") and str(inc.get("campania")) not in ["N/A", "None", "", "Sin Campaña"]]
         ),
         key=lambda x: str(x),
     )
 
-    headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Total (N)"] + [f"Año {c}" for c in all_campaigns] + ["Enlace Directo"]
+    headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Total (N)"]
+    if all_campaigns:
+        headers_cat += [f"Año {c}" for c in all_campaigns]
+    headers_cat.append("Enlace Directo")
+
     for idx, col in enumerate(headers_cat, start=2):
         cell = ws_cat.cell(row=5, column=idx, value=col)
         cell.font = font_header
@@ -324,8 +337,14 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         msg_simplificado = get_plt_incidence_category_name(inc)
         incidencias_por_error[msg_simplificado].append(inc)
 
+    # Filtrar categorías aplicables según el formato detectado
+    if "COMPACT" in str(formato_tipo):
+        applicable_categories = [cat for code, cat in CATEGORIES_REGISTRY_PLT.items() if code in COMPACT_FIELD_CATEGORIES]
+    else:
+        applicable_categories = list(CATEGORIES_REGISTRY_PLT.values())
+
     catalog_frequencies = []
-    for cat in CATEGORIES_REGISTRY_PLT.values():
+    for cat in applicable_categories:
         rule_msg = cat.name
         matches = incidencias_por_error[rule_msg]
         camp_counts = {}
@@ -397,7 +416,6 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         c_link.border = border_thin
         r_cat += 1
 
-    # AutoFilter para permitir filtrar por año directamente en Excel
     last_col_letter = get_column_letter(5 + len(all_campaigns) + 1)
     ws_cat.auto_filter.ref = f"B5:{last_col_letter}{r_cat - 1}"
 
@@ -483,10 +501,10 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
                 cell_d = ws_detail.cell(row=r_detail, column=col_idx)
                 cell_d.border = border_thin
                 if r_detail % 2 == 0:
-                    if col_idx != 4:  # Respetar color de severidad
+                    if col_idx != 4:
                         cell_d.fill = fill_zebra
 
-        end_detail_row = r_detail_start + len(chunk_data) - 1
+        end_detail_row = max(grid_heading_row + 1, r_detail_start + len(chunk_data) - 1)
         ws_detail.auto_filter.ref = f"B{grid_heading_row}:M{end_detail_row}"
 
     # =========================================================================
@@ -777,7 +795,6 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
     for ws in wb.worksheets:
         ws.column_dimensions['A'].width = 3
         if ws.title not in ["📋 Catálogo de Errores", "📑 Detalle de Incidencias", "📊 Dashboard Ejecutivo"]:
-            # Hojas de error con anchos específicos optimizados para PLT
             ws.column_dimensions['B'].width = 11  # Fila Excel
             ws.column_dimensions['C'].width = 14  # Celda Mapeo
             ws.column_dimensions['D'].width = 14  # Muestra
