@@ -58,7 +58,7 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_NIVEL_LIMITE_EXCEDIDO", "Valor de nivel supera el límite máximo permitido (> 4999).", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_INVALIDA", "Letra de muestra inválida (debe ser A, B, C o D).", "ALERTA"
+        "CAT_PLT_MUESTRA_INVALIDA", "Letra de muestra inválida (debe ser A, B, C o D).", "ADVERTENCIA"
     ),
     "CAT_PLT_MUESTRA_DUPLICADA": RuleCategoryPLT(
         "CAT_PLT_MUESTRA_DUPLICADA", "Muestra duplicada dentro de la misma celda de mapeo en la misma fecha.", "ALERTA"
@@ -112,7 +112,7 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_FUERZA_P_RANGO", "Fuerza P (kN) debe ser un valor positivo mayor a cero.", "ALERTA"
     ),
     "CAT_PLT_DIRECCION_ROTURA_INVALIDA": RuleCategoryPLT(
-        "CAT_PLT_DIRECCION_ROTURA_INVALIDA", "Dirección de rotura no admitida (debe ser Pa, Pe o NA).", "ALERTA"
+        "CAT_PLT_DIRECCION_ROTURA_INVALIDA", "Dirección de rotura no admitida (debe ser Pa, Pe, NA o N/A).", "ALERTA"
     ),
     "CAT_PLT_TIPO_FRACTURA_INVALIDO": RuleCategoryPLT(
         "CAT_PLT_TIPO_FRACTURA_INVALIDO", "Tipo de fractura no admitido (debe ser M, E o C).", "ALERTA"
@@ -246,6 +246,12 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         ["Muestra"],
         "Letra de muestra '{value}' inválida. Debe ser A, B, C o D.",
     ),
+    "WRN_PLT_MUESTRA_LETRA_INVALIDA": ErrorRulePLT(
+        "WRN_PLT_MUESTRA_LETRA_INVALIDA",
+        "CAT_PLT_MUESTRA_INVALIDA",
+        ["Muestra"],
+        "Letra de muestra '{value}' inválida. Debe ser A, B, C o D.",
+    ),
     "ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA": ErrorRulePLT(
         "ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA",
         "CAT_PLT_MUESTRA_DUPLICADA",
@@ -316,61 +322,61 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_ESPESOR_D_RANGO",
         "CAT_PLT_ESPESOR_D_RANGO",
         ["Espesor D (cm)"],
-        "Espesor D ({value}) fuera de rango (1.0 a 20.0 cm).",
+        "Espesor D ({value}) debe ser un valor positivo mayor a cero (D > 0).",
     ),
     "ERR_PLT_LONGITUD_L_RANGO": ErrorRulePLT(
         "ERR_PLT_LONGITUD_L_RANGO",
         "CAT_PLT_LONGITUD_L_RANGO",
         ["Longitud L (cm)"],
-        "Longitud L ({value}) fuera de rango (1.0 a 50.0 cm).",
+        "Longitud L ({value}) debe ser un valor positivo mayor a cero (L > 0).",
     ),
     "ERR_PLT_ANCHO_W1_RANGO": ErrorRulePLT(
         "ERR_PLT_ANCHO_W1_RANGO",
         "CAT_PLT_ANCHO_W1_RANGO",
         ["Ancho W1 (cm)"],
-        "Ancho W1 ({value}) fuera de rango (1.0 a 30.0 cm).",
+        "Ancho W1 ({value}) debe ser un valor positivo mayor a cero (W1 > 0).",
     ),
     "ERR_PLT_ANCHO_W2_RANGO": ErrorRulePLT(
         "ERR_PLT_ANCHO_W2_RANGO",
         "CAT_PLT_ANCHO_W2_RANGO",
         ["Ancho W2 (cm)"],
-        "Ancho W2 ({value}) fuera de rango (1.0 a 30.0 cm).",
+        "Ancho W2 ({value}) debe ser un valor positivo mayor a cero (W2 > 0).",
     ),
     "ERR_PLT_ANCHO_W_RANGO": ErrorRulePLT(
         "ERR_PLT_ANCHO_W_RANGO",
         "CAT_PLT_ANCHO_W1_RANGO",
         ["Ancho W (cm)"],
-        "Ancho W ({value}) fuera de rango (1.0 a 30.0 cm).",
+        "Ancho W ({value}) debe ser un valor positivo mayor a cero (W > 0).",
     ),
     "ERR_PLT_ANCHO_W_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_ANCHO_W_INCONGRUENTE",
         "CAT_PLT_ANCHO_W_INCONGRUENTE",
         ["Ancho W (cm)"],
-        "Ancho W ({actual}) diverge del promedio (W1+W2)/2 = {expected:.2f}.",
+        "Ancho W ({actual}) diverge de (W1+W2)/2 = ({w1}+{w2})/2 = {expected} cm.",
     ),
     "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
         "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
         ["Muestra válida - Longitud"],
-        "Validación de longitud '{actual}' no coincide con la condición L >= D (esperado '{expected}').",
+        "Criterio Longitud (L >= D): con L={l} cm y D={d} cm se esperaba '{expected}', pero se registró '{actual}'.",
     ),
     "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
         "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
         ["Muestra válida - Ancho"],
-        "Validación de ancho '{actual}' no coincide con la condición 0.3W < D < W (esperado '{expected}').",
+        "Criterio Ancho (0.3*W < D < W): con 0.3*W={lim_inf} cm, D={d} cm y W={w} cm se esperaba '{expected}', pero se registró '{actual}'.",
     ),
     "ERR_PLT_FUERZA_P_RANGO": ErrorRulePLT(
         "ERR_PLT_FUERZA_P_RANGO",
         "CAT_PLT_FUERZA_P_RANGO",
         ["Fuerza P (kN)"],
-        "Fuerza P ({value}) fuera de rango (0.01 a 200.0 kN).",
+        "Fuerza P ({value}) debe ser un valor positivo mayor a cero (P > 0).",
     ),
     "ERR_PLT_DIRECCION_ROTURA_CATALOGO": ErrorRulePLT(
         "ERR_PLT_DIRECCION_ROTURA_CATALOGO",
         "CAT_PLT_DIRECCION_ROTURA_INVALIDA",
         ["Dirección de rotura"],
-        "Dirección de rotura '{value}' no admitida (debe ser Pa, Pe o NA).",
+        "Dirección de rotura '{value}' no admitida (debe ser Pa, Pe, NA o N/A).",
     ),
     "ERR_PLT_TIPO_FRACTURA_CATALOGO": ErrorRulePLT(
         "ERR_PLT_TIPO_FRACTURA_CATALOGO",
@@ -382,31 +388,31 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         ["Diámetro equivalente (cm)"],
-        "Diámetro equivalente De ({actual}) diverge de sqrt(4*W*D/pi) = {expected:.2f}.",
+        "Diámetro De ({actual} cm) diverge de sqrt(4*W*D/pi) = sqrt(4*{w}*{d}/pi) = {expected} cm.",
     ),
     "ERR_PLT_FACTOR_F_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_FACTOR_F_INCONGRUENTE",
         "CAT_PLT_FACTOR_F_INCONGRUENTE",
         ["Factor F"],
-        "Factor F ({actual:.3f}) diverge del valor teórico ({expected:.3f}).",
+        "Factor F ({actual}) diverge de (De_mm / 50)^0.45 = ({de_mm} / 50)^0.45 = {expected}.",
     ),
     "ERR_PLT_IS_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_IS_INCONGRUENTE",
         "CAT_PLT_IS_INCONGRUENTE",
         ["Is (MPa)"],
-        "Índice Is ({actual:.2f}) diverge del cálculo teórico ({expected:.2f}).",
+        "Índice Is ({actual} MPa) diverge de (10 * P) / De^2 = (10 * {p}) / ({de})^2 = {expected} MPa.",
     ),
     "ERR_PLT_IS50_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_IS50_INCONGRUENTE",
         "CAT_PLT_IS50_INCONGRUENTE",
         ["Is(50) (MPa)"],
-        "Índice Is(50) ({actual:.2f}) diverge de F * Is ({expected:.2f}).",
+        "Índice Is(50) ({actual} MPa) diverge de F * Is = {f} * {is_val} = {expected} MPa.",
     ),
     "ERR_PLT_FACTOR_K_INCORRECTO": ErrorRulePLT(
         "ERR_PLT_FACTOR_K_INCORRECTO",
         "CAT_PLT_FACTOR_K_INCONGRUENTE",
         ["Factor de conversión K"],
-        "Factor K ({actual}) no coincide con el asignado por catálogo ({expected}).",
+        "Factor K ({actual}) diverge del asignado para litología '{litos}' (esperado K = {expected}).",
     ),
     "ERR_PLT_FACTOR_K_RANGO": ErrorRulePLT(
         "ERR_PLT_FACTOR_K_RANGO",
@@ -418,13 +424,13 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_UCS_INCONGRUENTE",
         "CAT_PLT_UCS_INCONGRUENTE",
         ["RCS/UCS (MPa)"],
-        "Resistencia UCS ({actual:.2f}) diverge de K * Is(50) = {expected:.2f}.",
+        "Resistencia UCS ({actual} MPa) diverge de Is(50) * K = {is50} * {k} = {expected} MPa.",
     ),
     "ERR_PLT_RESISTENCIA_ISRM_CATALOGO": ErrorRulePLT(
         "ERR_PLT_RESISTENCIA_ISRM_CATALOGO",
         "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
         ["Resistencia ISRM"],
-        "Resistencia ISRM '{actual}' no coincide con rango esperado '{expected}' para UCS={ucs_val:.1f} MPa.",
+        "Resistencia ISRM '{actual}' no coincide con rango esperado '{expected}' para UCS = {ucs_val} MPa.",
     ),
     "ERR_PLT_CELDA_ANOMALA": ErrorRulePLT(
         "ERR_PLT_CELDA_ANOMALA",

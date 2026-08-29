@@ -29,7 +29,7 @@ from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT, COMP
 
 
 PLT_MANDATORY_COLS_COUNT = 34
-CAT_DIRECCION_ROTURA = ["Pa", "Pe", "NA"]
+CAT_DIRECCION_ROTURA = ["Pa", "Pe", "NA", "N/A"]
 CAT_TIPO_FRACTURA = ["M", "E", "C"]
 
 INTRUSIVE_LITOS = {
@@ -119,6 +119,22 @@ def sanitize_number(val: Any) -> Optional[float]:
         return None
 
 
+MONTH_MAP = {
+    "ENE": 1, "JAN": 1, "ENERO": 1, "JANUARY": 1,
+    "FEB": 2, "FEBRERO": 2, "FEBRUARY": 2,
+    "MAR": 3, "MARZO": 3, "MARCH": 3,
+    "ABR": 4, "APR": 4, "ABRIL": 4, "APRIL": 4,
+    "MAY": 5, "MAYO": 5,
+    "JUN": 6, "JUNIO": 6, "JUNE": 6,
+    "JUL": 7, "JULIO": 7, "JULY": 7,
+    "AGO": 8, "AUG": 8, "AGOSTO": 8, "AUGUST": 8,
+    "SEP": 9, "SET": 9, "SEPT": 9, "SEPTIEMBRE": 9, "SEPTEMBER": 9,
+    "OCT": 10, "OCTUBRE": 10, "OCTOBER": 10,
+    "NOV": 11, "NOVIEMBRE": 11, "NOVEMBER": 11,
+    "DIC": 12, "DEC": 12, "DICIEMBRE": 12, "DECEMBER": 12,
+}
+
+
 def sanitize_date(val: Any) -> Tuple[Optional[datetime], Optional[str]]:
     """Parsea una fecha desde datetime, pandas Timestamp, string o serial numérico de Excel."""
     if val is None or pd.isna(val):
@@ -139,9 +155,28 @@ def sanitize_date(val: Any) -> Tuple[Optional[datetime], Optional[str]]:
     if not s or s.upper() in ("NONE", "NAN", "NULL", "N/A", "-"):
         return None, None
 
+    # 1. Patrón con nombre de mes: ej. 4-Sep-25, 04-Sep-2025, 4/set/25, 4-Sept-2025
+    m_name = re.match(r"^(\d{1,2})[-/\s\.]+([a-zA-ZáéíóúÁÉÍÓÚ]+)[-/\s\.]+(\d{2,4})$", s)
+    if m_name:
+        day = int(m_name.group(1))
+        mon_str = m_name.group(2).upper().strip()
+        year = int(m_name.group(3))
+        if year < 100:
+            year += 2000 if year <= 69 else 1900
+        
+        mon_num = MONTH_MAP.get(mon_str) or MONTH_MAP.get(mon_str[:4]) or MONTH_MAP.get(mon_str[:3])
+        if mon_num and 1 <= day <= 31:
+            try:
+                dt_val = datetime(year, mon_num, day)
+                return dt_val, dt_val.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+
+    # 2. Formatos numéricos directos estándar (incluyendo años a 2 dígitos %y)
     formats = [
         "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y",
-        "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y", "%m/%d/%Y"
+        "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y", "%m/%d/%Y",
+        "%d/%m/%y", "%d-%m-%y", "%d.%m.%y", "%y-%m-%d"
     ]
     for fmt in formats:
         try:
@@ -149,6 +184,13 @@ def sanitize_date(val: Any) -> Tuple[Optional[datetime], Optional[str]]:
             return dt_val, dt_val.strftime("%Y-%m-%d")
         except ValueError:
             pass
+
+    # 3. Fallback inteligente con pd.to_datetime
+    try:
+        dt_val = pd.to_datetime(s, dayfirst=True).to_pydatetime()
+        return dt_val, dt_val.strftime("%Y-%m-%d")
+    except Exception:
+        pass
 
     return None, s
 
@@ -329,7 +371,7 @@ def validate_plt_standard_34(
     """
     Audita un archivo Excel de Ensayos PLT en formato estándar de 34 columnas.
     """
-    df_raw = pd.read_excel(file_path, sheet_name=0, header=header_row_idx)
+    df_raw = pd.read_excel(file_path, sheet_name=0, header=header_row_idx, keep_default_na=False)
 
     col_map: Dict[str, str] = {}
     for canon_key, synonyms in PLT_CANONICAL_COLUMNS.items():
@@ -630,7 +672,7 @@ def validate_plt_standard_34(
             d_num = None
         else:
             d_num = sanitize_number(d_raw)
-            if d_num is None or not (1.0 <= d_num <= 20.0):
+            if d_num is None or d_num <= 0:
                 reg_err("espesor_d", d_raw, "ERR_PLT_ESPESOR_D_RANGO", value=str(d_raw))
 
         l_raw = get_val("longitud_l")
@@ -639,7 +681,7 @@ def validate_plt_standard_34(
             l_num = None
         else:
             l_num = sanitize_number(l_raw)
-            if l_num is None or not (1.0 <= l_num <= 50.0):
+            if l_num is None or l_num <= 0:
                 reg_err("longitud_l", l_raw, "ERR_PLT_LONGITUD_L_RANGO", value=str(l_raw))
 
         w1_raw = get_val("ancho_w1")
@@ -648,7 +690,7 @@ def validate_plt_standard_34(
             w1_num = None
         else:
             w1_num = sanitize_number(w1_raw)
-            if w1_num is None or not (1.0 <= w1_num <= 30.0):
+            if w1_num is None or w1_num <= 0:
                 reg_err("ancho_w1", w1_raw, "ERR_PLT_ANCHO_W1_RANGO", value=str(w1_raw))
 
         w2_raw = get_val("ancho_w2")
@@ -657,7 +699,7 @@ def validate_plt_standard_34(
             w2_num = None
         else:
             w2_num = sanitize_number(w2_raw)
-            if w2_num is None or not (1.0 <= w2_num <= 30.0):
+            if w2_num is None or w2_num <= 0:
                 reg_err("ancho_w2", w2_raw, "ERR_PLT_ANCHO_W2_RANGO", value=str(w2_raw))
 
         w_raw = get_val("ancho_w")
@@ -668,12 +710,10 @@ def validate_plt_standard_34(
             calc_w = round((w1_num + w2_num) / 2.0, 3)
             if is_blank(w_raw):
                 reg_err("ancho_w", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W (cm)")
-            elif w_num is None:
+            elif w_num is None or w_num <= 0:
                 reg_err("ancho_w", w_raw, "ERR_PLT_ANCHO_W_RANGO", value=str(w_raw))
             elif abs(w_num - calc_w) > tolerance:
-                reg_err("ancho_w", w_num, "ERR_PLT_ANCHO_W_INCONGRUENTE", actual=w_num, expected=calc_w)
-            elif not (1.0 <= w_num <= 30.0):
-                reg_err("ancho_w", w_num, "ERR_PLT_ANCHO_W_RANGO", value=w_num)
+                reg_err("ancho_w", w_num, "ERR_PLT_ANCHO_W_INCONGRUENTE", actual=w_num, w1=w1_num, w2=w2_num, expected=calc_w)
 
         effective_w = w_num if w_num is not None else calc_w
 
@@ -685,7 +725,7 @@ def validate_plt_standard_34(
                 reg_err("muestra_valida_long", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Muestra válida - Longitud")
             elif valida_l_norm != exp_val_l:
                 reg_err("muestra_valida_long", valida_l_raw, "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
-                        actual=valida_l_raw, expected=exp_val_l)
+                        actual=valida_l_raw, l=l_num, d=d_num, expected=exp_val_l)
 
         valida_w_raw = get_val("muestra_valida_ancho")
         valida_w_norm = _norm_str(valida_w_raw)
@@ -695,21 +735,23 @@ def validate_plt_standard_34(
                 reg_err("muestra_valida_ancho", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Muestra válida - Ancho")
             elif valida_w_norm != exp_val_w:
                 reg_err("muestra_valida_ancho", valida_w_raw, "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
-                        actual=valida_w_raw, expected=exp_val_w)
+                        actual=valida_w_raw, w=effective_w, d=d_num, lim_inf=round(0.3 * effective_w, 2), expected=exp_val_w)
 
         # 6. Ensayo Físico, Fractura y Parámetros PLT
-        fuerza_p = sanitize_number(get_val("fuerza_p"))
+        fuerza_raw = get_val("fuerza_p")
+        if is_blank(fuerza_raw):
+            reg_err("fuerza_p", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Fuerza P (kN)")
+            fuerza_p = None
+        else:
+            fuerza_p = sanitize_number(fuerza_raw)
+            if fuerza_p is None or fuerza_p <= 0:
+                reg_err("fuerza_p", fuerza_raw, "ERR_PLT_FUERZA_P_RANGO", value=str(fuerza_raw))
         dir_rot = _norm_str(get_val("direccion_rotura"))
         tipo_frac = _norm_str(get_val("tipo_fractura"))
         de_num = sanitize_number(get_val("diametro_equiv"))
         f_num = sanitize_number(get_val("f"))
         is_num = sanitize_number(get_val("is_mpa"))
         is50_num = sanitize_number(get_val("is50_mpa"))
-
-        if fuerza_p is None:
-            reg_err("fuerza_p", get_val("fuerza_p"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Fuerza P (kN)")
-        elif not (0.01 <= fuerza_p <= 200.0):
-            reg_err("fuerza_p", fuerza_p, "ERR_PLT_FUERZA_P_RANGO", value=fuerza_p)
 
         if not dir_rot:
             reg_err("direccion_rotura", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Dirección de rotura")
@@ -727,7 +769,8 @@ def validate_plt_standard_34(
             if de_num is None:
                 reg_err("diametro_equiv", get_val("diametro_equiv"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Diámetro equivalente (cm)")
             elif abs(de_num - calc_de) > tolerance:
-                reg_err("diametro_equiv", de_num, "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE", actual=de_num, expected=calc_de)
+                reg_err("diametro_equiv", de_num, "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
+                        actual=de_num, w=effective_w, d=d_num, expected=calc_de)
 
         effective_de = de_num if de_num is not None else calc_de
 
@@ -741,7 +784,8 @@ def validate_plt_standard_34(
             if f_num is None:
                 reg_err("f", get_val("f"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Factor F")
             elif abs(f_num - calc_f) > tolerance:
-                reg_err("f", f_num, "ERR_PLT_FACTOR_F_INCONGRUENTE", actual=f_num, expected=calc_f)
+                reg_err("f", f_num, "ERR_PLT_FACTOR_F_INCONGRUENTE",
+                        actual=f_num, de_mm=round(effective_de * 10.0, 1), expected=calc_f)
 
         calc_is = None
         if fuerza_p is not None and effective_de is not None and effective_de > 0:
@@ -749,7 +793,8 @@ def validate_plt_standard_34(
             if is_num is None:
                 reg_err("is_mpa", get_val("is_mpa"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Is (MPa)")
             elif abs(is_num - calc_is) > tolerance:
-                reg_err("is_mpa", is_num, "ERR_PLT_IS_INCONGRUENTE", actual=is_num, expected=calc_is)
+                reg_err("is_mpa", is_num, "ERR_PLT_IS_INCONGRUENTE",
+                        actual=is_num, p=fuerza_p, de=effective_de, expected=calc_is)
 
         effective_is = is_num if is_num is not None else calc_is
         effective_f = f_num if f_num is not None else calc_f
@@ -758,9 +803,11 @@ def validate_plt_standard_34(
             if is50_num is None:
                 reg_err("is50_mpa", get_val("is50_mpa"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Is(50) (MPa)")
             elif abs(is50_num - calc_is50) > tolerance:
-                reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE", actual=is50_num, expected=calc_is50)
+                reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
+                        actual=is50_num, f=effective_f, is_val=effective_is, expected=calc_is50)
         elif valida_w_norm == "NO" and is50_num is not None:
-            reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE", actual=is50_num, expected="NULL (Muestra Inválida)")
+            reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
+                    actual=is50_num, f=effective_f if effective_f is not None else 0, is_val=effective_is if effective_is is not None else 0, expected="NULL (Muestra Inválida)")
 
         # 7. Resistencia de Roca (K, UCS, ISRM)
         factor_k_num = sanitize_number(get_val("factor_k"))
@@ -773,7 +820,8 @@ def validate_plt_standard_34(
             if not (5.0 <= factor_k_num <= 30.0):
                 reg_err("factor_k", factor_k_num, "ERR_PLT_FACTOR_K_RANGO", value=factor_k_num)
             elif exp_k is not None and abs(factor_k_num - exp_k) > tolerance:
-                reg_err("factor_k", factor_k_num, "ERR_PLT_FACTOR_K_INCONGRUENTE", actual=factor_k_num, expected=exp_k)
+                reg_err("factor_k", factor_k_num, "ERR_PLT_FACTOR_K_INCORRECTO",
+                        actual=factor_k_num, litos=f"{l1}/{l2}/{l3}", expected=exp_k)
 
         effective_k = factor_k_num if factor_k_num is not None else exp_k
         effective_is50 = is50_num if is50_num is not None else (calc_is50 if valida_w_norm == "SI" and 'calc_is50' in locals() else None)
@@ -784,7 +832,8 @@ def validate_plt_standard_34(
             if ucs_num is None:
                 reg_err("ucs_mpa", get_val("ucs_mpa"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="RCS/UCS (MPa)")
             elif abs(ucs_num - calc_ucs) > tolerance:
-                reg_err("ucs_mpa", ucs_num, "ERR_PLT_UCS_INCONGRUENTE", actual=ucs_num, expected=calc_ucs)
+                reg_err("ucs_mpa", ucs_num, "ERR_PLT_UCS_INCONGRUENTE",
+                        actual=ucs_num, is50=effective_is50, k=effective_k, expected=calc_ucs)
 
         effective_ucs = ucs_num if ucs_num is not None else calc_ucs
         if effective_ucs is not None:
@@ -792,8 +841,8 @@ def validate_plt_standard_34(
             if not isrm_raw:
                 reg_err("resistencia_isrm", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Resistencia ISRM")
             elif exp_isrm and isrm_raw != exp_isrm:
-                reg_err("resistencia_isrm", isrm_raw, "ERR_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
-                        actual=isrm_raw, ucs_val=round(effective_ucs, 2), expected=exp_isrm)
+                reg_err("resistencia_isrm", isrm_raw, "ERR_PLT_RESISTENCIA_ISRM_CATALOGO",
+                        actual=isrm_raw, ucs_val=round(effective_ucs, 1), expected=exp_isrm)
 
     return {
         "formato_detectado": "FORMAT_STANDARD_34",
@@ -1079,7 +1128,7 @@ def validate_plt_compact_field(
             d_num = None
         else:
             d_num = sanitize_number(d_raw)
-            if d_num is None or not (1.0 <= d_num <= 20.0):
+            if d_num is None or d_num <= 0:
                 reg_err_comp("Espesor D (cm)", d_raw, "ERR_PLT_ESPESOR_D_RANGO", value=str(d_raw))
 
         l_raw = rd.get("l")
@@ -1088,7 +1137,7 @@ def validate_plt_compact_field(
             l_num = None
         else:
             l_num = sanitize_number(l_raw)
-            if l_num is None or not (1.0 <= l_num <= 50.0):
+            if l_num is None or l_num <= 0:
                 reg_err_comp("Longitud L (cm)", l_raw, "ERR_PLT_LONGITUD_L_RANGO", value=str(l_raw))
 
         w1_raw = rd.get("w1")
@@ -1097,7 +1146,7 @@ def validate_plt_compact_field(
             w1_num = None
         else:
             w1_num = sanitize_number(w1_raw)
-            if w1_num is None or not (1.0 <= w1_num <= 30.0):
+            if w1_num is None or w1_num <= 0:
                 reg_err_comp("Ancho W1 (cm)", w1_raw, "ERR_PLT_ANCHO_W1_RANGO", value=str(w1_raw))
 
         w2_raw = rd.get("w2")
@@ -1106,7 +1155,7 @@ def validate_plt_compact_field(
             w2_num = None
         else:
             w2_num = sanitize_number(w2_raw)
-            if w2_num is None or not (1.0 <= w2_num <= 30.0):
+            if w2_num is None or w2_num <= 0:
                 reg_err_comp("Ancho W2 (cm)", w2_raw, "ERR_PLT_ANCHO_W2_RANGO", value=str(w2_raw))
 
         w_raw = rd.get("w")
@@ -1116,12 +1165,10 @@ def validate_plt_compact_field(
             calc_w = round((w1_num + w2_num) / 2.0, 3)
             if is_blank(w_raw):
                 reg_err_comp("Ancho W (cm)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W (cm)")
-            elif w_num is None:
+            elif w_num is None or w_num <= 0:
                 reg_err_comp("Ancho W (cm)", w_raw, "ERR_PLT_ANCHO_W_RANGO", value=str(w_raw))
             elif abs(w_num - calc_w) > tolerance:
-                reg_err_comp("Ancho W (cm)", w_num, "ERR_PLT_ANCHO_W_INCONGRUENTE", actual=w_num, expected=calc_w)
-            elif not (1.0 <= w_num <= 30.0):
-                reg_err_comp("Ancho W (cm)", w_num, "ERR_PLT_ANCHO_W_RANGO", value=w_num)
+                reg_err_comp("Ancho W (cm)", w_num, "ERR_PLT_ANCHO_W_INCONGRUENTE", actual=w_num, w1=w1_num, w2=w2_num, expected=calc_w)
 
         effective_w = w_num if w_num is not None else calc_w
 
@@ -1133,7 +1180,7 @@ def validate_plt_compact_field(
                 reg_err_comp("Muestra válida - longitud", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Muestra válida - longitud")
             elif valida_l_norm != exp_val_l:
                 reg_err_comp("Muestra válida - longitud", valida_l_raw, "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
-                             actual=valida_l_raw, expected=exp_val_l)
+                             actual=valida_l_raw, l=l_num, d=d_num, expected=exp_val_l)
 
         valida_w_raw = rd.get("val_w")
         valida_w_norm = _norm_str(valida_w_raw)
@@ -1143,14 +1190,17 @@ def validate_plt_compact_field(
                 reg_err_comp("Muestra válida - ancHP", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Muestra válida - ancHP")
             elif valida_w_norm != exp_val_w:
                 reg_err_comp("Muestra válida - ancHP", valida_w_raw, "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
-                             actual=valida_w_raw, expected=exp_val_w)
+                             actual=valida_w_raw, w=effective_w, d=d_num, lim_inf=round(0.3 * effective_w, 2), expected=exp_val_w)
 
         # Fuerza P, Dirección de Rotura y Fractura
-        p_num = sanitize_number(rd.get("p"))
-        if p_num is None:
-            reg_err_comp("Fuerza P (kN)", rd.get("p"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Fuerza P (kN)")
-        elif not (0.01 <= p_num <= 200.0):
-            reg_err_comp("Fuerza P (kN)", p_num, "ERR_PLT_FUERZA_P_RANGO", value=p_num)
+        p_raw = rd.get("p")
+        if is_blank(p_raw):
+            reg_err_comp("Fuerza P (kN)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Fuerza P (kN)")
+            p_num = None
+        else:
+            p_num = sanitize_number(p_raw)
+            if p_num is None or p_num <= 0:
+                reg_err_comp("Fuerza P (kN)", p_raw, "ERR_PLT_FUERZA_P_RANGO", value=str(p_raw))
 
         dir_rot = _norm_str(rd.get("dir"))
         if not dir_rot:
@@ -1172,7 +1222,8 @@ def validate_plt_compact_field(
             if de_num is None:
                 reg_err_comp("Diámetro equiv. (cm)", rd.get("de"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Diámetro equiv. (cm)")
             elif abs(de_num - calc_de) > tolerance:
-                reg_err_comp("Diámetro equiv. (cm)", de_num, "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE", actual=de_num, expected=calc_de)
+                reg_err_comp("Diámetro equiv. (cm)", de_num, "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
+                             actual=de_num, w=effective_w, d=d_num, expected=calc_de)
 
         effective_de = de_num if de_num is not None else calc_de
 
@@ -1188,7 +1239,8 @@ def validate_plt_compact_field(
             if f_num is None:
                 reg_err_comp("F", rd.get("f"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="F")
             elif abs(f_num - calc_f) > tolerance:
-                reg_err_comp("F", f_num, "ERR_PLT_FACTOR_F_INCONGRUENTE", actual=f_num, expected=calc_f)
+                reg_err_comp("F", f_num, "ERR_PLT_FACTOR_F_INCONGRUENTE",
+                             actual=f_num, de_mm=round(effective_de * 10.0, 1), expected=calc_f)
 
         effective_f = f_num if f_num is not None else calc_f
 
@@ -1200,7 +1252,8 @@ def validate_plt_compact_field(
             if is_num is None:
                 reg_err_comp("Is", rd.get("is"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Is")
             elif abs(is_num - calc_is) > tolerance:
-                reg_err_comp("Is", is_num, "ERR_PLT_IS_INCONGRUENTE", actual=is_num, expected=calc_is)
+                reg_err_comp("Is", is_num, "ERR_PLT_IS_INCONGRUENTE",
+                             actual=is_num, p=p_num, de=effective_de, expected=calc_is)
 
         effective_is = is_num if is_num is not None else calc_is
 
@@ -1211,9 +1264,11 @@ def validate_plt_compact_field(
             if is50_num is None:
                 reg_err_comp("Is(50) (MPa)", rd.get("is50"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Is(50) (MPa)")
             elif abs(is50_num - calc_is50) > tolerance:
-                reg_err_comp("Is(50) (MPa)", is50_num, "ERR_PLT_IS50_INCONGRUENTE", actual=is50_num, expected=calc_is50)
+                reg_err_comp("Is(50) (MPa)", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
+                             actual=is50_num, f=effective_f, is_val=effective_is, expected=calc_is50)
         elif valida_w_norm == "NO" and is50_num is not None:
-            reg_err_comp("Is(50) (MPa)", is50_num, "ERR_PLT_IS50_INCONGRUENTE", actual=is50_num, expected="NULL (Muestra Inválida)")
+            reg_err_comp("Is(50) (MPa)", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
+                         actual=is50_num, f=effective_f if effective_f is not None else 0, is_val=effective_is if effective_is is not None else 0, expected="NULL (Muestra Inválida)")
 
         effective_is50 = is50_num if is50_num is not None else calc_is50
 
@@ -1225,7 +1280,8 @@ def validate_plt_compact_field(
             if ucs_num is None:
                 reg_err_comp("RCU (MPa)", rd.get("ucs"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="RCU (MPa)")
             elif abs(ucs_num - calc_ucs) > tolerance:
-                reg_err_comp("RCU (MPa)", ucs_num, "ERR_PLT_UCS_INCONGRUENTE", actual=ucs_num, expected=calc_ucs)
+                reg_err_comp("RCU (MPa)", ucs_num, "ERR_PLT_UCS_INCONGRUENTE",
+                             actual=ucs_num, is50=effective_is50, k=exp_k, expected=calc_ucs)
 
         effective_ucs = ucs_num if ucs_num is not None else calc_ucs
         isrm_raw = _norm_str(rd.get("isrm"))
@@ -1234,8 +1290,8 @@ def validate_plt_compact_field(
             if not isrm_raw:
                 reg_err_comp("Resistencia ISRM", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Resistencia ISRM")
             elif exp_isrm and isrm_raw != exp_isrm:
-                reg_err_comp("Resistencia ISRM", isrm_raw, "ERR_PLT_RESISTENCIA_ISRM_INCONGRUENTE",
-                             actual=isrm_raw, ucs_val=round(effective_ucs, 2), expected=exp_isrm)
+                reg_err_comp("Resistencia ISRM", isrm_raw, "ERR_PLT_RESISTENCIA_ISRM_CATALOGO",
+                             actual=isrm_raw, ucs_val=round(effective_ucs, 1), expected=exp_isrm)
 
     return {
         "formato_detectado": "FORMAT_COMPACT_FIELD",
