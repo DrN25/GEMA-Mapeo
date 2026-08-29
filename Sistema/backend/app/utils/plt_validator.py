@@ -161,15 +161,42 @@ def is_formula_error(val: Any) -> bool:
     return any(err in s for err in ("#VALUE!", "#REF!", "#DIV/0!", "#NAME?", "#N/A", "#NUM!", "#NULL!", "#ERR"))
 
 
+def is_blank(val: Any) -> bool:
+    """Verifica si un valor está realmente vacío o nulo en el Excel."""
+    if val is None or pd.isna(val):
+        return True
+    s = str(val).strip()
+    return s == "" or s.upper() in ("NONE", "NAN", "NULL", "N/A", "-")
+
+
 def normalize_lithology_group(group_val: Any) -> str:
-    """Normaliza el tipo/grupo litológico según los sinónimos geológicos permitidos."""
+    """
+    Normaliza el tipo/grupo litológico según los 5 grupos geológicos oficiales:
+    INTRUSIVOS, SEDIMENTARIOS, METAMORFICAS, ENDOSKARN, BRECHAS.
+    Reconoce variantes como 'ROCA SEDIMENTARIA', 'ROCA INTRUSIVA', 'BRECHA TECTONICA', etc.
+    """
     norm = _norm_str(group_val)
     if not norm:
         return ""
-    for canonical, synonyms in LITHOLOGY_GROUP_SYNONYMS.items():
-        if norm == _norm_str(canonical) or any(norm == _norm_str(syn) for syn in synonyms):
-            return canonical
-    return str(group_val).strip().upper()
+    
+    # 1. Match directo contra el diccionario de sinónimos
+    if norm in LITHOLOGY_GROUP_SYNONYMS:
+        return LITHOLOGY_GROUP_SYNONYMS[norm]
+
+    # 2. Match iterando sobre canonical / synonyms
+    for k, v in LITHOLOGY_GROUP_SYNONYMS.items():
+        if norm == _norm_str(k):
+            return v if isinstance(v, str) else k
+        if isinstance(v, (list, tuple, set)) and any(norm == _norm_str(syn) for syn in v):
+            return k
+
+    # 3. Limpieza de prefijos comunes como 'ROCA ', 'ROCAS ', 'TIPO ', 'GRUPO '
+    clean_norm = re.sub(r"^(ROCA|ROCAS|TIPO|GRUPO)\s+", "", norm).strip()
+    if clean_norm in LITHOLOGY_GROUP_SYNONYMS:
+        return LITHOLOGY_GROUP_SYNONYMS[clean_norm]
+
+    # 4. Fallback directo al texto limpio en mayúsculas
+    return norm
 
 
 def resolve_expected_lithology(l1: str, l2: str, l3: str) -> Tuple[Optional[str], Optional[float]]:
@@ -487,42 +514,50 @@ def validate_plt_standard_34(
                     resumen_celdas[cell_key]["vacios"] += 1
 
         # 1. Metadata Administrativa y Proyecto
-        if camp_raw is None or str(camp_raw).strip() == "":
+        if is_blank(camp_raw):
             reg_err("campania", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Campaña")
         else:
             try:
                 c_int = int(float(str(camp_raw).strip()))
                 if not (2000 <= c_int <= 2050):
-                    reg_err("campania", camp_raw, "ERR_PLT_CAMPANIA_RANGO", value=camp_raw)
+                    reg_err("campania", camp_raw, "ERR_PLT_CAMPANIA_RANGO", value=str(camp_raw))
             except (ValueError, TypeError):
-                reg_err("campania", camp_raw, "ERR_PLT_CAMPANIA_RANGO", value=camp_raw)
+                reg_err("campania", camp_raw, "ERR_PLT_CAMPANIA_RANGO", value=str(camp_raw))
 
-        if not fecha_dt:
-            reg_err("fecha_ensayo", get_val("fecha_ensayo"), "ERR_PLT_FORMATO_FECHA_INVALIDO", value=get_val("fecha_ensayo"))
+        if is_blank(get_val("fecha_ensayo")):
+            reg_err("fecha_ensayo", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Fecha de ensayo")
+        elif not fecha_dt:
+            reg_err("fecha_ensayo", get_val("fecha_ensayo"), "ERR_PLT_FORMATO_FECHA_INVALIDO", value=str(get_val("fecha_ensayo")))
 
         for col_req in ["tipo_ensayo", "ejecutado_por", "zona_muestreo"]:
             v_req = get_val(col_req)
-            if v_req is None or str(v_req).strip() == "":
+            if is_blank(v_req):
                 reg_err(col_req, None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name=col_map.get(col_req, col_req))
 
-        nivel_num = sanitize_number(get_val("nivel"))
-        if nivel_num is None:
-            reg_err("nivel", get_val("nivel"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Nivel")
-        elif nivel_num < 0:
-            reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_RANGO", value=nivel_num)
+        nivel_raw = get_val("nivel")
+        if is_blank(nivel_raw):
+            reg_err("nivel", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Nivel")
+        else:
+            nivel_num = sanitize_number(nivel_raw)
+            if nivel_num is None:
+                reg_err("nivel", nivel_raw, "ERR_PLT_NIVEL_NO_NUMERICO", value=str(nivel_raw))
+            elif nivel_num < 0:
+                reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_RANGO", value=nivel_num)
+            elif nivel_num > 4999:
+                reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_LIMITE_EXCEDIDO", value=nivel_num)
 
         # 2. Identificación Geomecánica y Muestras
-        if not celda_raw:
+        if is_blank(celda_raw):
             reg_err("celda_mapeo", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Celda de mapeo")
 
         muestra_raw = _norm_str(get_val("muestra"))
-        if not muestra_raw:
+        if is_blank(muestra_raw):
             reg_err("muestra", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Muestra")
         elif muestra_raw not in ["A", "B", "C", "D"]:
             reg_err("muestra", muestra_raw, "ERR_PLT_MUESTRA_LETRA_INVALIDA", value=muestra_raw)
 
         cod_muestra_raw = get_val("codigo_muestra")
-        if cod_muestra_raw is None or str(cod_muestra_raw).strip() == "":
+        if is_blank(cod_muestra_raw):
             reg_err("codigo_muestra", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Código de muestra")
         elif celda_raw and muestra_raw in ["A", "B", "C", "D"]:
             if not are_sample_codes_compatible(str(cod_muestra_raw), celda_raw, muestra_raw):
@@ -564,57 +599,77 @@ def validate_plt_standard_34(
                             actual=tipo_lito_raw, expected=exp_tipo)
 
         # 4. Coordenadas Espaciales WGS84
-        este_num = sanitize_number(get_val("este"))
-        norte_num = sanitize_number(get_val("norte"))
-        elev_num = sanitize_number(get_val("elevacion"))
+        este_raw = get_val("este")
+        if is_blank(este_raw):
+            reg_err("este", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Este (m)")
+        else:
+            este_num = sanitize_number(este_raw)
+            if este_num is None or not (100000.0 <= este_num <= 9999999.0):
+                reg_err("este", este_raw, "ERR_PLT_ESTE_RANGO", value=str(este_raw))
 
-        if este_num is None:
-            reg_err("este", get_val("este"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Este (m)")
-        elif not (100000.0 <= este_num <= 9999999.0):
-            reg_err("este", este_num, "ERR_PLT_ESTE_RANGO", value=este_num)
+        norte_raw = get_val("norte")
+        if is_blank(norte_raw):
+            reg_err("norte", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Norte (m)")
+        else:
+            norte_num = sanitize_number(norte_raw)
+            if norte_num is None or not (1000000.0 <= norte_num <= 99999999.0):
+                reg_err("norte", norte_raw, "ERR_PLT_NORTE_RANGO", value=str(norte_raw))
 
-        if norte_num is None:
-            reg_err("norte", get_val("norte"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Norte (m)")
-        elif not (1000000.0 <= norte_num <= 99999999.0):
-            reg_err("norte", norte_num, "ERR_PLT_NORTE_RANGO", value=norte_num)
-
-        if elev_num is None:
-            reg_err("elevacion", get_val("elevacion"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Elevación (msnm)")
-        elif not (0.0 <= elev_num <= 6000.0):
-            reg_err("elevacion", elev_num, "ERR_PLT_ELEVACION_RANGO", value=elev_num)
+        elev_raw = get_val("elevacion")
+        if is_blank(elev_raw):
+            reg_err("elevacion", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Elevación (msnm)")
+        else:
+            elev_num = sanitize_number(elev_raw)
+            if elev_num is None or not (0.0 <= elev_num <= 6000.0):
+                reg_err("elevacion", elev_raw, "ERR_PLT_ELEVACION_RANGO", value=str(elev_raw))
 
         # 5. Geometría de Probeta y Criterios de Validez
-        d_num = sanitize_number(get_val("espesor_d"))
-        l_num = sanitize_number(get_val("longitud_l"))
-        w1_num = sanitize_number(get_val("ancho_w1"))
-        w2_num = sanitize_number(get_val("ancho_w2"))
-        w_num = sanitize_number(get_val("ancho_w"))
+        d_raw = get_val("espesor_d")
+        if is_blank(d_raw):
+            reg_err("espesor_d", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Espesor D (cm)")
+            d_num = None
+        else:
+            d_num = sanitize_number(d_raw)
+            if d_num is None or not (1.0 <= d_num <= 20.0):
+                reg_err("espesor_d", d_raw, "ERR_PLT_ESPESOR_D_RANGO", value=str(d_raw))
 
-        if d_num is None:
-            reg_err("espesor_d", get_val("espesor_d"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Espesor D (cm)")
-        elif not (1.0 <= d_num <= 20.0):
-            reg_err("espesor_d", d_num, "ERR_PLT_ESPESOR_D_RANGO", value=d_num)
+        l_raw = get_val("longitud_l")
+        if is_blank(l_raw):
+            reg_err("longitud_l", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Longitud L (cm)")
+            l_num = None
+        else:
+            l_num = sanitize_number(l_raw)
+            if l_num is None or not (1.0 <= l_num <= 50.0):
+                reg_err("longitud_l", l_raw, "ERR_PLT_LONGITUD_L_RANGO", value=str(l_raw))
 
-        if l_num is None:
-            reg_err("longitud_l", get_val("longitud_l"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Longitud L (cm)")
-        elif not (1.0 <= l_num <= 50.0):
-            reg_err("longitud_l", l_num, "ERR_PLT_LONGITUD_L_RANGO", value=l_num)
+        w1_raw = get_val("ancho_w1")
+        if is_blank(w1_raw):
+            reg_err("ancho_w1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W1 (cm)")
+            w1_num = None
+        else:
+            w1_num = sanitize_number(w1_raw)
+            if w1_num is None or not (1.0 <= w1_num <= 30.0):
+                reg_err("ancho_w1", w1_raw, "ERR_PLT_ANCHO_W1_RANGO", value=str(w1_raw))
 
-        if w1_num is None:
-            reg_err("ancho_w1", get_val("ancho_w1"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W1 (cm)")
-        elif not (1.0 <= w1_num <= 30.0):
-            reg_err("ancho_w1", w1_num, "ERR_PLT_ANCHO_W1_RANGO", value=w1_num)
+        w2_raw = get_val("ancho_w2")
+        if is_blank(w2_raw):
+            reg_err("ancho_w2", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W2 (cm)")
+            w2_num = None
+        else:
+            w2_num = sanitize_number(w2_raw)
+            if w2_num is None or not (1.0 <= w2_num <= 30.0):
+                reg_err("ancho_w2", w2_raw, "ERR_PLT_ANCHO_W2_RANGO", value=str(w2_raw))
 
-        if w2_num is None:
-            reg_err("ancho_w2", get_val("ancho_w2"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W2 (cm)")
-        elif not (1.0 <= w2_num <= 30.0):
-            reg_err("ancho_w2", w2_num, "ERR_PLT_ANCHO_W2_RANGO", value=w2_num)
+        w_raw = get_val("ancho_w")
+        w_num = sanitize_number(w_raw) if not is_blank(w_raw) else None
 
         calc_w = None
         if w1_num is not None and w2_num is not None:
             calc_w = round((w1_num + w2_num) / 2.0, 3)
-            if w_num is None:
-                reg_err("ancho_w", get_val("ancho_w"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W (cm)")
+            if is_blank(w_raw):
+                reg_err("ancho_w", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W (cm)")
+            elif w_num is None:
+                reg_err("ancho_w", w_raw, "ERR_PLT_ANCHO_W_RANGO", value=str(w_raw))
             elif abs(w_num - calc_w) > tolerance:
                 reg_err("ancho_w", w_num, "ERR_PLT_ANCHO_W_INCONGRUENTE", actual=w_num, expected=calc_w)
             elif not (1.0 <= w_num <= 30.0):
@@ -993,55 +1048,76 @@ def validate_plt_compact_field(
                          lito1=lito1_val, lito2=lito2_val, lito3=lito3_val)
 
         # Coordenadas
-        este_num = sanitize_number(rd.get("este"))
-        if este_num is None:
-            reg_err_comp("Este", rd.get("este"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Este")
-        elif not (100000.0 <= este_num <= 9999999.0):
-            reg_err_comp("Este", este_num, "ERR_PLT_ESTE_RANGO", value=este_num)
+        este_raw = rd.get("este")
+        if is_blank(este_raw):
+            reg_err_comp("Este", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Este")
+        else:
+            este_num = sanitize_number(este_raw)
+            if este_num is None or not (100000.0 <= este_num <= 9999999.0):
+                reg_err_comp("Este", este_raw, "ERR_PLT_ESTE_RANGO", value=str(este_raw))
 
-        norte_num = sanitize_number(rd.get("norte"))
-        if norte_num is None:
-            reg_err_comp("Norte", rd.get("norte"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Norte")
-        elif not (1000000.0 <= norte_num <= 99999999.0):
-            reg_err_comp("Norte", norte_num, "ERR_PLT_NORTE_RANGO", value=norte_num)
+        norte_raw = rd.get("norte")
+        if is_blank(norte_raw):
+            reg_err_comp("Norte", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Norte")
+        else:
+            norte_num = sanitize_number(norte_raw)
+            if norte_num is None or not (1000000.0 <= norte_num <= 99999999.0):
+                reg_err_comp("Norte", norte_raw, "ERR_PLT_NORTE_RANGO", value=str(norte_raw))
 
-        cota_num = sanitize_number(rd.get("cota"))
-        if cota_num is None:
-            reg_err_comp("Elevación", rd.get("cota"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Elevación")
-        elif not (0.0 <= cota_num <= 6000.0):
-            reg_err_comp("Elevación", cota_num, "ERR_PLT_ELEVACION_RANGO", value=cota_num)
+        cota_raw = rd.get("cota")
+        if is_blank(cota_raw):
+            reg_err_comp("Elevación", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Elevación")
+        else:
+            cota_num = sanitize_number(cota_raw)
+            if cota_num is None or not (0.0 <= cota_num <= 6000.0):
+                reg_err_comp("Elevación", cota_raw, "ERR_PLT_ELEVACION_RANGO", value=str(cota_raw))
 
         # Dimensiones D, L, W1, W2, W
-        d_num = sanitize_number(rd.get("d"))
-        if d_num is None:
-            reg_err_comp("Espesor D (cm)", rd.get("d"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Espesor D (cm)")
-        elif not (1.0 <= d_num <= 20.0):
-            reg_err_comp("Espesor D (cm)", d_num, "ERR_PLT_ESPESOR_D_RANGO", value=d_num)
+        d_raw = rd.get("d")
+        if is_blank(d_raw):
+            reg_err_comp("Espesor D (cm)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Espesor D (cm)")
+            d_num = None
+        else:
+            d_num = sanitize_number(d_raw)
+            if d_num is None or not (1.0 <= d_num <= 20.0):
+                reg_err_comp("Espesor D (cm)", d_raw, "ERR_PLT_ESPESOR_D_RANGO", value=str(d_raw))
 
-        l_num = sanitize_number(rd.get("l"))
-        if l_num is None:
-            reg_err_comp("Longitud L (cm)", rd.get("l"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Longitud L (cm)")
-        elif not (1.0 <= l_num <= 50.0):
-            reg_err_comp("Longitud L (cm)", l_num, "ERR_PLT_LONGITUD_L_RANGO", value=l_num)
+        l_raw = rd.get("l")
+        if is_blank(l_raw):
+            reg_err_comp("Longitud L (cm)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Longitud L (cm)")
+            l_num = None
+        else:
+            l_num = sanitize_number(l_raw)
+            if l_num is None or not (1.0 <= l_num <= 50.0):
+                reg_err_comp("Longitud L (cm)", l_raw, "ERR_PLT_LONGITUD_L_RANGO", value=str(l_raw))
 
-        w1_num = sanitize_number(rd.get("w1"))
-        if w1_num is None:
-            reg_err_comp("Ancho W1 (cm)", rd.get("w1"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W1 (cm)")
-        elif not (1.0 <= w1_num <= 30.0):
-            reg_err_comp("Ancho W1 (cm)", w1_num, "ERR_PLT_ANCHO_W1_RANGO", value=w1_num)
+        w1_raw = rd.get("w1")
+        if is_blank(w1_raw):
+            reg_err_comp("Ancho W1 (cm)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W1 (cm)")
+            w1_num = None
+        else:
+            w1_num = sanitize_number(w1_raw)
+            if w1_num is None or not (1.0 <= w1_num <= 30.0):
+                reg_err_comp("Ancho W1 (cm)", w1_raw, "ERR_PLT_ANCHO_W1_RANGO", value=str(w1_raw))
 
-        w2_num = sanitize_number(rd.get("w2"))
-        if w2_num is None:
-            reg_err_comp("Ancho W2 (cm)", rd.get("w2"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W2 (cm)")
-        elif not (1.0 <= w2_num <= 30.0):
-            reg_err_comp("Ancho W2 (cm)", w2_num, "ERR_PLT_ANCHO_W2_RANGO", value=w2_num)
+        w2_raw = rd.get("w2")
+        if is_blank(w2_raw):
+            reg_err_comp("Ancho W2 (cm)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W2 (cm)")
+            w2_num = None
+        else:
+            w2_num = sanitize_number(w2_raw)
+            if w2_num is None or not (1.0 <= w2_num <= 30.0):
+                reg_err_comp("Ancho W2 (cm)", w2_raw, "ERR_PLT_ANCHO_W2_RANGO", value=str(w2_raw))
 
-        w_num = sanitize_number(rd.get("w"))
+        w_raw = rd.get("w")
+        w_num = sanitize_number(w_raw) if not is_blank(w_raw) else None
         calc_w = None
         if w1_num is not None and w2_num is not None:
             calc_w = round((w1_num + w2_num) / 2.0, 3)
-            if w_num is None:
-                reg_err_comp("Ancho W (cm)", rd.get("w"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W (cm)")
+            if is_blank(w_raw):
+                reg_err_comp("Ancho W (cm)", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Ancho W (cm)")
+            elif w_num is None:
+                reg_err_comp("Ancho W (cm)", w_raw, "ERR_PLT_ANCHO_W_RANGO", value=str(w_raw))
             elif abs(w_num - calc_w) > tolerance:
                 reg_err_comp("Ancho W (cm)", w_num, "ERR_PLT_ANCHO_W_INCONGRUENTE", actual=w_num, expected=calc_w)
             elif not (1.0 <= w_num <= 30.0):

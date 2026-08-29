@@ -234,6 +234,12 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         ["Nivel"],
         "Nivel con valor '{value}' no puede ser negativo.",
     ),
+    "ERR_PLT_NIVEL_LIMITE_EXCEDIDO": ErrorRulePLT(
+        "ERR_PLT_NIVEL_LIMITE_EXCEDIDO",
+        "CAT_PLT_NIVEL_LIMITE_EXCEDIDO",
+        ["Nivel"],
+        "Nivel con valor '{value}' supera el límite máximo permitido (> 4999).",
+    ),
     "ERR_PLT_MUESTRA_LETRA_INVALIDA": ErrorRulePLT(
         "ERR_PLT_MUESTRA_LETRA_INVALIDA",
         "CAT_PLT_MUESTRA_INVALIDA",
