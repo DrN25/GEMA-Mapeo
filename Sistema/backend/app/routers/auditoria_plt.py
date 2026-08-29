@@ -1,6 +1,7 @@
 """
 app/routers/auditoria_plt.py — Endpoints API para Auditoría QA/QC de Ensayos PLT Irregulares.
-Incluye validación de 34 columnas, cálculo de KPIs, filtrado dinámico, pre-generación y persistencia de Excel en uploads/.
+Incluye validación de 34 columnas, cálculo de KPIs, filtrado dinámico, pre-generación y persistencia de Excel en uploads/,
+así como endpoints de status, cancelación e historial.
 """
 
 import os
@@ -13,6 +14,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 
+from app.core.audit_helpers import safe_replace
 from app.utils.plt_validator import validate_plt_excel
 from app.core.audit_plt_helpers import (
     aggregate_plt_audit_metrics,
@@ -33,30 +35,67 @@ LATEST_PLT_COMPACT = os.path.join(uploads_dir, "plt_compact_ultimo.json")
 LATEST_PLT_EXCEL = os.path.join(uploads_dir, "plt_reporte_completo_ultimo.xlsx")
 
 
+def _cancel_flag_path(audit_id: str) -> str:
+    return os.path.join(plt_history_dir, f"{audit_id}.cancel")
+
+
+def _is_cancelled(audit_id: str) -> bool:
+    return os.path.exists(_cancel_flag_path(audit_id))
+
+
+def _cleanup_audit_files(audit_id: str):
+    """Elimina los archivos generados de una auditoría cancelada."""
+    for ext in [".xlsx", ".cancel", "_diag.json", "_compact.json", "_reporte_completo.xlsx"]:
+        p = os.path.join(plt_history_dir, f"{audit_id}{ext}")
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+
 def _pregenerate_plt_excel(diag: dict, compact: dict, excel_out_path: str, public_out_path: str):
-    """Genera y guarda el libro Excel completo en disco en segundo plano o de forma síncrona."""
+    """Genera y guarda el libro Excel completo en disco."""
     try:
         incidencias_list = diag.get("incidencias", [])
         wb = export_plt_audit_to_excel(diag, compact, incidencias_list)
         
-        tmp_out = excel_out_path + ".tmp"
-        wb.save(tmp_out)
-        if os.path.exists(excel_out_path):
-            try: os.remove(excel_out_path)
-            except Exception: pass
-        shutil.move(tmp_out, excel_out_path)
+        # 1. Guardar en histórico
+        wb.save(excel_out_path)
 
-        tmp_pub = public_out_path + ".tmp"
-        shutil.copyfile(excel_out_path, tmp_pub)
-        if os.path.exists(public_out_path):
-            try: os.remove(public_out_path)
-            except Exception: pass
-        shutil.move(tmp_pub, public_out_path)
+        # 2. Guardar en caché pública
+        try:
+            wb.save(public_out_path)
+        except Exception:
+            try:
+                shutil.copyfile(excel_out_path, public_out_path)
+            except Exception:
+                pass
 
         size_kb = os.path.getsize(excel_out_path) / 1024.0
         print(f"[QAQC PLT] [PRE-GENERACIÓN EXCEL] Reporte Excel guardado en disco ({size_kb:.1f} KB) -> '{os.path.basename(excel_out_path)}'")
     except Exception as e:
         print(f"[QAQC PLT] [ERROR PRE-GENERACIÓN] Error al generar Excel: {e}")
+
+
+@router.post("/auditoria/plt/cancelar")
+def cancel_plt_audit(audit_id: Optional[str] = Query(None)):
+    """
+    Cancela una auditoría PLT en curso, marca el flag de cancelación y limpia archivos temporales.
+    """
+    if not audit_id:
+        return {"status": "ok", "message": "No se especificó audit_id."}
+
+    flag_path = _cancel_flag_path(audit_id)
+    try:
+        with open(flag_path, "w", encoding="utf-8") as f:
+            f.write("cancelled")
+    except Exception:
+        pass
+
+    _cleanup_audit_files(audit_id)
+    print(f"[QAQC PLT] [CANCELACIÓN] Auditoría '{audit_id}' cancelada por el usuario.")
+    return {"status": "ok", "message": f"Auditoría '{audit_id}' cancelada correctamente."}
 
 
 @router.post("/auditoria/plt/upload")
@@ -93,6 +132,11 @@ async def upload_plt_audit_file(
         start_time = datetime.now()
         diag = validate_plt_excel(temp_path, tolerance=tolerance)
         elapsed_sec = (datetime.now() - start_time).total_seconds()
+
+        if _is_cancelled(audit_id):
+            _cleanup_audit_files(audit_id)
+            print(f"[x] [QAQC PLT] Auditoría '{audit_id}' cancelada durante la validación.")
+            return JSONResponse(content={"status": "cancelled", "message": "Auditoría cancelada por el usuario."})
 
         diag["nombre_archivo"] = file.filename
         diag["fecha_auditoria"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -374,10 +418,16 @@ def list_plt_audit_history():
                 try:
                     with open(fpath, "r", encoding="utf-8") as file:
                         data = json.load(file)
+                        a_id = data.get("audit_id", f.replace("_compact.json", ""))
+                        a_file = data.get("nombre_archivo", "Planilla PLT")
+                        a_date = data.get("fecha_auditoria", "—")
                         history.append({
-                            "audit_id": data.get("audit_id", f.replace("_compact.json", "")),
-                            "nombre_archivo": data.get("nombre_archivo", "Planilla PLT"),
-                            "fecha_auditoria": data.get("fecha_auditoria", "—"),
+                            "id": a_id,
+                            "audit_id": a_id,
+                            "archivo": a_file,
+                            "nombre_archivo": a_file,
+                            "fecha": a_date,
+                            "fecha_auditoria": a_date,
                             "total_registros": data.get("total_registros_evaluados", 0),
                             "integridad_global_pct": data.get("integridad_global_pct", 0.0),
                             "total_alertas": data.get("total_alertas", 0),
