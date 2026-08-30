@@ -760,7 +760,7 @@ def validate_plt_standard_34(
 
         if not tipo_frac:
             reg_err("tipo_fractura", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Tipo de fractura")
-        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA]:
+        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA] and tipo_frac != "E-M":
             reg_err("tipo_fractura", tipo_frac, "ERR_PLT_TIPO_FRACTURA_CATALOGO", value=tipo_frac)
 
         calc_de = None
@@ -798,16 +798,14 @@ def validate_plt_standard_34(
 
         effective_is = is_num if is_num is not None else calc_is
         effective_f = f_num if f_num is not None else calc_f
-        if valida_w_norm == "SI" and effective_is is not None and effective_f is not None:
+        calc_is50 = None
+        if effective_is is not None and effective_f is not None:
             calc_is50 = round(effective_is * effective_f, 4)
             if is50_num is None:
                 reg_err("is50_mpa", get_val("is50_mpa"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Is(50) (MPa)")
             elif abs(is50_num - calc_is50) > tolerance:
                 reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
                         actual=is50_num, f=effective_f, is_val=effective_is, expected=calc_is50)
-        elif valida_w_norm == "NO" and is50_num is not None:
-            reg_err("is50_mpa", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
-                    actual=is50_num, f=effective_f if effective_f is not None else 0, is_val=effective_is if effective_is is not None else 0, expected="NULL (Muestra Inválida)")
 
         # 7. Resistencia de Roca (K, UCS, ISRM)
         factor_k_num = sanitize_number(get_val("factor_k"))
@@ -824,7 +822,7 @@ def validate_plt_standard_34(
                         actual=factor_k_num, litos=f"{l1}/{l2}/{l3}", expected=exp_k)
 
         effective_k = factor_k_num if factor_k_num is not None else exp_k
-        effective_is50 = is50_num if is50_num is not None else (calc_is50 if valida_w_norm == "SI" and 'calc_is50' in locals() else None)
+        effective_is50 = is50_num if is50_num is not None else calc_is50
 
         calc_ucs = None
         if effective_is50 is not None and effective_k is not None:
@@ -1259,16 +1257,13 @@ def validate_plt_compact_field(
 
         is50_num = sanitize_number(rd.get("is50"))
         calc_is50 = None
-        if valida_w_norm == "SI" and effective_is is not None and effective_f is not None:
+        if effective_is is not None and effective_f is not None:
             calc_is50 = round(effective_is * effective_f, 4)
             if is50_num is None:
                 reg_err_comp("Is(50) (MPa)", rd.get("is50"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Is(50) (MPa)")
             elif abs(is50_num - calc_is50) > tolerance:
                 reg_err_comp("Is(50) (MPa)", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
                              actual=is50_num, f=effective_f, is_val=effective_is, expected=calc_is50)
-        elif valida_w_norm == "NO" and is50_num is not None:
-            reg_err_comp("Is(50) (MPa)", is50_num, "ERR_PLT_IS50_INCONGRUENTE",
-                         actual=is50_num, f=effective_f if effective_f is not None else 0, is_val=effective_is if effective_is is not None else 0, expected="NULL (Muestra Inválida)")
 
         effective_is50 = is50_num if is50_num is not None else calc_is50
 
