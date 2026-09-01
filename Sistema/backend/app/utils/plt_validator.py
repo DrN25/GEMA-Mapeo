@@ -580,11 +580,13 @@ def validate_plt_standard_34(
         if is_blank(nivel_raw):
             reg_err("nivel", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Nivel")
         else:
+            is_range = bool(re.match(r"^\d{3,4}\s*[-/]\s*\d{3,4}$", str(nivel_raw).strip()))
             nivel_num = sanitize_number(nivel_raw)
             if nivel_num is None:
-                reg_err("nivel", nivel_raw, "ERR_PLT_NIVEL_NO_NUMERICO", value=str(nivel_raw))
+                if not is_range:
+                    reg_err("nivel", nivel_raw, "ERR_PLT_NIVEL_NO_NUMERICO", value=str(nivel_raw))
             elif nivel_num < 0:
-                reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_RANGO", value=nivel_num)
+                reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_NEGATIVO", value=nivel_num)
             elif nivel_num > 4999:
                 reg_err("nivel", nivel_num, "ERR_PLT_NIVEL_LIMITE_EXCEDIDO", value=nivel_num)
 
@@ -760,7 +762,7 @@ def validate_plt_standard_34(
 
         if not tipo_frac:
             reg_err("tipo_fractura", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Tipo de fractura")
-        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA] and tipo_frac != "E-M":
+        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA] and tipo_frac not in ("M-E", "M/E", "E/M", "E-M"):
             reg_err("tipo_fractura", tipo_frac, "ERR_PLT_TIPO_FRACTURA_CATALOGO", value=tipo_frac)
 
         calc_de = None
@@ -1209,7 +1211,7 @@ def validate_plt_compact_field(
         tipo_frac = _norm_str(rd.get("frac"))
         if not tipo_frac:
             reg_err_comp("Tipo de fractura", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Tipo de fractura")
-        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA]:
+        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA] and tipo_frac not in ("M-E", "M/E", "E/M", "E-M"):
             reg_err_comp("Tipo de fractura", tipo_frac, "ERR_PLT_TIPO_FRACTURA_CATALOGO", value=tipo_frac)
 
         # Diámetro Equivalente De
