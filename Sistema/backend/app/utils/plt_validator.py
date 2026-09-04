@@ -275,13 +275,25 @@ def resolve_expected_lithology(l1: str, l2: str, l3: str, project: str = "ferrob
 
         if cat_l1 in ("INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS"):
             m1 = (l1_norm in intrusives) or (l1_norm == cat_l1)
+        elif "/" in cat_l1:
+            m1 = (l1_norm == cat_l1) or (l1_norm in [p.strip() for p in cat_l1.split("/")])
         elif cat_l1:
             m1 = (l1_norm == cat_l1)
         else:
             m1 = True
 
         m2 = (l2_norm == cat_l2) if cat_l2 else True
-        m3 = (l3_norm == cat_l3) if cat_l3 else True
+
+        if cat_l3 in ("VARIOS", "CUALQUIERA"):
+            m3 = bool(l3_norm and l3_norm not in ("-", "N/A", "NONE"))
+        elif "/" in cat_l3:
+            m3 = (l3_norm == cat_l3) or (l3_norm in [p.strip() for p in cat_l3.split("/")])
+        elif cat_l3 in ("-", "NR", ""):
+            m3 = (l3_norm in ("-", "NR", "", "NONE", "N/A"))
+        elif cat_l3:
+            m3 = (l3_norm == cat_l3)
+        else:
+            m3 = True
 
         if m1 and m2 and m3:
             tipo_lito = item.get("grupo") or item.get("tipo_litologico")

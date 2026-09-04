@@ -215,12 +215,96 @@ def test_plt_resolve_expected_lithology():
     assert tipo == "INTRUSIVOS"
     assert k == 8.29
 
-    # Metamórficas
+    # Metamórficas Ferrobamba (GSK k = 11.15)
     tipo_meta, k_meta = resolve_expected_lithology("LMT", "GSK", "LMT_M", project="ferrobamba")
     assert tipo_meta == "METAMORFICAS"
     assert k_meta == 11.15
 
-    # Chalco
-    tipo_ch, k_ch = resolve_expected_lithology("MZB", "MZB", "MZB_EQ", project="chalco")
-    assert tipo_ch == "INTRUSIVOS"
-    assert k_ch == 8.29
+    # Chalco Intrusivos Oficiales (_LEYENDA_LITOLOGIA_CHALCO)
+    # Diorita de hornblenda 1 (k = 7.60)
+    tipo_di, k_di = resolve_expected_lithology("DI", "DI", "DIO_1", project="chalco")
+    assert tipo_di == "INTRUSIVOS"
+    assert k_di == 7.60
+
+    # Monzonita hornbléndica MZH_K (k = 9.31)
+    tipo_mzh, k_mzh = resolve_expected_lithology("MZH", "MZH", "MZH_K", project="chalco")
+    assert tipo_mzh == "INTRUSIVOS"
+    assert k_mzh == 9.31
+
+    # Monzonitas cuarzosas MZQ_1A (k = 12.29)
+    tipo_mzq, k_mzq = resolve_expected_lithology("MZQ", "MZQ", "MZQ_1A", project="chalco")
+    assert tipo_mzq == "INTRUSIVOS"
+    assert k_mzq == 12.29
+
+    # Chalco Metamórficas (GSK oficial k = 11.50, a diferencia de Ferrobamba que es 11.15)
+    tipo_ch_gsk, k_ch_gsk = resolve_expected_lithology("LMT", "GSK", "LMT_M", project="chalco")
+    assert tipo_ch_gsk == "METAMORFICAS"
+    assert k_ch_gsk == 11.50
+
+
+def test_chalco_diorite_validation():
+    errors = []
+    def reg_err(col, val, code, **kw):
+        errors.append((col, val, code, kw))
+
+    # Prueba de Diorita oficial de Chalco: DI / DI / DIO_1 (k = 7.60)
+    row = {
+        "Lito 1": "DI",
+        "Lito 2": "DI",
+        "Lito 3": "DIO_1",
+        "Unidad Litologica": "INTRUSIVOS",
+        "( UCS )  (Mpa)": 76.0,
+        "is50 (Mpa)": 10.0,
+    }
+    validate_lithology_correlation(row, reg_err, project="chalco")
+    assert len(errors) == 0
+
+
+def test_chalco_gsk_factor_k_and_unit_alias():
+    errors = []
+    def reg_err(col, val, code, **kw):
+        errors.append((col, val, code, kw))
+
+    # Chalco GSK con k = 11.50 y Unidad Litológica compuesta 'SEDIMENTARIAS ALTERADAS EXOSKARNS'
+    row = {
+        "Lito 1": "LMT",
+        "Lito 2": "GSK",
+        "Lito 3": "LMT_M",
+        "Unidad Litologica": "SEDIMENTARIAS ALTERADAS EXOSKARNS",
+        "( UCS )  (Mpa)": 115.0,
+        "is50 (Mpa)": 10.0,
+    }
+    validate_lithology_correlation(row, reg_err, project="chalco")
+    assert len(errors) == 0
+
+
+def test_chalco_breccia_and_aliases():
+    errors = []
+    def reg_err(col, val, code, **kw):
+        errors.append((col, val, code, kw))
+
+    # Brecha crackle hidrotermal: HBX / HBX / HBX_CM (k = 11.41)
+    row = {
+        "Lito 1": "HBX",
+        "Lito 2": "HBX",
+        "Lito 3": "HBX_CM",
+        "Unidad Litologica": "BRECHAS",
+        "( UCS )  (Mpa)": 114.1,
+        "is50 (Mpa)": 10.0,
+    }
+    validate_lithology_correlation(row, reg_err, project="chalco")
+    assert len(errors) == 0
+
+    # Alias DIO -> DI y DIO/1 -> DIO_1
+    row_alias = {
+        "Lito 1": "DIO",
+        "Lito 2": "DI",
+        "Lito 3": "DIO/1",
+        "Unidad Litologica": "INTRUSIVOS",
+        "( UCS )  (Mpa)": 76.0,
+        "is50 (Mpa)": 10.0,
+    }
+    errors.clear()
+    validate_lithology_correlation(row_alias, reg_err, project="chalco")
+    assert len(errors) == 0
+

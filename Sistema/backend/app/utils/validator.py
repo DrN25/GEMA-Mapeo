@@ -158,6 +158,8 @@ def normalize_geological_group(group_str):
     val = str(group_str).strip().upper()
     val = val.replace("Á", "A").replace("É", "E").replace("Í", "I").replace("Ó", "O").replace("Ú", "U")
     
+    if "EXOS" in val or "ALTERADA" in val:
+        return "METAMORFICAS"
     if "SEDIMENT" in val:
         return "SEDIMENTARIOS"
     if "METAMORF" in val:
@@ -168,8 +170,6 @@ def normalize_geological_group(group_str):
         return "BRECHAS"
     if "ESDONS" in val or "ENDOS" in val:
         return "ENDOSKARN"
-    if "EXOS" in val:
-        return "METAMORFICAS"
     if "SKARN" in val or val == "SK":
         return "SKARN"
         
