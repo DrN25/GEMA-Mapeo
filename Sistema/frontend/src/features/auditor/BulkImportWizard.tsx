@@ -1,20 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, UploadCloud, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { X, UploadCloud, FileSpreadsheet, CheckCircle2, Layers } from 'lucide-react';
+
+export type ProjectType = 'ferrobamba' | 'chalco';
 
 interface BulkImportWizardProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (payload: { file: File }) => void;
+    onConfirm: (payload: { file: File; proyecto: ProjectType }) => void;
 }
 
 export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImportWizardProps) {
     const [file, setFile] = useState<File | null>(null);
+    const [proyecto, setProyecto] = useState<ProjectType>('ferrobamba');
     const [errorMsg, setErrorMsg] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!isOpen) {
             setFile(null);
+            setProyecto('ferrobamba');
             setErrorMsg('');
         }
     }, [isOpen]);
@@ -36,7 +40,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
 
     const handleConfirmClick = () => {
         if (file) {
-            onConfirm({ file });
+            onConfirm({ file, proyecto });
         }
     };
 
@@ -60,12 +64,53 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
 
                 {/* Cuerpo del Asistente */}
                 <div className="p-6 space-y-5">
-                    <div className="bg-cyan-500/5 border border-cyan-500/10 p-4 rounded-xl text-xs text-slate-300 leading-relaxed font-semibold">
-                        El motor de auditoría del servidor analizará de manera automática la estructura del archivo Excel, detectando las estaciones, celdas hijo, meteorizaciones e inconsistencias físicas de RMR en segundo plano de forma 100% automatizada.
+                    {/* Selector de Proyecto Geológico */}
+                    <div>
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                            <Layers size={14} className="text-cyan-400" />
+                            <span>Proyecto Geológico (Catálogo Litológico)</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setProyecto('ferrobamba')}
+                                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                                    proyecto === 'ferrobamba'
+                                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                                        : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-xs font-black uppercase">Ferrobamba</span>
+                                    {proyecto === 'ferrobamba' && <CheckCircle2 size={14} className="text-cyan-400" />}
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-1">Tajo Ferrobamba (Reglas Oficiales)</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setProyecto('chalco')}
+                                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                                    proyecto === 'chalco'
+                                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                                        : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-xs font-black uppercase">Chalcobamba</span>
+                                    {proyecto === 'chalco' && <CheckCircle2 size={14} className="text-cyan-400" />}
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-1">Tajo Chalco (Reglas Chalco)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-cyan-500/5 border border-cyan-500/10 p-3.5 rounded-xl text-xs text-slate-300 leading-relaxed font-normal">
+                        Las reglas de correlación litológica (Lito 1, 2, 3 y factor K) se ajustarán dinámicamente según el proyecto seleccionado ({proyecto === 'ferrobamba' ? 'Ferrobamba' : 'Chalcobamba'}).
                     </div>
 
                     <div
-                        className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all ${file ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-cyan-500/30 hover:border-cyan-500/60 bg-navy-900/20 cursor-pointer'
+                        className={`border-2 border-dashed rounded-xl p-7 flex flex-col items-center justify-center text-center transition-all ${file ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-cyan-500/30 hover:border-cyan-500/60 bg-navy-900/20 cursor-pointer'
                             }`}
                         onClick={() => inputRef.current?.click()}
                     >
@@ -76,7 +121,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                             ref={inputRef}
                             onChange={handleFileChange}
                         />
-                        <FileSpreadsheet size={36} className={file ? 'text-emerald-400 mb-3' : 'text-cyan-500 mb-3'} />
+                        <FileSpreadsheet size={36} className={file ? 'text-emerald-400 mb-2' : 'text-cyan-500 mb-2'} />
                         <h3 className="text-sm font-bold text-slate-200">Archivo Excel de Celdas (.xlsx)</h3>
                         <p className="text-xs text-slate-400 mt-1">
                             {file ? file.name : 'Haz clic aquí para explorar tu computadora'}
@@ -97,7 +142,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                     {file && (
                         <div className="flex gap-2.5 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">
                             <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
-                            <span>Archivo seleccionado correctamente. Presione "Iniciar Auditoría Masiva" para comenzar el procesamiento.</span>
+                            <span>Archivo listo para procesar bajo perfil <strong>{proyecto.toUpperCase()}</strong>. Presione "Iniciar Auditoría Masiva".</span>
                         </div>
                     )}
                 </div>
@@ -122,4 +167,4 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
             </div>
         </div>
     );
-}
+}

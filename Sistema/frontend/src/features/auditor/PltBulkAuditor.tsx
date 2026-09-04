@@ -378,10 +378,14 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
 
         const formData = new FormData();
         formData.append('file', payload.file);
+        if (payload.proyecto) {
+            formData.append('proyecto', payload.proyecto);
+        }
 
         try {
             const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
-            const res = await fetch(`${cleanBase}/api/auditoria/plt/upload?tolerance=${payload.tolerance || 0.1}`, {
+            const projParam = payload.proyecto ? `&proyecto=${encodeURIComponent(payload.proyecto)}` : '';
+            const res = await fetch(`${cleanBase}/api/auditoria/plt/upload?tolerance=${payload.tolerance || 0.1}${projParam}`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: formData,
@@ -669,9 +673,14 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                                     <ShieldCheck size={18} />
                                 </div>
                                 <div>
-                                    <h1 className="text-xs font-black uppercase tracking-widest">
-                                        Auditoría QA/QC Ensayos PLT
-                                    </h1>
+                                    <div className="flex items-center gap-2">
+                                        <h1 className="text-xs font-black uppercase tracking-widest">
+                                            Auditoría QA/QC Ensayos PLT
+                                        </h1>
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold uppercase">
+                                            {kpis?.proyecto?.toUpperCase() || 'FERROBAMBA'}
+                                        </span>
+                                    </div>
                                     <p className="text-xs text-slate-400 mt-0.5">
                                         Planilla Activa: <span className="font-bold text-slate-100">{kpis?.nombre_archivo || selectedAuditId || 'Ensayos PLT'}</span>
                                     </p>

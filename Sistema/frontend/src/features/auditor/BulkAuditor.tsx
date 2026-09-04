@@ -384,6 +384,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
         const formData = new FormData();
         formData.append('file', payload.file);
+        if (payload.proyecto) {
+            formData.append('proyecto', payload.proyecto);
+        }
 
         try {
             const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
@@ -671,7 +674,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                                     <ShieldCheck size={18} />
                                 </div>
                                 <div>
-                                    <h1 className="text-xs font-black uppercase tracking-widest">Auditoría Geotécnica de Integridad</h1>
+                                    <div className="flex items-center gap-2">
+                                        <h1 className="text-xs font-black uppercase tracking-widest">Auditoría Geotécnica de Integridad</h1>
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold uppercase">
+                                            {kpis?.proyecto?.toUpperCase() || 'FERROBAMBA'}
+                                        </span>
+                                    </div>
                                     <p className="text-xs text-slate-400 mt-0.5">
                                         Planilla Activa: <span className="font-bold text-slate-100">{kpis?.nombre_archivo || 'Por Defecto'}</span>
                                     </p>

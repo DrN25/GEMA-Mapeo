@@ -62,12 +62,14 @@ interface CatalogsViewProps {
 
 export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
   const [activeTab, setActiveTab] = useState<string>('litologia');
+  const [selectedProject, setSelectedProject] = useState<'ferrobamba' | 'chalco'>('ferrobamba');
   const [catalogs, setCatalogs] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const apiBase = import.meta.env.VITE_API_BASE || "";
-    fetch(`${apiBase}/api/catalogs/all`, { headers: getAuthHeaders() })
+    setLoading(true);
+    fetch(`${apiBase}/api/catalogs/all?proyecto=${selectedProject}`, { headers: getAuthHeaders() })
       .then(res => {
         if (!res.ok) throw new Error("Server error");
         return res.json();
@@ -80,7 +82,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
         console.warn("No se pudo cargar catálogos desde el servidor backend, continuando en modo fallback local:", err);
         setLoading(false);
       });
-  }, []);
+  }, [selectedProject]);
 
   if (loading) {
     return (
@@ -181,10 +183,36 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
             <div className="flex-1 min-w-0 flex flex-col gap-8">
               {/* TABLA 1 */}
               <div className="space-y-3">
-                <h3 className="text-xs md:text-sm font-bold text-slate-200 border-b border-navy-800 pb-2 flex items-center gap-2">
-                  <Layers size={14} className="text-cyan-400 animate-pulse" />
-                  <span>Factor de correlación para ensayos de carga puntual (SRK, 2023)</span>
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-navy-800 pb-2">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <Layers size={14} className="text-cyan-400 animate-pulse" />
+                    <span>Factor de correlación para ensayos de carga puntual (Proyecto: {selectedProject.toUpperCase()})</span>
+                  </h3>
+                  <div className="flex items-center gap-1.5 bg-navy-950 p-1 rounded-xl border border-navy-800 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProject('ferrobamba')}
+                      className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                        selectedProject === 'ferrobamba'
+                          ? 'bg-cyan-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Ferrobamba
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProject('chalco')}
+                      className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                        selectedProject === 'chalco'
+                          ? 'bg-cyan-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Chalcobamba
+                    </button>
+                  </div>
+                </div>
                 <div className="overflow-x-auto rounded-lg border border-navy-900 max-h-[40vh] scrollbar-thin">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="sticky top-0 bg-navy-950 z-10 border-b border-navy-900">
@@ -198,22 +226,7 @@ export default function CatalogsView({ mode = 'ventanas' }: CatalogsViewProps) {
                     </thead>
                     <tbody className="divide-y divide-navy-900/40 text-slate-200 font-medium">
                       {catalogs.litologia.tabla_colores.map((item: any, idx: number) => {
-                        const lito2Up = item.lito2.toUpperCase();
-                        let grupo = "INTRUSIVOS";
-                        if (["GSK", "PSK", "MSK", "ESK", "MBC", "MBL"].includes(lito2Up)) {
-                          grupo = "METAMORFICAS";
-                        } else {
-                          const l1 = item.lito1.toUpperCase();
-                          if (["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"].includes(l1)) {
-                            grupo = "INTRUSIVOS";
-                          } else if (["LMT", "SHL", "SND"].includes(l1)) {
-                            grupo = "SEDIMENTARIAS";
-                          } else if (l1 === "INTRUSIVO") {
-                            grupo = "ENDOSKARN";
-                          } else if (["TBX", "HBX", "MBX / VARIOS", "BX"].includes(l1)) {
-                            grupo = "BRECHAS";
-                          }
-                        }
+                        const grupo = item.grupo || "INTRUSIVOS";
 
                         return (
                           <tr key={idx} className="hover:bg-navy-900/20">

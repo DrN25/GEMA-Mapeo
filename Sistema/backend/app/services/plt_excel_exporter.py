@@ -70,7 +70,8 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         if "COMPACT" in str(formato_tipo)
         else "Dashboard Ejecutivo de Control de Calidad, Consistencia de 34 Columnas y Secuencias ABCD"
     )
-    ws_dash.cell(row=3, column=2, value=subtitle_txt).font = font_subtitle
+    proj_name = str(compact.get("proyecto") or diag.get("proyecto") or "Ferrobamba").upper()
+    ws_dash.cell(row=3, column=2, value=f"{subtitle_txt} | PROYECTO: {proj_name}").font = font_subtitle
 
     total_filas = compact.get("familia1", {}).get("total_registros", diag.get("total_filas_procesadas", 0))
     total_fields = compact.get("familia2", {}).get("total_fields", total_filas * (24 if "COMPACT" in str(formato_tipo) else 34))

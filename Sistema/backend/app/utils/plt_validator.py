@@ -24,6 +24,8 @@ import pandas as pd
 from app.core.catalogs import (
     LITHOLOGY_FULL_CATALOG,
     LITHOLOGY_GROUP_SYNONYMS,
+    get_project_geology_config,
+    GROUP_COMPATIBILITY,
 )
 from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT, COMPACT_FIELD_CATEGORIES
 
@@ -241,23 +243,38 @@ def normalize_lithology_group(group_val: Any) -> str:
     return norm
 
 
-def resolve_expected_lithology(l1: str, l2: str, l3: str) -> Tuple[Optional[str], Optional[float]]:
+def resolve_expected_lithology(l1: str, l2: str, l3: str, project: str = "ferrobamba") -> Tuple[Optional[str], Optional[float]]:
     """
     Resuelve la combinación litológica según la cascada oficial de Ensayos PLT.
-    Soporta sinónimos intrusivos en Lito 1 (ej. MZB, MZQ, MZM, Intrusivo, etc.).
+    Soporta sinónimos intrusivos en Lito 1 y configuración declarativa del proyecto.
     Retorna (tipo_litologico_esperado, factor_k_esperado).
     """
-    l1_norm = _norm_str(l1)
-    l2_norm = _norm_str(l2)
-    l3_norm = _norm_str(l3)
+    cfg = get_project_geology_config(project)
+    catalog = cfg.get("catalog", LITHOLOGY_FULL_CATALOG)
+    aliases = cfg.get("aliases", {})
+    intrusives = cfg.get("intrusive_codes", INTRUSIVE_LITOS)
+    overrides = cfg.get("overrides", {})
 
-    for item in LITHOLOGY_FULL_CATALOG:
+    l1_raw = aliases.get(l1, l1)
+    l2_raw = aliases.get(l2, l2)
+    l3_raw = aliases.get(l3, l3)
+
+    l1_norm = _norm_str(l1_raw)
+    l2_norm = _norm_str(l2_raw)
+    l3_norm = _norm_str(l3_raw)
+
+    # 0. Overrides específicos del proyecto
+    if (l1_norm, l2_norm, l3_norm) in overrides:
+        ov = overrides[(l1_norm, l2_norm, l3_norm)]
+        return ov.get("grupo") or ov.get("tipo_litologico"), ov.get("k") or ov.get("factor_k")
+
+    for item in catalog:
         cat_l1 = _norm_str(item.get("lito1"))
         cat_l2 = _norm_str(item.get("lito2"))
         cat_l3 = _norm_str(item.get("lito3"))
 
         if cat_l1 in ("INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS"):
-            m1 = (l1_norm in INTRUSIVE_LITOS) or (l1_norm == cat_l1)
+            m1 = (l1_norm in intrusives) or (l1_norm == cat_l1)
         elif cat_l1:
             m1 = (l1_norm == cat_l1)
         else:
@@ -367,6 +384,7 @@ def validate_plt_standard_34(
     file_path: str,
     header_row_idx: int = 1,
     tolerance: float = 0.1,
+    project: str = "ferrobamba",
 ) -> dict:
     """
     Audita un archivo Excel de Ensayos PLT en formato estándar de 34 columnas.
@@ -505,10 +523,12 @@ def validate_plt_standard_34(
         }
 
     # Validación fila a fila
+    cfg_std = get_project_geology_config(project)
+    catalog_std = cfg_std.get("catalog", LITHOLOGY_FULL_CATALOG)
     valid_litos_set = set(
-        [_norm_str(x.get("lito1")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito1")]
-        + [_norm_str(x.get("lito2")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito2")]
-        + [_norm_str(x.get("lito3")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito3")]
+        [_norm_str(x.get("lito1")) for x in catalog_std if x.get("lito1")]
+        + [_norm_str(x.get("lito2")) for x in catalog_std if x.get("lito2")]
+        + [_norm_str(x.get("lito3")) for x in catalog_std if x.get("lito3")]
     )
 
     for idx, row in df_raw.iterrows():
@@ -630,7 +650,7 @@ def validate_plt_standard_34(
         elif l3 not in valid_litos_set:
             reg_err("litologia_3", l3, "ERR_PLT_LITO3_NO_RECONOCIDO", value=l3)
 
-        exp_tipo, exp_k = resolve_expected_lithology(l1, l2, l3)
+        exp_tipo, exp_k = resolve_expected_lithology(l1, l2, l3, project=project)
         if l1 and l2 and l3:
             if not exp_tipo:
                 reg_err("litologia_1", f"{l1}/{l2}/{l3}", "ERR_PLT_COMBINACION_LITOLOGICA_NO_VALIDA",
@@ -638,9 +658,12 @@ def validate_plt_standard_34(
             else:
                 if not tipo_lito_raw:
                     reg_err("tipo_litologico", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Tipo litológico")
-                elif tipo_lito_norm != normalize_lithology_group(exp_tipo):
-                    reg_err("tipo_litologico", tipo_lito_raw, "ERR_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
-                            actual=tipo_lito_raw, expected=exp_tipo)
+                else:
+                    expected_group_norm = normalize_lithology_group(exp_tipo)
+                    compatible = GROUP_COMPATIBILITY.get(tipo_lito_norm, {tipo_lito_norm})
+                    if expected_group_norm not in compatible and tipo_lito_norm != expected_group_norm:
+                        reg_err("tipo_litologico", tipo_lito_raw, "ERR_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
+                                actual=tipo_lito_raw, expected=exp_tipo)
 
         # 4. Coordenadas Espaciales WGS84
         este_raw = get_val("este")
@@ -859,6 +882,7 @@ def validate_plt_compact_field(
     file_path: str,
     header_row_idx: int = 2,
     tolerance: float = 0.1,
+    project: str = "ferrobamba",
 ) -> dict:
     """
     Valida planillas de campo compactas de Ensayos PLT (ej. 03 feb1.xlsx).
@@ -1016,10 +1040,12 @@ def validate_plt_compact_field(
         }
 
     # 2. Validación Fila a Fila sobre columnas presentes en Formato de Campo
+    cfg_comp = get_project_geology_config(project)
+    catalog_comp = cfg_comp.get("catalog", LITHOLOGY_FULL_CATALOG)
     valid_litos_set = set(
-        [_norm_str(x.get("lito1")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito1")]
-        + [_norm_str(x.get("lito2")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito2")]
-        + [_norm_str(x.get("lito3")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito3")]
+        [_norm_str(x.get("lito1")) for x in catalog_comp if x.get("lito1")]
+        + [_norm_str(x.get("lito2")) for x in catalog_comp if x.get("lito2")]
+        + [_norm_str(x.get("lito3")) for x in catalog_comp if x.get("lito3")]
     )
 
     for rd in rows_data:
@@ -1091,7 +1117,7 @@ def validate_plt_compact_field(
         elif lito3_val not in valid_litos_set:
             reg_err_comp("Lito 3", lito3_val, "ERR_PLT_LITO3_NO_RECONOCIDO", value=lito3_val)
 
-        exp_tipo, exp_k = resolve_expected_lithology(lito1_val, lito2_val, lito3_val)
+        exp_tipo, exp_k = resolve_expected_lithology(lito1_val, lito2_val, lito3_val, project=project)
         if lito1_val and lito2_val and lito3_val and not exp_tipo:
             reg_err_comp("Lito 1", f"{lito1_val}/{lito2_val}/{lito3_val}", "ERR_PLT_COMBINACION_LITOLOGICA_NO_VALIDA",
                          lito1=lito1_val, lito2=lito2_val, lito3=lito3_val)
@@ -1305,6 +1331,7 @@ def validate_plt_excel(
     file_path: str,
     output_json_path: Optional[str] = None,
     tolerance: float = 0.1,
+    project: str = "ferrobamba",
 ) -> dict:
     """
     Audita un archivo Excel de Ensayos PLT (.xlsx / .xlsm) contra las reglas QAQC oficiales.
@@ -1317,9 +1344,9 @@ def validate_plt_excel(
     formato_tipo, header_row_idx = detect_plt_file_format(file_path)
 
     if "COMPACT" in str(formato_tipo):
-        diag = validate_plt_compact_field(file_path, header_row_idx=header_row_idx, tolerance=tolerance)
+        diag = validate_plt_compact_field(file_path, header_row_idx=header_row_idx, tolerance=tolerance, project=project)
     else:
-        diag = validate_plt_standard_34(file_path, header_row_idx=header_row_idx, tolerance=tolerance)
+        diag = validate_plt_standard_34(file_path, header_row_idx=header_row_idx, tolerance=tolerance, project=project)
 
     elapsed_sec = time.time() - t_start
     total_filas = diag.get("total_filas_procesadas", 0)
@@ -1329,6 +1356,7 @@ def validate_plt_excel(
     num_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
 
     output_json = {
+        "proyecto": project,
         "nombre_archivo": os.path.basename(file_path),
         "formato_detectado": formato_tipo,
         "total_filas_procesadas": total_filas,

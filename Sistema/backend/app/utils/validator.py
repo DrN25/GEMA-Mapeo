@@ -14,7 +14,8 @@ from app.core.catalogs import (
     EFECTOS_VOLADURA_CATALOG, RQD_RATINGS_CATALOG, ESPACIAMIENTO_R89_CATALOG,
     ESPACIAMIENTO_R76_CATALOG, TIPO_ESTRUCTURA_CATALOG, TIPO_RELLENO_CATALOG,
     RUGOSIDAD_CATALOG, FORMA_ESTRUCTURA_CATALOG, ALTERACION_CATALOG,
-    LITHOLOGY_CLASSIFICATION, RESISTENCIA_DISPLAY_CATALOG, RQD_DISPLAY_CATALOG
+    LITHOLOGY_CLASSIFICATION, RESISTENCIA_DISPLAY_CATALOG, RQD_DISPLAY_CATALOG,
+    get_project_geology_config, GROUP_COMPATIBILITY
 )
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
 from app.utils.interpolation import rating_promedio_rqd, rating_promedio_r1, rating_continuo_rqd, rating_continuo_r1
@@ -126,7 +127,7 @@ def is_within_tolerance(val, targets, tolerance):
     if val is None: return False
     return any(abs(val - t) <= tolerance for t in targets)
 
-def match_lito_column(catalog_val, input_val) -> bool:
+def match_lito_column(catalog_val, input_val, intrusive_codes: set = None) -> bool:
     c_val = str(catalog_val or '').strip().upper()
     i_val = str(input_val or '').strip().upper()
     
@@ -138,8 +139,12 @@ def match_lito_column(catalog_val, input_val) -> bool:
         if opt == 'VARIOS' or opt == 'CUALQUIERA':
             return i_val not in ['', '-', 'N/A', 'NONE']
             
-        if opt == 'INTRUSIVO' and i_val in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]:
-            return True
+        if opt in ('INTRUSIVO', 'INTRUSIVOS'):
+            if intrusive_codes is not None:
+                if i_val in intrusive_codes:
+                    return True
+            elif i_val in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]:
+                return True
             
         if opt == i_val:
             return True
@@ -161,8 +166,12 @@ def normalize_geological_group(group_str):
         return "INTRUSIVOS"
     if "BRECHA" in val:
         return "BRECHAS"
-    if "SKARN" in val or "ESDONS" in val or "ENDOS" in val:
+    if "ESDONS" in val or "ENDOS" in val:
         return "ENDOSKARN"
+    if "EXOS" in val:
+        return "METAMORFICAS"
+    if "SKARN" in val or val == "SK":
+        return "SKARN"
         
     return NORM_GROUP_MAP.get(val, val)
 
@@ -520,7 +529,7 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
         if num_estrucs % 1 != 0:
             registrar_error("NUMERO DE ESTRUCTURAS", num_estrucs, "ERR_NUMERO_ESTRUCTURAS_DECIMAL", value=num_estrucs)
 
-def validate_lithology_correlation(row_dict, registrar_error):
+def validate_lithology_correlation(row_dict, registrar_error, project: str = "ferrobamba"):
     l1 = sanitize_value(get_row_val(row_dict, "Lito 1"), str)
     l2 = sanitize_value(get_row_val(row_dict, "Lito 2"), str)
     l3 = sanitize_value(get_row_val(row_dict, "Lito 3"), str)
@@ -534,11 +543,26 @@ def validate_lithology_correlation(row_dict, registrar_error):
     if not l1_clean and not l2_clean and (not l3_clean or l3_clean == "-"):
         return
 
-    group_input_norm = normalize_geological_group(u_lito) if u_lito else ""
+    # Configuración geológica declarativa del proyecto
+    proj_cfg = get_project_geology_config(project)
+    catalog = proj_cfg.get("catalog", LITHOLOGY_CLASSIFICATION)
+    aliases = proj_cfg.get("aliases", {})
+    intrusive_codes = proj_cfg.get("intrusive_codes", set())
+    shifted_rocks = proj_cfg.get("shifted_rocks", set())
+    default_endo_k = proj_cfg.get("default_endo_k", 9.87)
+    default_k = proj_cfg.get("default_k", 10.0)
+    overrides = proj_cfg.get("overrides", {})
+
+    # Aplicar aliases declarativos (ej. SK -> SKARN, MZB/P -> MZB_P)
+    l1_clean = aliases.get(l1_clean, l1_clean)
+    l2_clean = aliases.get(l2_clean, l2_clean)
+    l3_clean = aliases.get(l3_clean, l3_clean)
+    u_lito_clean = aliases.get(u_lito.strip().upper(), u_lito.strip().upper()) if u_lito else ""
+
+    group_input_norm = normalize_geological_group(u_lito_clean) if u_lito_clean else ""
 
     # Determinar si es Metamórfica o Endoskarn mediante roca en Lito 1 (desplazado) o Lito 2 (estándar)
-    metamorficas_endoskarn_rocks = {"GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT"}
-    is_shifted = l1_clean in metamorficas_endoskarn_rocks
+    is_shifted = l1_clean in shifted_rocks
     
     if is_shifted:
         # Orden desplazado (ej. Lito1=MBL, Lito2=LMT_MG)
@@ -556,16 +580,24 @@ def validate_lithology_correlation(row_dict, registrar_error):
     # --- BÚSQUEDA DE LITOLOGÍA ---
     matched_row = None
     
-    # Caso especial: Endoskarn
-    if group_input_norm == "ENDOSKARN" or eff_l2 in ["EPG", "EGT"]:
-        intrusivos_l1 = ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"]
+    # 0. Overrides específicos del proyecto
+    override_key = (l1_clean, l2_clean, l3_clean)
+    if override_key in overrides:
+        matched_row = overrides[override_key]
+    else:
+        override_key2 = (eff_l2, eff_l3)
+        if override_key2 in overrides:
+            matched_row = overrides[override_key2]
+
+    # Caso especial: Endoskarn (EPG, EGT o grupo explícito ENDOSKARN con roca compatible)
+    if not matched_row and (eff_l2 in ["EPG", "EGT"] or (group_input_norm == "ENDOSKARN" and eff_l2 in shifted_rocks)):
         valid_endo_l1 = {"INTRUSIVO", "INTRUSIVOS", "ENDO", "ENDOSKARN"}
-        if is_shifted or l1_clean in valid_endo_l1 or l1_clean in intrusivos_l1 or not l1_clean:
-            matched_row = {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": eff_l2, "lito3": "-", "k": 9.87}
+        if is_shifted or l1_clean in valid_endo_l1 or l1_clean in intrusive_codes or not l1_clean:
+            matched_row = {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": eff_l2, "lito3": "-", "k": default_endo_k}
             
     if not matched_row and eff_l2:
         # 1. Buscar coincidencia exacta en lito2 y lito3
-        for row in LITHOLOGY_CLASSIFICATION:
+        for row in catalog:
             row_l3 = row["lito3"].upper()
             norm_row_l3 = "NR" if row_l3 in ["-", "NR", ""] else row_l3
             norm_search_l3 = "NR" if eff_l3_search in ["-", "NR", ""] else eff_l3_search
@@ -575,14 +607,14 @@ def validate_lithology_correlation(row_dict, registrar_error):
                 
         # 2. Si no hay coincidencia exacta, buscar con "VARIOS"
         if not matched_row:
-            for row in LITHOLOGY_CLASSIFICATION:
+            for row in catalog:
                 if row["lito2"].upper() == eff_l2 and row["lito3"].upper() == "VARIOS":
                     matched_row = row
                     break
                     
         # 3. Si no, buscar con "NR" o "-" fallback
         if not matched_row:
-            for row in LITHOLOGY_CLASSIFICATION:
+            for row in catalog:
                 row_l3 = row["lito3"].upper()
                 if row["lito2"].upper() == eff_l2 and row_l3 in ["NR", "-", ""]:
                     matched_row = row
@@ -594,14 +626,14 @@ def validate_lithology_correlation(row_dict, registrar_error):
         if is_shifted:
             # En orden desplazado, Lito 1 (roca) y Lito 2 (subclase/alteración) deben calzar
             is_valid_combination = (l1_clean == matched_row["lito2"].upper() and 
-                                    match_lito_column(matched_row["lito3"], l2_clean))
+                                    match_lito_column(matched_row["lito3"], l2_clean, intrusive_codes))
         else:
             if l1_clean:
                 if matched_row["grupo"] == "ENDOSKARN":
                     is_valid_combination = (l1_clean in {"INTRUSIVO", "INTRUSIVOS", "ENDO", "ENDOSKARN"} or 
-                                            l1_clean in ["MZB", "MBF1", "MBF2", "MZM", "MZH", "MZD", "MZQ", "AN"])
+                                            l1_clean in intrusive_codes)
                 else:
-                    is_valid_combination = match_lito_column(matched_row["lito1"], l1_clean)
+                    is_valid_combination = match_lito_column(matched_row["lito1"], l1_clean, intrusive_codes)
             else:
                 is_valid_combination = True
 
@@ -610,7 +642,8 @@ def validate_lithology_correlation(row_dict, registrar_error):
         registrar_error("Lito 1", l1, "ERR_LITOLOGIA_COMBINACION_INVALIDA", l1=l1, l2=l2, l3=l3)
     elif u_lito and matched_row:
         group_esperado = matched_row["grupo"]
-        if group_input_norm != group_esperado:
+        compatible_groups = GROUP_COMPATIBILITY.get(group_input_norm, {group_input_norm})
+        if group_esperado not in compatible_groups and group_input_norm != group_esperado:
             registrar_error("Unidad Litologica", u_lito, "ERR_UNIDAD_LITOLOGICA_INCONGRUENTE", value=u_lito, expected_group=group_esperado)
 
     # 13. Resistencia Uniaxial UCS vs Resistencia de Carga Puntual (Is50)
@@ -625,7 +658,7 @@ def validate_lithology_correlation(row_dict, registrar_error):
         if ucs_val <= is50_val:
             registrar_error("( UCS )  (Mpa)", ucs_val, "ERR_UCS_DIVERGENTE_IS50", ucs_val=ucs_val, is50_val=is50_val)
         else:
-            factor_k = matched_row["k"] if (matched_row is not None and is_valid_combination) else 10.0
+            factor_k = matched_row["k"] if (matched_row is not None and is_valid_combination) else default_k
             expected_ucs = is50_val * factor_k
             if abs(ucs_val - expected_ucs) > 1.0:
                 registrar_error("( UCS )  (Mpa)", ucs_val, "WRN_UCS_VS_IS50_K_DIVERGENTE", ucs_val=ucs_val, is50_val=is50_val, factor_k=factor_k, expected_ucs=expected_ucs)
@@ -661,7 +694,7 @@ def format_raw_value_for_report(raw_val):
             
     return str(raw_val)
 
-def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = None):
+def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = None, project: str = "ferrobamba"):
     t_start = time.time()
     print(f"    [*] [QA/QC] Iniciando lectura de archivo: {os.path.basename(file_path)}")
     
@@ -992,7 +1025,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
 
             validate_geotechnical_header(row_dict, registrar_error)
             validate_geomechanical_properties(row_dict, registrar_error, resolved_camp)
-            validate_lithology_correlation(row_dict, registrar_error)
+            validate_lithology_correlation(row_dict, registrar_error, project=project)
             
         validate_structural_row(row_dict, resolved_dist_celda, registrar_error)
 
@@ -1005,6 +1038,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
         else: data["estado_celda"] = "OK"
 
     output_json = {
+        "proyecto": project,
         "total_filas_procesadas": total_filas,
         "total_celdas_evaluadas": total_filas * MANDATORY_COLS_COUNT,
         "metricas_globales": {

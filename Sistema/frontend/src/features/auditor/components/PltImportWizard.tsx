@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, UploadCloud, FileSpreadsheet, CheckCircle2, Sliders } from 'lucide-react';
+import { X, UploadCloud, FileSpreadsheet, CheckCircle2, Sliders, Layers } from 'lucide-react';
+
+export type PltProjectType = 'ferrobamba' | 'chalco';
 
 interface PltImportWizardProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (payload: { file: File; tolerance: number }) => void;
+    onConfirm: (payload: { file: File; tolerance: number; proyecto: PltProjectType }) => void;
 }
 
 export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImportWizardProps) {
     const [file, setFile] = useState<File | null>(null);
+    const [proyecto, setProyecto] = useState<PltProjectType>('ferrobamba');
     const [tolerance, setTolerance] = useState<number>(0.1);
     const [errorMsg, setErrorMsg] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -16,6 +19,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
     useEffect(() => {
         if (!isOpen) {
             setFile(null);
+            setProyecto('ferrobamba');
             setErrorMsg('');
         }
     }, [isOpen]);
@@ -38,7 +42,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
 
     const handleConfirmClick = () => {
         if (file) {
-            onConfirm({ file, tolerance });
+            onConfirm({ file, tolerance, proyecto });
         }
     };
 
@@ -50,7 +54,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                 <div className="shrink-0 border-b border-navy-800 bg-navy-900/30 p-5 flex justify-between items-center">
                     <div>
                         <h2 className="text-base font-black text-slate-100 uppercase tracking-wider">Cargar Planilla Ensayos PLT</h2>
-                        <p className="text-xs text-slate-400 mt-1">Sube el archivo Excel de ensayos de carga puntual (34 columnas)</p>
+                        <p className="text-xs text-slate-400 mt-1">Sube el archivo Excel de ensayos de carga puntual (34 columnas / compacto)</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -61,7 +65,48 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                 </div>
 
                 {/* Cuerpo */}
-                <div className="p-6 space-y-5">
+                <div className="p-6 space-y-4">
+                    {/* Selector de Proyecto */}
+                    <div>
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                            <Layers size={14} className="text-cyan-400" />
+                            <span>Proyecto Geológico (Factor K y Litologías)</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setProyecto('ferrobamba')}
+                                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                                    proyecto === 'ferrobamba'
+                                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                                        : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-xs font-black uppercase">Ferrobamba</span>
+                                    {proyecto === 'ferrobamba' && <CheckCircle2 size={14} className="text-cyan-400" />}
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-1">Tajo Ferrobamba (Reglas Oficiales)</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setProyecto('chalco')}
+                                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                                    proyecto === 'chalco'
+                                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                                        : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-xs font-black uppercase">Chalcobamba</span>
+                                    {proyecto === 'chalco' && <CheckCircle2 size={14} className="text-cyan-400" />}
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-1">Tajo Chalco (Reglas Chalco)</span>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Zona Drag & Drop */}
                     <div
                         onClick={() => inputRef.current?.click()}
@@ -79,7 +124,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                                 setFile(droppedFile);
                             }
                         }}
-                        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 ${
+                        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
                             file
                                 ? 'border-cyan-500/50 bg-cyan-500/5'
                                 : 'border-navy-800 hover:border-cyan-500/30 hover:bg-navy-900/20'
@@ -95,10 +140,10 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
 
                         {file ? (
                             <>
-                                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl shadow-md">
-                                    <FileSpreadsheet size={28} />
+                                <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl shadow-md">
+                                    <FileSpreadsheet size={26} />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-0.5">
                                     <p className="text-xs font-black text-slate-100">{file.name}</p>
                                     <p className="text-[10px] text-slate-500 font-mono">{(file.size / 1024).toFixed(1)} KB</p>
                                 </div>
@@ -108,15 +153,15 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                             </>
                         ) : (
                             <>
-                                <div className="p-3 bg-slate-800 text-slate-400 rounded-xl">
-                                    <UploadCloud size={28} />
+                                <div className="p-2.5 bg-slate-800 text-slate-400 rounded-xl">
+                                    <UploadCloud size={26} />
                                 </div>
                                 <div>
                                     <p className="text-xs font-bold text-slate-200">
                                         Haz clic para seleccionar o arrastra el archivo aquí
                                     </p>
                                     <p className="text-[10px] text-slate-500 mt-0.5 font-semibold">
-                                        Archivos Excel .xlsx / .xlsm (formatos estándar y consolidados)
+                                        Archivos Excel .xlsx / .xlsm (formatos estándar y compactos)
                                     </p>
                                 </div>
                             </>
@@ -124,7 +169,7 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                     </div>
 
                     {/* Tolerancia de fórmulas */}
-                    <div className="p-4 rounded-xl bg-navy-950/60 border border-navy-800 space-y-2">
+                    <div className="p-3.5 rounded-xl bg-navy-950/60 border border-navy-800 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 text-slate-300 font-bold">
                                 <Sliders size={14} className="text-cyan-400" />
@@ -134,8 +179,8 @@ export default function PltImportWizard({ isOpen, onClose, onConfirm }: PltImpor
                                 ± {tolerance.toFixed(2)}
                             </span>
                         </div>
-                        <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
-                            Tolerancia admitida para verificar cálculos de Ancho W, Diámetro equivalente, Is, Is(50), K y UCS.
+                        <p className="text-[10px] text-slate-400 leading-relaxed font-normal">
+                            Tolerancia admitida para verificar cálculos de Ancho W, De, Is, Is(50), K y UCS.
                         </p>
                         <input
                             type="range"

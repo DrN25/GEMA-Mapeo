@@ -8,7 +8,7 @@ import time
 import traceback
 from datetime import datetime
 from collections import Counter, defaultdict
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import BarChart, Reference
@@ -75,7 +75,8 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_dash.views.sheetView[0].showGridLines = True
     
     ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA").font = font_title
-    ws_dash.cell(row=3, column=2, value="Dashboard de Control de Calidad y Consistencia de Mapeo Geomecánico").font = font_subtitle
+    proj_name = str(compact.get("proyecto") or diag.get("proyecto") or "Ferrobamba").upper()
+    ws_dash.cell(row=3, column=2, value=f"Dashboard de Control de Calidad y Consistencia de Mapeo Geomecánico | PROYECTO: {proj_name}").font = font_subtitle
     
     total_filas = compact.get("familia1", {}).get("total_discontinuidades", 0)
     total_fields = compact.get("familia2", {}).get("total_fields", 0)
@@ -832,11 +833,11 @@ def _release_lock(audit_id: str = None) -> None:
     except Exception:
         pass
 
-def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: str = None):
+def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: str = None, proyecto: str = "ferrobamba"):
     t_start = time.time()
     print(f"\n======================================================================")
     print(f"[*] [AUDITORÍA {audit_id}] INICIANDO PIPELINE DE PROCESAMIENTO ASÍNCRONO")
-    print(f"[*] Archivo cargado: {os.path.basename(file_path)}")
+    print(f"[*] Archivo cargado: {os.path.basename(file_path)} | Proyecto: {proyecto}")
     print(f"======================================================================")
     
     history_dir = os.path.join(uploads_dir, "history")
@@ -848,7 +849,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
     try:
         # Paso 1: Ejecutar la validación masiva en validator.py
         print(f"[*] [AUDITORÍA {audit_id}] Paso 1/5: Ejecutando motor de validación QA/QC geomecánica...")
-        validate_bulk_excel(file_path, raw_json_out, cancel_flag_path=_cancel_flag_path(audit_id))
+        validate_bulk_excel(file_path, raw_json_out, cancel_flag_path=_cancel_flag_path(audit_id), project=proyecto)
         if _is_cancelled(audit_id):
             _cleanup_audit_files(audit_id)
             print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario tras la validación.")
@@ -872,9 +873,11 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
             diag = json.load(f)
 
         diag["nombre_archivo"] = original_filename or os.path.basename(file_path)
+        diag["proyecto"] = proyecto
         compact = aggregate_audit_metrics(diag)
         compact["audit_id"] = audit_id
         compact["nombre_archivo"] = diag["nombre_archivo"]
+        compact["proyecto"] = proyecto
 
         print(f"[*] [AUDITORÍA {audit_id}] Paso 4/5: Escribiendo JSON de resumen ligero...")
         if _is_cancelled(audit_id):
@@ -978,7 +981,11 @@ def cancelar_auditoria(audit_id: str = None):
     return {"status": "cancelado", "audit_id": audit_id}
 
 @router.post("/geomecanica/importar-excel-bulk")
-async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def importar_excel_bulk(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    proyecto: str = Form("ferrobamba")
+):
     if not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+).")
     audit_id = f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1026,8 +1033,8 @@ async def importar_excel_bulk(background_tasks: BackgroundTasks, file: UploadFil
                 detail=f"No se pudo leer el archivo Excel. Verifique que no esté corrupto o posea un formato inválido. Detalle: {str(e)}"
             )
 
-        background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id, file.filename)
-        return {"status": "procesando", "audit_id": audit_id, "filename": file.filename}
+        background_tasks.add_task(run_bulk_pipeline_with_id, file_path, audit_id, file.filename, proyecto)
+        return {"status": "procesando", "audit_id": audit_id, "filename": file.filename, "proyecto": proyecto}
     except BaseException:
         # Cualquier fallo (desconexión del cliente, error de disco, fallo al agendar)
         # debe liberar el lock para no bloquear futuras auditorías hasta el timeout.
@@ -1049,6 +1056,7 @@ def listar_auditorias():
                     audits.append({
                         "audit_id": audit_id, "fecha": meta.get("fecha_auditoria", "Desconocida"),
                         "archivo": meta.get("nombre_archivo", "Desconocido.xlsx"),
+                        "proyecto": meta.get("proyecto", "ferrobamba"),
                         "total_filas": meta.get("familia1", {}).get("total_discontinuidades", 0),
                         "total_vacios": meta.get("familia2", {}).get("total_vacios", 0),
                         "total_advertencias": meta.get("familia2", {}).get("total_advertencias", 0),

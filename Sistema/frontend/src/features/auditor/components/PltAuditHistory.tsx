@@ -5,6 +5,7 @@ export interface PltAuditHistoryItem {
     id: string;
     fecha: string;
     archivo: string;
+    proyecto?: string;
     total_registros: number;
     total_vacios: number;
     total_advertencias: number;
@@ -45,13 +46,18 @@ export default function PltAuditHistory({
                                     : 'bg-navy-900/40 border-navy-800 hover:border-navy-700 hover:bg-navy-850/50'
                                     }`}
                             >
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs font-black text-slate-100 truncate max-w-[180px]" title={audit.archivo}>
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-xs font-black text-slate-100 truncate max-w-[150px]" title={audit.archivo}>
                                         {audit.archivo}
                                     </span>
-                                    <span className="text-xs bg-navy-800 px-2 py-0.5 rounded text-slate-300 font-bold">
-                                        {audit.total_registros} filas
-                                    </span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-[9px] bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-mono px-1.5 py-0.5 rounded font-bold uppercase">
+                                            {audit.proyecto || 'ferrobamba'}
+                                        </span>
+                                        <span className="text-xs bg-navy-800 px-2 py-0.5 rounded text-slate-300 font-bold">
+                                            {audit.total_registros} filas
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="text-xs text-slate-500 mt-1.5 flex gap-2 font-semibold">
                                     <span>{audit.fecha}</span>

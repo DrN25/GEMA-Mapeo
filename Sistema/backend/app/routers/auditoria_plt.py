@@ -11,7 +11,7 @@ import shutil
 import openpyxl
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks, Form
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 
 from app.core.audit_helpers import safe_replace
@@ -102,18 +102,21 @@ def cancel_plt_audit(audit_id: Optional[str] = Query(None)):
 async def upload_plt_audit_file(
     file: UploadFile = File(...),
     tolerance: float = Query(0.1, description="Tolerancia numérica para fórmulas (default: 0.1)"),
+    proyecto: Optional[str] = Form(None),
+    proyecto_query: Optional[str] = Query(None, alias="proyecto"),
 ):
     """
     Recibe un archivo Excel de Ensayos PLT, ejecuta la validación integral,
     guarda el diagnóstico, métricas compactas y pre-genera el reporte Excel (.xlsx) en uploads/.
     """
+    resolved_proyecto = proyecto or proyecto_query or "ferrobamba"
     if not file.filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
         raise HTTPException(
             status_code=400,
             detail="Formato no soportado. Solo se aceptan libros de Excel (.xlsx, .xlsm, .xls).",
         )
 
-    print(f"\n[QAQC PLT] [CARGA] [{datetime.now().strftime('%H:%M:%S')}] Recibiendo archivo '{file.filename}'...")
+    print(f"\n[QAQC PLT] [CARGA] [{datetime.now().strftime('%H:%M:%S')}] Recibiendo archivo '{file.filename}' | Proyecto: {resolved_proyecto}...")
 
     audit_id = f"plt_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     saved_excel_path = os.path.join(plt_history_dir, f"{audit_id}.xlsx")
@@ -130,7 +133,7 @@ async def upload_plt_audit_file(
 
         # 1. Ejecutar motor de validación
         start_time = datetime.now()
-        diag = validate_plt_excel(temp_path, tolerance=tolerance)
+        diag = validate_plt_excel(temp_path, tolerance=tolerance, project=resolved_proyecto)
         elapsed_sec = (datetime.now() - start_time).total_seconds()
 
         if _is_cancelled(audit_id):
@@ -139,12 +142,14 @@ async def upload_plt_audit_file(
             return JSONResponse(content={"status": "cancelled", "message": "Auditoría cancelada por el usuario."})
 
         diag["nombre_archivo"] = file.filename
+        diag["proyecto"] = resolved_proyecto
         diag["fecha_auditoria"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         diag["audit_id"] = audit_id
 
         # 2. Generar métricas y KPIs
         metricas = aggregate_plt_audit_metrics(diag)
         metricas["nombre_archivo"] = file.filename
+        metricas["proyecto"] = resolved_proyecto
         metricas["fecha_auditoria"] = diag["fecha_auditoria"]
         metricas["audit_id"] = audit_id
 
@@ -426,6 +431,7 @@ def list_plt_audit_history():
                             "audit_id": a_id,
                             "archivo": a_file,
                             "nombre_archivo": a_file,
+                            "proyecto": data.get("proyecto", "ferrobamba"),
                             "fecha": a_date,
                             "fecha_auditoria": a_date,
                             "total_registros": data.get("total_registros_evaluados", 0),

@@ -16,7 +16,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, Reference
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from fastapi.responses import StreamingResponse
 
 from app.utils.validator import validate_bulk_excel
@@ -982,7 +982,7 @@ def reporte_comparativo_historial(audit_id_a: str, audit_id_b: str):
     return _stream_wb(wb, fname)
 
 @router.post("/geomecanica/comparativo/importar-y-comparar")
-async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: UploadFile = File(...)):
+async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: UploadFile = File(...), proyecto: str = Form("ferrobamba")):
     """
     Sube dos Excel crudos, los audita secuencialmente y genera el comparativo.
     Puede tardar varios minutos dependiendo del tamano de los archivos.
@@ -1001,13 +1001,15 @@ async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: U
         with open(path_a, "wb") as buf: shutil.copyfileobj(file_a.file, buf)
         with open(path_b, "wb") as buf: shutil.copyfileobj(file_b.file, buf)
 
-        validate_bulk_excel(path_a, raw_a)
+        validate_bulk_excel(path_a, raw_a, project=proyecto)
         with open(raw_a, "r", encoding="utf-8") as f2: diag_a = json.load(f2)
         diag_a["nombre_archivo"] = file_a.filename
+        diag_a["proyecto"] = proyecto
 
-        validate_bulk_excel(path_b, raw_b)
+        validate_bulk_excel(path_b, raw_b, project=proyecto)
         with open(raw_b, "r", encoding="utf-8") as f2: diag_b = json.load(f2)
         diag_b["nombre_archivo"] = file_b.filename
+        diag_b["proyecto"] = proyecto
 
         from app.routers.auditoria import aggregate_audit_metrics
         compact_a = aggregate_audit_metrics(diag_a)
