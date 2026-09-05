@@ -253,6 +253,7 @@ def resolve_expected_lithology(l1: str, l2: str, l3: str, project: str = "ferrob
     catalog = cfg.get("catalog", LITHOLOGY_FULL_CATALOG)
     aliases = cfg.get("aliases", {})
     intrusives = cfg.get("intrusive_codes", INTRUSIVE_LITOS)
+    shifted_rocks = cfg.get("shifted_rocks", set())
     overrides = cfg.get("overrides", {})
 
     l1_raw = aliases.get(l1, l1)
@@ -537,10 +538,17 @@ def validate_plt_standard_34(
     # Validación fila a fila
     cfg_std = get_project_geology_config(project)
     catalog_std = cfg_std.get("catalog", LITHOLOGY_FULL_CATALOG)
+    aliases_std = cfg_std.get("aliases", {})
+    intrusives_std = cfg_std.get("intrusive_codes", INTRUSIVE_LITOS)
+    shifted_std = cfg_std.get("shifted_rocks", set())
     valid_litos_set = set(
         [_norm_str(x.get("lito1")) for x in catalog_std if x.get("lito1")]
         + [_norm_str(x.get("lito2")) for x in catalog_std if x.get("lito2")]
         + [_norm_str(x.get("lito3")) for x in catalog_std if x.get("lito3")]
+        + [_norm_str(k) for k in aliases_std.keys()]
+        + [_norm_str(v) for v in aliases_std.values()]
+        + [_norm_str(c) for c in intrusives_std]
+        + [_norm_str(s) for s in shifted_std]
     )
 
     for idx, row in df_raw.iterrows():
@@ -649,17 +657,17 @@ def validate_plt_standard_34(
 
         if not l1:
             reg_err("litologia_1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Litología 1")
-        elif l1 not in valid_litos_set and l1 not in INTRUSIVE_LITOS:
+        elif l1 not in valid_litos_set and l1 not in intrusives_std and l1 not in shifted_std:
             reg_err("litologia_1", l1, "ERR_PLT_LITO1_NO_RECONOCIDO", value=l1)
 
         if not l2:
             reg_err("litologia_2", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Litología 2")
-        elif l2 not in valid_litos_set:
+        elif l2 not in valid_litos_set and l2 not in shifted_std:
             reg_err("litologia_2", l2, "ERR_PLT_LITO2_NO_RECONOCIDO", value=l2)
 
         if not l3:
             reg_err("litologia_3", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Litología 3")
-        elif l3 not in valid_litos_set:
+        elif l3 not in valid_litos_set and l3 not in aliases_std:
             reg_err("litologia_3", l3, "ERR_PLT_LITO3_NO_RECONOCIDO", value=l3)
 
         exp_tipo, exp_k = resolve_expected_lithology(l1, l2, l3, project=project)
@@ -1054,10 +1062,17 @@ def validate_plt_compact_field(
     # 2. Validación Fila a Fila sobre columnas presentes en Formato de Campo
     cfg_comp = get_project_geology_config(project)
     catalog_comp = cfg_comp.get("catalog", LITHOLOGY_FULL_CATALOG)
+    aliases_comp = cfg_comp.get("aliases", {})
+    intrusives_comp = cfg_comp.get("intrusive_codes", INTRUSIVE_LITOS)
+    shifted_comp = cfg_comp.get("shifted_rocks", set())
     valid_litos_set = set(
         [_norm_str(x.get("lito1")) for x in catalog_comp if x.get("lito1")]
         + [_norm_str(x.get("lito2")) for x in catalog_comp if x.get("lito2")]
         + [_norm_str(x.get("lito3")) for x in catalog_comp if x.get("lito3")]
+        + [_norm_str(k) for k in aliases_comp.keys()]
+        + [_norm_str(v) for v in aliases_comp.values()]
+        + [_norm_str(c) for c in intrusives_comp]
+        + [_norm_str(s) for s in shifted_comp]
     )
 
     for rd in rows_data:
@@ -1116,17 +1131,17 @@ def validate_plt_compact_field(
 
         if not lito1_val:
             reg_err_comp("Lito 1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Lito 1")
-        elif lito1_val not in valid_litos_set and lito1_val not in INTRUSIVE_LITOS:
+        elif lito1_val not in valid_litos_set and lito1_val not in intrusives_comp and lito1_val not in shifted_comp:
             reg_err_comp("Lito 1", lito1_val, "ERR_PLT_LITO1_NO_RECONOCIDO", value=lito1_val)
 
         if not lito2_val:
             reg_err_comp("Lito 2", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Lito 2")
-        elif lito2_val not in valid_litos_set:
+        elif lito2_val not in valid_litos_set and lito2_val not in shifted_comp:
             reg_err_comp("Lito 2", lito2_val, "ERR_PLT_LITO2_NO_RECONOCIDO", value=lito2_val)
 
         if not lito3_val:
             reg_err_comp("Lito 3", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Lito 3")
-        elif lito3_val not in valid_litos_set:
+        elif lito3_val not in valid_litos_set and lito3_val not in aliases_comp:
             reg_err_comp("Lito 3", lito3_val, "ERR_PLT_LITO3_NO_RECONOCIDO", value=lito3_val)
 
         exp_tipo, exp_k = resolve_expected_lithology(lito1_val, lito2_val, lito3_val, project=project)

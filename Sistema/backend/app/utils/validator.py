@@ -168,7 +168,7 @@ def normalize_geological_group(group_str):
         return "INTRUSIVOS"
     if "BRECHA" in val:
         return "BRECHAS"
-    if "ESDONS" in val or "ENDOS" in val:
+    if "ESDONS" in val or "ENDO" in val:
         return "ENDOSKARN"
     if "SKARN" in val or val == "SK":
         return "SKARN"

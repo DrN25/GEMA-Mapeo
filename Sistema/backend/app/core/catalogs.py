@@ -264,8 +264,11 @@ CHALCO_LITHOLOGY_CATALOG = [
     {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "NR",     "k": 12.29},
     {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "-",      "k": 12.29},
     {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "Varios", "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZD", "lito2": "MZD", "lito3": "MZD",    "k": 9.87},
 
     # ==================== BRECHAS ====================
+    {"grupo": "BRECHAS", "lito1": "BX",           "lito2": "BX",  "lito3": "BX",     "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "BX",           "lito2": "TBX", "lito3": "TBX",    "k": 13.72},
     {"grupo": "BRECHAS", "lito1": "TBX",          "lito2": "TBX", "lito3": "TBX",    "k": 13.72},
     {"grupo": "BRECHAS", "lito1": "TBX",          "lito2": "TBX", "lito3": "-",      "k": 13.72},
     {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_MM", "k": 11.41},
@@ -373,6 +376,7 @@ GROUP_COMPATIBILITY = {
     "BRECHAS":       {"BRECHAS"},
     "ENDOSKARN":     {"ENDOSKARN"},
     "ENDOSKARNS":    {"ENDOSKARN"},
+    "ENDO":          {"ENDOSKARN"},
     # Híbridos geológicos:
     "SKARN":         {"ENDOSKARN", "METAMORFICAS"},
     "SKARNS":        {"ENDOSKARN", "METAMORFICAS"},
@@ -432,10 +436,13 @@ PROJECT_GEOLOGY_CONFIG = {
             "MZQ/2": "MZQ_2",
             "MZQ/3A": "MZQ_3A",
             "MZQ/3B": "MZQ_3B",
+            # Variantes ortográficas encontradas en bases de datos de campo:
+            "MZQ1A_CUERPO(TQMP)": "MZQ_1A",
+            "MZQ1A_CUERPO": "MZQ_1A",
         },
         "intrusive_codes": {
             "DI", "DIO", "DIORITA", "MZM", "MZH", "MZB", "MZQ",
-            "MBF1", "MBF2", "MZD", "AN", "GD", "TON", "POR", "DAC", "QFP",
+            "MZD", "AN", "GD", "TON", "POR", "DAC", "QFP",
             "INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS"
         },
         "shifted_rocks": {
