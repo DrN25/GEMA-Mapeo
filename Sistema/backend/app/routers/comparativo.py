@@ -62,13 +62,8 @@ def _load_values_from_excel(excel_path, keys_to_query):
         import pandas as pd
         import numpy as np
         from app.utils.validator import clean_and_rename_columns, sanitize_value
-        
-        try:
-            import python_calamine
-            df = pd.read_excel(excel_path, engine='calamine')
-        except ImportError:
-            df = pd.read_excel(excel_path, engine='openpyxl')
-            
+        # ponytail: openpyxl es el estándar del backend, calamine eliminado
+        df = pd.read_excel(excel_path, engine='openpyxl')
         df = clean_and_rename_columns(df)
         if 'CELDA_PADRE' not in df.columns:
             return values_map, celda_counts

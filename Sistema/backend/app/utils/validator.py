@@ -18,7 +18,6 @@ from app.core.catalogs import (
     get_project_geology_config, GROUP_COMPATIBILITY
 )
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
-from app.utils.interpolation import rating_promedio_rqd, rating_promedio_r1, rating_continuo_rqd, rating_continuo_r1
 
 class AuditCancelledError(Exception):
     """Se lanza cuando el usuario cancela una auditoría en curso (flag de cancelación presente)."""
