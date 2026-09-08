@@ -11,6 +11,7 @@ from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.utils.validator import clean_and_rename_columns, get_row_val, sanitize_value
+from app.utils.interpolation import rating_continuo_rqd, rating_continuo_r1
 from app.core.catalogs import RESISTENCIA_RATING_CATALOG
 
 router = APIRouter()
