@@ -311,14 +311,14 @@ CHALCO_LITHOLOGY_CATALOG = [
     {"grupo": "ENDOSKARN", "lito1": "MZQ",       "lito2": "EPG", "lito3": "-",      "k": 9.87},
 
     # ==================== METAMORFICAS / EXOSKARNS ====================
-    # GSK - Skarn de granates (k = 11.50 oficial Chalcobamba)
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_M",  "k": 11.50},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_S",  "k": 11.50},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_U",  "k": 11.50},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_MG", "k": 11.50},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_Mg", "k": 11.50},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "Varios", "k": 11.50},
-    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "-",      "k": 11.50},
+    # GSK - Skarn de granates (k = 11.15 oficial Chalcobamba / corregido por Geología)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_M",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_S",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_U",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_MG", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_Mg", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "Varios", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "-",      "k": 11.15},
     # PSK - Skarn de piroxenos (k = 12.63)
     {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_MG", "k": 12.63},
     {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_Mg", "k": 12.63},
@@ -408,7 +408,7 @@ PROJECT_GEOLOGY_CONFIG = {
             "GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT"
         },
         "default_endo_k": 9.87,
-        "default_k": 10.0,
+        "default_k": None,  # ponytail: sin factor k por defecto para evitar alertas con factor 10 inexistente
         "overrides": {},
     },
     "chalco": {
@@ -449,7 +449,7 @@ PROJECT_GEOLOGY_CONFIG = {
             "GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT", "HFL", "QZT", "SKN", "SKARN"
         },
         "default_endo_k": 9.87,
-        "default_k": 10.0,
+        "default_k": None,  # ponytail: no existe factor 10 por defecto en geomecánica
         "overrides": {},
     }
 }

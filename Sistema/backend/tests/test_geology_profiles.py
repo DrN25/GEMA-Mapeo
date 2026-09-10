@@ -236,10 +236,10 @@ def test_plt_resolve_expected_lithology():
     assert tipo_mzq == "INTRUSIVOS"
     assert k_mzq == 12.29
 
-    # Chalco Metamórficas (GSK oficial k = 11.50, a diferencia de Ferrobamba que es 11.15)
+    # Chalco Metamórficas (GSK oficial k = 11.15, homologado y corregido por Geología Chalco)
     tipo_ch_gsk, k_ch_gsk = resolve_expected_lithology("LMT", "GSK", "LMT_M", project="chalco")
     assert tipo_ch_gsk == "METAMORFICAS"
-    assert k_ch_gsk == 11.50
+    assert k_ch_gsk == 11.15
 
 
 def test_chalco_diorite_validation():
@@ -265,13 +265,13 @@ def test_chalco_gsk_factor_k_and_unit_alias():
     def reg_err(col, val, code, **kw):
         errors.append((col, val, code, kw))
 
-    # Chalco GSK con k = 11.50 y Unidad Litológica compuesta 'SEDIMENTARIAS ALTERADAS EXOSKARNS'
+    # Chalco GSK con k = 11.15 y Unidad Litológica compuesta 'SEDIMENTARIAS ALTERADAS EXOSKARNS'
     row = {
         "Lito 1": "LMT",
         "Lito 2": "GSK",
         "Lito 3": "LMT_M",
         "Unidad Litologica": "SEDIMENTARIAS ALTERADAS EXOSKARNS",
-        "( UCS )  (Mpa)": 115.0,
+        "( UCS )  (Mpa)": 111.5,
         "is50 (Mpa)": 10.0,
     }
     validate_lithology_correlation(row, reg_err, project="chalco")

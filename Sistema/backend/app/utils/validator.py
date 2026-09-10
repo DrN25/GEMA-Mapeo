@@ -550,7 +550,6 @@ def validate_lithology_correlation(row_dict, registrar_error, project: str = "fe
     intrusive_codes = proj_cfg.get("intrusive_codes", set())
     shifted_rocks = proj_cfg.get("shifted_rocks", set())
     default_endo_k = proj_cfg.get("default_endo_k", 9.87)
-    default_k = proj_cfg.get("default_k", 10.0)
     overrides = proj_cfg.get("overrides", {})
 
     # Aplicar aliases declarativos (ej. SK -> SKARN, MZB/P -> MZB_P)
@@ -657,8 +656,8 @@ def validate_lithology_correlation(row_dict, registrar_error, project: str = "fe
     if ucs_val is not None and is50_val is not None:
         if ucs_val <= is50_val:
             registrar_error("( UCS )  (Mpa)", ucs_val, "ERR_UCS_DIVERGENTE_IS50", ucs_val=ucs_val, is50_val=is50_val)
-        else:
-            factor_k = matched_row["k"] if (matched_row is not None and is_valid_combination) else default_k
+        elif matched_row is not None and is_valid_combination and matched_row.get("k") is not None:
+            factor_k = matched_row["k"]
             expected_ucs = is50_val * factor_k
             if abs(ucs_val - expected_ucs) > 1.0:
                 registrar_error("( UCS )  (Mpa)", ucs_val, "WRN_UCS_VS_IS50_K_DIVERGENTE", ucs_val=ucs_val, is50_val=is50_val, factor_k=factor_k, expected_ucs=expected_ucs)
