@@ -1,0 +1,1181 @@
+[
+  {
+    "code": "ERR_DIP_TALUD_RANGO",
+    "category_code": "CAT_DIP_TALUD_RANGO",
+    "category_name": "Ángulo del talud fuera del rango [-90, 90] grados.",
+    "severity": "ALERTA",
+    "columns": [
+      "DIP_TALUD"
+    ],
+    "message_template": "Ángulo del talud fuera del rango [-90, 90] grados. Valor actual de DIP_TALUD: {value}°.",
+    "description": "Ángulo del talud fuera del rango [-90, 90] grados.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_AGUA_76_CODIGO_INVALIDO",
+    "category_code": "CAT_AGUA_CODIGO_INVALIDO",
+    "category_name": "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONDICION DE AGUA  '76."
+    ],
+    "message_template": "Código de agua '76 no admitido. Valor ingresado: '{value}'. Debe ser uno de {allowed_codes} (C, H, M, E, F).",
+    "description": "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_AGUA_89_CODIGO_INVALIDO",
+    "category_code": "CAT_AGUA_CODIGO_INVALIDO",
+    "category_name": "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONDICION DE AGUA  '89"
+    ],
+    "message_template": "Código de agua '89 no admitido. Valor ingresado: '{value}'. Debe ser uno de {allowed_codes} (C, H, M, E, F).",
+    "description": "Código de agua '76 / '89 no admitido. Debe ser C, H, M, E o F.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_AGUA_76_LIMITE_EXCEDIDO",
+    "category_code": "CAT_AGUA_LIMITE_EXCEDIDO",
+    "category_name": "Valor de agua '76 / '89 fuera del rango de la escala.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONDICION DE AGUA VALOR  '76"
+    ],
+    "message_template": "El valor de agua '76 ({value}) está fuera de la escala [0, 10].",
+    "description": "Valor de agua '76 / '89 fuera del rango de la escala.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_AGUA_89_LIMITE_EXCEDIDO",
+    "category_code": "CAT_AGUA_LIMITE_EXCEDIDO",
+    "category_name": "Valor de agua '76 / '89 fuera del rango de la escala.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONDICION DE AGUA VALOR '89"
+    ],
+    "message_template": "El valor de agua '89 ({value}) está fuera de la escala [0, 15].",
+    "description": "Valor de agua '76 / '89 fuera del rango de la escala.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_AGUA_76_INCONGRUENTE",
+    "category_code": "CAT_AGUA_INCONGRUENTE",
+    "category_name": "El valor de agua '76 / '89 no coincide con el código.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONDICION DE AGUA VALOR  '76",
+      "CONDICION DE AGUA  '76."
+    ],
+    "message_template": "El valor de agua '76 ({value}) no coincide con el código '{code_val}'. Debe ser {expected}.",
+    "description": "El valor de agua '76 / '89 no coincide con el código.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_AGUA_89_INCONGRUENTE",
+    "category_code": "CAT_AGUA_INCONGRUENTE",
+    "category_name": "El valor de agua '76 / '89 no coincide con el código.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONDICION DE AGUA VALOR '89",
+      "CONDICION DE AGUA  '89"
+    ],
+    "message_template": "El valor de agua '89 ({value}) no coincide con el código '{code_val}'. Debe ser {expected}.",
+    "description": "El valor de agua '76 / '89 no coincide con el código.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_AGUA_76_VALOR_MEDIO",
+    "category_code": "CAT_AGUA_VALOR_MEDIO",
+    "category_name": "El valor de agua '76 / '89 no es un valor estándar del catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "CONDICION DE AGUA VALOR  '76"
+    ],
+    "message_template": "El valor de agua '76 ({value}) no es un valor estándar del catálogo. Opciones: [10, 7, 4, 0].",
+    "description": "El valor de agua '76 / '89 no es un valor estándar del catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_AGUA_89_VALOR_MEDIO",
+    "category_code": "CAT_AGUA_VALOR_MEDIO",
+    "category_name": "El valor de agua '76 / '89 no es un valor estándar del catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "CONDICION DE AGUA VALOR '89"
+    ],
+    "message_template": "El valor de agua '89 ({value}) no es un valor estándar del catálogo. Opciones: [15, 10, 7, 4, 0].",
+    "description": "El valor de agua '76 / '89 no es un valor estándar del catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_DUREZA_76_INVALIDA",
+    "category_code": "CAT_DUREZA_INVALIDA",
+    "category_name": "Dureza '76 / '89 no admitida. Debe ser R0 a R6.",
+    "severity": "ALERTA",
+    "columns": [
+      "DUREZA  '76"
+    ],
+    "message_template": "Dureza '76 '{value}' no admitida. Debe ser R0 a R6.",
+    "description": "Dureza '76 / '89 no admitida. Debe ser R0 a R6.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_DUREZA_89_INVALIDA",
+    "category_code": "CAT_DUREZA_INVALIDA",
+    "category_name": "Dureza '76 / '89 no admitida. Debe ser R0 a R6.",
+    "severity": "ALERTA",
+    "columns": [
+      "DUREZA '89"
+    ],
+    "message_template": "Dureza '89 '{value}' no admitida. Debe ser R0 a R6.",
+    "description": "Dureza '76 / '89 no admitida. Debe ser R0 a R6.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RESISTENCIA_76_LIMITE_EXCEDIDO",
+    "category_code": "CAT_RESISTENCIA_LIMITE_EXCEDIDO",
+    "category_name": "Puntaje de resistencia '76 / '89 fuera del rango permitido.",
+    "severity": "ALERTA",
+    "columns": [
+      "RESISTENCIA ESTIMADA VALOR  '76"
+    ],
+    "message_template": "El puntaje de resistencia '76 ({value}) está fuera de la escala [0, 15].",
+    "description": "Puntaje de resistencia '76 / '89 fuera del rango permitido.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RESISTENCIA_89_LIMITE_EXCEDIDO",
+    "category_code": "CAT_RESISTENCIA_LIMITE_EXCEDIDO",
+    "category_name": "Puntaje de resistencia '76 / '89 fuera del rango permitido.",
+    "severity": "ALERTA",
+    "columns": [
+      "RESISTENCIA ESTIMADA VALOR '89"
+    ],
+    "message_template": "El puntaje de resistencia '89 ({value}) está fuera de la escala [0, 15].",
+    "description": "Puntaje de resistencia '76 / '89 fuera del rango permitido.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RESISTENCIA_76_INCONGRUENTE",
+    "category_code": "CAT_RESISTENCIA_INCONGRUENTE",
+    "category_name": "El puntaje de resistencia '76 / '89 no coincide con la dureza.",
+    "severity": "ALERTA",
+    "columns": [
+      "RESISTENCIA ESTIMADA VALOR  '76",
+      "DUREZA  '76"
+    ],
+    "message_template": "El puntaje de resistencia '76 ({value}) no coincide con la dureza '{dureza_val}'. Debe ser {expected} (tolerancia ±0.2).",
+    "description": "El puntaje de resistencia '76 / '89 no coincide con la dureza.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RESISTENCIA_89_INCONGRUENTE",
+    "category_code": "CAT_RESISTENCIA_INCONGRUENTE",
+    "category_name": "El puntaje de resistencia '76 / '89 no coincide con la dureza.",
+    "severity": "ALERTA",
+    "columns": [
+      "RESISTENCIA ESTIMADA VALOR '89",
+      "DUREZA '89"
+    ],
+    "message_template": "El puntaje de resistencia '89 ({value}) no coincide con la dureza '{dureza_val}'. Debe estar en el rango {expected}.",
+    "description": "El puntaje de resistencia '76 / '89 no coincide con la dureza.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_RESISTENCIA_76_VALOR_ALEJADO",
+    "category_code": "CAT_RESISTENCIA_VALOR_ALEJADO",
+    "category_name": "El puntaje de resistencia '76 / '89 no coincide con el catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "RESISTENCIA ESTIMADA VALOR  '76"
+    ],
+    "message_template": "El puntaje de resistencia '76 ({value}) no coincide con los valores del catálogo: [0, 1, 2, 4, 7, 12, 15].",
+    "description": "El puntaje de resistencia '76 / '89 no coincide con el catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_RESISTENCIA_89_VALOR_ALEJADO",
+    "category_code": "CAT_RESISTENCIA_VALOR_ALEJADO",
+    "category_name": "El puntaje de resistencia '76 / '89 no coincide con el catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "RESISTENCIA ESTIMADA VALOR '89"
+    ],
+    "message_template": "El puntaje de resistencia '89 ({value}) está fuera de los límites del catálogo. Rangos válidos: R0 (0.0), R1 (1.5) o R2-R6 (1.5 a 15.0).",
+    "description": "El puntaje de resistencia '76 / '89 no coincide con el catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_CONTROL_ESTRUCTURAL_76_FUERA_LIMITES",
+    "category_code": "CAT_CONTROL_ESTRUCTURAL_FUERA_LIMITES",
+    "category_name": "Control estructural '76 / '89 fuera de límites permitidos [1, 5].",
+    "severity": "ALERTA",
+    "columns": [
+      "CONTROL ESTRUCTURAL  '76"
+    ],
+    "message_template": "Control estructural '76 fuera de límites permitidos [1, 5]. Valor ingresado: {value}.",
+    "description": "Control estructural '76 / '89 fuera de límites permitidos [1, 5].",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_CONTROL_ESTRUCTURAL_89_FUERA_LIMITES",
+    "category_code": "CAT_CONTROL_ESTRUCTURAL_FUERA_LIMITES",
+    "category_name": "Control estructural '76 / '89 fuera de límites permitidos [1, 5].",
+    "severity": "ALERTA",
+    "columns": [
+      "CONTROL ESTRUCTURAL '89"
+    ],
+    "message_template": "Control estructural '89 fuera de límites permitidos [1, 5]. Valor ingresado: {value}.",
+    "description": "Control estructural '76 / '89 fuera de límites permitidos [1, 5].",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_EFECTOS_VOLADURA_76_EXCEDE_ESCALA",
+    "category_code": "CAT_EFECTOS_VOLADURA_EXCEDE_ESCALA",
+    "category_name": "Efecto de voladura '76 / '89 fuera de la escala [1, 6].",
+    "severity": "ALERTA",
+    "columns": [
+      "EFECTOS DE VOLADURA  '76"
+    ],
+    "message_template": "El efecto de voladura '76 ({value}) está fuera de la escala [1, 6].",
+    "description": "Efecto de voladura '76 / '89 fuera de la escala [1, 6].",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_EFECTOS_VOLADURA_89_EXCEDE_ESCALA",
+    "category_code": "CAT_EFECTOS_VOLADURA_EXCEDE_ESCALA",
+    "category_name": "Efecto de voladura '76 / '89 fuera de la escala [1, 6].",
+    "severity": "ALERTA",
+    "columns": [
+      "EFECTOS DE VOLADURA '89"
+    ],
+    "message_template": "El efecto de voladura '89 ({value}) está fuera de la escala [1, 6].",
+    "description": "Efecto de voladura '76 / '89 fuera de la escala [1, 6].",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_EFECTOS_VOLADURA_76_VALOR_MEDIO",
+    "category_code": "CAT_EFECTOS_VOLADURA_VALOR_MEDIO",
+    "category_name": "El puntaje de efectos de voladura '76 / '89 no es un valor estándar del catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "EFECTOS DE VOLADURA  '76"
+    ],
+    "message_template": "El valor de efectos de voladura '76 ({value}) no es un valor estándar del catálogo: {allowed_values}.",
+    "description": "El puntaje de efectos de voladura '76 / '89 no es un valor estándar del catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_EFECTOS_VOLADURA_89_VALOR_MEDIO",
+    "category_code": "CAT_EFECTOS_VOLADURA_VALOR_MEDIO",
+    "category_name": "El puntaje de efectos de voladura '76 / '89 no es un valor estándar del catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "EFECTOS DE VOLADURA '89"
+    ],
+    "message_template": "El valor de efectos de voladura '89 ({value}) no es un valor estándar del catálogo: {allowed_values}.",
+    "description": "El puntaje de efectos de voladura '76 / '89 no es un valor estándar del catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_RQD_VAL_76_VALOR_ALEJADO",
+    "category_code": "CAT_RQD_VAL_VALOR_ALEJADO",
+    "category_name": "El puntaje de RQD '76 / '89 no coincide con el catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "RQD - VALOR  '76"
+    ],
+    "message_template": "El puntaje de RQD '76 ({value}) no coincide con los valores del catálogo: [3, 8, 13, 17, 20].",
+    "description": "El puntaje de RQD '76 / '89 no coincide con el catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_RQD_VAL_89_VALOR_ALEJADO",
+    "category_code": "CAT_RQD_VAL_VALOR_ALEJADO",
+    "category_name": "El puntaje de RQD '76 / '89 no coincide con el catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "RQD - VALOR '89"
+    ],
+    "message_template": "El puntaje de RQD '89 ({value}) está fuera de la escala [3.0, 20.0].",
+    "description": "El puntaje de RQD '76 / '89 no coincide con el catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RQD_76_SUPERIOR_100",
+    "category_code": "CAT_RQD_SUPERIOR_100",
+    "category_name": "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.",
+    "severity": "ALERTA",
+    "columns": [
+      "RQD  '76"
+    ],
+    "message_template": "El porcentaje de RQD '76 ({value}%) no puede ser superior a 100%.",
+    "description": "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RQD_89_SUPERIOR_100",
+    "category_code": "CAT_RQD_SUPERIOR_100",
+    "category_name": "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.",
+    "severity": "ALERTA",
+    "columns": [
+      "RQD '89"
+    ],
+    "message_template": "El porcentaje de RQD '89 ({value}%) no puede ser superior a 100%.",
+    "description": "Porcentaje de RQD '76 / '89 no puede ser superior al 100%.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RQD_76_INCONGRUENTE",
+    "category_code": "CAT_RQD_INCONGRUENTE",
+    "category_name": "El puntaje de RQD '76 / '89 no coincide con el porcentaje.",
+    "severity": "ALERTA",
+    "columns": [
+      "RQD - VALOR  '76",
+      "RQD  '76"
+    ],
+    "message_template": "El puntaje de RQD '76 ({value}) no coincide con el porcentaje ({pct}%). Debe ser {expected} (tolerancia ±0.2).",
+    "description": "El puntaje de RQD '76 / '89 no coincide con el porcentaje.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RQD_89_INCONGRUENTE",
+    "category_code": "CAT_RQD_INCONGRUENTE",
+    "category_name": "El puntaje de RQD '76 / '89 no coincide con el porcentaje.",
+    "severity": "ALERTA",
+    "columns": [
+      "RQD - VALOR '89",
+      "RQD '89"
+    ],
+    "message_template": "El puntaje de RQD '89 ({value}) no coincide con el porcentaje ({pct}%). Debe estar en el rango {expected}.",
+    "description": "El puntaje de RQD '76 / '89 no coincide con el porcentaje.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_PROMEDIO_76_NEGATIVO",
+    "category_code": "CAT_ESPACIAMIENTO_PROMEDIO_NEGATIVO",
+    "category_name": "El espaciamiento promedio '76 / '89 debe ser positivo.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO PROMEDIO   '76"
+    ],
+    "message_template": "El espaciamiento promedio '76 no puede ser negativo ({value} m).",
+    "description": "El espaciamiento promedio '76 / '89 debe ser positivo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_PROMEDIO_89_NEGATIVO",
+    "category_code": "CAT_ESPACIAMIENTO_PROMEDIO_NEGATIVO",
+    "category_name": "El espaciamiento promedio '76 / '89 debe ser positivo.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO PROMEDIO '89"
+    ],
+    "message_template": "El espaciamiento promedio '89 no puede ser negativo ({value} m).",
+    "description": "El espaciamiento promedio '76 / '89 debe ser positivo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_PROMEDIO_76_CERO",
+    "category_code": "CAT_ESPACIAMIENTO_PROMEDIO_CERO",
+    "category_name": "El espaciamiento promedio '76 / '89 no puede ser 0.0 m (debe ser mayor a cero).",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO PROMEDIO   '76"
+    ],
+    "message_template": "El espaciamiento promedio '76 no puede ser 0.0 m (debe ser mayor a cero).",
+    "description": "El espaciamiento promedio '76 / '89 no puede ser 0.0 m (debe ser mayor a cero).",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_PROMEDIO_89_CERO",
+    "category_code": "CAT_ESPACIAMIENTO_PROMEDIO_CERO",
+    "category_name": "El espaciamiento promedio '76 / '89 no puede ser 0.0 m (debe ser mayor a cero).",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO PROMEDIO '89"
+    ],
+    "message_template": "El espaciamiento promedio '89 no puede ser 0.0 m (debe ser mayor a cero).",
+    "description": "El espaciamiento promedio '76 / '89 no puede ser 0.0 m (debe ser mayor a cero).",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_VALOR_76_RANGO",
+    "category_code": "CAT_ESPACIAMIENTO_RATING_RANGO",
+    "category_name": "Puntaje de espaciamiento '76 / '89 fuera de rango.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO - VALOR    '76"
+    ],
+    "message_template": "El puntaje de espaciamiento '76 ({value}) está fuera del rango [5, 30].",
+    "description": "Puntaje de espaciamiento '76 / '89 fuera de rango.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_VALOR_89_RANGO",
+    "category_code": "CAT_ESPACIAMIENTO_RATING_RANGO",
+    "category_name": "Puntaje de espaciamiento '76 / '89 fuera de rango.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO - VALOR '89"
+    ],
+    "message_template": "El puntaje de espaciamiento '89 ({value}) está fuera del rango [5, 20].",
+    "description": "Puntaje de espaciamiento '76 / '89 fuera de rango.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO",
+    "category_code": "CAT_ESPACIAMIENTO_VALOR_MEDIO",
+    "category_name": "El puntaje de espaciamiento '76 / '89 no es un valor estándar del catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "ESPACIAMIENTO - VALOR    '76"
+    ],
+    "message_template": "El puntaje de espaciamiento '76 ({value}) no coincide con los valores del catálogo: [5, 10, 20, 25, 30].",
+    "description": "El puntaje de espaciamiento '76 / '89 no es un valor estándar del catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO",
+    "category_code": "CAT_ESPACIAMIENTO_VALOR_MEDIO",
+    "category_name": "El puntaje de espaciamiento '76 / '89 no es un valor estándar del catálogo.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "ESPACIAMIENTO - VALOR '89"
+    ],
+    "message_template": "El puntaje de espaciamiento '89 ({value}) no coincide con los valores del catálogo: [5, 8, 10, 15, 20].",
+    "description": "El puntaje de espaciamiento '76 / '89 no es un valor estándar del catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO",
+    "category_code": "CAT_ESPACIAMIENTO_NO_ALINEADO",
+    "category_name": "El puntaje de espaciamiento '76 / '89 no coincide con el promedio.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO - VALOR    '76",
+      "ESPACIAMIENTO PROMEDIO   '76"
+    ],
+    "message_template": "El puntaje de espaciamiento '76 ({value}) no coincide con el promedio ({promedio} m). Debe ser {expected}.",
+    "description": "El puntaje de espaciamiento '76 / '89 no coincide con el promedio.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO",
+    "category_code": "CAT_ESPACIAMIENTO_NO_ALINEADO",
+    "category_name": "El puntaje de espaciamiento '76 / '89 no coincide con el promedio.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO - VALOR '89",
+      "ESPACIAMIENTO PROMEDIO '89"
+    ],
+    "message_template": "El puntaje de espaciamiento '89 ({value}) no coincide con el promedio ({promedio} m). Debe ser {expected}.",
+    "description": "El puntaje de espaciamiento '76 / '89 no coincide con el promedio.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_TIPO_ESTRUCTURA_J",
+    "category_code": "CAT_TIPO_ESTRUCTURA_J",
+    "category_name": "Tipo de estructura geológica 'J' debe normalizarse a 'JN'.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "TIPO"
+    ],
+    "message_template": "El código de estructura 'J' debe registrarse como 'JN' según el catálogo.",
+    "description": "Tipo de estructura geológica 'J' debe normalizarse a 'JN'.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_TIPO_ESTRUCTURA_INVALIDO",
+    "category_code": "CAT_TIPO_ESTRUCTURA_INVALIDO",
+    "category_name": "Tipo de estructura geológica no permitida.",
+    "severity": "ALERTA",
+    "columns": [
+      "TIPO"
+    ],
+    "message_template": "Tipo de estructura geológica no permitida: '{value}'. Debe ser uno de {allowed_types}.",
+    "description": "Tipo de estructura geológica no permitida.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RELLENO_1_INVALIDO",
+    "category_code": "CAT_RELLENO_INVALIDO",
+    "category_name": "Tipo de relleno no pertenece al catálogo.",
+    "severity": "ALERTA",
+    "columns": [
+      "TIPO DE  RELLENO 1"
+    ],
+    "message_template": "El tipo de relleno 1 ('{value}') no pertenece al catálogo: {allowed_fill_types}.",
+    "description": "Tipo de relleno no pertenece al catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RELLENO_2_INVALIDO",
+    "category_code": "CAT_RELLENO_INVALIDO",
+    "category_name": "Tipo de relleno no pertenece al catálogo.",
+    "severity": "ALERTA",
+    "columns": [
+      "TIPO DE  RELLENO 2"
+    ],
+    "message_template": "El tipo de relleno 2 ('{value}') no pertenece al catálogo: {allowed_fill_types}.",
+    "description": "Tipo de relleno no pertenece al catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_JRC_RANGO",
+    "category_code": "CAT_JRC_RANGO",
+    "category_name": "Valor JRC fuera de rango permitido [0, 20].",
+    "severity": "ALERTA",
+    "columns": [
+      "JRC"
+    ],
+    "message_template": "El valor JRC ({value}) está fuera del rango permitido [0, 20].",
+    "description": "Valor JRC fuera de rango permitido [0, 20].",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RUGOSIDAD_RANGO",
+    "category_code": "CAT_RUGOSIDAD_RANGO",
+    "category_name": "Clase de rugosidad de junta fuera de límites [1, 9].",
+    "severity": "ALERTA",
+    "columns": [
+      "RUGOSIDAD DE ESTRUCTURAS"
+    ],
+    "message_template": "La rugosidad de junta ({value}) está fuera del rango [1, 9].",
+    "description": "Clase de rugosidad de junta fuera de límites [1, 9].",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_FORMA_ESTRUCTURA_INVALIDA",
+    "category_code": "CAT_FORMA_ESTRUCTURA_INVALIDA",
+    "category_name": "Forma de estructura inválida. Debe ser P, C, O, E o I.",
+    "severity": "ALERTA",
+    "columns": [
+      "FORMA DE ESTRUCTURA"
+    ],
+    "message_template": "Forma de estructura inválida: '{value}'. Debe ser P, C, O, E o I.",
+    "description": "Forma de estructura inválida. Debe ser P, C, O, E o I.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ALTERACION_INVALIDA",
+    "category_code": "CAT_ALTERACION_INVALIDA",
+    "category_name": "Código de alteración inválido.",
+    "severity": "ALERTA",
+    "columns": [
+      "ALTERACION"
+    ],
+    "message_template": "Código de alteración inválido: '{value}'. Debe ser uno de {allowed_alteration_types}.",
+    "description": "Código de alteración inválido.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPESOR_NEGATIVO",
+    "category_code": "CAT_ESPESOR_NEGATIVO",
+    "category_name": "El espesor del relleno no puede ser un valor negativo.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPESOR mm."
+    ],
+    "message_template": "El espesor del relleno no puede ser negativo ({value} mm).",
+    "description": "El espesor del relleno no puede ser un valor negativo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ABERTURA_NEGATIVO",
+    "category_code": "CAT_ABERTURA_NEGATIVO",
+    "category_name": "La abertura total no puede ser un valor negativo.",
+    "severity": "ALERTA",
+    "columns": [
+      "ABERTURA mm."
+    ],
+    "message_template": "La abertura total no puede ser negativa ({value} mm).",
+    "description": "La abertura total no puede ser un valor negativo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPESOR_SUPERIOR_ABERTURA",
+    "category_code": "CAT_ESPESOR_SUPERIOR_ABERTURA",
+    "category_name": "Espesor del relleno es superior a la abertura total.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPESOR mm.",
+      "ABERTURA mm."
+    ],
+    "message_template": "El espesor del relleno ({thickness} mm) es mayor a la abertura ({aperture} mm) para la estructura '{struct_type}'.",
+    "description": "Espesor del relleno es superior a la abertura total.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ABERTURA_EXCEDE_CELDA",
+    "category_code": "CAT_ABERTURA_EXCEDE_CELDA",
+    "category_name": "La abertura de la falla supera la longitud de la celda.",
+    "severity": "ALERTA",
+    "columns": [
+      "ABERTURA mm."
+    ],
+    "message_template": "La abertura ({aperture} mm) supera la longitud de la celda ({cell_len} m) para la estructura '{struct_type}'.",
+    "description": "La abertura de la falla supera la longitud de la celda.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_CONTINUIDAD_NEGATIVA",
+    "category_code": "CAT_CONTINUIDAD_NEGATIVA",
+    "category_name": "La continuidad no puede ser un valor negativo.",
+    "severity": "ALERTA",
+    "columns": [
+      "CONTINUIDAD m."
+    ],
+    "message_template": "La continuidad no puede ser negativa ({value} m).",
+    "description": "La continuidad no puede ser un valor negativo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_ESPACIAMIENTO_NEGATIVO",
+    "category_code": "CAT_ESPACIAMIENTO_NEGATIVO",
+    "category_name": "El espaciamiento no puede ser un valor negativo.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESPACIAMIENTO m."
+    ],
+    "message_template": "El espaciamiento no puede ser negativo ({value} m).",
+    "description": "El espaciamiento no puede ser un valor negativo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_DIP_ESTRUC_RANGO",
+    "category_code": "CAT_DIP_ESTRUC_RANGO",
+    "category_name": "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados.",
+    "severity": "ALERTA",
+    "columns": [
+      "DIP"
+    ],
+    "message_template": "El valor de buzamiento (DIP: {value}°) está fuera del rango permitido [0, 90].",
+    "description": "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_NUMERO_ESTRUCTURAS_DECIMAL",
+    "category_code": "CAT_NUMERO_ESTRUCTURAS_DECIMAL",
+    "category_name": "En número de estructuras solamente se permiten números enteros.",
+    "severity": "ALERTA",
+    "columns": [
+      "NUMERO DE ESTRUCTURAS"
+    ],
+    "message_template": "El número de estructuras debe ser un número entero (se ingresó: {value}).",
+    "description": "En número de estructuras solamente se permiten números enteros.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_LITOLOGIA_COMBINACION_INVALIDA",
+    "category_code": "CAT_LITOLOGIA_COMBINACION_INVALIDA",
+    "category_name": "Combinación litológica Lito 1-2-3 inválida según el catálogo.",
+    "severity": "ALERTA",
+    "columns": [
+      "Lito 1",
+      "Lito 2",
+      "Lito 3"
+    ],
+    "message_template": "Combinación litológica (Lito 1: '{l1}', Lito 2: '{l2}', Lito 3: '{l3}') no válida según el catálogo.",
+    "description": "Combinación litológica Lito 1-2-3 inválida según el catálogo.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_UNIDAD_LITOLOGICA_INCONGRUENTE",
+    "category_code": "CAT_UNIDAD_LITOLOGICA_INCONGRUENTE",
+    "category_name": "La unidad litológica no coincide con la litología.",
+    "severity": "ALERTA",
+    "columns": [
+      "Unidad Litologica"
+    ],
+    "message_template": "La unidad litológica '{value}' no coincide con la litología registrada. Se esperaba '{expected_group}'.",
+    "description": "La unidad litológica no coincide con la litología.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_UCS_DIVERGENTE_IS50",
+    "category_code": "CAT_UCS_DIVERGENTE_IS50",
+    "category_name": "Los valores de UCS e Is50 no guardan relación física válida.",
+    "severity": "ALERTA",
+    "columns": [
+      "( UCS )  (Mpa)",
+      "is50 (Mpa)"
+    ],
+    "message_template": "Los valores de UCS ({ucs_val} MPa) e Is50 ({is50_val} MPa) no guardan relación física válida.",
+    "description": "Los valores de UCS e Is50 no guardan relación física válida.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_UCS_VS_IS50_K_DIVERGENTE",
+    "category_code": "CAT_UCS_VS_IS50_K_DIVERGENTE",
+    "category_name": "El valor de UCS difiere del producto Is50 * K.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "( UCS )  (Mpa)",
+      "is50 (Mpa)"
+    ],
+    "message_template": "El valor de UCS ({ucs_val} MPa) difiere del producto Is50 * K ({is50_val} * {factor_k} = {expected_ucs:.2f} MPa).",
+    "description": "El valor de UCS difiere del producto Is50 * K.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_CELDA_PADRE_MISSING",
+    "category_code": "CAT_CELDA_PADRE_MISSING",
+    "category_name": "La fila no tiene una celda de mapeo asociada en CELDA.",
+    "severity": "ALERTA",
+    "columns": [
+      "CELDA_PADRE"
+    ],
+    "message_template": "La fila no tiene una celda de mapeo asociada en CELDA.",
+    "description": "La fila no tiene una celda de mapeo asociada en CELDA.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_CAMPO_OBLIGATORIO_VACIO",
+    "category_code": "CAT_CAMPO_OBLIGATORIO_VACIO",
+    "category_name": "Campo obligatorio se encuentra vacío.",
+    "severity": "VACIO",
+    "columns": [],
+    "message_template": "Campo obligatorio vacío: '{col_key}'.",
+    "description": "Campo obligatorio se encuentra vacío.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RMR_76_CERO",
+    "category_code": "CAT_RMR_CERO",
+    "category_name": "El valor de RMR '76 / '89 no puede ser 0.",
+    "severity": "ALERTA",
+    "columns": [
+      "RMR  '76"
+    ],
+    "message_template": "El valor de RMR '76 no puede ser 0.",
+    "description": "El valor de RMR '76 / '89 no puede ser 0.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_RMR_89_CERO",
+    "category_code": "CAT_RMR_CERO",
+    "category_name": "El valor de RMR '76 / '89 no puede ser 0.",
+    "severity": "ALERTA",
+    "columns": [
+      "RMR '89"
+    ],
+    "message_template": "El valor de RMR '89 no puede ser 0.",
+    "description": "El valor de RMR '76 / '89 no puede ser 0.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_DIP_TALUD_DISCREPANCIA",
+    "category_code": "CAT_DIP_TALUD_DISCREPANCIA",
+    "category_name": "Diferencia entre DIP_TALUD y el valor esperado de la celda.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "DIP_TALUD"
+    ],
+    "message_template": "La inclinación del talud (DIP_TALUD: {actual}°) difiere del valor esperado ({expected}°). Supera la tolerancia de 2°.",
+    "description": "Diferencia entre DIP_TALUD y el valor esperado de la celda.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_DIP_DISCREPANCIA_COORD",
+    "category_code": "CAT_DIP_DISCREPANCIA_COORD",
+    "category_name": "Diferencia entre DIP y el calculado por coordenadas.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "DIP"
+    ],
+    "message_template": "El valor de DIP ({actual}°) difiere del calculado por coordenadas ({expected}°). Supera la tolerancia de 2°.",
+    "description": "Diferencia entre DIP y el calculado por coordenadas.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_AZ_HOLE_DISCREPANCIA",
+    "category_code": "CAT_AZ_HOLE_DISCREPANCIA",
+    "category_name": "Diferencia entre AZ_HOLE y el calculado por coordenadas.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "AZ_HOLE"
+    ],
+    "message_template": "El valor de AZ_HOLE ({actual}°) difiere del calculado por coordenadas ({expected}°). Supera la tolerancia de 2°.",
+    "description": "Diferencia entre AZ_HOLE y el calculado por coordenadas.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "WRN_DIP_DIR_TALUD_DISCREPANCIA",
+    "category_code": "CAT_AZ_HOLE_DISCREPANCIA",
+    "category_name": "Diferencia entre AZ_HOLE y el calculado por coordenadas.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "DIP_DIR_TALUD"
+    ],
+    "message_template": "El valor de DIP_DIR_TALUD ({actual}°) difiere del esperado ({expected}° según AZ_HOLE + 90°). Supera la tolerancia de 2°.",
+    "description": "Diferencia entre AZ_HOLE y el calculado por coordenadas.",
+    "technical_formula": "",
+    "example_ok": "",
+    "example_error": "",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "GEOM_ERR_COORD_FUERA_DE_PROYECTO",
+    "category_code": "CAT_GEOM_COORDENADAS",
+    "category_name": "Coordenadas fuera del rango del proyecto.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESTE_FROM",
+      "NORTE_FROM",
+      "COTA_FROM",
+      "ESTE_TO",
+      "NORTE_TO",
+      "COTA_TO"
+    ],
+    "message_template": "La coordenada {columna} con valor '{valor}' está fuera del rango del proyecto [Este: 790 000 - 795 000  Norte: 8 400 000 - 8 450 000  Cota: 3400-4500].",
+    "description": "Revisa que las coordenadas Este, Norte y Cota estén dentro de los límites del proyecto minero.",
+    "technical_formula": "Este ∈ [790000, 795000] ∧ Norte ∈ [8400000, 8450000] ∧ Cota ∈ [3400, 4500]",
+    "example_ok": "ESTE_FROM: 792533.9 m, NORTE_FROM: 8441076.2 m, COTA: 4260.0 msnm",
+    "example_error": "ESTE_FROM: 79253.9 m (falta un dígito) o ESTE_FROM: 0.0",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "GEOM_ERR_SEGMENTO_DEGENERADO",
+    "category_code": "CAT_GEOM_LONGITUD",
+    "category_name": "Celda con distancia cero (FROM y TO iguales).",
+    "severity": "ALERTA",
+    "columns": [
+      "ESTE_FROM",
+      "NORTE_FROM",
+      "COTA_FROM",
+      "ESTE_TO",
+      "NORTE_TO",
+      "COTA_TO"
+    ],
+    "message_template": "Las coordenadas FROM y TO son iguales. La celda tiene distancia cero.",
+    "description": "Revisa que la celda tenga longitud física real y no tenga las mismas coordenadas de inicio y fin.",
+    "technical_formula": "√(ΔX² + ΔY² + ΔZ²) < 0.01 m",
+    "example_ok": "FROM=(792533.9, 8441076.2, 4260.0), TO=(792539.1, 8441090.3, 4260.0)",
+    "example_error": "FROM=(792533.9, 8441076.2, 4260.0), TO=(792533.9, 8441076.2, 4260.0)",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "GEOM_WRN_COTA_VS_NIVEL",
+    "category_code": "CAT_GEOM_NIVEL",
+    "category_name": "Diferencia entre la Cota promedio y el Nivel.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "Nivel",
+      "COTA_FROM",
+      "COTA_TO"
+    ],
+    "message_template": "La cota promedio ({cota_prom} m) no coincide con el Nivel ({nivel}). Diferencia de {diff} m (tolerancia: 20 m).",
+    "description": "Revisa que la cota promedio entre FROM y TO no se aleje más de 20 m del valor en la columna Nivel.",
+    "technical_formula": "|((Cota_FROM + Cota_TO)/2) - Nivel| > 20.0 m",
+    "example_ok": "Nivel: 4260, Cota_FROM: 4260.0 m, Cota_TO: 4260.5 m (Diferencia: 0.25 m)",
+    "example_error": "Nivel: 3960, Cota_FROM: 4260.0 m, Cota_TO: 4260.0 m (Diferencia: 300 m)",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_CODIGO_CELDA_DUPLICADO",
+    "category_code": "CAT_DUPLICADOS_CELDA",
+    "category_name": "Código de celda repetido en el archivo.",
+    "severity": "ALERTA",
+    "columns": [
+      "CELDA"
+    ],
+    "message_template": "El código de celda '{codigo}' está repetido en el archivo (aparece primero en la fila {fila_orig}).",
+    "description": "Revisa que el código de la celda no se repita en filas separadas del archivo.",
+    "technical_formula": "Código de celda único en el archivo",
+    "example_ok": "Celda 'FW-101' registrada en un solo bloque continuo de filas",
+    "example_error": "Celda 'FW-101' reaparece en la fila 450 después de haber cerrado en la fila 35",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_COORDENADAS_CELDA_DUPLICADAS",
+    "category_code": "CAT_DUPLICADOS_GEOMETRIA",
+    "category_name": "Coordenadas FROM-TO repetidas en otra celda.",
+    "severity": "ALERTA",
+    "columns": [
+      "ESTE_FROM",
+      "NORTE_FROM",
+      "COTA_FROM",
+      "ESTE_TO",
+      "NORTE_TO",
+      "COTA_TO"
+    ],
+    "message_template": "La celda '{codigo}' tiene las mismas coordenadas FROM-TO que la celda '{otro_codigo}' (registrada en la fila {fila_orig}).",
+    "description": "Revisa que dos celdas con distinto nombre no tengan las mismas coordenadas de inicio y fin.",
+    "technical_formula": "‖FROM_A - FROM_B‖ ≤ 0.05 m ∧ ‖TO_A - TO_B‖ ≤ 0.05 m",
+    "example_ok": "Celda A en [FROM1 -> TO1] y Celda B en [FROM2 -> TO2]",
+    "example_error": "Celda A y Celda B tienen exactamente las mismas coordenadas UTM de inicio y fin",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_DISTANCIA_CELDA_DISCREPANCIA_COORD",
+    "category_code": "CAT_DISTANCIA_CELDA",
+    "category_name": "Diferencia entre Dist.Celda y coordenadas 3D.",
+    "severity": "ALERTA",
+    "columns": [
+      "Dist.Celda",
+      "ESTE_FROM",
+      "NORTE_FROM",
+      "COTA_FROM",
+      "ESTE_TO",
+      "NORTE_TO",
+      "COTA_TO"
+    ],
+    "message_template": "La distancia declarada en Dist.Celda ({decl} m) difiere de la calculada por coordenadas ({calc} m) en {diff} m (tolerancia: 0.30 m).",
+    "description": "Compara la columna Dist.Celda contra la distancia real calculada entre FROM y TO.",
+    "technical_formula": "|D_3D - Dist.Celda| > 0.30 m, donde D_3D = √(ΔX² + ΔY² + ΔZ²)",
+    "example_ok": "Dist.Celda: 15.0 m, Coordenadas calculan: 15.02 m (Diferencia: 0.02 m)",
+    "example_error": "Dist.Celda: 15.0 m, Coordenadas calculan: 15.40 m (Diferencia: 0.40 m)",
+    "tipo_mapeo": "Mapeo de Celdas"
+  },
+  {
+    "code": "ERR_DISTANCIA_ESTRUCTURA_EXCEDE_CELDA",
+    "category_code": "CAT_ESTRUCTURA_LIMITES",
+    "category_name": "Dist. de estr. supera la longitud de la celda.",
+    "severity": "ALERTA",
+    "columns": [
+      "Dist. de estr.",
+      "Dist.Celda"
+    ],
+    "message_template": "La columna Dist. de estr. ({dest} m) supera la longitud de la celda ({largo} m).",
+    "description": "Revisa que la distancia de la estructura no sobrepase la longitud de la celda (Dist.Celda).",
+    "technical_formula": "d_est ≠ -1 ∧ (d_est < 0 ∨ d_est > Dist.Celda + 0.03 m)",
+    "example_ok": "Dist.Celda: 15.0 m, Dist. de estr.: 8.5 m (o -1 si no hay registro)",
+    "example_error": "Dist.Celda: 15.0 m, Dist. de estr.: 22.0 m",
+    "tipo_mapeo": "Mapeo de Estructuras"
+  },
+  {
+    "code": "ERR_COORD_ESTRUCTURA_FUERA_DE_CELDA",
+    "category_code": "CAT_ESTRUCTURA_GEOMETRIA",
+    "category_name": "Coordenadas (x, y, z) de la estructura fuera de la línea de la celda.",
+    "severity": "ALERTA",
+    "columns": [
+      "x",
+      "y",
+      "z"
+    ],
+    "message_template": "Las coordenadas de la estructura (x={x}, y={y}, z={z}) se desvían {desv} m de la línea entre FROM y TO (tolerancia: 0.30 m).",
+    "description": "Revisa que las coordenadas (x, y, z) de la estructura estén sobre la línea recta entre FROM y TO.",
+    "technical_formula": "d_perp = ‖w - t*v‖ > 0.30 m",
+    "example_ok": "Estructura sobre la línea entre FROM y TO con desviación < 0.03 m",
+    "example_error": "Estructura desviada a 1.2 m de la línea entre FROM y TO",
+    "tipo_mapeo": "Mapeo de Estructuras"
+  },
+  {
+    "code": "ERR_COORD_ESTRUCTURA_DISCREPANCIA_CALCULO",
+    "category_code": "CAT_ESTRUCTURA_CALCULO",
+    "category_name": "Diferencia entre coordenadas declaradas (x, y, z) y coordenadas calculadas.",
+    "severity": "ADVERTENCIA",
+    "columns": [
+      "x",
+      "y",
+      "z"
+    ],
+    "message_template": "Las coordenadas declaradas ({decl_x}, {decl_y}, {decl_z}) difieren en {diff} m del cálculo analítico ({calc_x}, {calc_y}, {calc_z}). Fórmula: P = FROM + (Dist.estr / L_celda) * (TO - FROM). Reemplazo: FROM=({ef}, {nf}, {cf}), TO=({et}, {nt}, {ct}), Dist.estr={dest} m, L_celda={l_scan} m (tolerancia: 0.30 m).",
+    "description": "Calcula la posición analítica (x, y, z) a lo largo de la celda a partir de Dist. de estr. y la compara con los valores ingresados.",
+    "technical_formula": "P_calc = FROM + (Dist.estr / L_scan) * (TO - FROM); diff = ||P_decl - P_calc|| > 0.30 m",
+    "example_ok": "Coordenadas declaradas coinciden con el cálculo (diferencia <= 0.30 m)",
+    "example_error": "Las coordenadas declaradas (792533.96, 8441076.22, 4260.01) difieren en 4.04 m del cálculo analítico (792535.34, 8441080.02, 4260.01)",
+    "tipo_mapeo": "Mapeo de Estructuras"
+  }
+]

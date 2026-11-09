@@ -109,44 +109,44 @@ def get_incidence_category_name(i: dict) -> str:
         if "EXCEDE" in msg_up or "LÍMITES REALES" in msg_up or "LIMITES REALES" in msg_up:
             return "Valor de agua '76 / '89 excede los límites reales de la escala."
         if "INCONGRUENTE" in msg_up or "RATING" in msg_up:
-            return "Rating de agua '76 / '89 es incongruente con el código."
+            return "El valor de agua '76 / '89 no coincide con el código."
         if "MEDIO NO EXACTO" in msg_up:
-            return "El valor de agua '76 / '89 es un valor medio no exacto."
+            return "El valor de agua '76 / '89 no es un valor estándar del catálogo."
     if "DUREZA" in msg_up and "ADMITIDA" in msg_up:
         return "Dureza '76 / '89 no admitida. Debe ser R0 a R6."
     if "RESISTENCIA" in msg_up:
         if "INCONGRUENTE" in msg_up:
-            return "Resistencia '76 / '89 es incongruente con la dureza."
+            return "El puntaje de resistencia '76 / '89 no coincide con la dureza."
         if "LÍMITE REAL" in msg_up or "LIMITE REAL" in msg_up or "EXCEDE" in msg_up or "FUERA DEL" in msg_up:
             return "Rating de resistencia '76 / '89 fuera del límite real."
         if "ALEJADO" in msg_up or "PUNTAJE DE RESISTENCIA" in msg_up:
-            return "Puntaje de resistencia '76 / '89 es un valor alejado no válido."
+            return "El puntaje de resistencia '76 / '89 no coincide con el catálogo."
     if "CONTROL ESTRUCTURAL" in msg_up:
         return "Control estructural '76 / '89 fuera de límites permitidos [1, 5]."
     if "EFECTO" in msg_up or "VOLADURA" in msg_up:
         if "EXCEDE" in msg_up or "ESCALA" in msg_up:
             return "Efecto de voladura '76 / '89 excede los límites de la escala."
         if "MEDIO NO EXACTO" in msg_up:
-            return "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto."
+            return "El puntaje de efectos de voladura '76 / '89 no es un valor estándar del catálogo."
     if "RQD" in msg_up:
         if "SUPERIOR AL 100%" in msg_up or "SUPERIOR" in msg_up:
             return "Porcentaje de RQD '76 / '89 no puede ser superior al 100%."
         if "ALEJADO" in msg_up or "PUNTAJE DE RQD" in msg_up:
-            return "Puntaje de RQD '76 / '89 es un valor alejado no válido."
+            return "El puntaje de RQD '76 / '89 no coincide con el catálogo."
     if "ESPACIAMIENTO PROMEDIO" in msg_up:
         if "ES DE 0.0 M" in msg_up or "CERO" in msg_up:
-            return "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero)."
+            return "El espaciamiento promedio '76 / '89 no puede ser 0.0 m (debe ser mayor a cero)."
         if "POSITIVO" in msg_up or "NEGATIVO" in msg_up:
             return "El espaciamiento promedio '76 / '89 debe ser positivo."
     if "ESPACIAMIENTO" in msg_up:
         if "RANGO" in msg_up or "FUERA DEL" in msg_up:
             return "Valor de rating de espaciamiento '76 / '89 fuera de rango."
         if "ALINEA" in msg_up:
-            return "Rating de espaciamiento '76 / '89 no se alinea con el promedio."
+            return "El puntaje de espaciamiento '76 / '89 no coincide con el promedio."
         if "MEDIO NO EXACTO" in msg_up:
-            return "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto."
+            return "El puntaje de espaciamiento '76 / '89 no es un valor estándar del catálogo."
     if "SUGERIDA A NORMALIZAR POR 'JN'" in msg_up or "NORMALIZAR POR 'JN'" in msg_up:
-        return "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'."
+        return "Tipo de estructura geológica 'J' debe normalizarse a 'JN'."
     if "TIPO DE ESTRUCTURA GEOLÓGICA NO PERMITIDA" in msg_up or "TIPO DE ESTRUCTURA GEOLOGICA NO PERMITIDA" in msg_up:
         return "Tipo de estructura geológica no permitida."
     if ("RELLENO" in msg_up and "CATÁLOGO" in msg_up) or ("RELLENO" in msg_up and "CATALOGO" in msg_up):
@@ -165,13 +165,13 @@ def get_incidence_category_name(i: dict) -> str:
         return "La abertura de la falla supera la longitud de la celda."
     if "UCS" in msg_up and "IS50" in msg_up:
         if "DIVERGENTE" in msg_up:
-            return "UCS es divergente a Is50."
+            return "Los valores de UCS e Is50 no guardan relación física válida."
         if "DIVERGENCIA" in msg_up or "IS50 * K" in msg_up or "UCS VS IS50 * K" in msg_up:
-            return "Divergencia de resistencia uniaxial (UCS vs Is50 * K)."
+            return "El valor de UCS difiere del producto Is50 * K."
     if "COMBINACIÓN LITOLÓGICA" in msg_up or "COMBINACION LITOLOGICA" in msg_up:
         return "Combinación litológica Lito 1-2-3 inválida según el catálogo."
     if "UNIDAD LITOLÓGICA" in msg_up or "UNIDAD LITOLOGICA" in msg_up:
-        return "Unidad litológica es incongruente con la litología."
+        return "La unidad litológica no coincide con la litología."
     if "INCLINACIÓN (DIP) FUERA" in msg_up or "INCLINACION (DIP) FUERA" in msg_up or ("DIP" in msg_up and "DIP DIR" not in msg_up and "TALUD" not in msg_up):
         return "Valor de inclinación (Dip) fuera de rango permitido [-90, 90] grados."
     if "INCLINACIÓN (DIP DIRECTION) FUERA" in msg_up or "DIP DIR" in msg_up:

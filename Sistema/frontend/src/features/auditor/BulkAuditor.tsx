@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getAuthHeaders } from '../../utils/apiClient';
 import {
     FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
-    Loader2, RefreshCw, Trash2, X, WifiOff
+    Loader2, RefreshCw, Trash2, X, WifiOff, BookOpen
 } from 'lucide-react';
 import BulkImportWizard from './BulkImportWizard';
 
@@ -17,9 +17,10 @@ import ComparativoModal from './components/ComparativoModal';
 
 interface BulkAuditorProps {
     apiBase: string;
+    onNavigateToRules?: () => void;
 }
 
-export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
+export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorProps) {
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'loaded' | 'error'>(() => {
         const saved = localStorage.getItem('geomec_bulk_auditor_status');
         return (saved as any) || 'idle';
@@ -531,6 +532,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                     selectedAuditId={selectedAuditId}
                     onSelectAudit={handleSelectPastAudit}
                     onOpenCompare={() => setIsCompareOpen(true)}
+                    onOpenRules={onNavigateToRules}
                 />
             )}
 
@@ -600,6 +602,17 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             </span>
                         </div>
                     </button>
+                    {onNavigateToRules && (
+                        <div className="text-center pt-2">
+                            <button
+                                onClick={onNavigateToRules}
+                                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 font-bold transition-all hover:underline cursor-pointer"
+                            >
+                                <BookOpen size={13} />
+                                <span>Ver Diccionario de Reglas y Criterios QA/QC (76) &rarr;</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 

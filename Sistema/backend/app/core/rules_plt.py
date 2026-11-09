@@ -76,7 +76,7 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_TIPO_LITOLOGICO_INVALIDO", "Tipo litológico no pertenece a los 5 grupos admitidos.", "ALERTA"
     ),
     "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE", "Tipo litológico es incongruente con la combinación Lito 1-2-3.", "ALERTA"
+        "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE", "El tipo litológico no coincide con la combinación Lito 1-2-3.", "ALERTA"
     ),
     "CAT_PLT_COORD_ESTE_RANGO": RuleCategoryPLT(
         "CAT_PLT_COORD_ESTE_RANGO", "Coordenada Este no puede ser menor o igual a cero.", "ALERTA"
@@ -103,10 +103,10 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_ANCHO_W_INCONGRUENTE", "Ancho W (cm) no coincide con el promedio de W1 y W2.", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE", "Validación de longitud de muestra (L >= D) es incongruente.", "ALERTA"
+        "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE", "La validación de longitud (L >= D) no coincide con las medidas registradas.", "ALERTA"
     ),
     "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE", "Validación de ancho de muestra (0.3W < D < W) es incongruente.", "ALERTA"
+        "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE", "La validación de ancho (0.3W < D < W) no coincide con las medidas registradas.", "ALERTA"
     ),
     "CAT_PLT_FUERZA_P_RANGO": RuleCategoryPLT(
         "CAT_PLT_FUERZA_P_RANGO", "Fuerza P (kN) debe ser un valor positivo mayor a cero.", "ALERTA"
@@ -142,7 +142,7 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_RESISTENCIA_ISRM_INCONGRUENTE", "Clasificación de resistencia ISRM no corresponde al rango de UCS según tabla oficial.", "ALERTA"
     ),
     "CAT_PLT_FORMULA_ERROR": RuleCategoryPLT(
-        "CAT_PLT_FORMULA_ERROR", "La celda contiene un error de evaluación de fórmula (#VALUE!, #REF!, #DIV/0!).", "ALERTA"
+        "CAT_PLT_FORMULA_ERROR", "La celda contiene error de fórmula (#VALUE!, #REF!, #DIV/0!).", "ALERTA"
     ),
     "CAT_PLT_SECUENCIA_DESORDEN": RuleCategoryPLT(
         "CAT_PLT_SECUENCIA_DESORDEN", "Las muestras de la celda de mapeo no se encuentran en orden canónico (A-B-C-D).", "ADVERTENCIA"
@@ -298,7 +298,7 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
         "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
         ["Tipo litológico"],
-        "Tipo litológico '{actual}' es incongruente con la combinación litológica (esperado: '{expected}').",
+        "El tipo litológico '{actual}' no coincide con la combinación litológica (debe ser: '{expected}').",
     ),
     "ERR_PLT_ESTE_RANGO": ErrorRulePLT(
         "ERR_PLT_ESTE_RANGO",
@@ -352,7 +352,7 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_ANCHO_W_INCONGRUENTE",
         "CAT_PLT_ANCHO_W_INCONGRUENTE",
         ["Ancho W (cm)"],
-        "Ancho W ({actual}) diverge de (W1+W2)/2 = ({w1}+{w2})/2 = {expected} cm.",
+        "El ancho W ({actual} cm) no coincide con el promedio (W1+W2)/2 = ({w1}+{w2})/2 = {expected} cm.",
     ),
     "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
@@ -388,31 +388,31 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         ["Diámetro equivalente (cm)"],
-        "Diámetro De ({actual} cm) diverge de sqrt(4*W*D/pi) = sqrt(4*{w}*{d}/pi) = {expected} cm.",
+        "El diámetro De ({actual} cm) no coincide con la fórmula √(4*W*D/π) = {expected} cm.",
     ),
     "ERR_PLT_FACTOR_F_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_FACTOR_F_INCONGRUENTE",
         "CAT_PLT_FACTOR_F_INCONGRUENTE",
         ["Factor F"],
-        "Factor F ({actual}) diverge de (De_mm / 50)^0.45 = ({de_mm} / 50)^0.45 = {expected}.",
+        "El factor F ({actual}) no coincide con el cálculo ((De*10)/50)^0.45 = {expected}.",
     ),
     "ERR_PLT_IS_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_IS_INCONGRUENTE",
         "CAT_PLT_IS_INCONGRUENTE",
         ["Is (MPa)"],
-        "Índice Is ({actual} MPa) diverge de (10 * P) / De^2 = (10 * {p}) / ({de})^2 = {expected} MPa.",
+        "El índice Is ({actual} MPa) no coincide con la fórmula P*1000/(De*10)² = {expected} MPa.",
     ),
     "ERR_PLT_IS50_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_IS50_INCONGRUENTE",
         "CAT_PLT_IS50_INCONGRUENTE",
         ["Is(50) (MPa)"],
-        "Índice Is(50) ({actual} MPa) diverge de F * Is = {f} * {is_val} = {expected} MPa.",
+        "El índice Is(50) ({actual} MPa) no coincide con F * Is = {expected} MPa.",
     ),
     "ERR_PLT_FACTOR_K_INCORRECTO": ErrorRulePLT(
         "ERR_PLT_FACTOR_K_INCORRECTO",
         "CAT_PLT_FACTOR_K_INCONGRUENTE",
         ["Factor de conversión K"],
-        "Factor K ({actual}) diverge del asignado para litología '{litos}' (esperado K = {expected}).",
+        "El factor K ({actual}) no coincide con el asignado a la litología '{litos}' (debe ser K = {expected}).",
     ),
     "ERR_PLT_FACTOR_K_RANGO": ErrorRulePLT(
         "ERR_PLT_FACTOR_K_RANGO",
@@ -424,7 +424,7 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_UCS_INCONGRUENTE",
         "CAT_PLT_UCS_INCONGRUENTE",
         ["RCS/UCS (MPa)"],
-        "Resistencia UCS ({actual} MPa) diverge de Is(50) * K = {is50} * {k} = {expected} MPa.",
+        "El valor de UCS ({actual} MPa) no coincide con Is(50) * K = {expected} MPa.",
     ),
     "ERR_PLT_RESISTENCIA_ISRM_CATALOGO": ErrorRulePLT(
         "ERR_PLT_RESISTENCIA_ISRM_CATALOGO",
@@ -436,7 +436,7 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_CELDA_ANOMALA",
         "CAT_PLT_FORMULA_ERROR",
         ["Celda de mapeo"],
-        "Celda '{celda}': Contiene errores críticos de fórmula (#VALUE!, #REF!, etc.).",
+        "La celda '{celda}' contiene error de fórmula en Excel (#VALUE!, #REF!, #DIV/0!).",
     ),
     "WRN_PLT_SECUENCIA_DESORDEN": ErrorRulePLT(
         "WRN_PLT_SECUENCIA_DESORDEN",

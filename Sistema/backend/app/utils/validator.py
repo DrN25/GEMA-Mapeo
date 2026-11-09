@@ -17,7 +17,7 @@ from app.core.catalogs import (
     LITHOLOGY_CLASSIFICATION, RESISTENCIA_DISPLAY_CATALOG, RQD_DISPLAY_CATALOG,
     get_project_geology_config, GROUP_COMPATIBILITY
 )
-from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
+from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY, GEOMECHANICAL_THRESHOLDS
 from app.utils.interpolation import rating_continuo_rqd, rating_continuo_r1
 
 class AuditCancelledError(Exception):
@@ -421,14 +421,19 @@ def validate_geomechanical_properties(row_dict, registrar_error, campania=None):
     if rmr_89 is not None and rmr_89 <= 0.0:
         registrar_error("RMR '89", rmr_89, "ERR_RMR_89_CERO")
 
-def validate_structural_row(row_dict, dist_celda, registrar_error):
+def validate_structural_row(row_dict, dist_celda, registrar_error, parent_coords=None):
     # 1. Tipo de estructura geológica
-    tipo_junta = sanitize_value(
+    raw_tipo = (
         get_row_val(row_dict, "TIPO") or 
         get_row_val(row_dict, "TIPO DE ESTRUCT") or 
-        get_row_val(row_dict, "TIPO DE ESTRUCTURA"), 
-        str
+        get_row_val(row_dict, "TIPO DE ESTRUCTURA")
     )
+    
+    # Manejo del centinela "-1" ("Sin Registro"): No genera error y desactiva validaciones de discontinuidad
+    if raw_tipo is not None and str(raw_tipo).strip() in ['-1', '-1.0']:
+        return
+
+    tipo_junta = sanitize_value(raw_tipo, str)
     if tipo_junta is not None:
         tipo_junta_clean = tipo_junta.strip().upper()
         if tipo_junta_clean not in TIPO_ESTRUCTURA_CATALOG:
@@ -439,13 +444,13 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
 
     # 2. Rellenos de junta (Opcionales)
     rel1 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 1"), str, allow_negative=True)
-    if rel1 is not None:
+    if rel1 is not None and rel1 not in ['-1', '-1.0']:
         rel1_clean = rel1.strip().lower()
         if rel1_clean not in TIPO_RELLENO_CATALOG:
             registrar_error("TIPO DE  RELLENO 1", rel1, "ERR_RELLENO_1_INVALIDO", value=rel1, allowed_fill_types=TIPO_RELLENO_CATALOG)
         
     rel2 = sanitize_value(get_row_val(row_dict, "TIPO DE  RELLENO 2"), str, allow_negative=True)
-    if rel2 is not None:
+    if rel2 is not None and rel2 not in ['-1', '-1.0']:
         rel2_clean = rel2.strip().lower()
         if rel2_clean not in TIPO_RELLENO_CATALOG:
             registrar_error("TIPO DE  RELLENO 2", rel2, "ERR_RELLENO_2_INVALIDO", value=rel2, allowed_fill_types=TIPO_RELLENO_CATALOG)
@@ -485,9 +490,9 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
     tipo_junta_clean = tipo_junta.strip().upper() if tipo_junta is not None else ""
     es_estructura_exceptuada = tipo_junta_clean in ['F', 'SZ', 'BED']
 
-    if espesor is not None and espesor < 0:
+    if espesor is not None and espesor < 0 and espesor != -1.0:
         registrar_error("ESPESOR mm.", espesor, "ERR_ESPESOR_NEGATIVO", value=espesor)
-    if abertura is not None and abertura < 0:
+    if abertura is not None and abertura < 0 and abertura != -1.0:
         registrar_error("ABERTURA mm.", abertura, "ERR_ABERTURA_NEGATIVO", value=abertura)
 
     if espesor is not None and abertura is not None and espesor > abertura:
@@ -500,18 +505,18 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
             if dist_celda is not None and (abertura / 1000.0) > dist_celda:
                 registrar_error("ABERTURA mm.", abertura, "ERR_ABERTURA_EXCEDE_CELDA", struct_type=tipo_junta_clean, aperture=abertura, cell_len=dist_celda)
 
-    # 9. Persistencia de discontinuidad (Continuidad física vs celda - ERROR DE SUPERACIÓN ELIMINADO)
+    # 9. Persistencia de discontinuidad (Continuidad física vs celda)
     cont_junta = sanitize_value(get_row_val(row_dict, "CONTINUIDAD m."), float)
     if cont_junta is not None:
         cont_junta = round(cont_junta, 2)
-        if cont_junta < 0:
+        if cont_junta < 0 and cont_junta != -1.0:
             registrar_error("CONTINUIDAD m.", cont_junta, "ERR_CONTINUIDAD_NEGATIVA", value=cont_junta)
 
     # 10. Espaciamiento de discontinuidad estructural
     espac_struct = sanitize_value(get_row_val(row_dict, "ESPACIAMIENTO m."), float)
     if espac_struct is not None:
         espac_struct = round(espac_struct, 2)
-        if espac_struct < 0:
+        if espac_struct < 0 and espac_struct != -1.0:
             registrar_error("ESPACIAMIENTO m.", espac_struct, "ERR_ESPACIAMIENTO_NEGATIVO", value=espac_struct)
 
     # 11. Inclinación y Dirección de Estructura
@@ -521,13 +526,64 @@ def validate_structural_row(row_dict, dist_celda, registrar_error):
         if not (0.0 <= dip_estruc <= 90.0):
             registrar_error("DIP_ESTRUC", dip_estruc, "ERR_DIP_ESTRUC_RANGO", value=dip_estruc)
 
-
-
     # 12. Consistencia en conteo de estructuras estructurales
     num_estrucs = sanitize_value(get_row_val(row_dict, "NUMERO DE ESTRUCTURAS") or get_row_val(row_dict, "N_ESTRUCTURAS"), float)
     if num_estrucs is not None:
         if num_estrucs % 1 != 0:
             registrar_error("NUMERO DE ESTRUCTURAS", num_estrucs, "ERR_NUMERO_ESTRUCTURAS_DECIMAL", value=num_estrucs)
+
+    # 13. Distancia de la estructura a lo largo de la celda (Permite -1 como Sin Registro)
+    raw_dist_est = (
+        get_row_val(row_dict, "Dist. de estr.") or 
+        get_row_val(row_dict, "DISTANCIA") or 
+        get_row_val(row_dict, "DISTANCIA DE ESTRUCTURA")
+    )
+    dist_est = sanitize_value(raw_dist_est, float, allow_negative=True)
+    if dist_est is not None and dist_est != -1.0:
+        if dist_est < 0.0:
+            registrar_error("Dist. de estr.", dist_est, "ERR_DISTANCIA_ESTRUCTURA_EXCEDE_CELDA", dest=dist_est, largo=dist_celda or 0.0)
+        elif dist_celda is not None and dist_est > (dist_celda + GEOMECHANICAL_THRESHOLDS["ESTRUCTURA_DISTANCIA_TOLERANCIA"]):
+            registrar_error("Dist. de estr.", dist_est, "ERR_DISTANCIA_ESTRUCTURA_EXCEDE_CELDA", dest=dist_est, largo=round(dist_celda, 2))
+
+    # 14. Coordenadas de estructura (x, y, z) respecto a la recta de la ventana
+    sx = sanitize_value(get_row_val(row_dict, "x") or get_row_val(row_dict, "X"), float)
+    sy = sanitize_value(get_row_val(row_dict, "y") or get_row_val(row_dict, "Y"), float)
+    sz = sanitize_value(get_row_val(row_dict, "z") or get_row_val(row_dict, "Z"), float)
+    if all(v is not None for v in [sx, sy, sz]) and not (sx == 0 and sy == 0 and sz == 0):
+        if parent_coords and all(c is not None for c in parent_coords):
+            ef, nf, cf, et, nt, ct = parent_coords
+            dx, dy, dz = et - ef, nt - nf, ct - cf
+            l_scan = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if l_scan > 0:
+                # Desviación ortogonal a la recta de celda
+                wx, wy, wz = sx - ef, sy - nf, sz - cf
+                t = (wx * dx + wy * dy + wz * dz) / (l_scan * l_scan)
+                proj_x = ef + t * dx
+                proj_y = nf + t * dy
+                proj_z = cf + t * dz
+                d_perp = math.sqrt((sx - proj_x)**2 + (sy - proj_y)**2 + (sz - proj_z)**2)
+                if d_perp > GEOMECHANICAL_THRESHOLDS["ESTRUCTURA_COORD_TOLERANCIA"]:
+                    registrar_error("x, y, z", sx, "ERR_COORD_ESTRUCTURA_FUERA_DE_CELDA", x=round(sx, 2), y=round(sy, 2), z=round(sz, 2), desv=round(d_perp, 2))
+                
+                # Contraste con el cálculo analítico estándar de GEMA
+                if dist_est is not None and dist_est > 0:
+                    calc_x = ef + (dist_est / l_scan) * dx
+                    calc_y = nf + (dist_est / l_scan) * dy
+                    calc_z = cf + (dist_est / l_scan) * dz
+                    diff_calc = math.sqrt((sx - calc_x)**2 + (sy - calc_y)**2 + (sz - calc_z)**2)
+                    if diff_calc > GEOMECHANICAL_THRESHOLDS["ESTRUCTURA_COORD_TOLERANCIA"]:
+                        registrar_error(
+                            "x, y, z",
+                            sx,
+                            "ERR_COORD_ESTRUCTURA_DISCREPANCIA_CALCULO",
+                            diff=round(diff_calc, 2),
+                            decl_x=round(sx, 2), decl_y=round(sy, 2), decl_z=round(sz, 2),
+                            calc_x=round(calc_x, 2), calc_y=round(calc_y, 2), calc_z=round(calc_z, 2),
+                            ef=round(ef, 2), nf=round(nf, 2), cf=round(cf, 2),
+                            et=round(et, 2), nt=round(nt, 2), ct=round(ct, 2),
+                            dest=round(dist_est, 2),
+                            l_scan=round(l_scan, 2)
+                        )
 
 def validate_lithology_correlation(row_dict, registrar_error, project: str = "ferrobamba"):
     l1 = sanitize_value(get_row_val(row_dict, "Lito 1"), str)
@@ -770,6 +826,9 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
     seen_parents = set()
     daughter_counters = {}
     parent_properties = {}
+    parent_coords_map = {}
+    seen_celda_blocks = {}
+    seen_coords_cells = {}
     active_celda_padre = None
     active_block_key = None
 
@@ -892,8 +951,16 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
             actual_col = col
             if col == "DIP" and rule_code.startswith("ERR_DIP_ESTRUC") and "DIP_ESTRUC" in row_dict:
                 actual_col = "DIP_ESTRUC"
-            raw_excel_val = get_row_val(row_dict, actual_col)
-            formatted_val = format_raw_value_for_report(raw_excel_val)
+                raw_excel_val = get_row_val(row_dict, actual_col)
+                formatted_val = format_raw_value_for_report(raw_excel_val)
+            elif col == "x, y, z":
+                vx = get_row_val(row_dict, "x") or get_row_val(row_dict, "X")
+                vy = get_row_val(row_dict, "y") or get_row_val(row_dict, "Y")
+                vz = get_row_val(row_dict, "z") or get_row_val(row_dict, "Z")
+                formatted_val = f"({format_raw_value_for_report(vx)}, {format_raw_value_for_report(vy)}, {format_raw_value_for_report(vz)})"
+            else:
+                raw_excel_val = get_row_val(row_dict, actual_col)
+                formatted_val = format_raw_value_for_report(raw_excel_val)
             
             incidencias.append({
                 "fila_excel": fila_excel, "celda_padre": celda_padre, "celda_hija": celda_hija,
@@ -919,10 +986,26 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 row_has_errors = True
 
         # 1. Validar campos obligatorios vacíos (RELLENO 2 es OPCIONAL)
+        raw_tipo = (
+            get_row_val(row_dict, 'TIPO') or 
+            get_row_val(row_dict, 'TIPO DE ESTRUCT') or 
+            get_row_val(row_dict, 'TIPO DE ESTRUCTURA')
+        )
+        is_tipo_sin_registro = str(raw_tipo).strip() in ['-1', '-1.0'] if raw_tipo is not None else False
+
+        # Comprobación de unicidad de código de celda
+        if is_parent_row:
+            if celda_padre in seen_celda_blocks and seen_celda_blocks[celda_padre] != fila_excel:
+                registrar_error("CELDA", celda_padre, "ERR_CODIGO_CELDA_DUPLICADO", codigo=celda_padre, fila_orig=seen_celda_blocks[celda_padre])
+            else:
+                seen_celda_blocks[celda_padre] = fila_excel
+
         structural_mandatory_cols = [
             'TIPO', 'TIPO DE ESTRUCT', 'TIPO DE ESTRUCTURA', 'JRC', 'RUGOSIDAD DE ESTRUCTURAS', 
             'FORMA DE ESTRUCTURA', 'ALTERACION', 'ESPESOR mm.', 'ABERTURA mm.', 'CONTINUIDAD m.', 
-            'ESPACIAMIENTO m.', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS'
+            'ESPACIAMIENTO m.', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS',
+            'TIPO DE  RELLENO 1', 'TIPO DE RELLENO 1', 'Dist. de estr.', 'DISTANCIA', 'DISTANCIA DE ESTRUCTURA',
+            'x', 'y', 'z', 'X', 'Y', 'Z'
         ]
         structural_mandatory_clean = [clean_col_name(c) for c in structural_mandatory_cols]
 
@@ -930,6 +1013,10 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
             if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2'] or str(col_key).startswith('Unnamed:'): 
                 continue
                 
+            # Si la fila tiene TIPO == "-1", se desactiva la obligatoriedad de campos de discontinuidad
+            if is_tipo_sin_registro and clean_col_name(col_key) in structural_mandatory_clean:
+                continue
+
             # Omisión Inteligente de Vacíos: Si es celda secundaria (hija) y la columna NO es de tipo estructural,
             # omitimos por completo el chequeo de vacío, ya que las columnas de cabecera/geomecánica solo son obligatorias en la fila maestra (padre).
             if not is_parent_row and clean_col_name(col_key) not in structural_mandatory_clean:
@@ -942,9 +1029,6 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 registrar_error(col_key, None, "ERR_CAMPO_OBLIGATORIO_VACIO", col_key=col_key)
 
         # 2. Desglose de validaciones estructuradas
-        # Omisión Inteligente de Reglas Cruzadas: Si la celda es secundaria y hereda sus datos por omisión,
-        # evitamos re-evaluar las validaciones globales de cabecera y propiedades geomecánicas.
-        # Solo se validan si el usuario ingresó explícitamente información en esta fila secundaria.
         debe_validar_global = is_parent_row
         if not is_parent_row:
             # Verificamos si hay alguna columna de cabecera o geomecánica que tenga un valor explícito en esta fila secundaria
@@ -954,13 +1038,13 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                     break
 
         if debe_validar_global:
-            # Validación cruzada basada en las coordenadas espaciales de la celda
+            # Coordenadas espaciales de la celda
             ef = sanitize_value(get_row_val(row_dict, 'ESTE_FROM'), float)
             nf = sanitize_value(get_row_val(row_dict, 'NORTE_FROM'), float)
-            cf = sanitize_value(get_row_val(row_dict, 'COTA_FROM'), float)
+            cf = sanitize_value(get_row_val(row_dict, 'COTA_FROM') or get_row_val(row_dict, 'COTA'), float)
             et = sanitize_value(get_row_val(row_dict, 'ESTE_TO'), float)
             nt = sanitize_value(get_row_val(row_dict, 'NORTE_TO'), float)
-            ct = sanitize_value(get_row_val(row_dict, 'COTA_TO'), float)
+            ct = sanitize_value(get_row_val(row_dict, 'COTA_TO') or get_row_val(row_dict, 'COTA.1'), float)
             
             coords_valid = all(val is not None for val in [ef, nf, cf, et, nt, ct]) and not (ef == 0 and nf == 0 and cf == 0)
             
@@ -973,46 +1057,51 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 
             largo_val = largo_calc if (largo_calc is not None and largo_calc > 0) else resolved_dist_celda
             
-            # Validaciones de fórmulas comentadas a petición
-            # if coords_valid and largo_val and largo_val > 0:
-            #     dx = et - ef
-            #     dy = nt - nf
-            #     dz = ct - cf
-            #     
-            #     sin_val = abs(dz) / largo_val
-            #     if sin_val > 1.0:
-            #         sin_val = 1.0
-            #     expected_dip = abs(math.asin(sin_val) * (180.0 / math.pi))
-            #     
-            #     expected_az = (math.atan2(dx, dy) * (180.0 / math.pi)) % 360.0
-            #     if expected_az < 0:
-            #         expected_az += 360.0
-            #         
-            #     expected_dipdir = (expected_az + 90.0) % 360.0
-            #     
-            #     # Validar DIP (inclinación de celda)
-            #     entered_dip = sanitize_value(get_row_val(row_dict, 'DIP'), float, allow_negative=True)
-            #     if entered_dip is not None:
-            #         if abs(abs(entered_dip) - expected_dip) > 2.0:
-            #             registrar_error("DIP", entered_dip, "WRN_DIP_DISCREPANCIA_COORD", actual=entered_dip, expected=round(expected_dip, 2))
-            #             
-            #     # Validar AZ_HOLE
-            #     entered_az = sanitize_value(get_row_val(row_dict, 'AZ_HOLE'), float)
-            #     if entered_az is not None:
-            #         diff_az = abs(entered_az - expected_az) % 360.0
-            #         if diff_az > 180.0:
-            #             diff_az = 360.0 - diff_az
-            #         if diff_az > 2.0:
-            #             registrar_error("AZ_HOLE", entered_az, "WRN_AZ_HOLE_DISCREPANCIA", actual=entered_az, expected=round(expected_az, 2))
-            #             
-            #     # Validar DIP_DIR_TALUD
-            #     entered_dipdir = sanitize_value(get_row_val(row_dict, 'DIP_DIR_TALUD'), float)
-            #     if entered_dipdir is not None:
-            #         diff_dd = abs(entered_dipdir - expected_dipdir) % 360.0
-            #         if diff_dd > 180.0:
-            #             diff_dd = 360.0 - diff_dd
-            #         if diff_dd > 2.0:
-            #             registrar_error("DIP_DIR_TALUD", entered_dipdir, "WRN_DIP_DIR_TALUD_DISCREPANCIA", actual=entered_dipdir, expected=round(expected_dipdir, 2))
+            # Guardar coordenadas de la celda padre para las estructuras hijas
+            if is_parent_row:
+                parent_coords_map[active_block_key] = (ef, nf, cf, et, nt, ct)
+
+                # A. Comprobar que las coordenadas no estén fuera del rango recomendado del proyecto
+                coords_check = [
+                    ("ESTE_FROM", ef, GEOMECHANICAL_THRESHOLDS["COORD_ESTE_MIN"], GEOMECHANICAL_THRESHOLDS["COORD_ESTE_MAX"]),
+                    ("NORTE_FROM", nf, GEOMECHANICAL_THRESHOLDS["COORD_NORTE_MIN"], GEOMECHANICAL_THRESHOLDS["COORD_NORTE_MAX"]),
+                    ("COTA_FROM", cf, GEOMECHANICAL_THRESHOLDS["COORD_COTA_MIN"], GEOMECHANICAL_THRESHOLDS["COORD_COTA_MAX"]),
+                    ("ESTE_TO", et, GEOMECHANICAL_THRESHOLDS["COORD_ESTE_MIN"], GEOMECHANICAL_THRESHOLDS["COORD_ESTE_MAX"]),
+                    ("NORTE_TO", nt, GEOMECHANICAL_THRESHOLDS["COORD_NORTE_MIN"], GEOMECHANICAL_THRESHOLDS["COORD_NORTE_MAX"]),
+                    ("COTA_TO", ct, GEOMECHANICAL_THRESHOLDS["COORD_COTA_MIN"], GEOMECHANICAL_THRESHOLDS["COORD_COTA_MAX"])
+                ]
+                for c_col, c_val, c_min, c_max in coords_check:
+                    if c_val is not None and not (c_min <= c_val <= c_max):
+                        registrar_error(c_col, c_val, "GEOM_ERR_COORD_FUERA_DE_PROYECTO", columna=c_col, valor=c_val)
+
+                # B. Comprobar segmento degenerado (FROM == TO) y Distancia 3D
+                if coords_valid:
+                    if largo_calc is not None and largo_calc < 0.01:
+                        registrar_error("ESTE_FROM", ef, "GEOM_ERR_SEGMENTO_DEGENERADO")
+
+                    # C. Coordenadas duplicadas entre celdas distintas
+                    coord_key = (round(ef, 2), round(nf, 2), round(cf, 2), round(et, 2), round(nt, 2), round(ct, 2))
+                    if coord_key in seen_coords_cells:
+                        prev_cell, prev_fila = seen_coords_cells[coord_key]
+                        if prev_cell != celda_padre:
+                            registrar_error("ESTE_FROM", ef, "ERR_COORDENADAS_CELDA_DUPLICADAS", codigo=celda_padre, otro_codigo=prev_cell, fila_orig=prev_fila)
+                    else:
+                        seen_coords_cells[coord_key] = (celda_padre, fila_excel)
+
+                    # D. Discrepancia Dist.Celda declarada vs 3D (> 5m ALERTA)
+                    if resolved_dist_celda is not None and largo_calc is not None:
+                        diff_d = abs(largo_calc - resolved_dist_celda)
+                        if diff_d > GEOMECHANICAL_THRESHOLDS["DISTANCIA_CELDA_MAX_DIFF"]:
+                            registrar_error("Dist.Celda", resolved_dist_celda, "ERR_DISTANCIA_CELDA_DISCREPANCIA_COORD", decl=round(resolved_dist_celda, 2), calc=round(largo_calc, 2), diff=round(diff_d, 2))
+
+                # E. Cota vs Nivel (Tolerancia 20m)
+                raw_nivel = get_row_val(row_dict, "Nivel") or get_row_val(row_dict, "NIVEL")
+                nivel_val = sanitize_value(raw_nivel, float)
+                if nivel_val is not None and cf is not None and ct is not None:
+                    cota_prom = (cf + ct) / 2.0
+                    diff_nivel = abs(cota_prom - nivel_val)
+                    if diff_nivel > GEOMECHANICAL_THRESHOLDS["COTA_VS_NIVEL_MAX_DIFF"]:
+                        registrar_error("Nivel", raw_nivel, "GEOM_WRN_COTA_VS_NIVEL", cota_prom=round(cota_prom, 2), diff=round(diff_nivel, 2), nivel=raw_nivel)
             
             # Comparar DIP_TALUD de fila hija contra el valor de la fila maestra (parent_properties) con 2° de tolerancia
             if not is_parent_row:
@@ -1026,7 +1115,8 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
             validate_geomechanical_properties(row_dict, registrar_error, resolved_camp)
             validate_lithology_correlation(row_dict, registrar_error, project=project)
             
-        validate_structural_row(row_dict, resolved_dist_celda, registrar_error)
+        curr_coords = parent_coords_map.get(active_block_key)
+        validate_structural_row(row_dict, resolved_dist_celda, registrar_error, parent_coords=curr_coords)
 
         if not row_has_errors: total_ok += 1
 

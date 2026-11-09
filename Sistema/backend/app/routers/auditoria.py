@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 uploads_dir = os.path.join(BASE_DIR, "uploads")
 
 # --- SISTEMA CENTRALIZADO (SSOT) DE REGLAS DE VALIDACIÓN GEOMECÁNICA ---
-from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
+from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY, get_rules_catalog_data
 from app.core.audit_helpers import (
     safe_int,
     safe_float,
@@ -1348,3 +1348,12 @@ def descargar_reporte_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@router.get("/geomecanica/reglas")
+@router.get("/auditoria/reglas")
+def obtener_catalogo_reglas():
+    """
+    Retorna el catálogo completo de reglas de consistencia de auditoría
+    con metadatos, severidades, categorías, columnas y ejemplos didácticos.
+    """
+    return get_rules_catalog_data()

@@ -8,11 +8,27 @@ class RuleCategory:
 
 
 class ErrorRule:
-    def __init__(self, code: str, category_code: str, columns: list, message_template: str):
+    def __init__(
+        self, 
+        code: str, 
+        category_code: str, 
+        columns: list, 
+        message_template: str,
+        description: str = "",
+        technical_formula: str = "",
+        example_ok: str = "",
+        example_error: str = "",
+        tipo_mapeo: str = "Mapeo de Celdas"
+    ):
         self.code = code
         self.category_code = category_code
         self.columns = columns
         self.message_template = message_template
+        self.description = description
+        self.technical_formula = technical_formula
+        self.example_ok = example_ok
+        self.example_error = example_error
+        self.tipo_mapeo = tipo_mapeo
 
     def format_message(self, **kwargs) -> str:
         try:
@@ -24,7 +40,7 @@ class ErrorRule:
 
 # 1. CATEGORÍAS MAESTRAS (Reemplaza la lista estática y desordenada anterior)
 CATEGORIES_REGISTRY = {
-    # Alertas Críticas (Física, Rangos y Catálogos obligatorios)
+    # Alertas (Física, Rangos y Catálogos obligatorios)
     "CAT_DIP_TALUD_RANGO": RuleCategory(
         "CAT_DIP_TALUD_RANGO", 
         "Ángulo del talud fuera del rango [-90, 90] grados.", 
@@ -37,12 +53,12 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_AGUA_LIMITE_EXCEDIDO": RuleCategory(
         "CAT_AGUA_LIMITE_EXCEDIDO", 
-        "Valor de agua '76 / '89 excede los límites reales de la escala.", 
+        "Valor de agua '76 / '89 fuera del rango de la escala.", 
         "ALERTA"
     ),
     "CAT_AGUA_INCONGRUENTE": RuleCategory(
         "CAT_AGUA_INCONGRUENTE", 
-        "Rating de agua '76 / '89 es incongruente con el código.", 
+        "El valor de agua '76 / '89 no coincide con el código.", 
         "ALERTA"
     ),
     "CAT_DUREZA_INVALIDA": RuleCategory(
@@ -52,12 +68,12 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_RESISTENCIA_LIMITE_EXCEDIDO": RuleCategory(
         "CAT_RESISTENCIA_LIMITE_EXCEDIDO", 
-        "Rating de resistencia '76 / '89 fuera del límite real.", 
+        "Puntaje de resistencia '76 / '89 fuera del rango permitido.", 
         "ALERTA"
     ),
     "CAT_RESISTENCIA_INCONGRUENTE": RuleCategory(
         "CAT_RESISTENCIA_INCONGRUENTE", 
-        "Resistencia '76 / '89 es incongruente con la dureza.", 
+        "El puntaje de resistencia '76 / '89 no coincide con la dureza.", 
         "ALERTA"
     ),
     "CAT_CONTROL_ESTRUCTURAL_FUERA_LIMITES": RuleCategory(
@@ -67,7 +83,7 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_EFECTOS_VOLADURA_EXCEDE_ESCALA": RuleCategory(
         "CAT_EFECTOS_VOLADURA_EXCEDE_ESCALA", 
-        "Efecto de voladura '76 / '89 excede los límites de la escala.", 
+        "Efecto de voladura '76 / '89 fuera de la escala [1, 6].", 
         "ALERTA"
     ),
     "CAT_RQD_SUPERIOR_100": RuleCategory(
@@ -77,12 +93,12 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_RQD_INCONGRUENTE": RuleCategory(
         "CAT_RQD_INCONGRUENTE", 
-        "Rating de RQD '76 / '89 es incongruente con el porcentaje.", 
+        "El puntaje de RQD '76 / '89 no coincide con el porcentaje.", 
         "ALERTA"
     ),
     "CAT_ESPACIAMIENTO_PROMEDIO_CERO": RuleCategory(
         "CAT_ESPACIAMIENTO_PROMEDIO_CERO", 
-        "Inconsistencia: El espaciamiento promedio '76 / '89 es de 0.0 m (debe ser mayor a cero).", 
+        "El espaciamiento promedio '76 / '89 no puede ser 0.0 m (debe ser mayor a cero).", 
         "ALERTA"
     ),
     "CAT_ESPACIAMIENTO_PROMEDIO_NEGATIVO": RuleCategory(
@@ -92,12 +108,12 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_ESPACIAMIENTO_RATING_RANGO": RuleCategory(
         "CAT_ESPACIAMIENTO_RATING_RANGO", 
-        "Valor de rating de espaciamiento '76 / '89 fuera de rango.", 
+        "Puntaje de espaciamiento '76 / '89 fuera de rango.", 
         "ALERTA"
     ),
     "CAT_ESPACIAMIENTO_NO_ALINEADO": RuleCategory(
         "CAT_ESPACIAMIENTO_NO_ALINEADO", 
-        "Rating de espaciamiento '76 / '89 no se alinea con el promedio.", 
+        "El puntaje de espaciamiento '76 / '89 no coincide con el promedio.", 
         "ALERTA"
     ),
     "CAT_TIPO_ESTRUCTURA_INVALIDO": RuleCategory(
@@ -142,7 +158,7 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_UCS_DIVERGENTE_IS50": RuleCategory(
         "CAT_UCS_DIVERGENTE_IS50", 
-        "UCS es divergente a Is50.", 
+        "Los valores de UCS e Is50 no guardan relación física válida.", 
         "ALERTA"
     ),
     "CAT_LITOLOGIA_COMBINACION_INVALIDA": RuleCategory(
@@ -152,7 +168,7 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_UNIDAD_LITOLOGICA_INCONGRUENTE": RuleCategory(
         "CAT_UNIDAD_LITOLOGICA_INCONGRUENTE", 
-        "Unidad litológica es incongruente con la litología.", 
+        "La unidad litológica no coincide con la litología.", 
         "ALERTA"
     ),
     "CAT_DIP_ESTRUC_RANGO": RuleCategory(
@@ -173,12 +189,12 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_CONTINUIDAD_NEGATIVA": RuleCategory(
         "CAT_CONTINUIDAD_NEGATIVA", 
-        "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo.", 
+        "La continuidad no puede ser un valor negativo.", 
         "ALERTA"
     ),
     "CAT_ESPACIAMIENTO_NEGATIVO": RuleCategory(
         "CAT_ESPACIAMIENTO_NEGATIVO", 
-        "El espaciamiento de discontinuidad no puede ser un valor negativo.", 
+        "El espaciamiento no puede ser un valor negativo.", 
         "ALERTA"
     ),
     "CAT_NUMERO_ESTRUCTURAS_DECIMAL": RuleCategory(
@@ -188,44 +204,44 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_CELDA_PADRE_MISSING": RuleCategory(
         "CAT_CELDA_PADRE_MISSING", 
-        "La fila no posee una estación de mapeo válida asociada.", 
+        "La fila no tiene una celda de mapeo asociada en CELDA.", 
         "ALERTA"
     ),
 
     # Advertencias de Consistencia y Formato
     "CAT_AGUA_VALOR_MEDIO": RuleCategory(
         "CAT_AGUA_VALOR_MEDIO", 
-        "El valor de agua '76 / '89 es un valor medio no exacto.", 
+        "El valor de agua '76 / '89 no es un valor estándar del catálogo.", 
         "ADVERTENCIA"
     ),
     "CAT_RESISTENCIA_VALOR_ALEJADO": RuleCategory(
         "CAT_RESISTENCIA_VALOR_ALEJADO", 
-        "Puntaje de resistencia '76 / '89 es un valor alejado no válido.", 
+        "El puntaje de resistencia '76 / '89 no coincide con el catálogo.", 
         "ADVERTENCIA"
     ),
     "CAT_EFECTOS_VOLADURA_VALOR_MEDIO": RuleCategory(
         "CAT_EFECTOS_VOLADURA_VALOR_MEDIO", 
-        "Puntaje de efectos de voladura '76 / '89 es un valor medio no exacto.", 
+        "El puntaje de efectos de voladura '76 / '89 no es un valor estándar del catálogo.", 
         "ADVERTENCIA"
     ),
     "CAT_RQD_VAL_VALOR_ALEJADO": RuleCategory(
         "CAT_RQD_VAL_VALOR_ALEJADO", 
-        "Puntaje de RQD '76 / '89 es un valor alejado no válido.", 
+        "El puntaje de RQD '76 / '89 no coincide con el catálogo.", 
         "ADVERTENCIA"
     ),
     "CAT_ESPACIAMIENTO_VALOR_MEDIO": RuleCategory(
         "CAT_ESPACIAMIENTO_VALOR_MEDIO", 
-        "Puntaje de espaciamiento '76 / '89 es un valor medio no exacto.", 
+        "El puntaje de espaciamiento '76 / '89 no es un valor estándar del catálogo.", 
         "ADVERTENCIA"
     ),
     "CAT_TIPO_ESTRUCTURA_J": RuleCategory(
         "CAT_TIPO_ESTRUCTURA_J", 
-        "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN'.", 
+        "Tipo de estructura geológica 'J' debe normalizarse a 'JN'.", 
         "ADVERTENCIA"
     ),
     "CAT_UCS_VS_IS50_K_DIVERGENTE": RuleCategory(
         "CAT_UCS_VS_IS50_K_DIVERGENTE", 
-        "Divergencia de resistencia uniaxial (UCS vs Is50 * K).", 
+        "El valor de UCS difiere del producto Is50 * K.", 
         "ADVERTENCIA"
     ),
     
@@ -237,17 +253,64 @@ CATEGORIES_REGISTRY = {
     ),
     "CAT_DIP_TALUD_DISCREPANCIA": RuleCategory(
         "CAT_DIP_TALUD_DISCREPANCIA",
-        "Discrepancia en inclinación del talud con respecto al valor esperado.",
+        "Diferencia entre DIP_TALUD y el valor esperado de la celda.",
         "ADVERTENCIA"
     ),
     "CAT_DIP_DISCREPANCIA_COORD": RuleCategory(
         "CAT_DIP_DISCREPANCIA_COORD",
-        "Discrepancia en inclinación (Dip) del taladro/celda con respecto a las coordenadas.",
+        "Diferencia entre DIP y el calculado por coordenadas.",
         "ADVERTENCIA"
     ),
     "CAT_AZ_HOLE_DISCREPANCIA": RuleCategory(
         "CAT_AZ_HOLE_DISCREPANCIA",
-        "Discrepancia en azimuth/dirección con respecto a las coordenadas.",
+        "Diferencia entre AZ_HOLE y el calculado por coordenadas.",
+        "ADVERTENCIA"
+    ),
+
+    # Nuevas Categorías Geométricas, Duplicados y Estructurales
+    "CAT_GEOM_COORDENADAS": RuleCategory(
+        "CAT_GEOM_COORDENADAS",
+        "Coordenadas fuera del rango del proyecto.",
+        "ALERTA"
+    ),
+    "CAT_GEOM_LONGITUD": RuleCategory(
+        "CAT_GEOM_LONGITUD",
+        "Celda con distancia cero (FROM y TO iguales).",
+        "ALERTA"
+    ),
+    "CAT_GEOM_NIVEL": RuleCategory(
+        "CAT_GEOM_NIVEL",
+        "Diferencia entre la Cota promedio y el Nivel.",
+        "ADVERTENCIA"
+    ),
+    "CAT_DUPLICADOS_CELDA": RuleCategory(
+        "CAT_DUPLICADOS_CELDA",
+        "Código de celda repetido en el archivo.",
+        "ALERTA"
+    ),
+    "CAT_DUPLICADOS_GEOMETRIA": RuleCategory(
+        "CAT_DUPLICADOS_GEOMETRIA",
+        "Coordenadas FROM-TO repetidas en otra celda.",
+        "ALERTA"
+    ),
+    "CAT_DISTANCIA_CELDA": RuleCategory(
+        "CAT_DISTANCIA_CELDA",
+        "Diferencia entre Dist.Celda y coordenadas 3D.",
+        "ALERTA"
+    ),
+    "CAT_ESTRUCTURA_LIMITES": RuleCategory(
+        "CAT_ESTRUCTURA_LIMITES",
+        "Dist. de estr. supera la longitud de la celda.",
+        "ALERTA"
+    ),
+    "CAT_ESTRUCTURA_GEOMETRIA": RuleCategory(
+        "CAT_ESTRUCTURA_GEOMETRIA",
+        "Coordenadas (x, y, z) de la estructura fuera de la línea de la celda.",
+        "ALERTA"
+    ),
+    "CAT_ESTRUCTURA_CALCULO": RuleCategory(
+        "CAT_ESTRUCTURA_CALCULO",
+        "Diferencia entre coordenadas declaradas (x, y, z) y coordenadas calculadas.",
         "ADVERTENCIA"
     ),
 
@@ -258,6 +321,34 @@ CATEGORIES_REGISTRY = {
         "VACIO"
     )
 }
+
+# =============================================================================
+# UMBRALES Y PARÁMETROS GEOMECÁNICOS DEL PROYECTO (SSOT CENTRALIZADO)
+# =============================================================================
+# Edita aquí los límites y tolerancias para que se sincronicen automáticamente
+# tanto en el motor de validación del Excel como en el Diccionario de Reglas.
+GEOMECHANICAL_THRESHOLDS = {
+    # Coordenadas UTM y Elevaciones del tajo del proyecto
+    "COORD_ESTE_MIN": 790000.0,
+    "COORD_ESTE_MAX": 795000.0,
+    "COORD_NORTE_MIN": 8400000.0,
+    "COORD_NORTE_MAX": 8450000.0,
+    "COORD_COTA_MIN": 3400.0,  # Límite inferior de cota (actualizado a 3400)
+    "COORD_COTA_MAX": 4500.0,
+
+    # Coherencia Cota promedio vs Nivel declarado (bancos separados 15 m)
+    "COTA_VS_NIVEL_MAX_DIFF": 20.0,
+
+    # Coherencia Distancia Euclidiana 3D vs Dist.Celda declarada
+    "DISTANCIA_CELDA_MAX_DIFF": 0.30,
+
+    # Tolerancia longitud estructura vs ventana (+0.03 m = 3 cm)
+    "ESTRUCTURA_DISTANCIA_TOLERANCIA": 0.03,
+
+    # Tolerancia ortogonal y angular de estructura (+0.30 m = 30 cm)
+    "ESTRUCTURA_COORD_TOLERANCIA": 0.30,
+}
+
 
 # 2. REGLAS ESPECÍFICAS DE ERROR
 RULES_REGISTRY = {
@@ -286,37 +377,37 @@ RULES_REGISTRY = {
         "ERR_AGUA_76_LIMITE_EXCEDIDO",
         "CAT_AGUA_LIMITE_EXCEDIDO",
         ["CONDICION DE AGUA VALOR  '76"],
-        "Valor de agua '76 excede los límites reales de la escala [0, 10]. Valor ingresado: {value}."
+        "El valor de agua '76 ({value}) está fuera de la escala [0, 10]."
     ),
     "ERR_AGUA_89_LIMITE_EXCEDIDO": ErrorRule(
         "ERR_AGUA_89_LIMITE_EXCEDIDO",
         "CAT_AGUA_LIMITE_EXCEDIDO",
         ["CONDICION DE AGUA VALOR '89"],
-        "Valor de agua '89 excede los límites reales de la escala [0, 15]. Valor ingresado: {value}."
+        "El valor de agua '89 ({value}) está fuera de la escala [0, 15]."
     ),
     "ERR_AGUA_76_INCONGRUENTE": ErrorRule(
         "ERR_AGUA_76_INCONGRUENTE",
         "CAT_AGUA_INCONGRUENTE",
         ["CONDICION DE AGUA VALOR  '76", "CONDICION DE AGUA  '76."],
-        "Rating de agua '76 es incongruente con el código. Valor ingresado: {value}, Código: '{code_val}'. Se esperaba {expected} según catálogo."
+        "El valor de agua '76 ({value}) no coincide con el código '{code_val}'. Debe ser {expected}."
     ),
     "ERR_AGUA_89_INCONGRUENTE": ErrorRule(
         "ERR_AGUA_89_INCONGRUENTE",
         "CAT_AGUA_INCONGRUENTE",
         ["CONDICION DE AGUA VALOR '89", "CONDICION DE AGUA  '89"],
-        "Rating de agua '89 es incongruente con el código. Valor ingresado: {value}, Código: '{code_val}'. Se esperaba {expected} según catálogo."
+        "El valor de agua '89 ({value}) no coincide con el código '{code_val}'. Debe ser {expected}."
     ),
     "WRN_AGUA_76_VALOR_MEDIO": ErrorRule(
         "WRN_AGUA_76_VALOR_MEDIO",
         "CAT_AGUA_VALOR_MEDIO",
         ["CONDICION DE AGUA VALOR  '76"],
-        "El valor de agua '76 es un valor medio no exacto. Valor ingresado: {value}. Valores permitidos: [10, 7, 4, 0]."
+        "El valor de agua '76 ({value}) no es un valor estándar del catálogo. Opciones: [10, 7, 4, 0]."
     ),
     "WRN_AGUA_89_VALOR_MEDIO": ErrorRule(
         "WRN_AGUA_89_VALOR_MEDIO",
         "CAT_AGUA_VALOR_MEDIO",
         ["CONDICION DE AGUA VALOR '89"],
-        "El valor de agua '89 es un valor medio no exacto. Valor ingresado: {value}. Valores permitidos: [15, 10, 7, 4, 0]."
+        "El valor de agua '89 ({value}) no es un valor estándar del catálogo. Opciones: [15, 10, 7, 4, 0]."
     ),
 
     # DUREZA & RESISTENCIA
@@ -336,37 +427,37 @@ RULES_REGISTRY = {
         "ERR_RESISTENCIA_76_LIMITE_EXCEDIDO",
         "CAT_RESISTENCIA_LIMITE_EXCEDIDO",
         ["RESISTENCIA ESTIMADA VALOR  '76"],
-        "Rating de resistencia '76 fuera del límite real [0, 15]. Valor ingresado: {value}."
+        "El puntaje de resistencia '76 ({value}) está fuera de la escala [0, 15]."
     ),
     "ERR_RESISTENCIA_89_LIMITE_EXCEDIDO": ErrorRule(
         "ERR_RESISTENCIA_89_LIMITE_EXCEDIDO",
         "CAT_RESISTENCIA_LIMITE_EXCEDIDO",
         ["RESISTENCIA ESTIMADA VALOR '89"],
-        "Rating de resistencia '89 fuera del límite real [0, 15]. Valor ingresado: {value}."
+        "El puntaje de resistencia '89 ({value}) está fuera de la escala [0, 15]."
     ),
     "ERR_RESISTENCIA_76_INCONGRUENTE": ErrorRule(
         "ERR_RESISTENCIA_76_INCONGRUENTE",
         "CAT_RESISTENCIA_INCONGRUENTE",
         ["RESISTENCIA ESTIMADA VALOR  '76", "DUREZA  '76"],
-        "Resistencia '76 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Se esperaba {expected} (Tolerancia ±0.2)."
+        "El puntaje de resistencia '76 ({value}) no coincide con la dureza '{dureza_val}'. Debe ser {expected} (tolerancia ±0.2)."
     ),
     "ERR_RESISTENCIA_89_INCONGRUENTE": ErrorRule(
         "ERR_RESISTENCIA_89_INCONGRUENTE",
         "CAT_RESISTENCIA_INCONGRUENTE",
         ["RESISTENCIA ESTIMADA VALOR '89", "DUREZA '89"],
-        "Resistencia '89 es incongruente con la dureza. Valor ingresado: {value}, Dureza: '{dureza_val}'. Rango de rating esperado: {expected}."
+        "El puntaje de resistencia '89 ({value}) no coincide con la dureza '{dureza_val}'. Debe estar en el rango {expected}."
     ),
     "WRN_RESISTENCIA_76_VALOR_ALEJADO": ErrorRule(
         "WRN_RESISTENCIA_76_VALOR_ALEJADO",
         "CAT_RESISTENCIA_VALOR_ALEJADO",
         ["RESISTENCIA ESTIMADA VALOR  '76"],
-        "Puntaje de resistencia '76 es un valor alejado no válido. Valor ingresado: {value}. Valores discretos estándar: [0, 1, 2, 4, 7, 12, 15]."
+        "El puntaje de resistencia '76 ({value}) no coincide con los valores del catálogo: [0, 1, 2, 4, 7, 12, 15]."
     ),
     "WRN_RESISTENCIA_89_VALOR_ALEJADO": ErrorRule(
         "WRN_RESISTENCIA_89_VALOR_ALEJADO",
         "CAT_RESISTENCIA_VALOR_ALEJADO",
         ["RESISTENCIA ESTIMADA VALOR '89"],
-        "El rating de Resistencia '89 ingresado ({value}) está fuera de los límites del catálogo. Rangos válidos: R0 (0.0), R1 (1.5) o R2-R6 (1.5 a 15.0)."
+        "El puntaje de resistencia '89 ({value}) está fuera de los límites del catálogo. Rangos válidos: R0 (0.0), R1 (1.5) o R2-R6 (1.5 a 15.0)."
     ),
 
     # CONTROL ESTRUCTURAL
@@ -388,25 +479,25 @@ RULES_REGISTRY = {
         "ERR_EFECTOS_VOLADURA_76_EXCEDE_ESCALA",
         "CAT_EFECTOS_VOLADURA_EXCEDE_ESCALA",
         ["EFECTOS DE VOLADURA  '76"],
-        "Efecto de voladura '76 excede los límites de la escala [1, 6]. Valor ingresado: {value}."
+        "El efecto de voladura '76 ({value}) está fuera de la escala [1, 6]."
     ),
     "ERR_EFECTOS_VOLADURA_89_EXCEDE_ESCALA": ErrorRule(
         "ERR_EFECTOS_VOLADURA_89_EXCEDE_ESCALA",
         "CAT_EFECTOS_VOLADURA_EXCEDE_ESCALA",
         ["EFECTOS DE VOLADURA '89"],
-        "Efecto de voladura '89 excede los límites de la escala [1, 6]. Valor ingresado: {value}."
+        "El efecto de voladura '89 ({value}) está fuera de la escala [1, 6]."
     ),
     "WRN_EFECTOS_VOLADURA_76_VALOR_MEDIO": ErrorRule(
         "WRN_EFECTOS_VOLADURA_76_VALOR_MEDIO",
         "CAT_EFECTOS_VOLADURA_VALOR_MEDIO",
         ["EFECTOS DE VOLADURA  '76"],
-        "Puntaje de efectos de voladura '76 es un valor medio no exacto. Valor ingresado: {value}. Se sugieren los valores estándar de catálogo: {allowed_values}."
+        "El valor de efectos de voladura '76 ({value}) no es un valor estándar del catálogo: {allowed_values}."
     ),
     "WRN_EFECTOS_VOLADURA_89_VALOR_MEDIO": ErrorRule(
         "WRN_EFECTOS_VOLADURA_89_VALOR_MEDIO",
         "CAT_EFECTOS_VOLADURA_VALOR_MEDIO",
         ["EFECTOS DE VOLADURA '89"],
-        "Puntaje de efectos de voladura '89 es un valor medio no exacto. Valor ingresado: {value}. Se sugieren los valores estándar de catálogo: {allowed_values}."
+        "El valor de efectos de voladura '89 ({value}) no es un valor estándar del catálogo: {allowed_values}."
     ),
 
     # RQD
@@ -414,37 +505,37 @@ RULES_REGISTRY = {
         "WRN_RQD_VAL_76_VALOR_ALEJADO",
         "CAT_RQD_VAL_VALOR_ALEJADO",
         ["RQD - VALOR  '76"],
-        "Puntaje de RQD '76 es un valor alejado no válido. Valor ingresado: {value}. Valores de catálogo esperados: [3, 8, 13, 17, 20]."
+        "El puntaje de RQD '76 ({value}) no coincide con los valores del catálogo: [3, 8, 13, 17, 20]."
     ),
     "WRN_RQD_VAL_89_VALOR_ALEJADO": ErrorRule(
         "WRN_RQD_VAL_89_VALOR_ALEJADO",
         "CAT_RQD_VAL_VALOR_ALEJADO",
         ["RQD - VALOR '89"],
-        "Rating de RQD '89 fuera del límite real [3.0, 20.0]. Valor ingresado: {value}."
+        "El puntaje de RQD '89 ({value}) está fuera de la escala [3.0, 20.0]."
     ),
     "ERR_RQD_76_SUPERIOR_100": ErrorRule(
         "ERR_RQD_76_SUPERIOR_100",
         "CAT_RQD_SUPERIOR_100",
         ["RQD  '76"],
-        "Porcentaje de RQD '76 no puede ser superior al 100%. Porcentaje actual: {value}%."
+        "El porcentaje de RQD '76 ({value}%) no puede ser superior a 100%."
     ),
     "ERR_RQD_89_SUPERIOR_100": ErrorRule(
         "ERR_RQD_89_SUPERIOR_100",
         "CAT_RQD_SUPERIOR_100",
         ["RQD '89"],
-        "Porcentaje de RQD '89 no puede ser superior al 100%. Porcentaje actual: {value}%."
+        "El porcentaje de RQD '89 ({value}%) no puede ser superior a 100%."
     ),
     "ERR_RQD_76_INCONGRUENTE": ErrorRule(
         "ERR_RQD_76_INCONGRUENTE",
         "CAT_RQD_INCONGRUENTE",
         ["RQD - VALOR  '76", "RQD  '76"],
-        "Rating de RQD '76 es incongruente con el porcentaje. Valor ingresado: {value}, Porcentaje: {pct}%. Se esperaba {expected} (Tolerancia ±0.2)."
+        "El puntaje de RQD '76 ({value}) no coincide con el porcentaje ({pct}%). Debe ser {expected} (tolerancia ±0.2)."
     ),
     "ERR_RQD_89_INCONGRUENTE": ErrorRule(
         "ERR_RQD_89_INCONGRUENTE",
         "CAT_RQD_INCONGRUENTE",
         ["RQD - VALOR '89", "RQD '89"],
-        "Rating de RQD '89 es incongruente con el porcentaje. Valor ingresado: {value}, Porcentaje: {pct}%. Rango esperado: {expected}."
+        "El puntaje de RQD '89 ({value}) no coincide con el porcentaje ({pct}%). Debe estar en el rango {expected}."
     ),
 
     # ESPACIAMIENTO
@@ -452,61 +543,61 @@ RULES_REGISTRY = {
         "ERR_ESPACIAMIENTO_PROMEDIO_76_NEGATIVO",
         "CAT_ESPACIAMIENTO_PROMEDIO_NEGATIVO",
         ["ESPACIAMIENTO PROMEDIO   '76"],
-        "El espaciamiento promedio '76 no puede ser negativo. Valor ingresado: {value} m."
+        "El espaciamiento promedio '76 no puede ser negativo ({value} m)."
     ),
     "ERR_ESPACIAMIENTO_PROMEDIO_89_NEGATIVO": ErrorRule(
         "ERR_ESPACIAMIENTO_PROMEDIO_89_NEGATIVO",
         "CAT_ESPACIAMIENTO_PROMEDIO_NEGATIVO",
         ["ESPACIAMIENTO PROMEDIO '89"],
-        "El espaciamiento promedio '89 no puede ser negativo. Valor ingresado: {value} m."
+        "El espaciamiento promedio '89 no puede ser negativo ({value} m)."
     ),
     "ERR_ESPACIAMIENTO_PROMEDIO_76_CERO": ErrorRule(
         "ERR_ESPACIAMIENTO_PROMEDIO_76_CERO",
         "CAT_ESPACIAMIENTO_PROMEDIO_CERO",
         ["ESPACIAMIENTO PROMEDIO   '76"],
-        "Inconsistencia: El espaciamiento promedio '76 es de 0.0 m (debe ser mayor a cero)."
+        "El espaciamiento promedio '76 no puede ser 0.0 m (debe ser mayor a cero)."
     ),
     "ERR_ESPACIAMIENTO_PROMEDIO_89_CERO": ErrorRule(
         "ERR_ESPACIAMIENTO_PROMEDIO_89_CERO",
         "CAT_ESPACIAMIENTO_PROMEDIO_CERO",
         ["ESPACIAMIENTO PROMEDIO '89"],
-        "Inconsistencia: El espaciamiento promedio '89 es de 0.0 m (debe ser mayor a cero)."
+        "El espaciamiento promedio '89 no puede ser 0.0 m (debe ser mayor a cero)."
     ),
     "ERR_ESPACIAMIENTO_VALOR_76_RANGO": ErrorRule(
         "ERR_ESPACIAMIENTO_VALOR_76_RANGO",
         "CAT_ESPACIAMIENTO_RATING_RANGO",
         ["ESPACIAMIENTO - VALOR    '76"],
-        "Valor de rating de espaciamiento '76 fuera del rango [5, 30]. Valor ingresado: {value}."
+        "El puntaje de espaciamiento '76 ({value}) está fuera del rango [5, 30]."
     ),
     "ERR_ESPACIAMIENTO_VALOR_89_RANGO": ErrorRule(
         "ERR_ESPACIAMIENTO_VALOR_89_RANGO",
         "CAT_ESPACIAMIENTO_RATING_RANGO",
         ["ESPACIAMIENTO - VALOR '89"],
-        "Valor de rating de espaciamiento '89 fuera del rango [5, 20]. Valor ingresado: {value}."
+        "El puntaje de espaciamiento '89 ({value}) está fuera del rango [5, 20]."
     ),
     "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO": ErrorRule(
         "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO",
         "CAT_ESPACIAMIENTO_VALOR_MEDIO",
         ["ESPACIAMIENTO - VALOR    '76"],
-        "Puntaje de espaciamiento '76 es un valor medio no exacto. Valor ingresado: {value}. Valores de catálogo estándar: [5, 10, 20, 25, 30]."
+        "El puntaje de espaciamiento '76 ({value}) no coincide con los valores del catálogo: [5, 10, 20, 25, 30]."
     ),
     "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO": ErrorRule(
         "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO",
         "CAT_ESPACIAMIENTO_VALOR_MEDIO",
         ["ESPACIAMIENTO - VALOR '89"],
-        "Puntaje de espaciamiento '89 es un valor medio no exacto. Valor ingresado: {value}. Valores de catálogo estándar: [5, 8, 10, 15, 20]."
+        "El puntaje de espaciamiento '89 ({value}) no coincide con los valores del catálogo: [5, 8, 10, 15, 20]."
     ),
     "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO": ErrorRule(
         "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO",
         "CAT_ESPACIAMIENTO_NO_ALINEADO",
         ["ESPACIAMIENTO - VALOR    '76", "ESPACIAMIENTO PROMEDIO   '76"],
-        "Rating de espaciamiento '76 no se alinea con el promedio. Valor ingresado: {value}, Espaciamiento promedio: {promedio} m. Se esperaba {expected} según la escala discreta R76."
+        "El puntaje de espaciamiento '76 ({value}) no coincide con el promedio ({promedio} m). Debe ser {expected}."
     ),
     "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO": ErrorRule(
         "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO",
         "CAT_ESPACIAMIENTO_NO_ALINEADO",
         ["ESPACIAMIENTO - VALOR '89", "ESPACIAMIENTO PROMEDIO '89"],
-        "Rating de espaciamiento '89 no se alinea con el promedio esperado. Valor ingresado: {value}, Espaciamiento promedio: {promedio} m. Se esperaba {expected} según la escala discreta R89."
+        "El puntaje de espaciamiento '89 ({value}) no coincide con el promedio ({promedio} m). Debe ser {expected}."
     ),
 
     # TIPO DE ESTRUCTURA
@@ -514,13 +605,13 @@ RULES_REGISTRY = {
         "WRN_TIPO_ESTRUCTURA_J",
         "CAT_TIPO_ESTRUCTURA_J",
         ["TIPO"],
-        "Tipo de estructura geológica 'J' sugerida a normalizar por 'JN' según catálogo estándar. Código ingresado: 'J'."
+        "El código de estructura 'J' debe registrarse como 'JN' según el catálogo."
     ),
     "ERR_TIPO_ESTRUCTURA_INVALIDO": ErrorRule(
         "ERR_TIPO_ESTRUCTURA_INVALIDO",
         "CAT_TIPO_ESTRUCTURA_INVALIDO",
         ["TIPO"],
-        "Tipo de estructura geológica no permitida. Valor ingresado: '{value}'. Debe ser uno de {allowed_types}."
+        "Tipo de estructura geológica no permitida: '{value}'. Debe ser uno de {allowed_types}."
     ),
 
     # RELLENOS
@@ -528,13 +619,13 @@ RULES_REGISTRY = {
         "ERR_RELLENO_1_INVALIDO",
         "CAT_RELLENO_INVALIDO",
         ["TIPO DE  RELLENO 1"],
-        "Tipo de relleno no pertenece al catálogo. Relleno 1 ingresado: '{value}'. Catálogo permitido: {allowed_fill_types}."
+        "El tipo de relleno 1 ('{value}') no pertenece al catálogo: {allowed_fill_types}."
     ),
     "ERR_RELLENO_2_INVALIDO": ErrorRule(
         "ERR_RELLENO_2_INVALIDO",
         "CAT_RELLENO_INVALIDO",
         ["TIPO DE  RELLENO 2"],
-        "Tipo de relleno no pertenece al catálogo. Relleno 2 ingresado: '{value}'. Catálogo permitido: {allowed_fill_types}."
+        "El tipo de relleno 2 ('{value}') no pertenece al catálogo: {allowed_fill_types}."
     ),
 
     # JRC
@@ -542,7 +633,7 @@ RULES_REGISTRY = {
         "ERR_JRC_RANGO",
         "CAT_JRC_RANGO",
         ["JRC"],
-        "Valor JRC fuera de rango permitido [0, 20]. Valor ingresado: {value}."
+        "El valor JRC ({value}) está fuera del rango permitido [0, 20]."
     ),
 
     # RUGOSIDAD
@@ -550,7 +641,7 @@ RULES_REGISTRY = {
         "ERR_RUGOSIDAD_RANGO",
         "CAT_RUGOSIDAD_RANGO",
         ["RUGOSIDAD DE ESTRUCTURAS"],
-        "Clase de rugosidad de junta fuera de límites [1, 9]. Valor ingresado: {value}."
+        "La rugosidad de junta ({value}) está fuera del rango [1, 9]."
     ),
 
     # FORMA
@@ -558,7 +649,7 @@ RULES_REGISTRY = {
         "ERR_FORMA_ESTRUCTURA_INVALIDA",
         "CAT_FORMA_ESTRUCTURA_INVALIDA",
         ["FORMA DE ESTRUCTURA"],
-        "Forma de estructura inválida. Debe ser P, C, O, E o I. Valor ingresado: '{value}'."
+        "Forma de estructura inválida: '{value}'. Debe ser P, C, O, E o I."
     ),
 
     # ALTERACIÓN
@@ -566,7 +657,7 @@ RULES_REGISTRY = {
         "ERR_ALTERACION_INVALIDA",
         "CAT_ALTERACION_INVALIDA",
         ["ALTERACION"],
-        "Código de alteración inválido. Código ingresado: '{value}'. Debe ser uno de {allowed_alteration_types}."
+        "Código de alteración inválido: '{value}'. Debe ser uno de {allowed_alteration_types}."
     ),
 
     # ESPESOR & ABERTURA
@@ -574,25 +665,25 @@ RULES_REGISTRY = {
         "ERR_ESPESOR_NEGATIVO",
         "CAT_ESPESOR_NEGATIVO",
         ["ESPESOR mm."],
-        "El espesor del relleno no puede ser un valor negativo. Valor ingresado: {value} mm."
+        "El espesor del relleno no puede ser negativo ({value} mm)."
     ),
     "ERR_ABERTURA_NEGATIVO": ErrorRule(
         "ERR_ABERTURA_NEGATIVO",
         "CAT_ABERTURA_NEGATIVO",
         ["ABERTURA mm."],
-        "La abertura total no puede ser un valor negativo. Valor ingresado: {value} mm."
+        "La abertura total no puede ser negativa ({value} mm)."
     ),
     "ERR_ESPESOR_SUPERIOR_ABERTURA": ErrorRule(
         "ERR_ESPESOR_SUPERIOR_ABERTURA",
         "CAT_ESPESOR_SUPERIOR_ABERTURA",
         ["ESPESOR mm.", "ABERTURA mm."],
-        "Espesor del relleno es superior a la abertura total y no pertenece a F, SZ, BED. Estructura geológica: '{struct_type}', Espesor: {thickness} mm, Abertura total: {aperture} mm."
+        "El espesor del relleno ({thickness} mm) es mayor a la abertura ({aperture} mm) para la estructura '{struct_type}'."
     ),
     "ERR_ABERTURA_EXCEDE_CELDA": ErrorRule(
         "ERR_ABERTURA_EXCEDE_CELDA",
         "CAT_ABERTURA_EXCEDE_CELDA",
         ["ABERTURA mm."],
-        "La abertura de la falla supera la longitud de la celda y no pertenece a F, SZ, BED. Tipo de junta: '{struct_type}', Abertura: {aperture} mm, Longitud de la celda (Dist.Celda): {cell_len} m."
+        "La abertura ({aperture} mm) supera la longitud de la celda ({cell_len} m) para la estructura '{struct_type}'."
     ),
 
     # CONTINUIDAD & ESPACIAMIENTO STRUCT
@@ -600,13 +691,13 @@ RULES_REGISTRY = {
         "ERR_CONTINUIDAD_NEGATIVA",
         "CAT_CONTINUIDAD_NEGATIVA",
         ["CONTINUIDAD m."],
-        "La persistencia de discontinuidad (continuidad) no puede ser un valor negativo. Valor ingresado: {value} m."
+        "La continuidad no puede ser negativa ({value} m)."
     ),
     "ERR_ESPACIAMIENTO_NEGATIVO": ErrorRule(
         "ERR_ESPACIAMIENTO_NEGATIVO",
         "CAT_ESPACIAMIENTO_NEGATIVO",
         ["ESPACIAMIENTO m."],
-        "El espaciamiento de discontinuidad no puede ser un valor negativo. Valor ingresado: {value} m."
+        "El espaciamiento no puede ser negativo ({value} m)."
     ),
 
     # DIP & DIP DIR
@@ -614,16 +705,15 @@ RULES_REGISTRY = {
         "ERR_DIP_ESTRUC_RANGO",
         "CAT_DIP_ESTRUC_RANGO",
         ["DIP"],
-        "Valor de inclinación (Dip) fuera de rango permitido [0, 90] grados. Valor ingresado: {value}°."
+        "El valor de buzamiento (DIP: {value}°) está fuera del rango permitido [0, 90]."
     ),
-
 
     # NÚMERO DE ESTRUCTURAS
     "ERR_NUMERO_ESTRUCTURAS_DECIMAL": ErrorRule(
         "ERR_NUMERO_ESTRUCTURAS_DECIMAL",
         "CAT_NUMERO_ESTRUCTURAS_DECIMAL",
         ["NUMERO DE ESTRUCTURAS"],
-        "En número de estructuras solamente se permiten números enteros. Valor ingresado: {value}."
+        "El número de estructuras debe ser un número entero (se ingresó: {value})."
     ),
 
     # LITOLOGÍA & UCS
@@ -631,25 +721,25 @@ RULES_REGISTRY = {
         "ERR_LITOLOGIA_COMBINACION_INVALIDA",
         "CAT_LITOLOGIA_COMBINACION_INVALIDA",
         ["Lito 1", "Lito 2", "Lito 3"],
-        "Combinación litológica Lito 1-2-3 inválida según el catálogo. Litologías ingresadas -> Lito 1: '{l1}', Lito 2: '{l2}', Lito 3: '{l3}'."
+        "Combinación litológica (Lito 1: '{l1}', Lito 2: '{l2}', Lito 3: '{l3}') no válida según el catálogo."
     ),
     "ERR_UNIDAD_LITOLOGICA_INCONGRUENTE": ErrorRule(
         "ERR_UNIDAD_LITOLOGICA_INCONGRUENTE",
         "CAT_UNIDAD_LITOLOGICA_INCONGRUENTE",
         ["Unidad Litologica"],
-        "Unidad litológica es incongruente con la litología. Unidad ingresada: '{value}'. Se esperaba la unidad geológica '{expected_group}' basada en la litología."
+        "La unidad litológica '{value}' no coincide con la litología registrada. Se esperaba '{expected_group}'."
     ),
     "ERR_UCS_DIVERGENTE_IS50": ErrorRule(
         "ERR_UCS_DIVERGENTE_IS50",
         "CAT_UCS_DIVERGENTE_IS50",
         ["( UCS )  (Mpa)", "is50 (Mpa)"],
-        "UCS es divergente a Is50. UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa."
+        "Los valores de UCS ({ucs_val} MPa) e Is50 ({is50_val} MPa) no guardan relación física válida."
     ),
     "WRN_UCS_VS_IS50_K_DIVERGENTE": ErrorRule(
         "WRN_UCS_VS_IS50_K_DIVERGENTE",
         "CAT_UCS_VS_IS50_K_DIVERGENTE",
         ["( UCS )  (Mpa)", "is50 (Mpa)"],
-        "Divergencia de resistencia uniaxial (UCS vs Is50 * K). UCS ingresado: {ucs_val} MPa, Is50 ingresado: {is50_val} MPa, factor K asociado: {factor_k}, UCS esperado (Is50 * K): {expected_ucs:.2f} MPa."
+        "El valor de UCS ({ucs_val} MPa) difiere del producto Is50 * K ({is50_val} * {factor_k} = {expected_ucs:.2f} MPa)."
     ),
 
     # CELDA PADRE MISSING
@@ -657,7 +747,7 @@ RULES_REGISTRY = {
         "ERR_CELDA_PADRE_MISSING",
         "CAT_CELDA_PADRE_MISSING",
         ["CELDA_PADRE"],
-        "La fila no posee una estación de mapeo válida asociada."
+        "La fila no tiene una celda de mapeo asociada en CELDA."
     ),
 
     # CAMPO OBLIGATORIO VACÍO
@@ -665,7 +755,7 @@ RULES_REGISTRY = {
         "ERR_CAMPO_OBLIGATORIO_VACIO",
         "CAT_CAMPO_OBLIGATORIO_VACIO",
         [],
-        "Campo obligatorio se encuentra vacío. Columna: '{col_key}'."
+        "Campo obligatorio vacío: '{col_key}'."
     ),
 
     # RMR CERO
@@ -673,38 +763,188 @@ RULES_REGISTRY = {
         "ERR_RMR_76_CERO",
         "CAT_RMR_CERO",
         ["RMR  '76"],
-        "Inconsistencia crítica: El RMR calculado RMR '76 es de 0.0 (no puede ser cero)."
+        "El valor de RMR '76 no puede ser 0."
     ),
     "ERR_RMR_89_CERO": ErrorRule(
         "ERR_RMR_89_CERO",
         "CAT_RMR_CERO",
         ["RMR '89"],
-        "Inconsistencia crítica: El RMR calculado RMR '89 es de 0.0 (no puede ser cero)."
+        "El valor de RMR '89 no puede ser 0."
     ),
 
-    # GEOMETRIC CONSISTENCY WARNINGS (Gravedad ADVERTENCIA, tolerancia de hasta 2 grados)
+    # CONSISTENCIA GEOMÉTRICA DE DIPS Y COORDENADAS (Tolerancia: 2 grados)
     "WRN_DIP_TALUD_DISCREPANCIA": ErrorRule(
         "WRN_DIP_TALUD_DISCREPANCIA",
         "CAT_DIP_TALUD_DISCREPANCIA",
         ["DIP_TALUD"],
-        "Discrepancia en inclinación del talud: El geotécnico colocó {actual}°, pero el valor esperado de la celda es {expected}° (Excede la tolerancia de 2°)."
+        "La inclinación del talud (DIP_TALUD: {actual}°) difiere del valor esperado ({expected}°). Supera la tolerancia de 2°."
     ),
     "WRN_DIP_DISCREPANCIA_COORD": ErrorRule(
         "WRN_DIP_DISCREPANCIA_COORD",
         "CAT_DIP_DISCREPANCIA_COORD",
         ["DIP"],
-        "Discrepancia en inclinación (Dip) de celda: El valor ingresado es {actual}°, pero el calculado por coordenadas es {expected}° (Excede la tolerancia de 2°)."
+        "El valor de DIP ({actual}°) difiere del calculado por coordenadas ({expected}°). Supera la tolerancia de 2°."
     ),
     "WRN_AZ_HOLE_DISCREPANCIA": ErrorRule(
         "WRN_AZ_HOLE_DISCREPANCIA",
         "CAT_AZ_HOLE_DISCREPANCIA",
         ["AZ_HOLE"],
-        "Discrepancia en azimuth (AZ_HOLE) de celda: El valor ingresado es {actual}°, pero el calculado por coordenadas es {expected}° (Excede la tolerancia de 2°)."
+        "El valor de AZ_HOLE ({actual}°) difiere del calculado por coordenadas ({expected}°). Supera la tolerancia de 2°."
     ),
     "WRN_DIP_DIR_TALUD_DISCREPANCIA": ErrorRule(
         "WRN_DIP_DIR_TALUD_DISCREPANCIA",
         "CAT_AZ_HOLE_DISCREPANCIA",
         ["DIP_DIR_TALUD"],
-        "Discrepancia en dirección del talud (DIP_DIR_TALUD): El valor ingresado es {actual}°, pero el esperado (AZ_HOLE + 90) % 360 es {expected}° (Excede la tolerancia de 2°)."
+        "El valor de DIP_DIR_TALUD ({actual}°) difiere del esperado ({expected}° según AZ_HOLE + 90°). Supera la tolerancia de 2°."
+    ),
+
+    # =========================================================================
+    # NUEVAS REGLAS DE AUDITORÍA (Spec SDD Noviembre 2026)
+    # =========================================================================
+
+    # 1. Coordenadas fuera de rango de proyecto
+    "GEOM_ERR_COORD_FUERA_DE_PROYECTO": ErrorRule(
+        "GEOM_ERR_COORD_FUERA_DE_PROYECTO",
+        "CAT_GEOM_COORDENADAS",
+        ["ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO"],
+        f"La coordenada {{columna}} con valor '{{valor}}' está fuera del rango del proyecto [Este: {int(GEOMECHANICAL_THRESHOLDS['COORD_ESTE_MIN']):,} - {int(GEOMECHANICAL_THRESHOLDS['COORD_ESTE_MAX']):,}, Norte: {int(GEOMECHANICAL_THRESHOLDS['COORD_NORTE_MIN']):,} - {int(GEOMECHANICAL_THRESHOLDS['COORD_NORTE_MAX']):,}, Cota: {int(GEOMECHANICAL_THRESHOLDS['COORD_COTA_MIN'])}-{int(GEOMECHANICAL_THRESHOLDS['COORD_COTA_MAX'])}].".replace(",", " "),
+        description="Revisa que las coordenadas Este, Norte y Cota estén dentro de los límites del proyecto minero.",
+        technical_formula=f"Este ∈ [{int(GEOMECHANICAL_THRESHOLDS['COORD_ESTE_MIN'])}, {int(GEOMECHANICAL_THRESHOLDS['COORD_ESTE_MAX'])}] ∧ Norte ∈ [{int(GEOMECHANICAL_THRESHOLDS['COORD_NORTE_MIN'])}, {int(GEOMECHANICAL_THRESHOLDS['COORD_NORTE_MAX'])}] ∧ Cota ∈ [{int(GEOMECHANICAL_THRESHOLDS['COORD_COTA_MIN'])}, {int(GEOMECHANICAL_THRESHOLDS['COORD_COTA_MAX'])}]",
+        example_ok="ESTE_FROM: 792533.9 m, NORTE_FROM: 8441076.2 m, COTA: 4260.0 msnm",
+        example_error="ESTE_FROM: 79253.9 m (falta un dígito) o ESTE_FROM: 0.0",
+        tipo_mapeo="Mapeo de Celdas"
+    ),
+
+    # 2. Segmento de celda con distancia cero
+    "GEOM_ERR_SEGMENTO_DEGENERADO": ErrorRule(
+        "GEOM_ERR_SEGMENTO_DEGENERADO",
+        "CAT_GEOM_LONGITUD",
+        ["ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO"],
+        "Las coordenadas FROM y TO son iguales. La celda tiene distancia cero.",
+        description="Revisa que la celda tenga longitud física real y no tenga las mismas coordenadas de inicio y fin.",
+        technical_formula="√(ΔX² + ΔY² + ΔZ²) < 0.01 m",
+        example_ok="FROM=(792533.9, 8441076.2, 4260.0), TO=(792539.1, 8441090.3, 4260.0)",
+        example_error="FROM=(792533.9, 8441076.2, 4260.0), TO=(792533.9, 8441076.2, 4260.0)",
+        tipo_mapeo="Mapeo de Celdas"
+    ),
+
+    # 3. Cota promedio vs Nivel
+    "GEOM_WRN_COTA_VS_NIVEL": ErrorRule(
+        "GEOM_WRN_COTA_VS_NIVEL",
+        "CAT_GEOM_NIVEL",
+        ["Nivel", "COTA_FROM", "COTA_TO"],
+        "La cota promedio ({cota_prom} m) no coincide con el Nivel ({nivel}). Diferencia de {diff} m (tolerancia: 20 m).",
+        description="Revisa que la cota promedio entre FROM y TO no se aleje más de 20 m del valor en la columna Nivel.",
+        technical_formula="|((Cota_FROM + Cota_TO)/2) - Nivel| > 20.0 m",
+        example_ok="Nivel: 4260, Cota_FROM: 4260.0 m, Cota_TO: 4260.5 m (Diferencia: 0.25 m)",
+        example_error="Nivel: 3960, Cota_FROM: 4260.0 m, Cota_TO: 4260.0 m (Diferencia: 300 m)",
+        tipo_mapeo="Mapeo de Celdas"
+    ),
+
+    # 4. Código de celda repetido en el libro Excel
+    "ERR_CODIGO_CELDA_DUPLICADO": ErrorRule(
+        "ERR_CODIGO_CELDA_DUPLICADO",
+        "CAT_DUPLICADOS_CELDA",
+        ["CELDA"],
+        "El código de celda '{codigo}' está repetido en el archivo (aparece primero en la fila {fila_orig}).",
+        description="Revisa que el código de la celda no se repita en filas separadas del archivo.",
+        technical_formula="Código de celda único en el archivo",
+        example_ok="Celda 'FW-101' registrada en un solo bloque continuo de filas",
+        example_error="Celda 'FW-101' reaparece en la fila 450 después de haber cerrado en la fila 35",
+        tipo_mapeo="Mapeo de Celdas"
+    ),
+
+    # 5. Coordenadas de celda repetidas en otra celda
+    "ERR_COORDENADAS_CELDA_DUPLICADAS": ErrorRule(
+        "ERR_COORDENADAS_CELDA_DUPLICADAS",
+        "CAT_DUPLICADOS_GEOMETRIA",
+        ["ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO"],
+        "La celda '{codigo}' tiene las mismas coordenadas FROM-TO que la celda '{otro_codigo}' (registrada en la fila {fila_orig}).",
+        description="Revisa que dos celdas con distinto nombre no tengan las mismas coordenadas de inicio y fin.",
+        technical_formula="‖FROM_A - FROM_B‖ ≤ 0.05 m ∧ ‖TO_A - TO_B‖ ≤ 0.05 m",
+        example_ok="Celda A en [FROM1 -> TO1] y Celda B en [FROM2 -> TO2]",
+        example_error="Celda A y Celda B tienen exactamente las mismas coordenadas UTM de inicio y fin",
+        tipo_mapeo="Mapeo de Celdas"
+    ),
+
+    # 6. Distancia euclidiana 3D vs Distancia declarada (> 0.30 m)
+    "ERR_DISTANCIA_CELDA_DISCREPANCIA_COORD": ErrorRule(
+        "ERR_DISTANCIA_CELDA_DISCREPANCIA_COORD",
+        "CAT_DISTANCIA_CELDA",
+        ["Dist.Celda", "ESTE_FROM", "NORTE_FROM", "COTA_FROM", "ESTE_TO", "NORTE_TO", "COTA_TO"],
+        "La distancia declarada en Dist.Celda ({decl} m) difiere de la calculada por coordenadas ({calc} m) en {diff} m (tolerancia: 0.30 m).",
+        description="Compara la columna Dist.Celda contra la distancia real calculada entre FROM y TO.",
+        technical_formula="|D_3D - Dist.Celda| > 0.30 m, donde D_3D = √(ΔX² + ΔY² + ΔZ²)",
+        example_ok="Dist.Celda: 15.0 m, Coordenadas calculan: 15.02 m (Diferencia: 0.02 m)",
+        example_error="Dist.Celda: 15.0 m, Coordenadas calculan: 15.40 m (Diferencia: 0.40 m)",
+        tipo_mapeo="Mapeo de Celdas"
+    ),
+
+    # 7. Distancia de estructura excede celda
+    "ERR_DISTANCIA_ESTRUCTURA_EXCEDE_CELDA": ErrorRule(
+        "ERR_DISTANCIA_ESTRUCTURA_EXCEDE_CELDA",
+        "CAT_ESTRUCTURA_LIMITES",
+        ["Dist. de estr.", "Dist.Celda"],
+        "La columna Dist. de estr. ({dest} m) supera la longitud de la celda ({largo} m).",
+        description="Revisa que la distancia de la estructura no sobrepase la longitud de la celda (Dist.Celda).",
+        technical_formula="d_est ≠ -1 ∧ (d_est < 0 ∨ d_est > Dist.Celda + 0.03 m)",
+        example_ok="Dist.Celda: 15.0 m, Dist. de estr.: 8.5 m (o -1 si no hay registro)",
+        example_error="Dist.Celda: 15.0 m, Dist. de estr.: 22.0 m",
+        tipo_mapeo="Mapeo de Estructuras"
+    ),
+
+    # 8. Coordenadas de estructura fuera de la línea de la celda
+    "ERR_COORD_ESTRUCTURA_FUERA_DE_CELDA": ErrorRule(
+        "ERR_COORD_ESTRUCTURA_FUERA_DE_CELDA",
+        "CAT_ESTRUCTURA_GEOMETRIA",
+        ["x", "y", "z"],
+        "Las coordenadas de la estructura (x={x}, y={y}, z={z}) se desvían {desv} m de la línea entre FROM y TO (tolerancia: 0.30 m).",
+        description="Revisa que las coordenadas (x, y, z) de la estructura estén sobre la línea recta entre FROM y TO.",
+        technical_formula="d_perp = ‖w - t*v‖ > 0.30 m",
+        example_ok="Estructura sobre la línea entre FROM y TO con desviación < 0.03 m",
+        example_error="Estructura desviada a 1.2 m de la línea entre FROM y TO",
+        tipo_mapeo="Mapeo de Estructuras"
+    ),
+
+    # 9. Coordenadas calculadas vs declaradas de estructura (Advertencia fila por fila)
+    "ERR_COORD_ESTRUCTURA_DISCREPANCIA_CALCULO": ErrorRule(
+        "ERR_COORD_ESTRUCTURA_DISCREPANCIA_CALCULO",
+        "CAT_ESTRUCTURA_CALCULO",
+        ["x", "y", "z"],
+        "Las coordenadas declaradas ({decl_x}, {decl_y}, {decl_z}) difieren en {diff} m del cálculo analítico ({calc_x}, {calc_y}, {calc_z}). "
+        "Fórmula: P = FROM + (Dist.estr / L_celda) * (TO - FROM). "
+        "Reemplazo: FROM=({ef}, {nf}, {cf}), TO=({et}, {nt}, {ct}), Dist.estr={dest} m, L_celda={l_scan} m (tolerancia: 0.30 m).",
+        description="Calcula la posición analítica (x, y, z) a lo largo de la celda a partir de Dist. de estr. y la compara con los valores ingresados.",
+        technical_formula="P_calc = FROM + (Dist.estr / L_scan) * (TO - FROM); diff = ‖P_decl - P_calc‖ > 0.30 m",
+        example_ok="Coordenadas declaradas coinciden con el cálculo (diferencia ≤ 0.30 m)",
+        example_error="Las coordenadas declaradas (792533.96, 8441076.22, 4260.01) difieren en 4.04 m del cálculo analítico (792535.34, 8441080.02, 4260.01)",
+        tipo_mapeo="Mapeo de Estructuras"
     )
 }
+
+
+def get_rules_catalog_data():
+    """
+    Retorna el diccionario completo de reglas con sus metadatos, severidad,
+    categoría, columnas afectadas, explicaciones y ejemplos para la UI.
+    """
+    catalog = []
+    for code, rule in RULES_REGISTRY.items():
+        cat = CATEGORIES_REGISTRY.get(rule.category_code)
+        severity = cat.severity if cat else "ALERTA"
+        category_name = cat.name if cat else rule.category_code
+        
+        catalog.append({
+            "code": rule.code,
+            "category_code": rule.category_code,
+            "category_name": category_name,
+            "severity": severity,
+            "columns": rule.columns,
+            "message_template": rule.message_template,
+            "description": rule.description or category_name,
+            "technical_formula": rule.technical_formula,
+            "example_ok": rule.example_ok,
+            "example_error": rule.example_error,
+            "tipo_mapeo": rule.tipo_mapeo
+        })
+    return catalog
