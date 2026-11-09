@@ -74,6 +74,9 @@ cd frontend
 if not exist node_modules (
     echo Instalando modulos de Node.js [esto puede tardar]...
     call npm.cmd install >nul 2>&1
+) else if not exist node_modules\@tanstack\react-table (
+    echo Actualizando dependencias de Node.js (@tanstack)...
+    call npm.cmd install >nul 2>&1
 )
 cd ..
 echo OK: Dependencias instaladas y listas.
