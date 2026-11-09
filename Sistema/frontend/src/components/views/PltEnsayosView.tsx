@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 import PltExcelImportModal from '../modals/PltExcelImportModal';
+import { VirtualizedGrid } from '../../features/grid';
 import { LITHOLOGY_CLASSIFICATION } from '../../utils/catalogData';
 import {
   PLT_COLUMN_DEFS as COLS,
@@ -697,195 +698,36 @@ export default function PltEnsayosView({
         </div>
       </details>
 
-      {/* Tabla de Ensayos */}
-      <div className="overflow-x-auto relative rounded-lg border border-navy-700 bg-navy-950/20">
-        <table className="w-max min-w-full border-collapse border-separate border-spacing-0" style={{ minWidth: '3500px' }}>
-          <thead>
-            <tr className="bg-navy-950 text-slate-400 font-bold uppercase tracking-wider text-xs border-b border-navy-800">
-              <th className="py-3 px-2 text-center sticky left-0 bg-navy-950 z-20 border-r border-b border-navy-800 w-12 min-w-[48px]">#</th>
-              {visibleCols.map(c => (
-                <th
-                  key={c.key}
-                  style={{ width: c.width, minWidth: c.width }}
-                  className={`py-3 px-2 text-center border-r border-b border-navy-800 text-xs select-none font-bold uppercase tracking-wider ${c.computed ? "text-slate-500" : "text-slate-400"
-                    }`}
-                >
-                  {c.label}
-                </th>
-              ))}
-              <th className="py-3 px-2 text-center sticky right-0 bg-navy-950 z-20 border-l border-b border-navy-800 w-[75px] min-w-[75px]">Acción</th>
-            </tr>
-          </thead>
+      {/* Grid Virtualizada Moderna con Editor Flotante, Navegación de Teclado y Paginación (50/100/250) */}
+      <VirtualizedGrid
+        initialRecords={computedRows}
+        rowKey="id"
+        height="650px"
+        defaultPageSize={50}
+        onChange={(updatedRecords) => {
+          if (!hasActiveFilters) {
+            onChange(updatedRecords);
+            return;
+          }
+          const currentFilteredIds = new Set(computedRows.map(r => r.id));
+          const updatedIds = new Set(updatedRecords.map(r => r.id));
+          const updatedMap = new Map(updatedRecords.map(r => [r.id, r]));
 
-          <tbody>
-            {computedRows.map((row, idx) => {
-              const isEven = idx % 2 === 0;
-              const rowBg = isEven ? "bg-navy-900/5" : "bg-navy-950/20";
+          const nextFull = pltEnsayos
+            .filter(orig => !currentFilteredIds.has(orig.id) || updatedIds.has(orig.id))
+            .map(orig => updatedMap.get(orig.id) || orig);
 
-              return (
-                <tr key={row.id} className={`${rowBg} transition-colors border-b border-navy-900/20 hover:bg-navy-900/10`}>
-                  <td className="sticky left-0 bg-navy-950 text-center text-slate-500 font-mono font-bold text-xs py-1 border-r border-b border-navy-800 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.15)] select-none">
-                    {idx + 1}
-                  </td>
-
-                  {visibleCols.map(c => {
-                    const val = row[c.key];
-                    const isCellLocked = (c.key === "celda_mapeo" && filterActiveCell) || c.computed;
-
-                    return (
-                      <td
-                        key={c.key}
-                        style={{ width: c.width, minWidth: c.width }}
-                        className="p-0 border-r border-b border-navy-800 cursor-text hover:bg-navy-900/10 transition-colors animate-fade-in text-xs"
-                      >
-                        {isCellLocked ? (
-                          (() => {
-                            const isValidaCol = c.key === "muestra_valida_longitud" || c.key === "muestra_valida_ancho";
-                            const displayVal = isValidaCol ? (
-                              val === "SÍ" ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 select-none">
-                                  ✓ SÍ
-                                </span>
-                              ) : val === "NO" ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-black bg-rose-500/10 border border-rose-500/20 text-rose-400 select-none">
-                                  ✗ NO
-                                </span>
-                              ) : (
-                                <span className="text-navy-700/60 font-semibold select-none">—</span>
-                              )
-                            ) : (
-                              formatCellValue(val, c) || (
-                                <span className="text-navy-700/60 font-semibold select-none">—</span>
-                              )
-                            );
-
-                            const renderedCell = (
-                              <div className={getCellClassName(c, val)}>
-                                {displayVal}
-                              </div>
-                            );
-
-                            if (c.computed) {
-                              let fId = "";
-                              let params: Record<string, any> = {};
-
-                              if (c.key === "ancho_w") { fId = "plt_ancho_w"; params = { w1: row.ancho_w1, w2: row.ancho_w2, val }; }
-                              else if (c.key === "muestra_valida_longitud") { fId = "plt_valida_long"; params = { l: row.longitud_l, d: row.espesor_d, val }; }
-                              else if (c.key === "muestra_valida_ancho") { fId = "plt_valida_ancho"; params = { d: row.espesor_d, w: row.ancho_w, val }; }
-                              else if (c.key === "diametro_equivalente") { fId = "plt_diam_equiv"; params = { d: row.espesor_d, w: row.ancho_w, val }; }
-                              else if (c.key === "f") { fId = "plt_f_factor"; params = { de: row.diametro_equivalente, val }; }
-                              else if (c.key === "is_mpa") { fId = "plt_is_mpa"; params = { p: row.fuerza_p, de: row.diametro_equivalente, val }; }
-                              else if (c.key === "is_50") { fId = "plt_is50"; params = { isVal: row.is_mpa, f: row.f, val }; }
-                              else if (c.key === "ucs") { fId = "plt_ucs"; params = { is50: row.is_50, k: row.factor_conversion_k, val }; }
-                              else if (c.key === "resistencia_isrm") { fId = "plt_isrm"; params = { ucs: row.ucs, val }; }
-                              else if (c.key === "denominacion_isrm") { fId = "plt_isrm"; params = { ucs: row.ucs, val }; }
-
-                              if (fId) {
-                                return (
-                                  <FormulaTooltipTrigger formulaId={fId} params={params} position="top" enabled={showFormulas}>
-                                    {renderedCell}
-                                  </FormulaTooltipTrigger>
-                                );
-                              }
-                            }
-
-                            return renderedCell;
-                          })()
-                        ) : (
-                          c.type === "select" || c.type === "lito1" || c.type === "lito2" || c.type === "lito3" ? (
-                            (() => {
-                              let options = c.options || [];
-                              if (c.type === "lito1") {
-                                options = Array.from(new Set(LITHOLOGY_CLASSIFICATION.map(e => e.unidad)));
-                              } else if (c.type === "lito2") {
-                                options = getLito2Options(row.litologia_1);
-                              } else if (c.type === "lito3") {
-                                options = getLito3Options(row.litologia_1, row.litologia_2);
-                              }
-
-                              return (
-                                <select
-                                  id={`plt-${c.key}-${idx}`}
-                                  value={val ?? (c.key === "tipo_ensayo" ? "i" : "")}
-                                  onChange={(e) => handleCommitSelect(row.id, c.key, e.target.value)}
-                                  className="bg-transparent text-slate-300 focus:outline-none text-center cursor-pointer w-full text-xs font-semibold py-2 px-1 focus:ring-1 focus:ring-violet-500/50"
-                                >
-                                  {c.key !== "tipo_ensayo" && (
-                                    <option value="" className="bg-navy-950 text-slate-500">—</option>
-                                  )}
-                                  {options.map((o: string) => (
-                                    <option key={o} value={o} className="bg-navy-950 text-slate-100">{o}</option>
-                                  ))}
-                                </select>
-                              );
-                            })()
-                          ) : (
-                            <input
-                              id={`plt-${c.key}-${idx}`}
-                              type={c.type === "date" ? "date" : "text"}
-                              value={getInputValue(row.id, c.key, val)}
-                              onChange={(e) => {
-                                let inputVal = e.target.value;
-                                if (c.type === "int" || c.type === "decimal") {
-                                  const constraints = getPltConstraints(c.key);
-                                  const intDig = constraints ? constraints.intDigits : 5;
-                                  const decDig = constraints ? constraints.decDigits : (c.type === "int" ? 0 : 2);
-
-                                  inputVal = handlePltNumberLimit(inputVal, intDig, decDig);
-
-                                  if (c.key === "nivel") {
-                                    const parsed = parseFloat(inputVal);
-                                    if (!isNaN(parsed) && parsed > 4999) {
-                                      inputVal = "4999";
-                                    }
-                                  }
-                                }
-                                handleInputChange(row.id, c.key, inputVal);
-                              }}
-                              onKeyDown={handleGridKeyDown}
-                              onBlur={(e) => {
-                                handleCommitEdit(row.id, c.key, e.target.value);
-                              }}
-                              className="w-full bg-transparent text-slate-200 text-center focus:outline-none font-normal text-xs py-2.5 px-2 focus:bg-navy-900/50 focus:ring-1 focus:ring-violet-500/50"
-                            />
-                          )
-                        )}
-                      </td>
-                    );
-                  })}
-
-                  <td className="sticky right-0 bg-navy-950 text-center py-1 px-2 border-l border-b border-navy-800 z-10 w-[75px] min-w-[75px]">
-                    <div className="flex items-center justify-center gap-3">
-                      <button
-                        onClick={() => handleInsertRowBelow(idx)}
-                        className="text-slate-500 hover:text-emerald-400 font-black text-sm px-1 transition-colors select-none"
-                        title="Insertar fila abajo"
-                      >
-                        +
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRow(row.id)}
-                        className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:text-red-400 transition-colors flex items-center justify-center mx-auto active:scale-95"
-                        title="Eliminar registro"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-
-            {computedRows.length === 0 && (
-              <tr>
-                <td colSpan={visibleCols.length + 2} className="py-16 text-center text-slate-400 italic bg-navy-950 border-b border-navy-800 text-xs font-semibold select-none">
-                  No se registran ensayos PLT para los filtros aplicados. Haz clic en "Limpiar filtros" o agrega una "Nueva Fila".
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          for (const r of updatedRecords) {
+            if (!pltEnsayos.some(orig => orig.id === r.id)) {
+              nextFull.push(r);
+            }
+          }
+          onChange(nextFull);
+        }}
+        onDeleteRow={(deletedId) => {
+          onChange(pltEnsayos.filter(r => r.id !== deletedId));
+        }}
+      />
 
       {/* 📊 REPORTE RESUMEN MODAL CON GRÁFICOS INTERACTIVOS SVG */}
       {activeModal === 'reporte' && (
