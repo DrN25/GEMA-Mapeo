@@ -24,6 +24,8 @@ import pandas as pd
 from app.core.catalogs import (
     LITHOLOGY_FULL_CATALOG,
     LITHOLOGY_GROUP_SYNONYMS,
+    PROJECT_GEOLOGY_CONFIG,
+    normalize_project_name,
 )
 from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT, COMPACT_FIELD_CATEGORIES
 
@@ -241,23 +243,28 @@ def normalize_lithology_group(group_val: Any) -> str:
     return norm
 
 
-def resolve_expected_lithology(l1: str, l2: str, l3: str) -> Tuple[Optional[str], Optional[float]]:
+def resolve_expected_lithology(l1: str, l2: str, l3: str, project: str = "ferrobamba") -> Tuple[Optional[str], Optional[float]]:
     """
     Resuelve la combinación litológica según la cascada oficial de Ensayos PLT.
-    Soporta sinónimos intrusivos en Lito 1 (ej. MZB, MZQ, MZM, Intrusivo, etc.).
+    Soporta sinónimos intrusivos en Lito 1 y perfiles geológicos multi-proyecto (Ferrobamba / Chalcobamba).
     Retorna (tipo_litologico_esperado, factor_k_esperado).
     """
     l1_norm = _norm_str(l1)
     l2_norm = _norm_str(l2)
     l3_norm = _norm_str(l3)
 
-    for item in LITHOLOGY_FULL_CATALOG:
+    proj_norm = normalize_project_name(project) if project else "ferrobamba"
+    cfg = PROJECT_GEOLOGY_CONFIG.get(proj_norm, {})
+    catalog = cfg.get("catalog") or cfg.get("lithology_catalog") or LITHOLOGY_FULL_CATALOG
+    intrusive_litos = cfg.get("intrusive_codes") or cfg.get("intrusive_litos") or INTRUSIVE_LITOS
+
+    for item in catalog:
         cat_l1 = _norm_str(item.get("lito1"))
         cat_l2 = _norm_str(item.get("lito2"))
         cat_l3 = _norm_str(item.get("lito3"))
 
         if cat_l1 in ("INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS"):
-            m1 = (l1_norm in INTRUSIVE_LITOS) or (l1_norm == cat_l1)
+            m1 = (l1_norm in intrusive_litos) or (l1_norm == cat_l1)
         elif cat_l1:
             m1 = (l1_norm == cat_l1)
         else:

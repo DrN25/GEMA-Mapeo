@@ -937,7 +937,12 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 raise ValueError(f"Código de regla desconocido: {rule_code}")
             cat = CATEGORIES_REGISTRY.get(rule.category_code)
             tipo = cat.severity if cat else "ALERTA"
-            msg = rule.format_message(**msg_kwargs)
+            msg_admin = rule.format_message(es_admin=True, **msg_kwargs)
+            msg_no_admin = rule.format_message(es_admin=False, **msg_kwargs)
+            try:
+                rec_text = rule.recommendation_template.format(**msg_kwargs) if rule.recommendation_template else ""
+            except Exception:
+                rec_text = rule.recommendation_template
             
             # Clasificación de Tipo de Mapeo — usando constantes pre-computadas a nivel de módulo
             col_clean = str(col).strip()
@@ -966,7 +971,10 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 "fila_excel": fila_excel, "celda_padre": celda_padre, "celda_hija": celda_hija,
                 "columna": col, "valor_actual": formatted_val, 
                 "rule_code": rule_code,
-                "tipo_incidencia": tipo, "mensaje": msg,
+                "tipo_incidencia": tipo, 
+                "mensaje": msg_admin,
+                "mensaje_no_admin": msg_no_admin,
+                "recomendacion": rec_text,
                 "campania": str(resolved_camp) if resolved_camp else "N/A", 
                 "geotecnico": resolved_geo if resolved_geo else "N/A", 
                 "sector_geotecnico": resolved_sector,

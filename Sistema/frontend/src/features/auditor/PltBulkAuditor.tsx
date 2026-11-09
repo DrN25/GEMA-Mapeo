@@ -540,9 +540,9 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
 
             {/* Banner de Proceso en Segundo Plano */}
             {processingAuditId && (status === 'loaded' || status === 'idle') && (
-                <div className="bg-cyan-950/40 border border-cyan-500/20 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-400 font-semibold shadow-md animate-fade-in">
+                <div className="bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-500/30 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-900 dark:text-cyan-300 font-semibold shadow-sm dark:shadow-md animate-fade-in">
                     <div className="flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin text-cyan-400" />
+                        <Loader2 size={14} className="animate-spin text-cyan-600 dark:text-cyan-400" />
                         <span>Generando otra revisión PLT en segundo plano{processingFileName ? `: ${processingFileName}` : ''}...</span>
                     </div>
                     <div className="flex gap-2">
@@ -551,13 +551,13 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                                 setSelectedAuditId(processingAuditId);
                                 setStatus('processing');
                             }}
-                            className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 px-2.5 py-1 rounded text-xs font-black transition-all"
+                            className="bg-cyan-500 hover:bg-cyan-600 text-white dark:text-slate-950 px-2.5 py-1 rounded text-xs font-black transition-all cursor-pointer shadow-sm active:scale-95"
                         >
                             Ver Progreso
                         </button>
                         <button
                             onClick={handleCancelProcessing}
-                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-2.5 py-1 rounded text-xs font-black transition-all"
+                            className="bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer active:scale-95"
                         >
                             Cancelar
                         </button>

@@ -90,7 +90,7 @@ export default function AuditoriaHub({ apiBase }: AuditoriaHubProps) {
             {/* Contenedor del Panel de Revisión Activo */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {auditMode === 'mapeo' ? (
-                    <BulkAuditor apiBase={apiBase} onNavigateToRules={() => setAuditMode('reglas')} />
+                    <BulkAuditor apiBase={apiBase} onNavigateToRules={() => setAuditMode('reglas')} variant="simplified" />
                 ) : auditMode === 'plt' ? (
                     <PltBulkAuditor apiBase={apiBase} />
                 ) : (
