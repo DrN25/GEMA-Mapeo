@@ -293,7 +293,7 @@ export const AdminUsersView: React.FC = () => {
             <span>Gestión de Usuarios y Control de Accesos</span>
           </h2>
           <p className="text-slate-400 text-xs mt-1 font-semibold">
-            Administración de Cuentas RBAC y Auditoría del Sistema GEMA
+            Administración de Cuentas RBAC y Revisión del Sistema GEMA
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 justify-start md:justify-end">
@@ -467,7 +467,7 @@ export const AdminUsersView: React.FC = () => {
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                  Usuario Corto (para Auditoría, ej: CBAL) <span className="text-rose-500 font-bold ml-0.5">*</span>
+                  Usuario Corto (para Revisión, ej: CBAL) <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <input
                   type="text"

@@ -174,7 +174,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 const res = await fetch(`${apiBase}/api/auditoria/plt/status?${params.toString()}`, { headers: getAuthHeaders() });
 
                 if (res.status === 404) {
-                    failAudit('not_found', 'La auditoría PLT ya no existe en el servidor (probablemente se reinició o se perdieron los archivos). Vuelve a cargar tu planilla.', auditId);
+                    failAudit('not_found', 'La revisión PLT ya no existe en el servidor (probablemente se reinició o se perdieron los archivos). Vuelve a cargar tu planilla.', auditId);
                     return;
                 }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -207,7 +207,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 if (selectedAuditIdRef.current === auditId) {
                     setStatus('loaded');
                 }
-                setShowProgressToast(`Auditoría PLT finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
+                setShowProgressToast(`Revisión PLT finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
             } catch (e) {
                 fails += 1;
                 if (fails >= MAX_CONSECUTIVE_FAILURES) {
@@ -248,7 +248,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
         }
     };
 
-    // Verificación única de existencia de auditoría
+    // Verificación única de existencia de revisión
     const verifyAuditExists = async (auditId: string) => {
         try {
             const params = new URLSearchParams();
@@ -256,7 +256,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
             const res = await fetch(`${apiBase}/api/auditoria/plt/status?${params.toString()}`, { headers: getAuthHeaders() });
 
             if (res.status === 404) {
-                failAudit('not_found', 'La auditoría PLT ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
+                failAudit('not_found', 'La revisión PLT ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
                 return;
             }
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -267,7 +267,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 return;
             }
             if (data.status !== 'listo') {
-                failAudit('not_found', 'La auditoría solicitada no está completa en el servidor.', auditId);
+                failAudit('not_found', 'La revisión solicitada no está completa en el servidor.', auditId);
                 return;
             }
 
@@ -319,7 +319,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 const data = await res.json();
                 setKpis(data);
             } else if (res.status === 404) {
-                failAudit('not_found', 'La auditoría PLT ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', effectiveAuditId);
+                failAudit('not_found', 'La revisión PLT ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', effectiveAuditId);
             } else if (res.status === 400) {
                 const data = await res.json().catch(() => null);
                 failAudit('processing', data?.detail || 'El procesamiento falló en el servidor.', effectiveAuditId);
@@ -420,7 +420,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
         }
     };
 
-    // Cerrar Auditoría y Volver a la Vista de Carga
+    // Cerrar Revisión y Volver a la Vista de Carga
     const handleCloseView = () => {
         setStatus('idle');
         setSelectedAuditId('');
@@ -441,7 +441,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
     // Cancelar Proceso en Curso
     const handleCancelProcessing = async () => {
         const target = processingAuditId;
-        if (target && !window.confirm('¿Cancelar la auditoría PLT en curso? Se detendrá el procesamiento en el servidor y se eliminarán sus archivos parciales.')) return;
+        if (target && !window.confirm('¿Cancelar la revisión PLT en curso? Se detendrá el procesamiento en el servidor y se eliminarán sus archivos parciales.')) return;
         try {
             if (target) {
                 await fetch(`${apiBase}/api/auditoria/plt/cancelar?audit_id=${target}`, { method: 'POST', headers: getAuthHeaders() });
@@ -454,7 +454,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
         setProcessingFileName('');
         localStorage.removeItem('gema_plt_bulk_auditor_processing_id');
         localStorage.removeItem('gema_plt_bulk_auditor_processing_file');
-        if (target) setShowProgressToast('Auditoría PLT cancelada.');
+        if (target) setShowProgressToast('Revisión PLT cancelada.');
     };
 
     const clearAllFilters = () => {
@@ -495,7 +495,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `reporte_auditoria_qaqc_plt_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            a.download = `reporte_revision_qaqc_plt_${new Date().toISOString().slice(0, 10)}.xlsx`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -516,7 +516,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 onConfirm={handleWizardConfirm}
             />
 
-            {/* Historial de Auditorías (Arriba, visible en todo momento salvo durante subida) */}
+            {/* Historial de Revisiones (Arriba, visible en todo momento salvo durante subida) */}
             {status !== 'uploading' && (
                 <PltAuditHistory
                     history={history}
@@ -540,9 +540,9 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
 
             {/* Banner de Proceso en Segundo Plano */}
             {processingAuditId && (status === 'loaded' || status === 'idle') && (
-                <div className="bg-cyan-950/40 border border-cyan-500/20 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-400 font-semibold shadow-md animate-fade-in">
+                <div className="bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-500/30 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-900 dark:text-cyan-300 font-semibold shadow-sm dark:shadow-md animate-fade-in">
                     <div className="flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin text-cyan-400" />
+                        <Loader2 size={14} className="animate-spin text-cyan-600 dark:text-cyan-400" />
                         <span>Generando otra revisión PLT en segundo plano{processingFileName ? `: ${processingFileName}` : ''}...</span>
                     </div>
                     <div className="flex gap-2">
@@ -551,13 +551,13 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                                 setSelectedAuditId(processingAuditId);
                                 setStatus('processing');
                             }}
-                            className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 px-2.5 py-1 rounded text-xs font-black transition-all"
+                            className="bg-cyan-500 hover:bg-cyan-600 text-white dark:text-slate-950 px-2.5 py-1 rounded text-xs font-black transition-all cursor-pointer shadow-sm active:scale-95"
                         >
                             Ver Progreso
                         </button>
                         <button
                             onClick={handleCancelProcessing}
-                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-2.5 py-1 rounded text-xs font-black transition-all"
+                            className="bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer active:scale-95"
                         >
                             Cancelar
                         </button>
@@ -574,7 +574,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                         </div>
                         <div>
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
-                                Nueva Auditoría PLT Irregular
+                                Nueva Revisión PLT Irregular
                             </h3>
                             <p className="text-xs text-slate-400 max-w-sm mx-auto mt-2 leading-relaxed font-semibold">
                                 Sube una planilla de Ensayos de Carga Puntual (PLT) para evaluar 34 columnas obligatorias, fórmulas con tolerancia e integridad de secuencias A-B-C-D.
@@ -609,7 +609,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                         <div className="space-y-2">
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
                                 {errorKind === 'network' ? 'Conexión con el servidor perdida'
-                                    : errorKind === 'not_found' ? 'Auditoría PLT no encontrada'
+                                    : errorKind === 'not_found' ? 'Revisión PLT no encontrada'
                                     : 'Error de procesamiento'}
                             </h3>
                             <p className="text-xs text-slate-400 leading-relaxed font-semibold max-w-md mx-auto">{message}</p>
@@ -647,7 +647,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                             <span>{status === 'uploading' ? 'Transmitiendo datos...' : (processingFileName ? `Procesando: ${processingFileName}` : 'Procesando Reglas de Consistencia PLT')}</span>
                         </p>
                         <p className="text-xs text-slate-350 leading-relaxed font-semibold">
-                            Evaluando consistencia geométrica, resolviendo cascada litológica, verificando tolerancias en fórmulas y auditando secuencias canónicas A-B-C-D.
+                            Evaluando consistencia geométrica, resolviendo cascada litológica, verificando tolerancias en fórmulas y revisando secuencias canónicas A-B-C-D.
                         </p>
                     </div>
                     <div className="pt-2">
@@ -675,7 +675,7 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h1 className="text-xs font-black uppercase tracking-widest">
-                                            Auditoría QA/QC Ensayos PLT
+                                            Revisión QA/QC Ensayos PLT
                                         </h1>
                                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold uppercase">
                                             {kpis?.proyecto?.toUpperCase() || 'FERROBAMBA'}

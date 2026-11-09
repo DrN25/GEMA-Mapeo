@@ -43,7 +43,7 @@ export default function SaveConfirmModal({
   const hasPltChanges = pltDiff && pltDiff.totalChanges > 0;
   const hasAnyWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
 
-  // Auditoría sincrónica de campos obligatorios
+  // Revisión sincrónica de campos obligatorios
   const mapeoIssues = useMemo(() => {
     return activeWindow ? validateMapeoWindow(activeWindow) : [];
   }, [activeWindow]);
@@ -52,7 +52,7 @@ export default function SaveConfirmModal({
     return Array.isArray(pltEnsayos) && pltEnsayos.length > 0 ? validatePltEnsayosList(pltEnsayos) : [];
   }, [pltEnsayos]);
 
-  // Auditoría sincrónica QA/QC de combinaciones inválidas y errores críticos
+  // Revisión sincrónica QA/QC de combinaciones inválidas y errores críticos
   const qaqcAlerts = useMemo(() => {
     if (!activeWindow) return [];
     const ef = activeWindow.header.este_from || 0;
@@ -118,7 +118,7 @@ export default function SaveConfirmModal({
               <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">
                 Confirmar Guardado de Cambios
               </h3>
-              <p className="text-xs text-slate-400">Auditoría previa a la sincronización en base de datos SQL Server</p>
+              <p className="text-xs text-slate-400">Revisión previa a la sincronización en base de datos SQL Server</p>
             </div>
           </div>
           <button

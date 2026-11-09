@@ -72,6 +72,47 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> Optional[models.Usuario]:
+    """
+    Inyección de dependencia opcional: retorna el usuario autenticado si el token
+    es válido y el usuario está activo. Si no hay token, el token es inválido, expirado,
+    o el usuario no existe/está inactivo, retorna None sin lanzar excepción 401.
+    """
+    jwt_token = token
+    if not jwt_token and authorization:
+        if authorization.startswith("Bearer "):
+            jwt_token = authorization.split(" ")[1]
+        else:
+            jwt_token = authorization
+
+    if not jwt_token:
+        return None
+
+    payload = decode_access_token(jwt_token)
+    if not payload:
+        return None
+
+    username_or_email = payload.get("sub")
+    if not username_or_email:
+        return None
+
+    try:
+        user = db.query(models.Usuario).filter(
+            (models.Usuario.usuario == username_or_email) | (models.Usuario.email == username_or_email)
+        ).first()
+
+        if not user or user.estado != 'A':
+            return None
+
+        return user
+    except Exception:
+        return None
+
+
 def require_role(roles_permitidos: List[str]):
     """
     Fábrica de dependencias para verificar permisos RBAC (Control de Acceso basado en Roles).

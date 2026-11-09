@@ -1,5 +1,5 @@
 """
-app/core/audit_plt_helpers.py — Funciones de cálculo y agregación de métricas para Auditoría PLT.
+app/core/audit_plt_helpers.py — Funciones de cálculo y agregación de métricas para Revisión PLT.
 Sin dependencias de FastAPI — lógica de agregación pura y SSOT de categorización.
 """
 
@@ -37,7 +37,7 @@ def get_plt_incidence_category_name(i: dict) -> str:
 
 def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) -> dict:
     """
-    Calcula todas las métricas estadísticas, KPIs y cruces de variables para la auditoría PLT.
+    Calcula todas las métricas estadísticas, KPIs y cruces de variables para la revisión PLT.
     Soporta filtrado opcional por años de campaña y ajuste dinámico por formato detectado.
     """
     formato_tipo = diag.get("formato_detectado", "FORMAT_STANDARD_34")

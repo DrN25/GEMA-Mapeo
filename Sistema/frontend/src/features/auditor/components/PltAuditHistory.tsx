@@ -28,12 +28,12 @@ export default function PltAuditHistory({
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
                     <Folder size={14} className="text-cyan-400" />
-                    <span>Historial de Auditorías PLT Realizadas</span>
+                    <span>Historial de Revisiones PLT Realizadas</span>
                 </h3>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                 {history.length === 0 ? (
-                    <span className="text-xs text-slate-500 italic px-2">No hay registros de auditorías PLT anteriores.</span>
+                    <span className="text-xs text-slate-500 italic px-2">No hay registros de revisiones PLT anteriores.</span>
                 ) : (
                     history.map((audit) => {
                         const isActive = selectedAuditId === audit.id;

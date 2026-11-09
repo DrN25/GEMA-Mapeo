@@ -29,11 +29,11 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
     const handleCompareHistory = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!auditA || !auditB) {
-            setError('Debe seleccionar ambas auditorías para realizar la comparación.');
+            setError('Debe seleccionar ambas revisiones para realizar la comparación.');
             return;
         }
         if (auditA === auditB) {
-            setError('No puede comparar una auditoría consigo misma. Seleccione dos auditorías diferentes.');
+            setError('No puede comparar una revisión consigo misma. Seleccione dos revisiones diferentes.');
             return;
         }
 
@@ -117,7 +117,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                     <div className="flex items-center gap-2">
                         <FileSpreadsheet className="text-cyan-400" size={18} />
                         <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">
-                            Comparativa de Auditorías
+                            Comparativa de Revisiones
                         </h2>
                     </div>
                     <button 
@@ -167,13 +167,13 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                     {tab === 'history' ? (
                         <form onSubmit={handleCompareHistory} className="space-y-4">
                             <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                                Compare dos revisiones históricas del sistema. La auditoría base se tomará como la referencia de origen, y la auditoría actual mostrará las diferencias frente a esta.
+                                Compare dos revisiones históricas del sistema. La revisión base se tomará como la referencia de origen, y la revisión actual mostrará las diferencias frente a esta.
                             </p>
 
                             <div className="space-y-3">
                                 <div>
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
-                                        Auditoría Base (A - Referencia)
+                                        Revisión Base (A - Referencia)
                                     </label>
                                     <select
                                         value={auditA}
@@ -181,7 +181,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                         disabled={loading}
                                         className="w-full bg-navy-950 border border-cyan-500/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
                                     >
-                                        <option value="">-- Seleccionar auditoría base --</option>
+                                        <option value="">-- Seleccionar revisión base --</option>
                                         {history.map((h) => (
                                             <option key={h.audit_id} value={h.audit_id}>
                                                 {h.archivo} ({h.fecha} - {h.total_filas} filas)
@@ -198,7 +198,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
 
                                 <div>
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
-                                        Auditoría Actual (B - Comparar)
+                                        Revisión Actual (B - Comparar)
                                     </label>
                                     <select
                                         value={auditB}
@@ -206,7 +206,7 @@ export default function ComparativoModal({ isOpen, onClose, history, apiBase }: 
                                         disabled={loading}
                                         className="w-full bg-navy-950 border border-cyan-500/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
                                     >
-                                        <option value="">-- Seleccionar auditoría actual --</option>
+                                        <option value="">-- Seleccionar revisión actual --</option>
                                         {history.map((h) => (
                                             <option key={h.audit_id} value={h.audit_id}>
                                                 {h.archivo} ({h.fecha} - {h.total_filas} filas)

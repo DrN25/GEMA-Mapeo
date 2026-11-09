@@ -14,6 +14,9 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import BarChart, Reference
 from openpyxl.utils import get_column_letter
 
+from typing import Optional
+from app import models
+from app.auth.dependencies import get_optional_current_user
 from app.database import get_db
 from app.utils.validator import validate_bulk_excel, AuditCancelledError
 from app.core.catalogs import MANDATORY_COLS_COUNT
@@ -34,8 +37,32 @@ from app.core.audit_helpers import (
 )
 from app.core.excel_styles import get_styles, write_kpi_card
 
-def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
+def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_admin: bool = False):
     s = get_styles()
+
+    def _resolve_msg(item: dict) -> str:
+        if es_admin:
+            return item.get("mensaje", "")
+        if item.get("mensaje_no_admin"):
+            return item.get("mensaje_no_admin")
+        rule_code = item.get("rule_code")
+        if rule_code and rule_code in RULES_REGISTRY:
+            rule = RULES_REGISTRY[rule_code]
+            if rule.recommendation_template:
+                return rule.observation_template
+        return item.get("mensaje", "")
+
+    def _resolve_cat_name(inc: dict) -> str:
+        rule_code = inc.get("rule_code")
+        if rule_code and rule_code in RULES_REGISTRY:
+            cat_code = RULES_REGISTRY[rule_code].category_code
+            cat = CATEGORIES_REGISTRY.get(cat_code)
+            if cat:
+                return cat.get_name(es_admin)
+        cat_name = get_incidence_category_name(inc)
+        if not es_admin and ". Debe ser " in cat_name:
+            cat_name = cat_name.split(". Debe ser ")[0].strip() + "."
+        return cat_name
     font_title = s["font_title"]
     font_subtitle = s["font_subtitle"]
     font_section = s["font_section"]
@@ -74,7 +101,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
     
-    ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA").font = font_title
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN GEOTÉCNICA").font = font_title
     proj_name = str(compact.get("proyecto") or diag.get("proyecto") or "Ferrobamba").upper()
     ws_dash.cell(row=3, column=2, value=f"Dashboard de Control de Calidad y Consistencia de Mapeo Geomecánico | PROYECTO: {proj_name}").font = font_subtitle
     
@@ -224,7 +251,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    top_errs_list = Counter(get_incidence_category_name(i) for i in filtered if i.get("tipo_incidencia") == "ALERTA").most_common(5)
+    top_errs_list = Counter(_resolve_cat_name(i) for i in filtered if i.get("tipo_incidencia") == "ALERTA").most_common(5)
     r_graph = 11
     for msg, qty in top_errs_list:
         ws_dash.cell(row=r_graph, column=9, value=msg).font = font_regular
@@ -286,12 +313,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     incidencias_por_error = defaultdict(list)
     for inc in filtered:
-        msg_simplificado = get_incidence_category_name(inc)
+        msg_simplificado = _resolve_cat_name(inc)
         incidencias_por_error[msg_simplificado].append(inc)
 
     catalog_frequencies = []
     for cat in CATEGORIES_REGISTRY.values():
-        rule_msg = cat.name
+        rule_msg = cat.get_name(es_admin)
         matches = incidencias_por_error[rule_msg]
         # Calcular conteos por campaña
         camp_counts = {}
@@ -412,7 +439,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 inc_item.get("tipo_mapeo", "Mapeo de Celdas"),
                 inc_item.get("columna"),
                 inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
-                inc_item.get("mensaje")
+                _resolve_msg(inc_item)
             ]
             ws_detail.append(row_data)
 
@@ -531,7 +558,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         # 2. Agrupar por Mensaje Único (Tabla B)
         msg_group = defaultdict(list)
         for r in err_records:
-            msg_group[r.get("mensaje", "Desconocido")].append(r)
+            msg_group[_resolve_msg(r)].append(r)
             
         msg_stats = []
         for msg_val, recs in msg_group.items():
@@ -640,7 +667,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             ws_err.cell(row=curr_row, column=8, value=inc_item.get("sector_geotecnico"))
             ws_err.cell(row=curr_row, column=9, value=inc_item.get("columna"))
             ws_err.cell(row=curr_row, column=10, value=inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—")
-            ws_err.cell(row=curr_row, column=11, value=inc_item.get("mensaje"))
+            ws_err.cell(row=curr_row, column=11, value=_resolve_msg(inc_item))
             
         if truncated_err:
             curr_row = start_data_row + len(err_records_to_write)
@@ -904,16 +931,41 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
             print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario antes de generar el reporte Excel.")
             return
         incidencias_list = diag.pop("incidencias", [])
-        wb = generar_excel_reporte_core(diag, compact, incidencias_list)
-        del incidencias_list  # liberar RAM antes de guardar el .xlsx
         
-        excel_tmp = excel_pregenerated_out + ".tmp"
-        wb.save(excel_tmp)
-        safe_replace(excel_tmp, excel_pregenerated_out)
-        
+        # 1. Pre-generar reporte ADMIN (con recomendaciones)
+        excel_admin_out = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_admin.xlsx")
+        wb_admin = generar_excel_reporte_core(diag, compact, incidencias_list, es_admin=True)
+        excel_admin_tmp = excel_admin_out + ".tmp"
+        wb_admin.save(excel_admin_tmp)
+        safe_replace(excel_admin_tmp, excel_admin_out)
+        del wb_admin
+
+        # 2. Pre-generar reporte STANDARD / NO-ADMIN (sin recomendaciones)
+        excel_std_out = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_standard.xlsx")
+        wb_std = generar_excel_reporte_core(diag, compact, incidencias_list, es_admin=False)
+        excel_std_tmp = excel_std_out + ".tmp"
+        wb_std.save(excel_std_tmp)
+        safe_replace(excel_std_tmp, excel_std_out)
+        del wb_std
+        del incidencias_list  # liberar RAM tras guardar archivos
+
+        # Compatibilidad histórica
+        shutil.copyfile(excel_std_out, excel_pregenerated_out)
+
+        # Accesos directos globales para última auditoría
+        public_admin = os.path.join(uploads_dir, "reporte_completo_admin_ultimo.xlsx")
+        public_admin_tmp = public_admin + ".tmp"
+        shutil.copyfile(excel_admin_out, public_admin_tmp)
+        safe_replace(public_admin_tmp, public_admin)
+
+        public_std = os.path.join(uploads_dir, "reporte_completo_standard_ultimo.xlsx")
+        public_std_tmp = public_std + ".tmp"
+        shutil.copyfile(excel_std_out, public_std_tmp)
+        safe_replace(public_std_tmp, public_std)
+
         public_excel = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
         public_excel_tmp = public_excel + ".tmp"
-        shutil.copyfile(excel_pregenerated_out, public_excel_tmp)
+        shutil.copyfile(excel_std_out, public_excel_tmp)
         safe_replace(public_excel_tmp, public_excel)
         
         elapsed = time.time() - t_start
@@ -992,12 +1044,12 @@ async def importar_excel_bulk(
     history_dir = os.path.join(uploads_dir, "history")
     os.makedirs(history_dir, exist_ok=True)
 
-    # Guard de concurrencia: una sola auditoría pesada a la vez (evita OOM por
+    # Guard de concurrencia: una sola revisión pesada a la vez (evita OOM por
     # dos pipelines simultáneos de archivos grandes en instancias pequeñas).
     if not _acquire_lock(audit_id):
         raise HTTPException(
             status_code=409,
-            detail="Ya hay una auditoría en proceso en el servidor. Espera a que termine o cancélala antes de subir otro archivo."
+            detail="Ya hay una revisión en proceso en el servidor. Espera a que termine o cancélala antes de subir otro archivo."
         )
 
     try:
@@ -1019,7 +1071,7 @@ async def importar_excel_bulk(
                     pass
                 raise HTTPException(
                     status_code=400,
-                    detail="El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
+                    detail="El archivo cargado es un reporte de revisión generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
                 )
         except HTTPException:
             raise
@@ -1106,7 +1158,7 @@ def obtener_status_auditoria(audit_id: str = None):
 
     raise HTTPException(
         status_code=404,
-        detail="La auditoría solicitada ya no existe en el servidor (sus archivos se perdieron, probablemente por un reinicio o redeploy).",
+        detail="La revisión solicitada ya no existe en el servidor (sus archivos se perdieron, probablemente por un reinicio o redeploy).",
     )
 
 @router.get("/geomecanica/resumen-ligero")
@@ -1135,7 +1187,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
                     status_code=202, 
                     content={"status": "procesando", "message": "Procesando base de datos masiva y cruzando variables..."}
                 )
-            raise HTTPException(status_code=404, detail="La auditoría solicitada no existe en el servidor.")
+            raise HTTPException(status_code=404, detail="La revisión solicitada no existe en el servidor.")
     else:
         raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
         compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
@@ -1164,7 +1216,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
             if not os.path.exists(raw_file) or not os.path.exists(compact_file):
                 return JSONResponse(
                     status_code=202, 
-                    content={"status": "procesando", "message": "Esperando inicialización de datos de auditoría..."}
+                    content={"status": "procesando", "message": "Esperando inicialización de datos de revisión..."}
                 )
 
     # 2. FAST PATH: Cargar el reporte compacto directamente si no hay filtros aplicados
@@ -1243,8 +1295,15 @@ def obtener_incidencias_paginadas(
 @router.get("/geomecanica/reporte-excel")
 def descargar_reporte_excel(
     tipo: str = None, celda: str = None, columna: str = None, campania: str = None,
-    geotecnico: str = None, sector_geotecnico: str = None, search: str = None, audit_id: str = None
+    geotecnico: str = None, sector_geotecnico: str = None, search: str = None, audit_id: str = None,
+    current_user: Optional[models.Usuario] = Depends(get_optional_current_user)
 ):
+    # Control RBAC: Solo el rol 'admin' (estrictamente en minúsculas) recibe recomendaciones
+    es_admin = False
+    if current_user and current_user.rol and current_user.rol.nombre:
+        if current_user.rol.nombre.strip().lower() == "admin":
+            es_admin = True
+
     filtered_vals = []
     for val in [tipo, celda, columna, campania, geotecnico, sector_geotecnico, search]:
         if val is not None:
@@ -1253,12 +1312,22 @@ def descargar_reporte_excel(
                 filtered_vals.append(val)
                 
     is_filtered = len(filtered_vals) > 0
-    filename = f"reporte_auditoria_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"reporte_revision_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     if audit_id:
-        pregenerated_file = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_completo.xlsx")
+        target_name = f"{audit_id}_reporte_admin.xlsx" if es_admin else f"{audit_id}_reporte_standard.xlsx"
+        pregenerated_file = os.path.join(uploads_dir, "history", target_name)
+        if not os.path.exists(pregenerated_file) and es_admin:
+            fallback_file = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_completo.xlsx")
+            if os.path.exists(fallback_file):
+                pregenerated_file = fallback_file
     else:
-        pregenerated_file = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
+        target_name = "reporte_completo_admin_ultimo.xlsx" if es_admin else "reporte_completo_standard_ultimo.xlsx"
+        pregenerated_file = os.path.join(uploads_dir, target_name)
+        if not os.path.exists(pregenerated_file) and es_admin:
+            fallback_file = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
+            if os.path.exists(fallback_file):
+                pregenerated_file = fallback_file
 
     if not is_filtered and os.path.exists(pregenerated_file):
         return FileResponse(
@@ -1320,7 +1389,7 @@ def descargar_reporte_excel(
             or search_lower in i.get("celda_padre", "").lower()
         ]
 
-    wb = generar_excel_reporte_core(diag, compact, filtered)
+    wb = generar_excel_reporte_core(diag, compact, filtered, es_admin=es_admin)
     
     if not is_filtered:
         os.makedirs(os.path.dirname(pregenerated_file), exist_ok=True)
@@ -1351,9 +1420,10 @@ def descargar_reporte_excel(
 
 @router.get("/geomecanica/reglas")
 @router.get("/auditoria/reglas")
+@router.get("/revision/reglas")
 def obtener_catalogo_reglas():
     """
-    Retorna el catálogo completo de reglas de consistencia de auditoría
+    Retorna el catálogo completo de reglas de consistencia de revisión
     con metadatos, severidades, categorías, columnas y ejemplos didácticos.
     """
     return get_rules_catalog_data()

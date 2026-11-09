@@ -191,7 +191,7 @@ def get_incidence_category_name(i: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Agregación de métricas de auditoría (SSOT para auditoria y comparativo)
+# Agregación de métricas de revisión (SSOT para auditoria y comparativo)
 # ---------------------------------------------------------------------------
 
 def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:

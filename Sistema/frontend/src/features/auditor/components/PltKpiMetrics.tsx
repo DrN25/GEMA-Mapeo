@@ -40,7 +40,7 @@ export default function PltKpiMetrics({
 
     return (
         <div className="space-y-6">
-            {/* AUDITORÍA GENERAL / FAMILIA 1 */}
+            {/* REVISIÓN GENERAL / FAMILIA 1 */}
             {kpis.familia1 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-5 space-y-2 relative overflow-hidden">
@@ -84,11 +84,11 @@ export default function PltKpiMetrics({
                 </div>
             )}
 
-            {/* AUDITORÍA DE CAMPOS INDIVIDUALES (FAMILIA 2) */}
+            {/* REVISIÓN DE CAMPOS INDIVIDUALES (FAMILIA 2) */}
             {kpis.familia2 && (
                 <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                     <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
-                        <span>Auditoría de Datos por Celdas Individuales (34 Columnas)</span>
+                        <span>Revisión de Datos por Celdas Individuales (34 Columnas)</span>
                         <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Total: {kpis.familia2.total_fields?.toLocaleString() ?? 0} campos
                         </span>
@@ -153,11 +153,11 @@ export default function PltKpiMetrics({
                 </div>
             )}
 
-            {/* AUDITORÍA DE FILAS (FAMILIA 3) */}
+            {/* REVISIÓN DE FILAS (FAMILIA 3) */}
             {kpis.familia3 && (
                 <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                     <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
-                        <span>Auditoría a Nivel de Registro (Filas de Muestra)</span>
+                        <span>Revisión a Nivel de Registro (Filas de Muestra)</span>
                         <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Total: {kpis.familia3.total_registros?.toLocaleString() ?? 0} filas
                         </span>
@@ -207,7 +207,7 @@ export default function PltKpiMetrics({
                 </div>
             )}
 
-            {/* AUDITORÍA DE INTEGRIDAD DE SECUENCIAS ABCD */}
+            {/* REVISIÓN DE INTEGRIDAD DE SECUENCIAS ABCD */}
             {kpis.integridad_celdas && (
                 <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                     <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between items-center">

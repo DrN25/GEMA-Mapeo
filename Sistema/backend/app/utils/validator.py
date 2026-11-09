@@ -760,7 +760,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
         # Validar si el archivo es un reporte del sistema ya procesado
         is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
         if is_report:
-            raise ValueError("El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
+            raise ValueError("El archivo cargado es un reporte de revisión generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
             
         df = pd.read_excel(xls, sheet_name=sheet_names[0])
         xls.close()  # liberar el handle del archivo (en Windows impide borrar/limpiar el .xlsx)
@@ -835,7 +835,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
     for idx, row_dict in enumerate(records):
         # Cancelación cooperativa: revisar el flag cada 2000 filas para abortar rápido
         if cancel_flag_path and idx % 2000 == 0 and os.path.exists(cancel_flag_path):
-            raise AuditCancelledError(f"Auditoría cancelada por el usuario en la fila {idx + 2}.")
+            raise AuditCancelledError(f"Revisión cancelada por el usuario en la fila {idx + 2}.")
         fila_excel = idx + 2 
         celda_padre = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
         if not celda_padre:
@@ -937,7 +937,12 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 raise ValueError(f"Código de regla desconocido: {rule_code}")
             cat = CATEGORIES_REGISTRY.get(rule.category_code)
             tipo = cat.severity if cat else "ALERTA"
-            msg = rule.format_message(**msg_kwargs)
+            msg_admin = rule.format_message(es_admin=True, **msg_kwargs)
+            msg_no_admin = rule.format_message(es_admin=False, **msg_kwargs)
+            try:
+                rec_text = rule.recommendation_template.format(**msg_kwargs) if rule.recommendation_template else ""
+            except Exception:
+                rec_text = rule.recommendation_template
             
             # Clasificación de Tipo de Mapeo — usando constantes pre-computadas a nivel de módulo
             col_clean = str(col).strip()
@@ -966,7 +971,10 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
                 "fila_excel": fila_excel, "celda_padre": celda_padre, "celda_hija": celda_hija,
                 "columna": col, "valor_actual": formatted_val, 
                 "rule_code": rule_code,
-                "tipo_incidencia": tipo, "mensaje": msg,
+                "tipo_incidencia": tipo, 
+                "mensaje": msg_admin,
+                "mensaje_no_admin": msg_no_admin,
+                "recomendacion": rec_text,
                 "campania": str(resolved_camp) if resolved_camp else "N/A", 
                 "geotecnico": resolved_geo if resolved_geo else "N/A", 
                 "sector_geotecnico": resolved_sector,

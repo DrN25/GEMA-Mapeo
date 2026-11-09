@@ -1,10 +1,14 @@
 # backend/app/core/rules.py
 
 class RuleCategory:
-    def __init__(self, code: str, name: str, severity: str):
+    def __init__(self, code: str, name: str, severity: str, observation_name: str = ""):
         self.code = code
-        self.name = name  # This is the title/message shown in the "Catálogo de Errores" sheet
+        self.name = name  # Nombre completo para administrador (con recomendaciones si las hubiera)
+        self.observation_name = observation_name or name  # Nombre limpio sin recomendaciones para otros roles
         self.severity = severity
+
+    def get_name(self, es_admin: bool = True) -> str:
+        return self.name if es_admin else self.observation_name
 
 
 class ErrorRule:
@@ -18,24 +22,29 @@ class ErrorRule:
         technical_formula: str = "",
         example_ok: str = "",
         example_error: str = "",
-        tipo_mapeo: str = "Mapeo de Celdas"
+        tipo_mapeo: str = "Mapeo de Celdas",
+        observation_template: str = "",
+        recommendation_template: str = ""
     ):
         self.code = code
         self.category_code = category_code
         self.columns = columns
         self.message_template = message_template
+        self.observation_template = observation_template or message_template
+        self.recommendation_template = recommendation_template
         self.description = description
         self.technical_formula = technical_formula
         self.example_ok = example_ok
         self.example_error = example_error
         self.tipo_mapeo = tipo_mapeo
 
-    def format_message(self, **kwargs) -> str:
+    def format_message(self, es_admin: bool = True, **kwargs) -> str:
+        template = self.message_template if (es_admin or not self.recommendation_template) else self.observation_template
         try:
-            return self.message_template.format(**kwargs)
+            return template.format(**kwargs)
         except Exception:
             # Fallback in case of formatting error
-            return self.message_template
+            return template
 
 
 # 1. CATEGORÍAS MAESTRAS (Reemplaza la lista estática y desordenada anterior)
@@ -799,7 +808,7 @@ RULES_REGISTRY = {
     ),
 
     # =========================================================================
-    # NUEVAS REGLAS DE AUDITORÍA (Spec SDD Noviembre 2026)
+    # NUEVAS REGLAS DE REVISIÓN (Spec SDD Noviembre 2026)
     # =========================================================================
 
     # 1. Coordenadas fuera de rango de proyecto
@@ -921,6 +930,149 @@ RULES_REGISTRY = {
         tipo_mapeo="Mapeo de Estructuras"
     )
 }
+
+# 3. REGISTRO DE OBSERVACIONES Y RECOMENDACIONES NATIVAS (CONTROL RBAC)
+# Permite aislar limpiamente la observación descriptiva de la recomendación prescriptiva
+# para roles distintos a 'admin' (p. ej. mapeador, lectura).
+
+CATEGORY_OBSERVATIONS_REGISTRY: dict[str, str] = {
+    "CAT_AGUA_CODIGO_INVALIDO": "Código de agua '76 / '89 no admitido.",
+    "CAT_DUREZA_INVALIDA": "Dureza '76 / '89 no admitida.",
+    "CAT_ESPACIAMIENTO_PROMEDIO_CERO": "El espaciamiento promedio '76 / '89 no puede ser 0.0 m.",
+    "CAT_ESPACIAMIENTO_PROMEDIO_NEGATIVO": "El espaciamiento promedio '76 / '89 no puede ser negativo.",
+    "CAT_FORMA_ESTRUCTURA_INVALIDA": "Forma de estructura inválida.",
+}
+
+RULE_RECOMMENDATIONS_REGISTRY: dict[str, tuple[str, str]] = {
+    "ERR_AGUA_76_CODIGO_INVALIDO": (
+        "Código de agua '76 no admitido. Valor ingresado: '{value}'.",
+        "Debe ser uno de {allowed_codes} (C, H, M, E, F)."
+    ),
+    "ERR_AGUA_76_INCONGRUENTE": (
+        "El valor de agua '76 ({value}) no coincide con el código '{code_val}'.",
+        "Debe ser {expected}."
+    ),
+    "ERR_AGUA_89_CODIGO_INVALIDO": (
+        "Código de agua '89 no admitido. Valor ingresado: '{value}'.",
+        "Debe ser uno de {allowed_codes} (C, H, M, E, F)."
+    ),
+    "ERR_AGUA_89_INCONGRUENTE": (
+        "El valor de agua '89 ({value}) no coincide con el código '{code_val}'.",
+        "Debe ser {expected}."
+    ),
+    "ERR_ALTERACION_INVALIDA": (
+        "Código de alteración inválido: '{value}'.",
+        "Debe ser uno de {allowed_alteration_types}."
+    ),
+    "ERR_DUREZA_76_INVALIDA": (
+        "Dureza '76 '{value}' no admitida.",
+        "Debe ser R0 a R6."
+    ),
+    "ERR_DUREZA_89_INVALIDA": (
+        "Dureza '89 '{value}' no admitida.",
+        "Debe ser R0 a R6."
+    ),
+    "ERR_ESPACIAMIENTO_PROMEDIO_76_CERO": (
+        "El espaciamiento promedio '76 no puede ser 0.0 m.",
+        "Debe ser mayor a cero."
+    ),
+    "ERR_ESPACIAMIENTO_PROMEDIO_89_CERO": (
+        "El espaciamiento promedio '89 no puede ser 0.0 m.",
+        "Debe ser mayor a cero."
+    ),
+    "ERR_ESPACIAMIENTO_VALOR_76_NO_ALINEADO": (
+        "El puntaje de espaciamiento '76 ({value}) no coincide con el promedio ({promedio} m).",
+        "Debe ser {expected}."
+    ),
+    "ERR_ESPACIAMIENTO_VALOR_89_NO_ALINEADO": (
+        "El puntaje de espaciamiento '89 ({value}) no coincide con el promedio ({promedio} m).",
+        "Debe ser {expected}."
+    ),
+    "ERR_FORMA_ESTRUCTURA_INVALIDA": (
+        "Forma de estructura inválida: '{value}'.",
+        "Debe ser P, C, O, E o I."
+    ),
+    "ERR_RELLENO_1_INVALIDO": (
+        "El tipo de relleno 1 ('{value}') no pertenece al catálogo.",
+        "Catálogo: {allowed_fill_types}."
+    ),
+    "ERR_RELLENO_2_INVALIDO": (
+        "El tipo de relleno 2 ('{value}') no pertenece al catálogo.",
+        "Catálogo: {allowed_fill_types}."
+    ),
+    "ERR_RESISTENCIA_76_INCONGRUENTE": (
+        "El puntaje de resistencia '76 ({value}) no coincide con la dureza '{dureza_val}'.",
+        "Debe ser {expected} (tolerancia ±0.2)."
+    ),
+    "ERR_RESISTENCIA_89_INCONGRUENTE": (
+        "El puntaje de resistencia '89 ({value}) no coincide con la dureza '{dureza_val}'.",
+        "Debe estar en el rango {expected}."
+    ),
+    "ERR_RQD_76_INCONGRUENTE": (
+        "El puntaje de RQD '76 ({value}) no coincide con el porcentaje ({pct}%).",
+        "Debe ser {expected} (tolerancia ±0.2)."
+    ),
+    "ERR_RQD_89_INCONGRUENTE": (
+        "El puntaje de RQD '89 ({value}) no coincide con el porcentaje ({pct}%).",
+        "Debe estar en el rango {expected}."
+    ),
+    "ERR_TIPO_ESTRUCTURA_INVALIDO": (
+        "Tipo de estructura geológica no permitida: '{value}'.",
+        "Debe ser uno de {allowed_types}."
+    ),
+    "ERR_UNIDAD_LITOLOGICA_INCONGRUENTE": (
+        "La unidad litológica '{value}' no coincide con la litología registrada.",
+        "Se esperaba '{expected_group}'."
+    ),
+    "WRN_AGUA_76_VALOR_MEDIO": (
+        "El valor de agua '76 ({value}) no es un valor estándar del catálogo.",
+        "Opciones: [10, 7, 4, 0]."
+    ),
+    "WRN_AGUA_89_VALOR_MEDIO": (
+        "El valor de agua '89 ({value}) no es un valor estándar del catálogo.",
+        "Opciones: [15, 10, 7, 4, 0]."
+    ),
+    "WRN_EFECTOS_VOLADURA_76_VALOR_MEDIO": (
+        "El valor de efectos de voladura '76 ({value}) no es un valor estándar del catálogo.",
+        "Valores del catálogo: {allowed_values}."
+    ),
+    "WRN_EFECTOS_VOLADURA_89_VALOR_MEDIO": (
+        "El valor de efectos de voladura '89 ({value}) no es un valor estándar del catálogo.",
+        "Valores del catálogo: {allowed_values}."
+    ),
+    "WRN_ESPACIAMIENTO_VALOR_76_VALOR_MEDIO": (
+        "El puntaje de espaciamiento '76 ({value}) no coincide con los valores del catálogo.",
+        "Valores del catálogo: [5, 10, 20, 25, 30]."
+    ),
+    "WRN_ESPACIAMIENTO_VALOR_89_VALOR_MEDIO": (
+        "El puntaje de espaciamiento '89 ({value}) no coincide con los valores del catálogo.",
+        "Valores del catálogo: [5, 8, 10, 15, 20]."
+    ),
+    "WRN_RESISTENCIA_76_VALOR_ALEJADO": (
+        "El puntaje de resistencia '76 ({value}) no coincide con los valores del catálogo.",
+        "Valores del catálogo: [0, 1, 2, 4, 7, 12, 15]."
+    ),
+    "WRN_RESISTENCIA_89_VALOR_ALEJADO": (
+        "El puntaje de resistencia '89 ({value}) está fuera de los límites del catálogo.",
+        "Rangos válidos: R0 (0.0), R1 (1.5) o R2-R6 (1.5 a 15.0)."
+    ),
+    "WRN_RQD_VAL_76_VALOR_ALEJADO": (
+        "El puntaje de RQD '76 ({value}) no coincide con los valores del catálogo.",
+        "Valores del catálogo: [3, 8, 13, 17, 20]."
+    ),
+}
+
+# Inicializar observaciones en categorías
+for _cat_code, _obs_name in CATEGORY_OBSERVATIONS_REGISTRY.items():
+    if _cat_code in CATEGORIES_REGISTRY:
+        CATEGORIES_REGISTRY[_cat_code].observation_name = _obs_name
+
+# Inicializar observaciones y recomendaciones nativas en reglas
+for _rule_code, (_obs_tmpl, _rec_tmpl) in RULE_RECOMMENDATIONS_REGISTRY.items():
+    if _rule_code in RULES_REGISTRY:
+        RULES_REGISTRY[_rule_code].observation_template = _obs_tmpl
+        RULES_REGISTRY[_rule_code].recommendation_template = _rec_tmpl
+
 
 
 def get_rules_catalog_data():

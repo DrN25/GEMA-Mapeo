@@ -18,9 +18,11 @@ import ComparativoModal from './components/ComparativoModal';
 interface BulkAuditorProps {
     apiBase: string;
     onNavigateToRules?: () => void;
+    variant?: 'full' | 'simplified';
 }
 
-export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorProps) {
+export default function BulkAuditor({ apiBase, onNavigateToRules, variant = 'full' }: BulkAuditorProps) {
+    const [isExporting, setIsExporting] = useState<boolean>(false);
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'loaded' | 'error'>(() => {
         const saved = localStorage.getItem('geomec_bulk_auditor_status');
         return (saved as any) || 'idle';
@@ -126,7 +128,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
     }, []);
 
     // Al montar con un dashboard persistido (recarga / reapertura del navegador):
-    // verificar contra el backend que la auditoría sigue existiendo. Si la data se
+    // verificar contra el backend que la revisión sigue existiendo. Si la data se
     // perdió (p.ej. el servidor se reinició), se muestra un error claro — nunca una
     // pantalla en blanco.
     useEffect(() => {
@@ -143,7 +145,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Poller único de estado: corre solo mientras haya una auditoría procesando.
+    // Poller único de estado: corre solo mientras haya una revisión procesando.
     // El primer poll decide la verdad: si el backend ya no procesa (o murió), sale del estado de carga.
     useEffect(() => {
         if (processingAuditId) {
@@ -157,7 +159,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
     // conserva en localStorage y la verificación al volver decide si continúa.
     useEffect(() => () => { stopStatusPolling(); }, []);
 
-    // KPIs: el backend solo los afecta por auditoría y años seleccionados — los demás
+    // KPIs: el backend solo los afecta por revisión y años seleccionados — los demás
     // filtros NO cambian el compact, así que no debe re-descargarse (~1.1 MB por interacción ahorrado).
     useEffect(() => {
         if (status === 'loaded' && selectedAuditId && auditVerified) {
@@ -188,7 +190,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
             try {
                 const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`, { headers: getAuthHeaders() });
                 if (res.status === 404) {
-                    failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos). Vuelve a cargar tu planilla.', auditId);
+                    failAudit('not_found', 'La revisión ya no existe en el servidor (probablemente se reinició o se perdieron los archivos). Vuelve a cargar tu planilla.', auditId);
                     return;
                 }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -219,12 +221,12 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                 stopStatusPolling();
                 setProcessingAuditId('');
                 fetchHistory();
-                // Solo saltar al dashboard si esta auditoría es la que se está viendo;
+                // Solo saltar al dashboard si esta revisión es la que se está viendo;
                 // si quedó en segundo plano (banner), no se cambia la vista actual.
                 if (selectedAuditIdRef.current === auditId) {
                     setStatus('loaded');
                 }
-                setShowProgressToast(`Auditoría finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
+                setShowProgressToast(`Revisión finalizada. La planilla "${data.nombre_archivo || 'importada'}" se encuentra procesada.`);
             } catch (e) {
                 fails += 1;
                 if (fails >= MAX_CONSECUTIVE_FAILURES) {
@@ -246,7 +248,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
 
     // Maneja cualquier fallo del poller/verificación según el tipo:
     // - 'network': el servidor no responde (se conserva processingAuditId para reintentar)
-    // - 'not_found': los archivos de la auditoría ya no existen en el backend
+    // - 'not_found': los archivos de la revisión ya no existen en el backend
     // - 'processing': el pipeline persistió un error en el compact
     const failAudit = (kind: 'network' | 'not_found' | 'processing', msg: string, auditId: string) => {
         stopStatusPolling();
@@ -254,7 +256,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         setMessage(msg);
         setAuditVerified(false);
 
-        // Si la auditoría que falló no es la que el usuario está viendo (proceso en
+        // Si la revisión que falló no es la que el usuario está viendo (proceso en
         // segundo plano), no rompemos la vista actual: solo lo notificamos con un toast.
         if (selectedAuditIdRef.current !== auditId) {
             setProcessingAuditId('');
@@ -271,13 +273,13 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         }
     };
 
-    // Verificación única (montaje / selección de auditoría previa / reintento):
+    // Verificación única (montaje / selección de revisión previa / reintento):
     // confirma que la data del reporte sigue existiendo antes de renderizar el dashboard.
     const verifyAuditExists = async (auditId: string) => {
         try {
             const res = await fetch(`${apiBase}/api/geomecanica/status?audit_id=${auditId}`, { headers: getAuthHeaders() });
             if (res.status === 404) {
-                failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
+                failAudit('not_found', 'La revisión ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
                 return;
             }
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -288,7 +290,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                 return;
             }
             if (data.status !== 'listo') {
-                failAudit('not_found', 'La auditoría solicitada no está completa en el servidor.', auditId);
+                failAudit('not_found', 'La revisión solicitada no está completa en el servidor.', auditId);
                 return;
             }
 
@@ -321,7 +323,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                 setHistory(data);
             }
         } catch (e) {
-            console.error("Fallo de red cargando auditorías previas:", e);
+            console.error("Fallo de red cargando revisiones previas:", e);
         }
     };
 
@@ -333,7 +335,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                 const data = await res.json();
                 setKpis(data);
             } else if (res.status === 404) {
-                failAudit('not_found', 'La auditoría ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
+                failAudit('not_found', 'La revisión ya no existe en el servidor (probablemente se reinició o se perdieron los archivos).', auditId);
             } else if (res.status === 400) {
                 const data = await res.json().catch(() => null);
                 failAudit('processing', data?.detail || 'El procesamiento falló en el servidor.', auditId);
@@ -381,7 +383,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         setIsWizardOpen(false);
         setStatus('processing');
         setErrorKind(null);
-        setMessage('Ejecutando cálculos de celdas y auditoría geomecánica masiva...');
+        setMessage('Ejecutando cálculos de celdas y revisión geomecánica masiva...');
 
         const formData = new FormData();
         formData.append('file', payload.file);
@@ -445,11 +447,11 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         localStorage.removeItem('geomec_bulk_auditor_error_kind');
     };
 
-    // Cancela de verdad la auditoría en curso: avisa al backend (flag de cancelación)
+    // Cancela de verdad la revisión en curso: avisa al backend (flag de cancelación)
     // y limpia TODO el estado, incluido el procesamiento en segundo plano.
     const handleCancelProcessing = async () => {
         const target = processingAuditId;
-        if (target && !window.confirm('¿Cancelar la auditoría en curso? Se detendrá el procesamiento en el servidor y se eliminarán sus archivos parciales.')) return;
+        if (target && !window.confirm('¿Cancelar la revisión en curso? Se detendrá el procesamiento en el servidor y se eliminarán sus archivos parciales.')) return;
         try {
             if (target) {
                 await fetch(`${apiBase}/api/geomecanica/cancelar?audit_id=${target}`, { method: 'POST', headers: getAuthHeaders() });
@@ -462,7 +464,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         setProcessingFileName('');
         localStorage.removeItem('geomec_bulk_auditor_processing_id');
         localStorage.removeItem('geomec_bulk_auditor_processing_file');
-        if (target) setShowProgressToast('Auditoría cancelada.');
+        if (target) setShowProgressToast('Revisión cancelada.');
     };
 
     const clearAllFilters = () => {
@@ -483,9 +485,58 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
         verifyAuditExists(auditId);
     };
 
-    const handleExportExcel = () => {
-        if (!excelReady || !selectedAuditId) return;
-        window.open(`${apiBase}/api/geomecanica/reporte-excel?audit_id=${selectedAuditId}`, '_blank');
+    const handleExportExcel = async () => {
+        if (!excelReady || !selectedAuditId || isExporting) return;
+        try {
+            setIsExporting(true);
+            const token = localStorage.getItem('gema_auth_token');
+            const params = new URLSearchParams();
+            params.append('audit_id', selectedAuditId);
+            if (filterTipo) params.append('tipo', filterTipo);
+            if (filterCelda) params.append('celda', filterCelda);
+            if (filterCampania) params.append('campania', filterCampania);
+            if (filterGeotecnico) params.append('geotecnico', filterGeotecnico);
+            if (filterSearch) params.append('search', filterSearch);
+            if (selectedYears && selectedYears.length > 0) {
+                params.append('campania', selectedYears.join(','));
+            }
+
+            const headers: Record<string, string> = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const res = await fetch(`${apiBase}/api/geomecanica/reporte-excel?${params.toString()}`, {
+                method: 'GET',
+                headers,
+            });
+
+            if (!res.ok) {
+                throw new Error(`Error en la descarga del reporte: ${res.status} ${res.statusText}`);
+            }
+
+            const blob = await res.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+
+            const disposition = res.headers.get('content-disposition');
+            let filename = `reporte_revision_${selectedAuditId}.xlsx`;
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+                if (match && match[1]) filename = match[1];
+            }
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (err) {
+            console.error('Error al exportar reporte Excel:', err);
+            alert('Error al descargar el reporte Excel. Por favor verifique la conexión.');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const numCeldasPadre = kpis?.familia1?.num_celdas_padre || 0;
@@ -537,21 +588,21 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
             )}
 
             {showProgressToast && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-400 font-semibold animate-fade-in">
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-400 font-semibold animate-fade-in">
                     <div className="flex items-center gap-2">
-                        <ShieldCheck size={16} className="text-emerald-400" />
+                        <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" />
                         <span>{showProgressToast}</span>
                     </div>
-                    <button onClick={() => setShowProgressToast('')} className="text-slate-450 hover:text-slate-200">
+                    <button onClick={() => setShowProgressToast('')} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                         <X size={14} />
                     </button>
                 </div>
             )}
 
             {processingAuditId && (status === 'loaded' || status === 'idle') && (
-                <div className="bg-cyan-950/40 border border-cyan-500/20 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-400 font-semibold shadow-md animate-fade-in">
+                <div className="bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-500/30 rounded-xl p-3.5 flex items-center justify-between text-xs text-cyan-900 dark:text-cyan-300 font-semibold shadow-sm dark:shadow-md animate-fade-in">
                     <div className="flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin text-cyan-400" />
+                        <Loader2 size={14} className="animate-spin text-cyan-600 dark:text-cyan-400" />
                         <span>Generando otra revisión en segundo plano{processingFileName ? `: ${processingFileName}` : ''}...</span>
                     </div>
                     <div className="flex gap-2">
@@ -560,13 +611,13 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                                 setSelectedAuditId(processingAuditId);
                                 setStatus('processing');
                             }}
-                            className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 px-2.5 py-1 rounded text-xs font-black transition-all"
+                            className="bg-cyan-500 hover:bg-cyan-600 text-white dark:text-slate-950 px-2.5 py-1 rounded text-xs font-black transition-all cursor-pointer shadow-sm active:scale-95"
                         >
                             Ver Progreso
                         </button>
                         <button
                             onClick={handleCancelProcessing}
-                            className="bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded text-xs font-bold hover:bg-red-500/20 transition-all"
+                            className="bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer active:scale-95"
                         >
                             Cancelar
                         </button>
@@ -581,7 +632,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                             <Database size={24} />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">Nueva Auditoría Geomecánica</h3>
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">Nueva Revisión Geomecánica</h3>
                             <p className="text-xs text-slate-400 max-w-sm mx-auto mt-2 leading-relaxed font-semibold">
                                 Sube una planilla de mapeo de celdas para realizar validaciones cruzadas RMR y control de calidad estructural.
                             </p>
@@ -625,7 +676,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                         <div className="space-y-2">
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">
                                 {errorKind === 'network' ? 'Conexión con el servidor perdida'
-                                    : errorKind === 'not_found' ? 'Auditoría no encontrada'
+                                    : errorKind === 'not_found' ? 'Revisión no encontrada'
                                     : 'Error de procesamiento'}
                             </h3>
                             <p className="text-xs text-slate-400 leading-relaxed font-semibold max-w-md mx-auto">{message}</p>
@@ -688,7 +739,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h1 className="text-xs font-black uppercase tracking-widest">Auditoría Geotécnica de Integridad</h1>
+                                        <h1 className="text-xs font-black uppercase tracking-widest">Revisión Geotécnica de Integridad</h1>
                                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold uppercase">
                                             {kpis?.proyecto?.toUpperCase() || 'FERROBAMBA'}
                                         </span>
@@ -726,27 +777,36 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                             )}
                         </div>
 
-                        <div className="flex gap-2.5 w-full sm:w-auto shrink-0 justify-end">
+                        <div className="flex flex-wrap gap-2.5 w-full sm:w-auto shrink-0 justify-end items-center">
                             <button
                                 onClick={handleCloseView}
-                                className="flex items-center gap-1.5 bg-[#0f172a]/80 hover:bg-slate-900 border border-slate-800 text-slate-350 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95"
+                                className="flex items-center gap-1.5 bg-[#0f172a]/80 hover:bg-slate-900 border border-slate-800 text-slate-350 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer"
                             >
                                 <Trash2 size={14} className="text-red-400" />
                                 <span>Cerrar</span>
                             </button>
 
                             <button
-                                disabled={!excelReady}
+                                onClick={() => setIsWizardOpen(true)}
+                                className="flex items-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                                title="Procesar otro archivo Excel"
+                            >
+                                <FileSpreadsheet size={14} className="text-cyan-400" />
+                                <span>Procesar otro Excel</span>
+                            </button>
+
+                            <button
+                                disabled={!excelReady || isExporting}
                                 onClick={handleExportExcel}
-                                className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 ${excelReady
+                                className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 cursor-pointer ${excelReady && !isExporting
                                     ? 'bg-cyan-500 hover:bg-cyan-600 border-cyan-400/30 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
                                     : 'bg-[#0f172a]/50 border-navy-850 text-slate-500 cursor-not-allowed opacity-60'
                                     }`}
                             >
-                                {!excelReady ? (
+                                {(!excelReady || isExporting) ? (
                                     <>
                                         <Loader2 size={14} className="animate-spin text-cyan-400" />
-                                        <span>Cargando...</span>
+                                        <span>{isExporting ? 'Descargando...' : 'Cargando...'}</span>
                                     </>
                                 ) : (
                                     <>
@@ -766,42 +826,47 @@ export default function BulkAuditor({ apiBase, onNavigateToRules }: BulkAuditorP
                         periodLabel={periodLabel}
                         filterTipo={filterTipo}
                         onFilterTipo={(tipo) => setFilterTipo(prev => prev === tipo ? '' : tipo)}
+                        variant={variant}
                     />
 
-                    <ConsolidatedDeviations
-                        kpis={kpis}
-                        uniqueYears={uniqueYears}
-                        coreObservationTypes={coreObservationTypes}
-                        selectedObservation={selectedObservation}
-                        setSelectedObservation={setSelectedObservation}
-                        isConsolidatedExpanded={isConsolidatedExpanded}
-                        setIsConsolidatedExpanded={setIsConsolidatedExpanded}
-                    />
+                    {variant === 'full' && (
+                        <>
+                            <ConsolidatedDeviations
+                                kpis={kpis}
+                                uniqueYears={uniqueYears}
+                                coreObservationTypes={coreObservationTypes}
+                                selectedObservation={selectedObservation}
+                                setSelectedObservation={setSelectedObservation}
+                                isConsolidatedExpanded={isConsolidatedExpanded}
+                                setIsConsolidatedExpanded={setIsConsolidatedExpanded}
+                            />
 
-                    <DistributionBreakdown
-                        kpis={kpis}
-                        filterCampania={filterCampania}
-                        onFilterCampania={(camp) => setFilterCampania(prev => prev === camp ? '' : camp)}
-                        filterCelda={filterCelda}
-                        onFilterCelda={(celda) => setFilterCelda(prev => prev === celda ? '' : celda)}
-                        filterGeotecnico={filterGeotecnico}
-                        onFilterGeotecnico={(geo) => setFilterGeotecnico(prev => prev === geo ? '' : geo)}
-                    />
+                            <DistributionBreakdown
+                                kpis={kpis}
+                                filterCampania={filterCampania}
+                                onFilterCampania={(camp) => setFilterCampania(prev => prev === camp ? '' : camp)}
+                                filterCelda={filterCelda}
+                                onFilterCelda={(celda) => setFilterCelda(prev => prev === celda ? '' : celda)}
+                                filterGeotecnico={filterGeotecnico}
+                                onFilterGeotecnico={(geo) => setFilterGeotecnico(prev => prev === geo ? '' : geo)}
+                            />
 
-                    <AnomaliesViewer
-                        incidencias={incidencias}
-                        totalRecords={totalRecords}
-                        filterSearch={filterSearch}
-                        onFilterSearch={(search) => setFilterSearch(search)}
-                        page={page}
-                        totalPages={totalPages}
-                        onPageChange={(newPage) => {
-                            setPage(newPage);
-                            fetchPaginatedIncidencias(newPage);
-                        }}
-                        kpis={kpis}
-                        isLoading={loadingTable}
-                    />
+                            <AnomaliesViewer
+                                incidencias={incidencias}
+                                totalRecords={totalRecords}
+                                filterSearch={filterSearch}
+                                onFilterSearch={(search) => setFilterSearch(search)}
+                                page={page}
+                                totalPages={totalPages}
+                                onPageChange={(newPage) => {
+                                    setPage(newPage);
+                                    fetchPaginatedIncidencias(newPage);
+                                }}
+                                kpis={kpis}
+                                isLoading={loadingTable}
+                            />
+                        </>
+                    )}
 
                 </div>
             )}

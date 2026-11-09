@@ -419,7 +419,7 @@ async def auditar_congruencia(file: UploadFile = File(...)):
     output.seek(0)
     
     headers = {
-        'Content-Disposition': 'attachment; filename="Auditoria_Congruencia_Consolidada.xlsx"'
+        'Content-Disposition': 'attachment; filename="Revision_Congruencia_Consolidada.xlsx"'
     }
     return StreamingResponse(output, headers=headers, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 

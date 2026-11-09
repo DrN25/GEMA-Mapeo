@@ -1,4 +1,4 @@
-import { Map, Layers, Activity } from 'lucide-react';
+import { Map, Layers, Activity, AlertTriangle } from 'lucide-react';
 
 interface KpiMetricsProps {
     kpis: any;
@@ -8,6 +8,7 @@ interface KpiMetricsProps {
     periodLabel: string;
     filterTipo: string;
     onFilterTipo: (tipo: string) => void;
+    variant?: 'full' | 'simplified';
 }
 
 export default function KpiMetrics({
@@ -18,6 +19,7 @@ export default function KpiMetrics({
     periodLabel,
     filterTipo,
     onFilterTipo,
+    variant = 'full',
 }: KpiMetricsProps) {
     if (!kpis) return null;
 
@@ -29,7 +31,92 @@ export default function KpiMetrics({
     const pctFieldsAdvs = ((f2.total_advertencias || 0) / totalFields * 100).toFixed(1);
     const pctFieldsAlertas = ((f2.total_alertas || 0) / totalFields * 100).toFixed(1);
 
-    // Cálculo de porcentajes de filas estructurales
+    const totalAlertas = f2.total_alertas || 0;
+    const totalAdvertencias = f2.total_advertencias || 0;
+    const totalVacios = f2.total_vacios || 0;
+    const totalInconsistencias = totalAlertas + totalAdvertencias + totalVacios;
+
+    // Variante simplificada: SOLO 4 KPIs
+    if (variant === 'simplified') {
+        return (
+            <div className="rounded-xl border border-cyan-500/10 bg-navy-900/50 p-5 shadow-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* KPI 1: Estaciones Evaluadas */}
+                    <div className="flex items-center justify-between p-2">
+                        <div className="space-y-1">
+                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest block">Estaciones Evaluadas</span>
+                            <span className="text-3xl font-black text-cyan-400 font-mono block mt-1">
+                                {numCeldasPadre.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-slate-500 font-semibold block">{periodLabel}</span>
+                        </div>
+                        <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl">
+                            <Map size={24} />
+                        </div>
+                    </div>
+
+                    {/* KPI 2: Estructuras Registradas */}
+                    <div className="flex items-center justify-between p-2 border-t sm:border-t-0 sm:border-l border-navy-850 pt-4 sm:pt-0 sm:pl-6">
+                        <div className="space-y-1">
+                            <span className="text-xs font-black text-slate-400 uppercase block tracking-wider">Estructuras Registradas</span>
+                            <span className="text-3xl font-black text-cyan-400 font-mono block mt-1">
+                                {totalDiscontinuidades.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-slate-500 font-semibold block">{periodLabel}</span>
+                        </div>
+                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl">
+                            <Layers size={24} />
+                        </div>
+                    </div>
+
+                    {/* KPI 3: Metros Totales Mapeados */}
+                    <div className="flex items-center justify-between p-2 border-t lg:border-t-0 lg:border-l border-navy-850 pt-4 lg:pt-0 lg:pl-6">
+                        <div className="space-y-1">
+                            <span className="text-xs font-black text-slate-400 uppercase block tracking-wider">Metros Totales Mapeados</span>
+                            <span className="text-3xl font-black text-cyan-400 font-mono block mt-1">
+                                {totalMetrosMapped.toLocaleString()} <span className="text-xs text-slate-500 font-semibold">m</span>
+                            </span>
+                            <span className="text-xs text-slate-500 font-semibold block">{periodLabel}</span>
+                        </div>
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+                            <Activity size={24} />
+                        </div>
+                    </div>
+
+                    {/* KPI 4: Total Inconsistencias con sus 3 categorías */}
+                    <div className="flex flex-col justify-between p-2 border-t sm:border-t-0 lg:border-l border-navy-850 pt-4 lg:pt-0 lg:pl-6">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <span className="text-xs font-black text-slate-400 uppercase block tracking-wider">Total Inconsistencias</span>
+                                <span className="text-3xl font-black text-rose-400 font-mono block mt-1">
+                                    {totalInconsistencias.toLocaleString()}
+                                </span>
+                            </div>
+                            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
+                                <AlertTriangle size={24} />
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-navy-800">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-red-500/15 border border-red-500/30 text-red-400">
+                                <span>Alertas Críticas:</span>
+                                <span>{totalAlertas.toLocaleString()}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-orange-500/15 border border-orange-500/30 text-orange-400">
+                                <span>Advertencias:</span>
+                                <span>{totalAdvertencias.toLocaleString()}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-yellow-500/15 border border-yellow-500/30 text-yellow-400">
+                                <span>Campos Vacíos:</span>
+                                <span>{totalVacios.toLocaleString()}</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Cálculo de porcentajes de filas estructurales (variante full)
     const f3 = kpis.familia3 || {};
     const totalRows = f3.total_discontinuidades || 1;
     const pctDiscsCorrectas = ((f3.discontinuidades_correctas || 0) / totalRows * 100).toFixed(1);
@@ -85,11 +172,11 @@ export default function KpiMetrics({
 
             {/* INTEGRIDAD POR CAMPOS VS DISCONTINUIDADES */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* AUDITORÍA DE CAMPOS */}
+                {/* REVISIÓN DE CAMPOS */}
                 {kpis.familia2 && (
                     <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                         <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
-                            <span>Auditoría de Datos por Celdas Individuales</span>
+                            <span>Revisión de Datos por Celdas Individuales</span>
                             <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                                 Total: {kpis.familia2.total_fields.toLocaleString()} campos
                             </span>
@@ -143,11 +230,11 @@ export default function KpiMetrics({
                     </div>
                 )}
 
-                {/* AUDITORÍA DE REGISTROS (FILAS) */}
+                {/* REVISIÓN DE REGISTROS (FILAS) */}
                 {kpis.familia3 && (
                     <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                         <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
-                            <span>Auditoría de Filas de Registro (Corridas/Juntas)</span>
+                            <span>Revisión de Filas de Registro (Corridas/Juntas)</span>
                             <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                                 Total: {kpis.familia3.total_discontinuidades.toLocaleString()} filas
                             </span>
