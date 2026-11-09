@@ -64,7 +64,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
     ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
 
-    ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA — ENSAYOS PLT").font = font_title
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN GEOTÉCNICA — ENSAYOS PLT").font = font_title
     subtitle_txt = (
         "Dashboard Ejecutivo de Control de Calidad, Consistencia Geomecánica y Secuencias ABCD (Formato de Campo)"
         if "COMPACT" in str(formato_tipo)

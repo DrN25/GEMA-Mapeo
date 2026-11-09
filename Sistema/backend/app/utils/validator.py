@@ -760,7 +760,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
         # Validar si el archivo es un reporte del sistema ya procesado
         is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
         if is_report:
-            raise ValueError("El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
+            raise ValueError("El archivo cargado es un reporte de revisión generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
             
         df = pd.read_excel(xls, sheet_name=sheet_names[0])
         xls.close()  # liberar el handle del archivo (en Windows impide borrar/limpiar el .xlsx)
@@ -835,7 +835,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
     for idx, row_dict in enumerate(records):
         # Cancelación cooperativa: revisar el flag cada 2000 filas para abortar rápido
         if cancel_flag_path and idx % 2000 == 0 and os.path.exists(cancel_flag_path):
-            raise AuditCancelledError(f"Auditoría cancelada por el usuario en la fila {idx + 2}.")
+            raise AuditCancelledError(f"Revisión cancelada por el usuario en la fila {idx + 2}.")
         fila_excel = idx + 2 
         celda_padre = sanitize_value(get_row_val(row_dict, 'CELDA_PADRE'), str)
         if not celda_padre:

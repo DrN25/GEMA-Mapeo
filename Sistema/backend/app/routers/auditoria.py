@@ -74,7 +74,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
     
-    ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA").font = font_title
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN GEOTÉCNICA").font = font_title
     proj_name = str(compact.get("proyecto") or diag.get("proyecto") or "Ferrobamba").upper()
     ws_dash.cell(row=3, column=2, value=f"Dashboard de Control de Calidad y Consistencia de Mapeo Geomecánico | PROYECTO: {proj_name}").font = font_subtitle
     
@@ -992,12 +992,12 @@ async def importar_excel_bulk(
     history_dir = os.path.join(uploads_dir, "history")
     os.makedirs(history_dir, exist_ok=True)
 
-    # Guard de concurrencia: una sola auditoría pesada a la vez (evita OOM por
+    # Guard de concurrencia: una sola revisión pesada a la vez (evita OOM por
     # dos pipelines simultáneos de archivos grandes en instancias pequeñas).
     if not _acquire_lock(audit_id):
         raise HTTPException(
             status_code=409,
-            detail="Ya hay una auditoría en proceso en el servidor. Espera a que termine o cancélala antes de subir otro archivo."
+            detail="Ya hay una revisión en proceso en el servidor. Espera a que termine o cancélala antes de subir otro archivo."
         )
 
     try:
@@ -1019,7 +1019,7 @@ async def importar_excel_bulk(
                     pass
                 raise HTTPException(
                     status_code=400,
-                    detail="El archivo cargado es un reporte de auditoría generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
+                    detail="El archivo cargado es un reporte de revisión generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo."
                 )
         except HTTPException:
             raise
@@ -1106,7 +1106,7 @@ def obtener_status_auditoria(audit_id: str = None):
 
     raise HTTPException(
         status_code=404,
-        detail="La auditoría solicitada ya no existe en el servidor (sus archivos se perdieron, probablemente por un reinicio o redeploy).",
+        detail="La revisión solicitada ya no existe en el servidor (sus archivos se perdieron, probablemente por un reinicio o redeploy).",
     )
 
 @router.get("/geomecanica/resumen-ligero")
@@ -1135,7 +1135,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
                     status_code=202, 
                     content={"status": "procesando", "message": "Procesando base de datos masiva y cruzando variables..."}
                 )
-            raise HTTPException(status_code=404, detail="La auditoría solicitada no existe en el servidor.")
+            raise HTTPException(status_code=404, detail="La revisión solicitada no existe en el servidor.")
     else:
         raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
         compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
@@ -1164,7 +1164,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
             if not os.path.exists(raw_file) or not os.path.exists(compact_file):
                 return JSONResponse(
                     status_code=202, 
-                    content={"status": "procesando", "message": "Esperando inicialización de datos de auditoría..."}
+                    content={"status": "procesando", "message": "Esperando inicialización de datos de revisión..."}
                 )
 
     # 2. FAST PATH: Cargar el reporte compacto directamente si no hay filtros aplicados
@@ -1253,7 +1253,7 @@ def descargar_reporte_excel(
                 filtered_vals.append(val)
                 
     is_filtered = len(filtered_vals) > 0
-    filename = f"reporte_auditoria_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"reporte_revision_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     if audit_id:
         pregenerated_file = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_completo.xlsx")
@@ -1351,9 +1351,10 @@ def descargar_reporte_excel(
 
 @router.get("/geomecanica/reglas")
 @router.get("/auditoria/reglas")
+@router.get("/revision/reglas")
 def obtener_catalogo_reglas():
     """
-    Retorna el catálogo completo de reglas de consistencia de auditoría
+    Retorna el catálogo completo de reglas de consistencia de revisión
     con metadatos, severidades, categorías, columnas y ejemplos didácticos.
     """
     return get_rules_catalog_data()

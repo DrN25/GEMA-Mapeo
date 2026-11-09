@@ -85,11 +85,11 @@ export default function KpiMetrics({
 
             {/* INTEGRIDAD POR CAMPOS VS DISCONTINUIDADES */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* AUDITORÍA DE CAMPOS */}
+                {/* REVISIÓN DE CAMPOS */}
                 {kpis.familia2 && (
                     <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                         <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
-                            <span>Auditoría de Datos por Celdas Individuales</span>
+                            <span>Revisión de Datos por Celdas Individuales</span>
                             <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                                 Total: {kpis.familia2.total_fields.toLocaleString()} campos
                             </span>
@@ -143,11 +143,11 @@ export default function KpiMetrics({
                     </div>
                 )}
 
-                {/* AUDITORÍA DE REGISTROS (FILAS) */}
+                {/* REVISIÓN DE REGISTROS (FILAS) */}
                 {kpis.familia3 && (
                     <div className="rounded-xl border border-navy-800 bg-navy-900/50 p-6 space-y-4">
                         <h3 className="text-xs font-black uppercase text-slate-350 border-b border-navy-850 pb-2 flex justify-between">
-                            <span>Auditoría de Filas de Registro (Corridas/Juntas)</span>
+                            <span>Revisión de Filas de Registro (Corridas/Juntas)</span>
                             <span className="text-xs bg-navy-850 text-slate-400 px-2 py-0.5 rounded font-mono">
                                 Total: {kpis.familia3.total_discontinuidades.toLocaleString()} filas
                             </span>

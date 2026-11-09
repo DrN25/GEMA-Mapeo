@@ -799,7 +799,7 @@ RULES_REGISTRY = {
     ),
 
     # =========================================================================
-    # NUEVAS REGLAS DE AUDITORÍA (Spec SDD Noviembre 2026)
+    # NUEVAS REGLAS DE REVISIÓN (Spec SDD Noviembre 2026)
     # =========================================================================
 
     # 1. Coordenadas fuera de rango de proyecto

@@ -10,7 +10,7 @@ interface CongruenceAuditorProps {
 }
 
 export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
-  // Estados para Auditoría de Congruencia
+  // Estados para Revisión de Congruencia
   const [fileAudit, setFileAudit] = useState<File | null>(null);
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditSuccess, setAuditSuccess] = useState<boolean>(false);
@@ -23,7 +23,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
   const [compareSuccess, setCompareSuccess] = useState<boolean>(false);
   const [compareError, setCompareError] = useState<string | null>(null);
 
-  // Manejador de Auditoría
+  // Manejador de Revisión
   const handleAuditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fileAudit) return;
@@ -45,7 +45,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
 
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.detail || 'Error procesando la auditoría de congruencia.');
+        throw new Error(errData.detail || 'Error procesando la revisión de congruencia.');
       }
 
       // Descargar el archivo blob
@@ -53,7 +53,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Auditoria_Congruencia_${fileAudit.name}`);
+      link.setAttribute('download', `Revision_Congruencia_${fileAudit.name}`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -116,10 +116,10 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
         <div>
           <h2 className="text-xl md:text-2xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-2.5">
             <ArrowRightLeft className="text-indigo-400" size={24} />
-            <span>Auditoría y Comparativo de Congruencia</span>
+            <span>Revisión y Comparativo de Congruencia</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Motor de auditoría de celdas padre geomecánicas (RQD / Resistencia) por año de campaña.
+            Motor de revisión de celdas padre geomecánicas (RQD / Resistencia) por año de campaña.
           </p>
         </div>
       </div>
@@ -153,15 +153,15 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
       {/* Grid de Operaciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
-        {/* Panel Izquierdo: Auditoría Individual */}
+        {/* Panel Izquierdo: Revisión Individual */}
         <div className="glass-panel border border-navy-800 bg-navy-950/20 p-6 rounded-2xl flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider flex items-center gap-2 border-b border-navy-850 pb-3">
               <FileSpreadsheet className="text-indigo-400" size={16} />
-              <span>Auditoría de Congruencia Individual</span>
+              <span>Revisión de Congruencia Individual</span>
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Sube una planilla de Excel de mapeo. El sistema auditará la consistencia de cada celda padre y generará un reporte de 4 hojas indicando desviaciones y el valor esperado por catálogo.
+              Sube una planilla de Excel de mapeo. El sistema revisará la consistencia de cada celda padre y generará un reporte de 4 hojas indicando desviaciones y el valor esperado por catálogo.
             </p>
 
             <form onSubmit={handleAuditSubmit} className="space-y-4">
@@ -201,7 +201,7 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
               {auditSuccess && (
                 <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-lg flex items-start gap-2 text-xs">
                   <CheckCircle className="shrink-0 mt-0.5" size={14} />
-                  <span>¡Reporte de auditoría generado y descargado con éxito!</span>
+                  <span>¡Reporte de revisión generado y descargado con éxito!</span>
                 </div>
               )}
 
@@ -217,12 +217,12 @@ export default function CongruenceAuditor({ apiBase }: CongruenceAuditorProps) {
                 {auditLoading ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
-                    <span>Procesando Auditoría...</span>
+                    <span>Procesando Revisión...</span>
                   </>
                 ) : (
                   <>
                     <Download size={14} />
-                    <span>Auditar y Descargar Reporte</span>
+                    <span>Revisar y Descargar Reporte</span>
                   </>
                 )}
               </button>

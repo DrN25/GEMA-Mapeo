@@ -142,7 +142,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                     {file && (
                         <div className="flex gap-2.5 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-fade-in">
                             <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
-                            <span>Archivo listo para procesar bajo perfil <strong>{proyecto.toUpperCase()}</strong>. Presione "Iniciar Auditoría Masiva".</span>
+                            <span>Archivo listo para procesar bajo perfil <strong>{proyecto.toUpperCase()}</strong>. Presione "Iniciar Revisión Masiva".</span>
                         </div>
                     )}
                 </div>
@@ -160,7 +160,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                         onClick={handleConfirmClick}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-black text-xs bg-cyan-500 hover:bg-cyan-400 text-navy-950 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(6,182,212,0.2)]"
                     >
-                        <span>Iniciar Auditoría Masiva</span>
+                        <span>Iniciar Revisión Masiva</span>
                         <UploadCloud size={14} />
                     </button>
                 </div>

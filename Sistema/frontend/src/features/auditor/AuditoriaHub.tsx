@@ -23,7 +23,7 @@ export default function AuditoriaHub({ apiBase }: AuditoriaHubProps) {
             <div className="bg-navy-900 border-b border-navy-800 px-6 py-2.5 flex items-center justify-between shrink-0 shadow-sm dark:shadow-md">
                 <div className="flex items-center gap-3">
                     <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                        Módulo de Auditoría:
+                        Módulo de Revisión:
                     </span>
                     <div className="inline-flex p-1 bg-navy-950 rounded-xl border border-navy-800 shadow-inner">
                         {/* Opción 1: Mapeo Geomecánico */}
@@ -87,7 +87,7 @@ export default function AuditoriaHub({ apiBase }: AuditoriaHubProps) {
                 </div>
             </div>
 
-            {/* Contenedor del Auditor Activo */}
+            {/* Contenedor del Panel de Revisión Activo */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {auditMode === 'mapeo' ? (
                     <BulkAuditor apiBase={apiBase} onNavigateToRules={() => setAuditMode('reglas')} />

@@ -486,10 +486,10 @@ const [connectionLost, setConnectionLost] = useState(false);
     }
   };
 
-  // 3. Auditoría reactiva de diferencias y rastreo de celda activa
+  // 3. Revisión reactiva de diferencias y rastreo de celda activa
   const workspaceDiff = computeAllWindowsDiff(activeWindow, dbSnapshotData);
 
-  // 3b. Auditoría reactiva de cambios en Ensayos PLT
+  // 3b. Revisión reactiva de cambios en Ensayos PLT
   const pltDiffSummary = useMemo(() => {
     const snap = pltSnapshotRef.current;
     const curr = pltEnsayos;

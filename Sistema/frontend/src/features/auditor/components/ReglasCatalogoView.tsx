@@ -255,7 +255,7 @@ export default function ReglasCatalogoView({
                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-100 dark:text-slate-950 font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer"
                             >
                                 <Layers size={14} />
-                                <span>Volver a Auditoría</span>
+                                <span>Volver a Revisión</span>
                             </button>
                         )}
                     </div>
@@ -705,7 +705,7 @@ export default function ReglasCatalogoView({
                                     <div className="p-3.5 bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/30 rounded-xl">
                                         <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-black text-xs mb-2">
                                             <CheckCircle2 size={15} />
-                                            <span>Caso Válido (Pasa Auditoría)</span>
+                                            <span>Caso Válido (Pasa Revisión)</span>
                                         </div>
                                         <div className="text-[11px] text-slate-200 leading-relaxed font-mono whitespace-pre-wrap">
                                             {selectedRule.example_ok || 'Valores dentro de los rangos tolerados y coherencia matemática estricta.'}
@@ -725,7 +725,7 @@ export default function ReglasCatalogoView({
                                 </div>
                             </div>
 
-                            {/* Mensaje de Auditoría */}
+                            {/* Mensaje de Revisión */}
                             {selectedRule.message_template && (
                                 <div>
                                     <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">

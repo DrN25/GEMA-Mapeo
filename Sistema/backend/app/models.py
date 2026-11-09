@@ -191,7 +191,7 @@ class Ventana(Base):
     geotecnico_id = Column("GeotecnicoID", Integer, ForeignKey("dbo.Geotecnicos.GeotecnicoID"), nullable=True)
     comentarios = Column("Comentarios", String, nullable=True)
 
-    # Auditoría (FechaRegistro ya tiene DEFAULT getdate en GEMA.sql)
+    # Revisión y control de cambios (FechaRegistro ya tiene DEFAULT getdate en GEMA.sql)
     fecha_registro = Column("FechaRegistro", DateTime, nullable=False, default=func.getdate(), server_default=func.getdate())
     usuario_registro = Column("UsuarioRegistro", String(100), nullable=True)
     fecha_modificacion = Column("FechaModificacion", DateTime, nullable=True)
@@ -270,7 +270,7 @@ class EstructuraGeologica(Base):
     rugosidad_cd89		= Column("RugosidadCD89", Numeric(5, 2), nullable=True)
     valor_condicion_cd89	= Column("ValorCondicionCD89", Numeric(5, 2), nullable=True)
 
-    # Auditoría
+    # Revisión y control de cambios
     fecha_registro = Column("FechaRegistro", DateTime, nullable=False, default=func.getdate(), server_default=func.getdate())
     usuario_registro = Column("UsuarioRegistro", String(100), nullable=True)
     fecha_modificacion = Column("FechaModificacion", DateTime, nullable=True)

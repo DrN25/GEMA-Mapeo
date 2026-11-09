@@ -269,8 +269,8 @@ def _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=None, exc
     celdas_mejor.sort(key=lambda x: x["delta"])
 
     return {
-        "meta_a": {"nombre": diag_a.get("nombre_archivo","Auditoria A"), "fecha": compact_a.get("fecha_auditoria","N/A"), "campanias": sorted(list(campanias_a))},
-        "meta_b": {"nombre": diag_b.get("nombre_archivo","Auditoria B"), "fecha": compact_b.get("fecha_auditoria","N/A"), "campanias": sorted(list(campanias_b))},
+        "meta_a": {"nombre": diag_a.get("nombre_archivo","Revisión A"), "fecha": compact_a.get("fecha_auditoria","N/A"), "campanias": sorted(list(campanias_a))},
+        "meta_b": {"nombre": diag_b.get("nombre_archivo","Revisión B"), "fecha": compact_b.get("fecha_auditoria","N/A"), "campanias": sorted(list(campanias_b))},
         "campanias_comunes": sorted(list(common_campaigns)),
         "is_filtered_by_common": is_filtered_by_common,
         "has_camp_mismatch": has_camp_mismatch,
@@ -406,7 +406,7 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
     ws.row_dimensions[2].height = 38
 
     ws.merge_cells("B2:P2")
-    t = ws.cell(row=2, column=2, value="COMPARATIVA DE AUDITORÍA Y CONTROL DE CALIDAD")
+    t = ws.cell(row=2, column=2, value="COMPARATIVA DE REVISIÓN Y CONTROL DE CALIDAD")
     t.font = s["font_title"]; t.alignment = s["align_center"]; t.fill = s["fill_primary"]
 
     # Alerta o Banner si hay desajuste de campañas
@@ -946,7 +946,7 @@ def _load_audit_files(audit_id: str):
     comp_f   = os.path.join(history_dir, f"{audit_id}_compact.json")
     if not os.path.exists(raw_f) or not os.path.exists(comp_f):
         raise HTTPException(status_code=404,
-            detail=f"Auditoria '{audit_id}' no encontrada o incompleta en el historial.")
+            detail=f"Revisión '{audit_id}' no encontrada o incompleta en el historial.")
     with open(raw_f,  "r", encoding="utf-8") as f: diag    = json.load(f)
     with open(comp_f, "r", encoding="utf-8") as f: compact = json.load(f)
     return diag, compact
@@ -962,7 +962,7 @@ def _stream_wb(wb, fname):
 
 @router.get("/geomecanica/comparativo/reporte")
 def reporte_comparativo_historial(audit_id_a: str, audit_id_b: str):
-    """Genera Excel comparativo entre dos auditorias ya procesadas en el historial."""
+    """Genera Excel comparativo entre dos revisiones ya procesadas en el historial."""
     if not audit_id_a or not audit_id_b:
         raise HTTPException(status_code=400, detail="Se requieren audit_id_a y audit_id_b.")
     if audit_id_a == audit_id_b:

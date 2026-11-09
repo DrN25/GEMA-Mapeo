@@ -81,7 +81,7 @@ def _pregenerate_plt_excel(diag: dict, compact: dict, excel_out_path: str, publi
 @router.post("/auditoria/plt/cancelar")
 def cancel_plt_audit(audit_id: Optional[str] = Query(None)):
     """
-    Cancela una auditoría PLT en curso, marca el flag de cancelación y limpia archivos temporales.
+    Cancela una revisión PLT en curso, marca el flag de cancelación y limpia archivos temporales.
     """
     if not audit_id:
         return {"status": "ok", "message": "No se especificó audit_id."}
@@ -94,8 +94,8 @@ def cancel_plt_audit(audit_id: Optional[str] = Query(None)):
         pass
 
     _cleanup_audit_files(audit_id)
-    print(f"[QAQC PLT] [CANCELACIÓN] Auditoría '{audit_id}' cancelada por el usuario.")
-    return {"status": "ok", "message": f"Auditoría '{audit_id}' cancelada correctamente."}
+    print(f"[QAQC PLT] [CANCELACIÓN] Revisión '{audit_id}' cancelada por el usuario.")
+    return {"status": "ok", "message": f"Revisión '{audit_id}' cancelada correctamente."}
 
 
 @router.post("/auditoria/plt/upload")
@@ -138,8 +138,8 @@ async def upload_plt_audit_file(
 
         if _is_cancelled(audit_id):
             _cleanup_audit_files(audit_id)
-            print(f"[x] [QAQC PLT] Auditoría '{audit_id}' cancelada durante la validación.")
-            return JSONResponse(content={"status": "cancelled", "message": "Auditoría cancelada por el usuario."})
+            print(f"[x] [QAQC PLT] Revisión '{audit_id}' cancelada durante la validación.")
+            return JSONResponse(content={"status": "cancelled", "message": "Revisión cancelada por el usuario."})
 
         diag["nombre_archivo"] = file.filename
         diag["proyecto"] = resolved_proyecto
@@ -186,7 +186,7 @@ async def upload_plt_audit_file(
         return JSONResponse(
             content={
                 "status": "success",
-                "message": "Auditoría PLT ejecutada correctamente",
+                "message": "Revisión PLT ejecutada correctamente",
                 "audit_id": audit_id,
                 "filename": file.filename,
                 "metricas": metricas,
@@ -194,8 +194,8 @@ async def upload_plt_audit_file(
         )
 
     except Exception as e:
-        print(f"[QAQC PLT] [ERROR] Error durante la auditoría PLT: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error durante la auditoría PLT: {str(e)}")
+        print(f"[QAQC PLT] [ERROR] Error durante la revisión PLT: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error durante la revisión PLT: {str(e)}")
     finally:
         if os.path.exists(temp_path):
             try:
@@ -207,7 +207,7 @@ async def upload_plt_audit_file(
 @router.get("/auditoria/plt/status")
 def get_plt_audit_status(audit_id: Optional[str] = Query(None)):
     """
-    Estado ligero (~200 bytes) de la auditoría PLT para el polling del frontend y verificación de reporte Excel.
+    Estado ligero (~200 bytes) de la revisión PLT para el polling del frontend y verificación de reporte Excel.
     """
     if audit_id:
         compact_file = os.path.join(plt_history_dir, f"{audit_id}_compact.json")
@@ -233,7 +233,7 @@ def get_plt_audit_status(audit_id: Optional[str] = Query(None)):
     if os.path.exists(LATEST_PLT_DIAG):
         return {"status": "procesando", "reporte_listo": False}
 
-    raise HTTPException(status_code=404, detail="No se encontró ninguna auditoría PLT activa.")
+    raise HTTPException(status_code=404, detail="No se encontró ninguna revisión PLT activa.")
 
 
 @router.get("/auditoria/plt/resumen-ligero")
@@ -242,7 +242,7 @@ def get_plt_resumen_ligero(
     campania: Optional[str] = Query(None, description="Filtro opcional de campañas separadas por coma"),
 ):
     """
-    Retorna los KPIs ejecutivos y estadísticas de la auditoría PLT.
+    Retorna los KPIs ejecutivos y estadísticas de la revisión PLT.
     Soporta filtrado dinámico por campañas y selección de histórico por audit_id.
     """
     if audit_id:
@@ -251,7 +251,7 @@ def get_plt_resumen_ligero(
         diag_path = LATEST_PLT_DIAG
 
     if not os.path.exists(diag_path):
-        raise HTTPException(status_code=404, detail="No hay ninguna auditoría PLT cargada en memoria.")
+        raise HTTPException(status_code=404, detail="No hay ninguna revisión PLT cargada en memoria.")
 
     with open(diag_path, "r", encoding="utf-8") as f:
         diag = json.load(f)
@@ -276,7 +276,7 @@ def get_plt_incidencias_paginadas(
     audit_id: Optional[str] = Query(None),
 ):
     """
-    Retorna la lista paginada y filtrada de inconsistencias encontradas en la auditoría PLT.
+    Retorna la lista paginada y filtrada de inconsistencias encontradas en la revisión PLT.
     """
     if audit_id:
         diag_path = os.path.join(plt_history_dir, f"{audit_id}_diag.json")
@@ -284,7 +284,7 @@ def get_plt_incidencias_paginadas(
         diag_path = LATEST_PLT_DIAG
 
     if not os.path.exists(diag_path):
-        raise HTTPException(status_code=404, detail="No hay ninguna auditoría PLT cargada en memoria.")
+        raise HTTPException(status_code=404, detail="No hay ninguna revisión PLT cargada en memoria.")
 
     with open(diag_path, "r", encoding="utf-8") as f:
         diag = json.load(f)
@@ -353,7 +353,7 @@ def download_plt_excel_report(
         diag_path = LATEST_PLT_DIAG
 
     is_filtered = bool(campania and campania.strip().upper() not in ["", "TODAS", "NONE", "NULL"])
-    filename = f"reporte_auditoria_qaqc_plt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"reporte_revision_qaqc_plt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
     # Si no hay filtros y el archivo pre-generado existe en uploads, servir directamente
     if not is_filtered and os.path.exists(pregenerated_file):
@@ -365,7 +365,7 @@ def download_plt_excel_report(
         )
 
     if not os.path.exists(diag_path):
-        raise HTTPException(status_code=404, detail="No hay ninguna auditoría PLT cargada en memoria.")
+        raise HTTPException(status_code=404, detail="No hay ninguna revisión PLT cargada en memoria.")
 
     print(f"\n[QAQC PLT] [REPORTE] Generando reporte Excel con filtros...")
     start_time = datetime.now()
@@ -413,7 +413,7 @@ def download_plt_excel_report(
 @router.get("/auditoria/plt/auditorias")
 def list_plt_audit_history():
     """
-    Lista el historial de todas las auditorías PLT procesadas en el sistema.
+    Lista el historial de todas las revisiones PLT procesadas en el sistema.
     """
     history = []
     if os.path.exists(plt_history_dir):

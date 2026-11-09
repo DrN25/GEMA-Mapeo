@@ -1,6 +1,6 @@
 /**
  * Generador de hash rápido y determinístico en 32 bits (Murmur-like)
- * para auditoría reactiva de cambios en celdas de ventanas geomecánicas.
+ * para revisión reactiva de cambios en celdas de ventanas geomecánicas.
  *
  * IMPORTANTE: fastHashObject usa serialización CANÓNICA (keys ordenadas).
  * Así el hash solo depende de los VALORES, no del orden de construcción de

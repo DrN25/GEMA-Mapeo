@@ -3,7 +3,7 @@ from typing import Any
 
 def apply_audit(instance: Any, current_user: Any, is_new: bool = True) -> None:
     """
-    Helper de auditoría reutilizable para cualquier modelo de SQLAlchemy.
+    Helper de revisión y trazabilidad reutilizable para cualquier modelo de SQLAlchemy.
     Asigna automáticamente el campo `Usuario` (o `Email` como fallback)
     y la fecha/hora actual del servidor.
     """
