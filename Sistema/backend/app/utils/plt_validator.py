@@ -34,7 +34,7 @@ from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT, COMP
 
 PLT_MANDATORY_COLS_COUNT = 34
 CAT_DIRECCION_ROTURA = ["Pa", "Pe", "NA", "N/A"]
-CAT_TIPO_FRACTURA = ["M", "E", "C", "M-E", "M/E", "E/M", "E-M"]
+CAT_TIPO_FRACTURA = ["M", "E", "C"]
 
 INTRUSIVE_LITOS = {
     "MZB", "MZQ", "MZM", "GRD", "TON", "DIO", "POR", "AND", "DAC", "MZD",
@@ -295,8 +295,8 @@ def get_expected_isrm(ucs_val: Optional[float]) -> Optional[str]:
 
 
 def normalize_sample_code(celda: str, muestra: str) -> str:
-    """Formatea el código de muestra oficial (ej. 'WB1-A')."""
-    return f"{celda.strip().upper()}-{muestra.strip().upper()}"
+    """Formatea el código de muestra oficial (ej. 'AG57A')."""
+    return f"{celda.strip().upper()}{muestra.strip().upper()}"
 
 
 def are_sample_codes_compatible(actual: str, celda: str, muestra: str) -> bool:
@@ -405,6 +405,7 @@ def validate_plt_standard_34(
                 "total_filas_procesadas": 0,
                 "incidencias": [],
                 "resumen_por_celda": {},
+                "resumen_fractura": {"M": 0, "E": 0, "C": 0, "otros": 0},
             }
 
         columns = dedup_pandas_headers(hdr_rows[0])
@@ -459,6 +460,9 @@ def validate_plt_standard_34(
     pos_campania = col_pos.get("campania")
     pos_tipo_lito = col_pos.get("tipo_litologico")
     pos_nivel = col_pos.get("nivel")
+    pos_este = col_pos.get("este")
+    pos_norte = col_pos.get("norte")
+    pos_elev = col_pos.get("elevacion")
     err_check_positions = [col_pos[k] for k in ("is50_mpa", "ucs_mpa", "fuerza_p", "ancho_w") if k in col_pos]
 
     cell_groups: Dict[Tuple[str, str], List[Tuple[int, str, int]]] = defaultdict(list)
@@ -485,6 +489,8 @@ def validate_plt_standard_34(
         nivel_val = sanitize_number(first_row[pos_nivel] if pos_nivel is not None else None)
 
         cell_summary_key = f"{celda_k} ({fecha_k})" if fecha_k != "SIN_FECHA" else celda_k
+        group_alertas = 0
+        group_advertencias = 0
 
         has_formula_err = any(
             is_formula_error(rows_compact[r[2]][ep])
@@ -507,6 +513,7 @@ def validate_plt_standard_34(
                     "valor_actual": "#ERR",
                     "mensaje": f"Celda '{celda_k}': Contiene errores críticos de fórmula (#VALUE!, #REF!, etc.).",
                 })
+                group_alertas += 1
         elif count_muestras == 4:
             if muestras_secuencia == ["A", "B", "C", "D"]:
                 estado_secuencia = "CORRECTO (A-B-C-D)"
@@ -524,6 +531,7 @@ def validate_plt_standard_34(
                     "valor_actual": secuencia_str,
                     "mensaje": rule_obj.format_message(celda=celda_k, secuencia=secuencia_str),
                 })
+                group_advertencias += 1
         elif count_muestras < 4:
             estado_secuencia = f"INCOMPLETA ({count_muestras}/4: {secuencia_str})"
             rule_obj = RULES_REGISTRY_PLT["WRN_PLT_CELDA_INCOMPLETA"]
@@ -538,6 +546,7 @@ def validate_plt_standard_34(
                 "valor_actual": secuencia_str,
                 "mensaje": rule_obj.format_message(celda=celda_k, count=count_muestras, secuencia=secuencia_str),
             })
+            group_advertencias += 1
         else:
             estado_secuencia = f"EXCEDENTE ({count_muestras}/4: {secuencia_str})"
             rule_obj = RULES_REGISTRY_PLT["WRN_PLT_CELDA_EXCEDENTE"]
@@ -552,6 +561,59 @@ def validate_plt_standard_34(
                 "valor_actual": secuencia_str,
                 "mensaje": rule_obj.format_message(celda=celda_k, count=count_muestras, secuencia=secuencia_str),
             })
+            group_advertencias += 1
+
+        # Verificar muestras duplicadas en la misma celda/fecha y coordenadas repetidas entre muestras
+        seen_muestras = set()
+        for fila_ex, m_raw, _ in group_rows:
+            if m_raw:
+                if m_raw in seen_muestras:
+                    rule_dup = RULES_REGISTRY_PLT["ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA"]
+                    cat_dup = CATEGORIES_REGISTRY_PLT.get(rule_dup.category_code)
+                    incidencias.append({
+                        "fila_excel": fila_ex,
+                        "tipo_incidencia": cat_dup.severity if cat_dup else "ALERTA",
+                        "rule_code": "ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA",
+                        "celda_mapeo": celda_k,
+                        "campania": camp_val,
+                        "columna": col_map.get("muestra", "Muestra"),
+                        "valor_actual": m_raw,
+                        "mensaje": rule_dup.format_message(muestra=m_raw, celda=celda_k),
+                    })
+                    group_alertas += 1
+                seen_muestras.add(m_raw)
+
+        coord_occurrences: Dict[Tuple[float, float, float], List[Tuple[int, str]]] = defaultdict(list)
+        for fila_ex, m_raw, r_idx in group_rows:
+            r_t = rows_compact[r_idx]
+            e_v = sanitize_number(r_t[pos_este]) if pos_este is not None else None
+            n_v = sanitize_number(r_t[pos_norte]) if pos_norte is not None else None
+            z_v = sanitize_number(r_t[pos_elev]) if pos_elev is not None else None
+            if e_v is not None and n_v is not None and z_v is not None:
+                coord_occurrences[(round(e_v, 4), round(n_v, 4), round(z_v, 2))].append(
+                    (fila_ex, m_raw or f"F{fila_ex}")
+                )
+
+        rule_coord = RULES_REGISTRY_PLT["ERR_PLT_COORD_DUPLICADAS_EN_CELDA"]
+        cat_coord = CATEGORIES_REGISTRY_PLT.get(rule_coord.category_code)
+        for coord_key, occs in coord_occurrences.items():
+            if len(occs) > 1:
+                muestras_dup_str = ", ".join(m for _, m in occs)
+                coords_str = f"E={coord_key[0]}, N={coord_key[1]}, Z={coord_key[2]}"
+                for fila_ex, _ in occs[1:]:
+                    incidencias.append({
+                        "fila_excel": fila_ex,
+                        "tipo_incidencia": cat_coord.severity if cat_coord else "ALERTA",
+                        "rule_code": "ERR_PLT_COORD_DUPLICADAS_EN_CELDA",
+                        "celda_mapeo": celda_k,
+                        "campania": camp_val,
+                        "columna": col_map.get("este", "Este (m)"),
+                        "valor_actual": coords_str,
+                        "mensaje": rule_coord.format_message(
+                            celda=celda_k, muestras=muestras_dup_str, coords=coords_str
+                        ),
+                    })
+                    group_alertas += 1
 
         resumen_celdas[cell_summary_key] = {
             "celda": celda_k,
@@ -563,12 +625,13 @@ def validate_plt_standard_34(
             "secuencia": secuencia_str,
             "estado_secuencia": estado_secuencia,
             "filas": filas_nums,
-            "alertas": 0,
-            "advertencias": 0,
+            "alertas": group_alertas,
+            "advertencias": group_advertencias,
             "vacios": 0,
         }
 
     del cell_groups
+    frac_counts: Dict[str, int] = {"M": 0, "E": 0, "C": 0, "otros": 0}
 
     # Validación fila a fila
     proj_cfg = get_project_geology_config(project)
@@ -808,6 +871,30 @@ def validate_plt_standard_34(
                 reg_err("muestra_valida_ancho", valida_w_raw, "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
                         actual=valida_w_raw, w=effective_w, d=d_num, lim_inf=round(0.3 * effective_w, 2), expected=exp_val_w)
 
+        # Alerta geométrica fuera de norma ASTM/ISRM (ADVERTENCIA)
+        geom_failures: List[str] = []
+        if d_num is not None and l_num is not None:
+            if l_num < d_num:
+                geom_failures.append(f"L={l_num} cm < D={d_num} cm (dist. mín. < 0.5D)")
+        elif valida_l_norm == "NO":
+            geom_failures.append("Longitud L marcada como NO válida")
+
+        if d_num is not None and effective_w is not None:
+            if not (0.3 * effective_w < d_num < effective_w):
+                geom_failures.append(
+                    f"D={d_num} cm fuera de (0.3*W={round(0.3 * effective_w, 2)}, W={effective_w} cm)"
+                )
+        elif valida_w_norm == "NO":
+            geom_failures.append("Ancho W marcado como NO válido")
+
+        if geom_failures:
+            reg_err(
+                "muestra_valida_ancho",
+                f"{valida_l_norm or '-'}/{valida_w_norm or '-'}",
+                "WRN_PLT_GEOMETRIA_FUERA_NORMA",
+                motivo="; ".join(geom_failures),
+            )
+
         # 6. Ensayo Físico, Fractura y Parámetros PLT
         fuerza_raw = get_val("fuerza_p")
         if is_blank(fuerza_raw):
@@ -817,6 +904,12 @@ def validate_plt_standard_34(
             fuerza_p = sanitize_number(fuerza_raw)
             if fuerza_p is None or fuerza_p <= 0:
                 reg_err("fuerza_p", fuerza_raw, "ERR_PLT_FUERZA_P_RANGO", value=str(fuerza_raw))
+            elif 55.0 < fuerza_p <= 60.0:
+                reg_err("fuerza_p", fuerza_p, "WRN_PLT_CARGA_P_ALTA", value=round(fuerza_p, 3))
+            elif fuerza_p > 60.0:
+                reg_err("fuerza_p", fuerza_p, "ERR_PLT_CARGA_P_VERIFICACION", value=round(fuerza_p, 3))
+                if is_blank(get_val("observaciones")):
+                    reg_err("observaciones", None, "ERR_PLT_OBSERVACION_OBLIGATORIA_CARGA_P", p=round(fuerza_p, 3))
         dir_rot = _norm_str(get_val("direccion_rotura"))
         tipo_frac = _norm_str(get_val("tipo_fractura"))
         de_num = sanitize_number(get_val("diametro_equiv"))
@@ -831,15 +924,20 @@ def validate_plt_standard_34(
 
         if not tipo_frac:
             reg_err("tipo_fractura", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Tipo de fractura")
-        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA] and tipo_frac != "E-M":
+            frac_counts["otros"] += 1
+        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA]:
             reg_err("tipo_fractura", tipo_frac, "ERR_PLT_TIPO_FRACTURA_CATALOGO", value=tipo_frac)
+            frac_counts["otros"] += 1
+        else:
+            frac_counts[tipo_frac] = frac_counts.get(tipo_frac, 0) + 1
 
         calc_de = None
         if effective_w is not None and d_num is not None and (effective_w * d_num) > 0:
-            calc_de = round(math.sqrt((4.0 * effective_w * d_num) / math.pi), 2)
+            raw_de = math.sqrt((4.0 * effective_w * d_num) / math.pi)
+            calc_de = round(raw_de, 4)
             if de_num is None:
                 reg_err("diametro_equiv", get_val("diametro_equiv"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Diámetro equivalente (cm)")
-            elif abs(de_num - calc_de) > tolerance:
+            elif abs(de_num - raw_de) > 0.005:
                 reg_err("diametro_equiv", de_num, "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
                         actual=de_num, w=effective_w, d=d_num, expected=calc_de)
 
@@ -847,10 +945,7 @@ def validate_plt_standard_34(
 
         calc_f = None
         if effective_de is not None and effective_de > 0:
-            if 4.0 <= effective_de <= 6.0:
-                calc_f = round(math.sqrt(effective_de / 5.0), 4)
-            else:
-                calc_f = round(math.pow(effective_de / 5.0, 0.45), 4)
+            calc_f = round(math.pow(effective_de / 5.0, 0.45), 4)
 
             if f_num is None:
                 reg_err("f", get_val("f"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Factor F")
@@ -920,6 +1015,7 @@ def validate_plt_standard_34(
         "total_filas_procesadas": total_filas,
         "incidencias": incidencias,
         "resumen_por_celda": resumen_celdas,
+        "resumen_fractura": frac_counts,
     }
 
 
@@ -1009,6 +1105,8 @@ def validate_plt_compact_field(
 
         first_row = group_rows[0]
         lito_val = str(first_row.get("lito1") or "").strip().upper()
+        group_alertas = 0
+        group_advertencias = 0
 
         has_formula_err = any(
             is_formula_error(r.get(k))
@@ -1031,6 +1129,7 @@ def validate_plt_compact_field(
                     "valor_actual": "#ERR",
                     "mensaje": f"Celda '{celda_k}': Contiene errores críticos de fórmula (#VALUE!, #REF!, etc.).",
                 })
+                group_alertas += 1
         elif count_muestras == 4:
             if muestras_secuencia == ["A", "B", "C", "D"]:
                 estado_secuencia = "CORRECTO (A-B-C-D)"
@@ -1048,6 +1147,7 @@ def validate_plt_compact_field(
                     "valor_actual": secuencia_str,
                     "mensaje": rule_obj.format_message(celda=celda_k, secuencia=secuencia_str),
                 })
+                group_advertencias += 1
         elif count_muestras < 4:
             estado_secuencia = f"INCOMPLETA ({count_muestras}/4: {secuencia_str})"
             rule_obj = RULES_REGISTRY_PLT["WRN_PLT_CELDA_INCOMPLETA"]
@@ -1062,6 +1162,7 @@ def validate_plt_compact_field(
                 "valor_actual": secuencia_str,
                 "mensaje": rule_obj.format_message(celda=celda_k, count=count_muestras, secuencia=secuencia_str),
             })
+            group_advertencias += 1
         else:
             estado_secuencia = f"EXCEDENTE ({count_muestras}/4: {secuencia_str})"
             rule_obj = RULES_REGISTRY_PLT["WRN_PLT_CELDA_EXCEDENTE"]
@@ -1076,6 +1177,60 @@ def validate_plt_compact_field(
                 "valor_actual": secuencia_str,
                 "mensaje": rule_obj.format_message(celda=celda_k, count=count_muestras, secuencia=secuencia_str),
             })
+            group_advertencias += 1
+
+        # Verificar muestras duplicadas en la misma celda y coordenadas repetidas entre muestras
+        seen_muestras = set()
+        for r in group_rows:
+            m_raw = str(r.get("muestra") or "").strip().upper()
+            if m_raw:
+                if m_raw in seen_muestras:
+                    rule_dup = RULES_REGISTRY_PLT["ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA"]
+                    cat_dup = CATEGORIES_REGISTRY_PLT.get(rule_dup.category_code)
+                    incidencias.append({
+                        "fila_excel": r["fila_excel"],
+                        "tipo_incidencia": cat_dup.severity if cat_dup else "ALERTA",
+                        "rule_code": "ERR_PLT_MUESTRA_DUPLICADA_EN_CELDA",
+                        "celda_mapeo": celda_k,
+                        "campania": "N/A",
+                        "columna": "Código de muestra",
+                        "valor_actual": m_raw,
+                        "mensaje": rule_dup.format_message(muestra=m_raw, celda=celda_k),
+                    })
+                    group_alertas += 1
+                seen_muestras.add(m_raw)
+
+        coord_occurrences: Dict[Tuple[float, float, float], List[Tuple[int, str]]] = defaultdict(list)
+        for r in group_rows:
+            e_v = sanitize_number(r.get("este"))
+            n_v = sanitize_number(r.get("norte"))
+            z_v = sanitize_number(r.get("cota"))
+            if e_v is not None and n_v is not None and z_v is not None:
+                m_raw = str(r.get("muestra") or "").strip().upper()
+                coord_occurrences[(round(e_v, 4), round(n_v, 4), round(z_v, 2))].append(
+                    (r["fila_excel"], m_raw or f"F{r['fila_excel']}")
+                )
+
+        rule_coord = RULES_REGISTRY_PLT["ERR_PLT_COORD_DUPLICADAS_EN_CELDA"]
+        cat_coord = CATEGORIES_REGISTRY_PLT.get(rule_coord.category_code)
+        for coord_key, occs in coord_occurrences.items():
+            if len(occs) > 1:
+                muestras_dup_str = ", ".join(m for _, m in occs)
+                coords_str = f"E={coord_key[0]}, N={coord_key[1]}, Z={coord_key[2]}"
+                for fila_ex, _ in occs[1:]:
+                    incidencias.append({
+                        "fila_excel": fila_ex,
+                        "tipo_incidencia": cat_coord.severity if cat_coord else "ALERTA",
+                        "rule_code": "ERR_PLT_COORD_DUPLICADAS_EN_CELDA",
+                        "celda_mapeo": celda_k,
+                        "campania": "N/A",
+                        "columna": "Este",
+                        "valor_actual": coords_str,
+                        "mensaje": rule_coord.format_message(
+                            celda=celda_k, muestras=muestras_dup_str, coords=coords_str
+                        ),
+                    })
+                    group_alertas += 1
 
         resumen_celdas[celda_k] = {
             "celda": celda_k,
@@ -1087,10 +1242,12 @@ def validate_plt_compact_field(
             "secuencia": secuencia_str,
             "estado_secuencia": estado_secuencia,
             "filas": filas_nums,
-            "alertas": 0,
-            "advertencias": 0,
+            "alertas": group_alertas,
+            "advertencias": group_advertencias,
             "vacios": 0,
         }
+
+    frac_counts: Dict[str, int] = {"M": 0, "E": 0, "C": 0, "otros": 0}
 
     # 2. Validación Fila a Fila sobre columnas presentes en Formato de Campo
     proj_cfg = get_project_geology_config(project)
@@ -1272,6 +1429,30 @@ def validate_plt_compact_field(
                 reg_err_comp("Muestra válida - ancHP", valida_w_raw, "ERR_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
                              actual=valida_w_raw, w=effective_w, d=d_num, lim_inf=round(0.3 * effective_w, 2), expected=exp_val_w)
 
+        # Alerta geométrica fuera de norma ASTM/ISRM (ADVERTENCIA)
+        geom_failures: List[str] = []
+        if d_num is not None and l_num is not None:
+            if l_num < d_num:
+                geom_failures.append(f"L={l_num} cm < D={d_num} cm (dist. mín. < 0.5D)")
+        elif valida_l_norm == "NO":
+            geom_failures.append("Longitud L marcada como NO válida")
+
+        if d_num is not None and effective_w is not None:
+            if not (0.3 * effective_w < d_num < effective_w):
+                geom_failures.append(
+                    f"D={d_num} cm fuera de (0.3*W={round(0.3 * effective_w, 2)}, W={effective_w} cm)"
+                )
+        elif valida_w_norm == "NO":
+            geom_failures.append("Ancho W marcado como NO válido")
+
+        if geom_failures:
+            reg_err_comp(
+                "Muestra válida - ancHP",
+                f"{valida_l_norm or '-'}/{valida_w_norm or '-'}",
+                "WRN_PLT_GEOMETRIA_FUERA_NORMA",
+                motivo="; ".join(geom_failures),
+            )
+
         # Fuerza P, Dirección de Rotura y Fractura
         p_raw = rd.get("p")
         if is_blank(p_raw):
@@ -1281,6 +1462,12 @@ def validate_plt_compact_field(
             p_num = sanitize_number(p_raw)
             if p_num is None or p_num <= 0:
                 reg_err_comp("Fuerza P (kN)", p_raw, "ERR_PLT_FUERZA_P_RANGO", value=str(p_raw))
+            elif 55.0 < p_num <= 60.0:
+                reg_err_comp("Fuerza P (kN)", p_num, "WRN_PLT_CARGA_P_ALTA", value=round(p_num, 3))
+            elif p_num > 60.0:
+                reg_err_comp("Fuerza P (kN)", p_num, "ERR_PLT_CARGA_P_VERIFICACION", value=round(p_num, 3))
+                if is_blank(rd.get("obs")):
+                    reg_err_comp("Observaciones", None, "ERR_PLT_OBSERVACION_OBLIGATORIA_CARGA_P", p=round(p_num, 3))
 
         dir_rot = _norm_str(rd.get("dir"))
         if not dir_rot:
@@ -1291,17 +1478,22 @@ def validate_plt_compact_field(
         tipo_frac = _norm_str(rd.get("frac"))
         if not tipo_frac:
             reg_err_comp("Tipo de fractura", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Tipo de fractura")
-        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA] and tipo_frac not in ("M-E", "M/E", "E/M", "E-M"):
+            frac_counts["otros"] += 1
+        elif tipo_frac not in [x.upper() for x in CAT_TIPO_FRACTURA]:
             reg_err_comp("Tipo de fractura", tipo_frac, "ERR_PLT_TIPO_FRACTURA_CATALOGO", value=tipo_frac)
+            frac_counts["otros"] += 1
+        else:
+            frac_counts[tipo_frac] = frac_counts.get(tipo_frac, 0) + 1
 
         # Diámetro Equivalente De
         de_num = sanitize_number(rd.get("de"))
         calc_de = None
         if effective_w is not None and d_num is not None and (effective_w * d_num) > 0:
-            calc_de = round(math.sqrt((4.0 * effective_w * d_num) / math.pi), 2)
+            raw_de = math.sqrt((4.0 * effective_w * d_num) / math.pi)
+            calc_de = round(raw_de, 4)
             if de_num is None:
                 reg_err_comp("Diámetro equiv. (cm)", rd.get("de"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Diámetro equiv. (cm)")
-            elif abs(de_num - calc_de) > tolerance:
+            elif abs(de_num - raw_de) > 0.005:
                 reg_err_comp("Diámetro equiv. (cm)", de_num, "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
                              actual=de_num, w=effective_w, d=d_num, expected=calc_de)
 
@@ -1311,10 +1503,7 @@ def validate_plt_compact_field(
         f_num = sanitize_number(rd.get("f"))
         calc_f = None
         if effective_de is not None and effective_de > 0:
-            if 4.0 <= effective_de <= 6.0:
-                calc_f = round(math.sqrt(effective_de / 5.0), 4)
-            else:
-                calc_f = round(math.pow(effective_de / 5.0, 0.45), 4)
+            calc_f = round(math.pow(effective_de / 5.0, 0.45), 4)
 
             if f_num is None:
                 reg_err_comp("F", rd.get("f"), "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="F")
@@ -1375,6 +1564,7 @@ def validate_plt_compact_field(
         "total_filas_procesadas": total_filas,
         "incidencias": incidencias,
         "resumen_por_celda": resumen_celdas,
+        "resumen_fractura": frac_counts,
     }
 
 
@@ -1423,6 +1613,7 @@ def validate_plt_excel(
         },
         "incidencias": incidencias,
         "resumen_por_celda": diag.get("resumen_por_celda", {}),
+        "resumen_fractura": diag.get("resumen_fractura", {"M": 0, "E": 0, "C": 0, "otros": 0}),
     }
 
     if output_json_path:

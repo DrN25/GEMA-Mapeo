@@ -16,7 +16,7 @@ export {
   buildCampaniaYearMap,
   markFieldTouched,
 } from './qaQcRules';
-export type { QaQcAlert, QaQcSeverity } from './qaQcRules';
+export type { QaQcAlert, QaQcSeverity, WindowQaQcExtraCtx } from './qaQcRules';
 export { resetTouchedFields } from './qaQcTouch';
 
 // Alias retrocompatible: el panel y el modal usan `type` como

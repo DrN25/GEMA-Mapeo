@@ -16,6 +16,17 @@ import {
   CAT_TIPO_FRACTURA
 } from '../../../utils/geomecColumns';
 import { LITHOLOGY_CLASSIFICATION, resolveLithologyCascade } from '../../../utils/catalogData';
+import { resolveExpectedKStrict } from '../../../utils/pltQaQcRules';
+import { roundTo } from '../../../utils/numericPrecision';
+
+const numOrNull = (v: any): number | null => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (v === null || v === undefined || v === '') return null;
+  const trimmed = String(v).trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+};
 
 export const CAMPANA_OPTIONS = [
   '2019', '2020', '2021', '2022', '2023',
@@ -120,7 +131,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     emptyPolicy: 'block',
     hint: 'Código de celda / estación de mapeo'
   }),
-  textColumn({
+  selectColumn({
     id: 'muestra',
     header: 'Muestra',
     excelName: 'Muestra',
@@ -128,8 +139,24 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     module: 'plt',
     defaultWidth: 80,
     minWidth: 60,
+    options: ['A', 'B', 'C', 'D'],
     emptyPolicy: 'block',
-    hint: 'Número de muestra / probeta'
+    customValidators: [
+      (val: any, row: Record<string, any>) => {
+        const s = String(val || '').trim().toUpperCase();
+        if (!['A', 'B', 'C', 'D'].includes(s)) {
+          return {
+            rowId: Number(row.id || row.idd || 0),
+            field: 'muestra',
+            type: 'CRÍTICO',
+            message: `Muestra '${val}' inválida: solo se permiten A, B, C o D`,
+            value: val
+          };
+        }
+        return null;
+      }
+    ],
+    hint: 'Letra de muestra obligatoria (A, B, C o D)'
   }),
   calculatedColumn({
     id: 'codigo_muestra',
@@ -139,12 +166,13 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     module: 'plt',
     defaultWidth: 125,
     minWidth: 95,
+    format: (val: any) => (val === null || val === undefined ? '' : String(val)),
     calculate: (row: Record<string, any>) => {
       const c = String(row.celda_mapeo || '').trim().toUpperCase();
-      const m = String(row.muestra || '').trim();
-      return c ? (m ? `${c}_${m}` : c) : (m || '');
+      const m = String(row.muestra || '').trim().toUpperCase();
+      return c ? (m ? `${c}${m}` : c) : (m || '');
     },
-    hint: 'Generado automáticamente: Celda_Muestra'
+    hint: 'Generado automáticamente: {Celda}{Muestra} (sin guion)'
   }),
   selectColumn({
     id: 'litologia_1',
@@ -188,7 +216,9 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     module: 'plt',
     defaultWidth: 130,
     minWidth: 100,
+    format: (val: any) => (val === null || val === undefined ? '' : String(val)),
     calculate: (row: Record<string, any>) => {
+      if (!row.litologia_1 && !row.litologia_2 && !row.litologia_3 && !row.model2022) return '';
       const res = resolveLithologyCascade(row.litologia_1, row.litologia_2, row.litologia_3, row.model2022 || null);
       return res.clase || '';
     },
@@ -209,6 +239,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'm',
     constraints: { positiveOnly: true, minHard: 0 },
+    emptyPolicy: 'block',
     hint: 'Coordenada Este en metros'
   }),
   decimalColumn({
@@ -222,6 +253,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'm',
     constraints: { positiveOnly: true, minHard: 0 },
+    emptyPolicy: 'block',
     hint: 'Coordenada Norte en metros'
   }),
   decimalColumn({
@@ -234,6 +266,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     minWidth: 80,
     decimals: 2,
     unit: 'msnm',
+    emptyPolicy: 'block',
     hint: 'Cota de elevación'
   }),
 
@@ -251,6 +284,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'cm',
     constraints: { positiveOnly: true, minHard: 0.1 },
+    emptyPolicy: 'block',
     hint: 'Espesor de la probeta irregular (cm)'
   }),
   decimalColumn({
@@ -264,6 +298,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'cm',
     constraints: { positiveOnly: true, minHard: 0.1 },
+    emptyPolicy: 'block',
     hint: 'Longitud de la probeta irregular (cm)'
   }),
   decimalColumn({
@@ -277,6 +312,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'cm',
     constraints: { positiveOnly: true, minHard: 0.1 },
+    emptyPolicy: 'block',
     hint: 'Primer ancho de la probeta (cm)'
   }),
   decimalColumn({
@@ -290,6 +326,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'cm',
     constraints: { positiveOnly: true, minHard: 0.1 },
+    emptyPolicy: 'block',
     hint: 'Segundo ancho de la probeta (cm)'
   }),
   calculatedColumn({
@@ -303,9 +340,9 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'cm',
     calculate: (row: Record<string, any>) => {
-      const w1 = row.ancho_w1 !== null && row.ancho_w1 !== undefined && row.ancho_w1 !== '' ? Number(row.ancho_w1) : null;
-      const w2 = row.ancho_w2 !== null && row.ancho_w2 !== undefined && row.ancho_w2 !== '' ? Number(row.ancho_w2) : null;
-      return (w1 !== null && w2 !== null && !isNaN(w1) && !isNaN(w2)) ? Number(((w1 + w2) / 2).toFixed(2)) : null;
+      const w1 = numOrNull(row.ancho_w1);
+      const w2 = numOrNull(row.ancho_w2);
+      return (w1 !== null && w2 !== null) ? roundTo((w1 + w2) / 2, 2) : null;
     },
     hint: 'Promedio: (W1 + W2) / 2'
   }),
@@ -317,15 +354,16 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     module: 'plt',
     defaultWidth: 105,
     minWidth: 85,
+    format: (val: any) => (val === null || val === undefined ? '' : String(val)),
     calculate: (row: Record<string, any>) => {
-      const l = Number(row.longitud_l);
-      const d = Number(row.espesor_d);
-      if (row.longitud_l != null && row.espesor_d != null && !isNaN(l) && !isNaN(d)) {
+      const l = numOrNull(row.longitud_l);
+      const d = numOrNull(row.espesor_d);
+      if (l !== null && d !== null) {
         return l >= d ? 'SÍ' : 'NO';
       }
       return null;
     },
-    hint: 'Condición: L >= D'
+    hint: 'Condición: L >= D (distancia mín. 0.5D)'
   }),
   calculatedColumn({
     id: 'muestra_valida_ancho',
@@ -335,10 +373,11 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     module: 'plt',
     defaultWidth: 105,
     minWidth: 85,
+    format: (val: any) => (val === null || val === undefined ? '' : String(val)),
     calculate: (row: Record<string, any>) => {
-      const d = Number(row.espesor_d);
-      const w = Number(row.ancho_w);
-      if (row.espesor_d != null && row.ancho_w != null && !isNaN(d) && !isNaN(w)) {
+      const d = numOrNull(row.espesor_d);
+      const w = numOrNull(row.ancho_w);
+      if (d !== null && w !== null) {
         return (d > 0.3 * w && d < w) ? 'SÍ' : 'NO';
       }
       return null;
@@ -360,7 +399,33 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 2,
     unit: 'kN',
     constraints: { positiveOnly: true, minHard: 0.01 },
-    hint: 'Carga de rotura P en kilonewtons'
+    emptyPolicy: 'block',
+    customValidators: [
+      (val: any, row: Record<string, any>) => {
+        const p = Number(val);
+        if (!Number.isFinite(p)) return null;
+        if (p > 60) {
+          return {
+            rowId: Number(row.id || row.idd || 0),
+            field: 'fuerza_p',
+            type: 'AVISO',
+            message: `Carga P = ${p} kN (> 60 kN): alerta de verificación. Obligatorio comentar en Observaciones.`,
+            value: val
+          };
+        }
+        if (p > 55) {
+          return {
+            rowId: Number(row.id || row.idd || 0),
+            field: 'fuerza_p',
+            type: 'AVISO',
+            message: `Carga P = ${p} kN supera 55 kN (precaución 55–60 kN).`,
+            value: val
+          };
+        }
+        return null;
+      }
+    ],
+    hint: 'Carga de rotura P en kilonewtons (evitar > 55–60 kN; >60 kN exige comentario)'
   }),
   selectColumn({
     id: 'direccion_rotura',
@@ -371,6 +436,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     defaultWidth: 100,
     minWidth: 80,
     options: CAT_DIRECCION_ROTURA,
+    emptyPolicy: 'block',
     hint: 'Pa = Paralelo, Pe = Perpendicular, NA = No Aplica'
   }),
   selectColumn({
@@ -382,7 +448,8 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     defaultWidth: 100,
     minWidth: 80,
     options: CAT_TIPO_FRACTURA,
-    hint: 'M = Matriz, E = Estructura, C = Combinada'
+    emptyPolicy: 'block',
+    hint: 'M = Matriz (roca intacta), E = Estructura, C = Combinada'
   }),
 
   // =========================================================================
@@ -390,21 +457,22 @@ export const PLT_SCHEMA: ColumnSchema[] = [
   // =========================================================================
   calculatedColumn({
     id: 'diametro_equivalente',
-    header: 'De (mm)',
-    excelName: 'Diámetro equivalente (mm)',
+    header: 'De (cm)',
+    excelName: 'Diámetro equivalente (cm)',
     group: 'Índice de Carga Puntual',
     module: 'plt',
     defaultWidth: 110,
     minWidth: 85,
     decimals: 4,
+    unit: 'cm',
     calculate: (row: Record<string, any>) => {
-      const d = Number(row.espesor_d);
-      const w = Number(row.ancho_w);
-      return (d && w && !isNaN(d) && !isNaN(w))
-        ? Number(Math.sqrt((4 * d * w) / Math.PI).toFixed(4))
+      const d = numOrNull(row.espesor_d);
+      const w = numOrNull(row.ancho_w);
+      return (d !== null && w !== null && d > 0 && w > 0)
+        ? roundTo(Math.sqrt((4 * d * w) / Math.PI), 4)
         : null;
     },
-    hint: 'De = sqrt(4 * D * W / PI)'
+    hint: 'De = sqrt(4 * D * W / PI) en cm'
   }),
   calculatedColumn({
     id: 'f',
@@ -416,9 +484,9 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     minWidth: 70,
     decimals: 4,
     calculate: (row: Record<string, any>) => {
-      const de = Number(row.diametro_equivalente);
-      return (de && !isNaN(de))
-        ? Number(Math.pow((de * 10) / 50, 0.45).toFixed(4))
+      const de = numOrNull(row.diametro_equivalente);
+      return (de !== null && de > 0)
+        ? roundTo(Math.pow((de * 10) / 50, 0.45), 4)
         : null;
     },
     hint: 'F = ((De * 10) / 50) ^ 0.45'
@@ -434,10 +502,10 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 4,
     unit: 'MPa',
     calculate: (row: Record<string, any>) => {
-      const p = Number(row.fuerza_p);
-      const de = Number(row.diametro_equivalente);
-      return (p && de && de > 0 && !isNaN(p) && !isNaN(de))
-        ? Number(((p * 1000) / Math.pow(de * 10, 2)).toFixed(4))
+      const p = numOrNull(row.fuerza_p);
+      const de = numOrNull(row.diametro_equivalente);
+      return (p !== null && de !== null && de > 0)
+        ? roundTo((p * 1000) / Math.pow(de * 10, 2), 4)
         : null;
     },
     hint: 'Is = (P * 1000) / (De * 10)^2'
@@ -453,10 +521,10 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 4,
     unit: 'MPa',
     calculate: (row: Record<string, any>) => {
-      const isMpa = Number(row.is_mpa);
-      const f = Number(row.f);
-      if (row.muestra_valida_ancho === 'SÍ' && !isNaN(isMpa) && !isNaN(f) && row.is_mpa !== null && row.f !== null) {
-        return Number((isMpa * f).toFixed(4));
+      const isMpa = numOrNull(row.is_mpa);
+      const f = numOrNull(row.f);
+      if (row.muestra_valida_ancho === 'SÍ' && isMpa !== null && f !== null) {
+        return roundTo(isMpa * f, 4);
       }
       return null;
     },
@@ -466,7 +534,7 @@ export const PLT_SCHEMA: ColumnSchema[] = [
   // =========================================================================
   // GRUPO 7: Resistencia de la Roca Intacta
   // =========================================================================
-  calculatedColumn({
+  decimalColumn({
     id: 'factor_conversion_k',
     header: 'Factor K',
     excelName: 'Factor de conversión K',
@@ -475,11 +543,26 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     defaultWidth: 90,
     minWidth: 70,
     decimals: 2,
-    calculate: (row: Record<string, any>) => {
-      const res = resolveLithologyCascade(row.litologia_1, row.litologia_2, row.litologia_3, row.model2022 || null);
-      return res.k !== null ? Number(res.k) : null;
-    },
-    hint: 'Factor K litológico oficial'
+    constraints: { positiveOnly: true, minHard: 5, maxHard: 30 },
+    emptyPolicy: 'allowed',
+    customValidators: [
+      (val: any, row: Record<string, any>) => {
+        const kNum = Number(val);
+        if (!Number.isFinite(kNum)) return null;
+        const expected = resolveExpectedKStrict(row);
+        if (expected !== null && Math.abs(kNum - expected) > 0.1) {
+          return {
+            rowId: Number(row.id || row.idd || 0),
+            field: 'factor_conversion_k',
+            type: 'AVISO',
+            message: `Factor K (${kNum}) no corresponde a la litología declarada (esperado: ${expected})`,
+            value: val
+          };
+        }
+        return null;
+      }
+    ],
+    hint: 'Factor K según litología del muestreo (autocompletado desde catálogo o editable [5–30])'
   }),
   calculatedColumn({
     id: 'ucs',
@@ -492,10 +575,10 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     decimals: 3,
     unit: 'MPa',
     calculate: (row: Record<string, any>) => {
-      const is50 = Number(row.is_50);
-      const k = Number(row.factor_conversion_k);
-      return (!isNaN(is50) && !isNaN(k) && row.is_50 !== null && row.factor_conversion_k !== null)
-        ? Number((is50 * k).toFixed(3))
+      const is50 = numOrNull(row.is_50);
+      const k = numOrNull(row.factor_conversion_k);
+      return (is50 !== null && k !== null)
+        ? roundTo(is50 * k, 3)
         : null;
     },
     hint: 'UCS = Is(50) * K'
@@ -508,9 +591,10 @@ export const PLT_SCHEMA: ColumnSchema[] = [
     module: 'plt',
     defaultWidth: 85,
     minWidth: 65,
+    format: (val: any) => (val === null || val === undefined ? '' : String(val)),
     calculate: (row: Record<string, any>) => {
-      const ucs = Number(row.ucs);
-      if (row.ucs === null || isNaN(ucs)) return null;
+      const ucs = numOrNull(row.ucs);
+      if (ucs === null) return null;
       const cls = getIsrmClass(ucs);
       return cls ? cls.indice : null;
     },

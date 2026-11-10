@@ -80,11 +80,12 @@ import {
   type CalculatorResult
 } from './utils/rmrCalculator';
 
-import { validateWindowQAQC } from './utils/qaqcValidator';
+import { validateWindowQAQC, type WindowQaQcExtraCtx } from './utils/qaqcValidator';
 import type { QaQcAlert } from './utils/qaQcRules';
 import { buildCampaniaYearMap } from './utils/qaQcRules';
 import { resetTouchedFields, subscribeTouched } from './utils/qaQcTouch';
 import { validateMapeoWindow, validatePltEnsayosList, toVacioAlerts, isBlockingValidationAlert, type MissingFieldIssue } from './utils/mandatoryRules';
+import { validatePltQAQC } from './utils/pltQaQcRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || (
@@ -540,7 +541,7 @@ const [connectionLost, setConnectionLost] = useState(false);
   // Se obtiene con un fetch DEDICADO de todas las celdas (independiente del
   // filtro/búsqueda actual del dashboard, que limitaría la lista).
   const [allCellNames, setAllCellNames] = useState<string[]>([]);
-  useEffect(() => {
+  const refreshAllCellNames = () => {
     fetch(`${API_BASE}/api/ventanas/celdas`, { headers: getAuthHeaders() })
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
@@ -549,12 +550,21 @@ const [connectionLost, setConnectionLost] = useState(false);
         }
       })
       .catch(() => { /* sin backend: solo borradores locales */ });
+  };
+  useEffect(() => {
+    refreshAllCellNames();
   }, []);
 
   const knownCells = useMemo(
     () => [...new Set([...allCellNames, ...pendingCellNames])],
     [allCellNames, pendingCellNames]
   );
+
+  const qaqcExtraCtx = useMemo<WindowQaQcExtraCtx>(() => ({
+    dbCellNames: allCellNames.length > 0 ? allCellNames : windows.map(w => w.name),
+    originalCelda: dbSnapshotData?.header?.celda || null,
+    knownCells,
+  }), [allCellNames, windows, dbSnapshotData?.header?.celda, knownCells]);
 
   useEffect(() => {
     if (!activeWindow) return;
@@ -613,10 +623,18 @@ const [connectionLost, setConnectionLost] = useState(false);
     if (activeWindow) {
       const res = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
       setCalculated(res);
-      const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap(), true);
+      const errs = validateWindowQAQC(
+        activeWindow.header,
+        activeWindow.joints,
+        res.largo,
+        buildCampaniaYearMap(),
+        true,
+        qaqcExtraCtx
+      );
+      const pltQaQc = validatePltQAQC(pltEnsayos, activeWindow.header);
       const vacios = toVacioAlerts(validateMapeoWindow(activeWindow));
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
-      const allAlerts = [...errs, ...vacios, ...pltVacios];
+      const allAlerts = [...errs, ...pltQaQc, ...vacios, ...pltVacios];
       setAlerts(allAlerts);
       // Estado persistido de validación de la celda activa (lo consume el bloqueo del guardado).
       // Solo persisten CRITICAS y VACIOS: las ADVERTENCIAS se muestran en el panel QA/QC
@@ -624,11 +642,12 @@ const [connectionLost, setConnectionLost] = useState(false);
       const blockingAlerts = allAlerts.filter(a => isBlockingValidationAlert(a.type));
       setCellValidation(activeWindow.header.celda, blockingAlerts.map(a => a.message || JSON.stringify(a)));
     } else {
+      const pltQaQc = validatePltQAQC(pltEnsayos, null);
       const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
       setCalculated(null);
-      setAlerts([...pltVacios]);
+      setAlerts([...pltQaQc, ...pltVacios]);
     }
-  }, [activeWindow, touchedTick, catalogsLoaded, pltEnsayos]);
+  }, [activeWindow, touchedTick, catalogsLoaded, pltEnsayos, qaqcExtraCtx]);
 
   // Resetear el registro de campos "tocados" al cambiar de ventana activa
   useEffect(() => {
@@ -1130,6 +1149,7 @@ const [connectionLost, setConnectionLost] = useState(false);
              setSyncStatus('unsaved');
            }
            fetchWindows();
+           refreshAllCellNames();
       } else {
         throw new Error();
       }
@@ -1330,6 +1350,7 @@ const [connectionLost, setConnectionLost] = useState(false);
 
     // Refrescar listado de celdas
     fetchWindows();
+    refreshAllCellNames();
   };
 
   // Paginación y filtros del Dashboard
@@ -1522,6 +1543,48 @@ const [connectionLost, setConnectionLost] = useState(false);
         `No se puede guardar: ${invalidCells
           .map(v => `${v.celda} (${v.count} problema(s))`)
           .join(', ')}. Abra cada celda y corrija los campos señalados en el panel QA/QC.`
+      );
+      return;
+    }
+
+    // Validación previa de ensayos PLT pendientes (4 muestras A-B-C-D, coordenadas, K, carga P/Obs)
+    const pltPendingToValidate = new Set<string>(getPendingPltCells());
+    const activeCeldaNormPre = activeWindow?.header?.celda?.trim()?.toUpperCase();
+    if (activeCeldaNormPre && JSON.stringify(pltEnsayos) !== JSON.stringify(pltSnapshotRef.current)) {
+      pltPendingToValidate.add(activeCeldaNormPre);
+    }
+    const pltBlockingCells: string[] = [];
+    for (const celdaName of pltPendingToValidate) {
+      const isCurrentActive = activeCeldaNormPre === celdaName;
+      const rowsToValidate = isCurrentActive ? pltEnsayos : getPltDelta(celdaName);
+      if (!Array.isArray(rowsToValidate) || rowsToValidate.length === 0) continue;
+
+      let cellHeader: WindowHeader | null = isCurrentActive ? (activeWindow?.header ?? null) : null;
+      if (!cellHeader) {
+        const winMatch = windowsToSave.find(w => w.header.celda?.trim()?.toUpperCase() === celdaName);
+        if (winMatch) {
+          cellHeader = winMatch.header;
+        } else {
+          try {
+            const cachedRaw = localStorage.getItem(`geolog_window_${celdaName}`) || localStorage.getItem(`geolog_window_snapshot_${celdaName}`);
+            if (cachedRaw) cellHeader = JSON.parse(cachedRaw)?.header ?? null;
+          } catch { /* sin cabecera cacheada */ }
+        }
+      }
+
+      const pltVacios = validatePltEnsayosList(rowsToValidate);
+      const pltCritical = validatePltQAQC(rowsToValidate, cellHeader).filter(a => isBlockingValidationAlert(a.type));
+      const totalIssues = pltVacios.length + pltCritical.length;
+      if (totalIssues > 0) {
+        pltBlockingCells.push(`${celdaName} (${totalIssues} problema(s) PLT)`);
+      }
+    }
+    if (pltBlockingCells.length > 0) {
+      setIsLoadingWindow(false);
+      setSyncStatus('unsaved');
+      setSyncMessage('No se guardó: hay ensayos PLT con campos obligatorios vacíos o errores críticos QA/QC.');
+      alert(
+        `No se puede guardar ensayos PLT: ${pltBlockingCells.join(', ')}. Revise el panel QA/QC (4 muestras A-B-C-D, coordenadas, código sin guion y observaciones si P > 60 kN).`
       );
       return;
     }
@@ -1757,6 +1820,7 @@ const [connectionLost, setConnectionLost] = useState(false);
       setSyncStatus('unsaved');
     }
     fetchWindows();
+    refreshAllCellNames();
 
     if (successCount > 0) {
       setSaveResultData({
@@ -2323,6 +2387,8 @@ const [connectionLost, setConnectionLost] = useState(false);
                 pltEnsayos={pltEnsayos}
                 onChange={handlePltChange}
                 activeWindowCelda={activeWindow?.header.celda || null}
+                activeHeader={activeWindow?.header || null}
+                alerts={alerts}
                 showFormulas={showFormulas}
                 knownCells={knownCells}
                 onImportToCell={handlePltImport}
@@ -2432,6 +2498,9 @@ const [connectionLost, setConnectionLost] = useState(false);
         pltEnsayos={pltEnsayos}
         onOpenCatalogs={() => setIsCatalogModalOpen(true)}
         invalidPendingCells={getInvalidPendingCells()}
+        dbCellNames={qaqcExtraCtx.dbCellNames}
+        originalCelda={qaqcExtraCtx.originalCelda}
+        knownCells={qaqcExtraCtx.knownCells}
       />
 
       <DiscardModal

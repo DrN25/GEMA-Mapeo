@@ -64,7 +64,7 @@ export interface ResolvedKResult {
   clase: string;
 }
 
-const EQUIVALENCIAS_MIGRACION: Record<string, { lito1: string, lito2: string, lito3: string, k: number }> = {
+export const EQUIVALENCIAS_MIGRACION: Record<string, { lito1: string, lito2: string, lito3: string, k: number }> = {
   TBX: { lito1: "TBX", lito2: "TBX", lito3: "TBX", k: 13.72 },
   LMT_C: { lito1: "LMT", lito2: "LMT", lito3: "LMT_C", k: 16.83 },
   SKARN: { lito1: "LMT", lito2: "GSK", lito3: "Varios", k: 11.15 },
@@ -77,6 +77,8 @@ const EQUIVALENCIAS_MIGRACION: Record<string, { lito1: string, lito2: string, li
   MZQ: { lito1: "MZQ", lito2: "MZQ", lito3: "MZQ", k: 12.29 },
   MZB_P: { lito1: "MZB", lito2: "MZB", lito3: "MZB_P", k: 8.53 }
 };
+
+const SHIFTED_METAMORPHIC_ROCKS = new Set(["GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT"]);
 
 export function resolveLithologyCascade(
   l1: string,
@@ -125,8 +127,7 @@ export function resolveLithologyCascade(
   }
 
   // Detectar orden desplazado para Metamórficas o Endoskarn
-  const metamorficasEndoskarnRocks = new Set(["GSK", "PSK", "MSK", "ESK", "MBC", "MBL", "EPG", "EGT"]);
-  const isShifted = metamorficasEndoskarnRocks.has(cleanL1);
+  const isShifted = SHIFTED_METAMORPHIC_ROCKS.has(cleanL1);
 
   let finalL2 = cleanL2;
   let finalL3 = cleanL3;

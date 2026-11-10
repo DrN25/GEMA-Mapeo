@@ -14,12 +14,16 @@ import {
   Info,
   RotateCcw,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle,
+  Calculator
 } from 'lucide-react';
 import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 import PltExcelImportModal from '../modals/PltExcelImportModal';
-import { VirtualizedGrid } from '../../features/grid';
+import { VirtualizedGrid, type CellAlertInfo } from '../../features/grid';
 import { LITHOLOGY_CLASSIFICATION } from '../../utils/catalogData';
+import type { WindowHeader } from '../../utils/rmrCalculator';
+import type { QaQcAlert } from '../../utils/qaQcRules';
 import {
   PLT_COLUMN_DEFS as COLS,
   CAT_DIRECCION_ROTURA,
@@ -42,6 +46,8 @@ interface PltEnsayosViewProps {
   pltEnsayos: any[];
   onChange: (rows: any[]) => void;
   activeWindowCelda: string | null;
+  activeHeader?: WindowHeader | null;
+  alerts?: QaQcAlert[];
   showFormulas?: boolean;
   knownCells?: string[];
   /** Handler único de import (App: agrega, persiste y cambia la vista si aplica). */
@@ -84,6 +90,8 @@ export default function PltEnsayosView({
   pltEnsayos,
   onChange,
   activeWindowCelda,
+  activeHeader = null,
+  alerts = [],
   showFormulas = true,
   knownCells = [],
   onImportToCell
@@ -121,22 +129,34 @@ export default function PltEnsayosView({
     return JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
   }, [draftFilters, appliedFilters]);
 
-  const createEmptyRow = (customId?: number, prefillCelda?: string) => {
+  const createEmptyRow = (customId?: number, prefillCelda?: string, letter?: string) => {
+    const celdaTarget = (
+      prefillCelda || (filterActiveCell && activeWindowCelda ? activeWindowCelda : "")
+    ).trim().toUpperCase();
+    const hdr =
+      activeHeader && (!celdaTarget || normalizeCeldaCode(activeHeader.celda) === normalizeCeldaCode(celdaTarget))
+        ? activeHeader
+        : null;
+    const muestraLetter = letter ? letter.trim().toUpperCase() : "";
+    const hdrNivelRaw = hdr?.nivel !== undefined && hdr?.nivel !== null && String(hdr.nivel).trim() !== ""
+      ? Number(hdr.nivel)
+      : null;
+
     return applyPltFormulas({
       id: customId || Date.now(),
-      campana: new Date().getFullYear(),
+      campana: hdr?.campania || new Date().getFullYear(),
       fecha_ensayo: new Date().toISOString().split("T")[0],
-      sector_geotecnico: "",
+      sector_geotecnico: hdr?.sect_geot || "",
       ejecutado_por: "",
       zona_mapeo: "",
       tipo_ensayo: "i",
-      nivel: null,
-      celda_mapeo: prefillCelda || (filterActiveCell && activeWindowCelda ? activeWindowCelda : ""),
-      muestra: "",
-      codigo_muestra: "",
-      litologia_1: "",
-      litologia_2: "",
-      litologia_3: "",
+      nivel: hdrNivelRaw !== null && Number.isFinite(hdrNivelRaw) ? hdrNivelRaw : null,
+      celda_mapeo: celdaTarget,
+      muestra: muestraLetter,
+      codigo_muestra: celdaTarget && muestraLetter ? `${celdaTarget}${muestraLetter}` : "",
+      litologia_1: hdr?.lito_1 || "",
+      litologia_2: hdr?.lito_2 || "",
+      litologia_3: hdr?.lito_3 || "",
       tipo_litologico: "",
       este: null,
       norte: null,
@@ -155,8 +175,35 @@ export default function PltEnsayosView({
   };
 
   const handleAddRow = () => {
-    const newRow = createEmptyRow();
+    const maxId = pltEnsayos.reduce((mx, r) => Math.max(mx, Number(r?.id) || 0), Date.now());
+    const newRow = createEmptyRow(maxId + 1);
     onChange([...pltEnsayos, newRow]);
+  };
+
+  const handleGenerate4Samples = () => {
+    const targetCelda = (activeWindowCelda || activeHeader?.celda || "").trim().toUpperCase();
+    if (!targetCelda) {
+      alert("Seleccione o cree una celda de mapeo antes de generar las 4 muestras A, B, C, D.");
+      return;
+    }
+    const targetNorm = normalizeCeldaCode(targetCelda);
+    const existingForCell = pltEnsayos.filter(r => {
+      const c = String(r?.celda_mapeo || "").trim();
+      return !c || normalizeCeldaCode(c) === targetNorm;
+    });
+    const existingLetters = new Set(
+      existingForCell.map(r => String(r?.muestra || "").trim().toUpperCase()).filter(Boolean)
+    );
+    const missingLetters = (["A", "B", "C", "D"] as const).filter(l => !existingLetters.has(l));
+    if (missingLetters.length === 0) {
+      alert(`La celda ${targetCelda} ya tiene registradas las 4 muestras obligatorias (A, B, C y D).`);
+      return;
+    }
+    const baseId = pltEnsayos.reduce((mx, r) => Math.max(mx, Number(r?.id) || 0), Date.now());
+    const newRows = missingLetters.map((letter, idx) =>
+      createEmptyRow(baseId + idx + 1, targetCelda, letter)
+    );
+    onChange([...pltEnsayos, ...newRows]);
   };
 
   const handleInsertRowBelow = (index: number) => {
@@ -270,21 +317,6 @@ export default function PltEnsayosView({
     onChange(updated);
   };
 
-  const handleExportExcel = () => {
-    const dataToExport = computedRows.map((r, idx) => {
-      const obj: Record<string, any> = { "#": idx + 1 };
-      COLS.forEach(c => {
-        obj[c.label] = r[c.key] ?? "";
-      });
-      return obj;
-    });
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "PLT Irregulares");
-    XLSX.writeFile(wb, "plt_ensayos_irregulares.xlsx");
-  };
-
   const reportStats = useMemo(() => {
     const rr = computedRows;
     const total = rr.length;
@@ -307,34 +339,47 @@ export default function PltEnsayosView({
       return m !== 0 ? (stdDev(arr, m) / Math.abs(m)) * 100 : null;
     };
 
-    // Arrays numéricos
-    const ucsV = rr.filter(r => typeof r.ucs === 'number' && r.ucs !== null).map(r => r.ucs as number);
-    const isV = rr.filter(r => typeof r.is_mpa === 'number' && r.is_mpa !== null).map(r => r.is_mpa as number);
-    const is50V = rr.filter(r => typeof r.is_50 === 'number' && r.is_50 !== null).map(r => r.is_50 as number);
-    const kV = rr.filter(r => typeof r.factor_conversion_k === 'number' && r.factor_conversion_k !== null).map(r => r.factor_conversion_k as number);
+    // Desglose por Tipo de Rotura: únicamente M (matriz) representa roca intacta
+    const fracM = rr.filter(r => String(r?.tipo_fractura || '').trim().toUpperCase() === 'M');
+    const fracECount = rr.filter(r => String(r?.tipo_fractura || '').trim().toUpperCase() === 'E').length;
+    const fracCCount = rr.filter(r => String(r?.tipo_fractura || '').trim().toUpperCase() === 'C').length;
+    const fracOtherCount = total - fracM.length - fracECount - fracCCount;
+    const intactRows = fracM;
+    const intactCount = intactRows.length;
 
-    // Validez
+    // Arrays numéricos de resistencia calculados EXCLUSIVAMENTE sobre Tipo M (Roca Intacta)
+    const ucsV = intactRows.filter(r => typeof r.ucs === 'number' && r.ucs !== null).map(r => r.ucs as number);
+    const isV = intactRows.filter(r => typeof r.is_mpa === 'number' && r.is_mpa !== null).map(r => r.is_mpa as number);
+    const is50V = intactRows.filter(r => typeof r.is_50 === 'number' && r.is_50 !== null).map(r => r.is_50 as number);
+    const kV = intactRows.filter(r => typeof r.factor_conversion_k === 'number' && r.factor_conversion_k !== null).map(r => r.factor_conversion_k as number);
+
+    // Validez geométrica sobre el total de probetas ensayadas
     const valL = rr.filter(r => r.muestra_valida_longitud === 'SÍ').length;
     const valA = rr.filter(r => r.muestra_valida_ancho === 'SÍ').length;
     const bothValid = rr.filter(r => r.muestra_valida_longitud === 'SÍ' && r.muestra_valida_ancho === 'SÍ').length;
 
-    // Distribuciones
+    // Distribuciones de resistencia intacta (Tipo M)
     const isrmCnt: Record<string, number> = {};
     ISRM_TABLE.forEach(r => { isrmCnt[r.indice] = 0; });
-    rr.forEach(r => { if (r.resistencia_isrm) isrmCnt[r.resistencia_isrm] = (isrmCnt[r.resistencia_isrm] || 0) + 1; });
+    intactRows.forEach(r => { if (r.resistencia_isrm) isrmCnt[r.resistencia_isrm] = (isrmCnt[r.resistencia_isrm] || 0) + 1; });
 
     const tipoCnt: Record<string, number> = {};
-    rr.forEach(r => { if (r.tipo_litologico) tipoCnt[r.tipo_litologico] = (tipoCnt[r.tipo_litologico] || 0) + 1; });
+    intactRows.forEach(r => { if (r.tipo_litologico) tipoCnt[r.tipo_litologico] = (tipoCnt[r.tipo_litologico] || 0) + 1; });
 
     const sectorCnt: Record<string, number> = {};
-    rr.forEach(r => { const s = (r.sector_geotecnico || '').trim(); if (s) sectorCnt[s] = (sectorCnt[s] || 0) + 1; });
+    intactRows.forEach(r => { const s = (r.sector_geotecnico || '').trim(); if (s) sectorCnt[s] = (sectorCnt[s] || 0) + 1; });
 
-    const sectorCount = new Set(rr.map(r => (r.sector_geotecnico || '').trim()).filter(Boolean)).size;
-    const litoCount = new Set(rr.map(r => (r.tipo_litologico || '').trim()).filter(Boolean)).size;
+    const sectorCount = new Set(intactRows.map(r => (r.sector_geotecnico || '').trim()).filter(Boolean)).size;
+    const litoCount = new Set(intactRows.map(r => (r.tipo_litologico || '').trim()).filter(Boolean)).size;
 
     return {
       total,
       totalUnfiltered: allComputedRows.length,
+      intactCount,
+      fracMCount: fracM.length,
+      fracECount,
+      fracCCount,
+      fracOtherCount,
       valL, valA, bothValid,
       bothValidPct: total > 0 ? (bothValid / total) * 100 : 0,
 
@@ -366,6 +411,108 @@ export default function PltEnsayosView({
       isrmCnt, tipoCnt, sectorCnt, sectorCount, litoCount,
     };
   }, [computedRows, allComputedRows]);
+
+  const handleExportExcel = () => {
+    const dataToExport = computedRows.map((r, idx) => {
+      const obj: Record<string, any> = { "#": idx + 1 };
+      COLS.forEach(c => {
+        obj[c.label] = r[c.key] ?? "";
+      });
+      return obj;
+    });
+
+    const summaryRows = [
+      { Indicador: "Total ensayos PLT filtrados", Valor: reportStats.total, Unidad: "registros", Criterio: "Todos los tipos de rotura" },
+      { Indicador: "Tipo de Rotura M (Matriz - Roca Intacta)", Valor: reportStats.fracMCount, Unidad: "registros", Criterio: "Único tipo incorporado a estimaciones Is/Is(50)/UCS" },
+      { Indicador: "Tipo de Rotura E (Estructura - Excluido)", Valor: reportStats.fracECount, Unidad: "registros", Criterio: "Excluido de resistencia intacta" },
+      { Indicador: "Tipo de Rotura C (Combinada - Excluido)", Valor: reportStats.fracCCount, Unidad: "registros", Criterio: "Excluido de resistencia intacta" },
+      { Indicador: "Sin clasificar / Otro", Valor: reportStats.fracOtherCount, Unidad: "registros", Criterio: "Excluido hasta clasificar M/E/C" },
+      { Indicador: "Muestras válidas geométricas (L >= D y 0.3W < D < W)", Valor: `${reportStats.bothValid} / ${reportStats.total} (${reportStats.bothValidPct.toFixed(1)}%)`, Unidad: "%", Criterio: "ASTM / ISRM" },
+      { Indicador: "Is Promedio (Solo Tipo M)", Valor: reportStats.isAvg !== null ? Number(reportStats.isAvg.toFixed(4)) : "", Unidad: "MPa", Criterio: "Solo rotura M" },
+      { Indicador: "Is(50) Promedio (Solo Tipo M)", Valor: reportStats.is50Avg !== null ? Number(reportStats.is50Avg.toFixed(4)) : "", Unidad: "MPa", Criterio: "Solo rotura M" },
+      { Indicador: "UCS Promedio (Solo Tipo M)", Valor: reportStats.ucsAvg !== null ? Number(reportStats.ucsAvg.toFixed(2)) : "", Unidad: "MPa", Criterio: "Solo rotura M" },
+      { Indicador: "UCS Mediana (Solo Tipo M)", Valor: reportStats.ucsMedian !== null ? Number(reportStats.ucsMedian.toFixed(2)) : "", Unidad: "MPa", Criterio: "Solo rotura M" },
+      { Indicador: "Factor K Promedio (Solo Tipo M)", Valor: reportStats.kAvg !== null ? Number(reportStats.kAvg.toFixed(2)) : "", Unidad: "adimensional", Criterio: "Según litología declarada" },
+      ...ISRM_TABLE.map(row => ({
+        Indicador: `Distribución ISRM ${row.indice} (${row.denominacion})`,
+        Valor: reportStats.isrmCnt[row.indice] || 0,
+        Unidad: "muestras M",
+        Criterio: `${row.minUcs} - ${Number.isFinite(row.maxUcs) ? row.maxUcs : "∞"} MPa`,
+      })),
+    ];
+
+    const formulaRows = [
+      { Parametro: "Ancho equivalente (W)", Formula: "W = (W1 + W2) / 2", Unidad: "cm", Criterio_Normativo: "Promedio de anchos W1 y W2 de muestra irregular." },
+      { Parametro: "Criterio geométrico bloque irregular", Formula: "0.3W < D < W  y  L >= D", Unidad: "cm", Criterio_Normativo: "Distancia mínima al borde = 0.5D; Is(50) solo se calcula si 0.3W < D < W." },
+      { Parametro: "Diámetro equivalente (De)", Formula: "De = sqrt(4 * D * W / pi)", Unidad: "cm", Criterio_Normativo: "Reproducibilidad admitida ±0.005 cm por redondeo." },
+      { Parametro: "Factor de corrección por tamaño (F)", Formula: "F = (De_mm / 50)^0.45", Unidad: "adimensional", Criterio_Normativo: "De_mm = De (cm) * 10; denominador 50 mm." },
+      { Parametro: "Índice de carga puntual sin corrección (Is)", Formula: "Is = (P * 1000) / De_mm^2", Unidad: "MPa", Criterio_Normativo: "P en kN convertido a N (*1000)." },
+      { Parametro: "Índice de carga puntual corregido (Is50)", Formula: "Is(50) = F * Is", Unidad: "MPa", Criterio_Normativo: "Condicionado a cumplimiento 0.3W < D < W." },
+      { Parametro: "Resistencia a Compresión Simple (RCS / UCS)", Formula: "RCS = Is(50) * K", Unidad: "MPa", Criterio_Normativo: "K según litología declarada; solo Tipo M para roca intacta." },
+      { Parametro: "Control de Carga aplicada (P)", Formula: "55 < P <= 60 kN (Precaución) ; P > 60 kN (Verificación)", Unidad: "kN", Criterio_Normativo: "P > 60 kN exige comentario obligatorio en Observaciones." },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    const wsFormulas = XLSX.utils.json_to_sheet(formulaRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "PLT Irregulares");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen Roca Intacta (M)");
+    XLSX.utils.book_append_sheet(wb, wsFormulas, "Fórmulas y Criterios");
+    XLSX.writeFile(wb, "plt_ensayos_irregulares.xlsx");
+  };
+
+  // Mapeo de índices originales y alertas QA/QC para resaltado por celda y foco
+  const rowIndexById = useMemo(() => {
+    const map = new Map<number, number>();
+    pltEnsayos.forEach((r, idx) => {
+      const idNum = Number(r?.id);
+      if (Number.isFinite(idNum)) {
+        map.set(idNum, idx);
+      }
+    });
+    return map;
+  }, [pltEnsayos]);
+
+  const alertsByRowId = useMemo(() => {
+    const map = new Map<number, Record<string, CellAlertInfo>>();
+    if (!Array.isArray(alerts) || alerts.length === 0) return map;
+
+    const rank: Record<'CRITICA' | 'VACIO' | 'ADVERTENCIA', number> = {
+      CRITICA: 3,
+      VACIO: 2,
+      ADVERTENCIA: 1,
+    };
+
+    for (const al of alerts) {
+      if (!al?.fieldId || !al.fieldId.startsWith('plt-')) continue;
+      const m = /^plt-(.+)-(\d+)$/.exec(al.fieldId);
+      if (!m) continue;
+      const colKey = m[1];
+      const origIdx = Number(m[2]);
+      const targetRow = pltEnsayos[origIdx];
+      if (!targetRow) continue;
+      const rowId = Number(targetRow.id);
+      if (!Number.isFinite(rowId)) continue;
+
+      let recAlerts = map.get(rowId);
+      if (!recAlerts) {
+        recAlerts = {};
+        map.set(rowId, recAlerts);
+      }
+      const existing = recAlerts[colKey];
+      const sev: 'CRITICA' | 'VACIO' | 'ADVERTENCIA' =
+        al.type === 'CRITICA' ? 'CRITICA' : al.type === 'VACIO' ? 'VACIO' : 'ADVERTENCIA';
+      if (!existing) {
+        recAlerts[colKey] = { severity: sev, messages: [al.message] };
+      } else {
+        const nextSev = rank[sev] > rank[existing.severity] ? sev : existing.severity;
+        const msgs = existing.messages.includes(al.message) ? existing.messages : [...existing.messages, al.message];
+        recAlerts[colKey] = { severity: nextSev, messages: msgs };
+      }
+    }
+    return map;
+  }, [alerts, pltEnsayos]);
 
   return (
     <div className="space-y-6 select-none animate-fade-in text-left">
@@ -408,6 +555,15 @@ export default function PltEnsayosView({
           >
             <Download size={14} className="text-emerald-400" />
             <span>Exportar Excel</span>
+          </button>
+
+          <button
+            onClick={handleGenerate4Samples}
+            className="px-4 py-2 bg-cyan-500/10 border border-cyan-500/40 hover:bg-cyan-500/20 hover:border-cyan-400 text-cyan-300 text-xs font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(6,182,212,0.12)] rounded-lg flex items-center justify-center gap-2"
+            title="Generar muestras obligatorias A, B, C y D para la celda activa"
+          >
+            <Plus size={14} className="text-cyan-400" />
+            <span>Generar 4 muestras (A–D)</span>
           </button>
 
           <button
@@ -454,7 +610,7 @@ export default function PltEnsayosView({
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Ej: TEST_001_M1..."
+                    placeholder="Ej: AG57A..."
                     value={draftFilters.codigoMuestra}
                     onChange={e => setDraftFilters({ ...draftFilters, codigoMuestra: e.target.value })}
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyFilters(); }}
@@ -704,6 +860,8 @@ export default function PltEnsayosView({
         rowKey="id"
         height="650px"
         defaultPageSize={50}
+        alertsByRowId={alertsByRowId}
+        rowIndexById={rowIndexById}
         onChange={(updatedRecords) => {
           if (!hasActiveFilters) {
             onChange(updatedRecords);
@@ -803,49 +961,77 @@ export default function PltEnsayosView({
                 </div>
               ) : (
                 <>
+                  {/* Banner de Criterio Roca Intacta: Solo Tipo M */}
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-start gap-2.5 text-emerald-200">
+                      <AlertTriangle size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong className="font-extrabold text-emerald-300">Roca Intacta (Solo Tipo M):</strong>{' '}
+                        Los promedios, medianas, ISRM y estimaciones de resistencia se calculan únicamente con ensayos de rotura en Matriz (<strong>M</strong>).
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">
+                        M (Matriz): {reportStats.fracMCount}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold">
+                        E (Estructura): {reportStats.fracECount}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300 font-bold">
+                        C (Combinada): {reportStats.fracCCount}
+                      </span>
+                      {reportStats.fracOtherCount > 0 && (
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold">
+                          Sin clasificar: {reportStats.fracOtherCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {/* 8 KPIs Principales (Con texto >= 12px) */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
                     <div className="bg-gradient-to-br from-cyan-500/[0.08] to-transparent border border-cyan-500/20 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black text-cyan-400 font-mono">{reportStats.total}</div>
                       <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Total Ensayos</div>
+                      <div className="text-[11px] text-emerald-400 font-semibold mt-0.5">{reportStats.intactCount} Tipo M (intacta)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-amber-500/[0.08] to-transparent border border-amber-500/20 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black text-amber-400 font-mono">
                         {reportStats.ucsAvg !== null ? reportStats.ucsAvg.toFixed(1) : '—'} <span className="text-xs font-normal text-amber-400/80">MPa</span>
                       </div>
-                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">UCS Promedio</div>
+                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">UCS Promedio (M)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-amber-500/[0.05] to-transparent border border-amber-500/30 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black text-amber-300 font-mono">
                         {reportStats.ucsMedian !== null ? reportStats.ucsMedian.toFixed(1) : '—'} <span className="text-xs font-normal text-amber-300/80">MPa</span>
                       </div>
-                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">UCS Mediana</div>
+                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">UCS Mediana (M)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-sky-500/[0.08] to-transparent border border-sky-500/20 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black text-sky-400 font-mono">
                         {reportStats.is50Avg !== null ? reportStats.is50Avg.toFixed(2) : '—'} <span className="text-xs font-normal text-sky-400/80">MPa</span>
                       </div>
-                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Is(50) Promedio</div>
+                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Is(50) Promedio (M)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-rose-500/[0.08] to-transparent border border-rose-500/20 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black font-mono text-rose-400">
                         {reportStats.ucsCv !== null ? `${reportStats.ucsCv.toFixed(1)}%` : '—'}
                       </div>
-                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">CV% Resistencia</div>
+                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">CV% Resistencia (M)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-violet-500/[0.08] to-transparent border border-violet-500/20 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black text-violet-400 font-mono">{reportStats.sectorCount}</div>
-                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Sectores Evaluados</div>
+                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Sectores (Tipo M)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-teal-500/[0.08] to-transparent border border-teal-500/20 rounded-xl p-4 text-center shadow-md">
                       <div className="text-2xl font-black text-teal-400 font-mono">{reportStats.litoCount}</div>
-                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Tipos Litológicos</div>
+                      <div className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">Tipos Litológicos (M)</div>
                     </div>
 
                     <div className="bg-gradient-to-br from-emerald-500/[0.08] to-transparent border border-emerald-500/20 rounded-xl p-4 text-center shadow-md">
@@ -863,7 +1049,7 @@ export default function PltEnsayosView({
                       <div className="flex items-center justify-between border-b border-navy-800 pb-2">
                         <h4 className="text-xs font-black text-slate-200 uppercase tracking-widest flex items-center gap-2">
                           <BarChart3 size={15} className="text-violet-400" />
-                          <span>Distribución ISRM (Gráfico Donut)</span>
+                          <span>Distribución ISRM (Solo Tipo M)</span>
                         </h4>
                         <span className="text-xs font-bold text-slate-400">R0 a R6</span>
                       </div>
@@ -888,7 +1074,7 @@ export default function PltEnsayosView({
 
                               return ISRM_TABLE.map(row => {
                                 const count = reportStats.isrmCnt[row.indice] || 0;
-                                const pct = reportStats.total > 0 ? (count / reportStats.total) : 0;
+                                const pct = reportStats.intactCount > 0 ? (count / reportStats.intactCount) : 0;
                                 const strokeDasharray = `${pct * circumference} ${circumference}`;
                                 const strokeDashoffset = -cumulativePercent * circumference;
                                 cumulativePercent += pct;
@@ -913,8 +1099,8 @@ export default function PltEnsayosView({
                             })()}
                           </svg>
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                            <span className="text-xl font-black text-slate-100 font-mono">{reportStats.total}</span>
-                            <span className="text-xs font-extrabold text-slate-400 uppercase">Ensayos</span>
+                            <span className="text-xl font-black text-slate-100 font-mono">{reportStats.intactCount}</span>
+                            <span className="text-xs font-extrabold text-emerald-400 uppercase">Tipo M</span>
                           </div>
                         </div>
 
@@ -933,7 +1119,7 @@ export default function PltEnsayosView({
 
                             return ISRM_TABLE.map(row => {
                               const count = reportStats.isrmCnt[row.indice] || 0;
-                              const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
+                              const pct = reportStats.intactCount > 0 ? (count / reportStats.intactCount) * 100 : 0;
 
                               return (
                                 <div key={row.indice} className="flex items-center justify-between gap-3 font-semibold text-slate-300">
@@ -957,7 +1143,7 @@ export default function PltEnsayosView({
                           <Activity size={15} className="text-teal-400" />
                           <span>Distribución por Unidad Litológica</span>
                         </h4>
-                        <span className="text-xs font-bold text-slate-400">Roca Intacta</span>
+                        <span className="text-xs font-bold text-emerald-400">Roca Intacta (M)</span>
                       </div>
 
                       <div className="space-y-3 py-1">
@@ -972,11 +1158,11 @@ export default function PltEnsayosView({
                           const entries = Object.entries(reportStats.tipoCnt).sort((a, b) => b[1] - a[1]);
 
                           if (entries.length === 0) {
-                            return <p className="text-xs text-slate-400 italic">Sin tipos litológicos registrados.</p>;
+                            return <p className="text-xs text-slate-400 italic">Sin ensayos Tipo M con tipo litológico registrado.</p>;
                           }
 
                           return entries.map(([tipo, count], idx) => {
-                            const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
+                            const pct = reportStats.intactCount > 0 ? (count / reportStats.intactCount) * 100 : 0;
                             return (
                               <div key={tipo} className="space-y-1">
                                 <div className="flex justify-between text-xs font-bold text-slate-300">
@@ -1002,7 +1188,7 @@ export default function PltEnsayosView({
                     <div className="flex items-center justify-between border-b border-navy-800 pb-2">
                       <h4 className="text-xs font-black text-slate-200 uppercase tracking-widest flex items-center gap-2">
                         <TrendingUp size={15} className="text-amber-400" />
-                        <span>Estadística Descriptiva de Ensayos</span>
+                        <span>Estadística Descriptiva de Roca Intacta (Solo Tipo M)</span>
                       </h4>
                       <span className="text-xs text-slate-400 font-mono font-bold">Valores en MPa</span>
                     </div>
@@ -1060,7 +1246,7 @@ export default function PltEnsayosView({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Sector Geotécnico */}
                     <div className="bg-navy-950/60 border border-navy-800 p-5 rounded-2xl space-y-3 shadow-xl">
-                      <h4 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-800 pb-2">Distribución por Sector Geotécnico</h4>
+                      <h4 className="text-xs font-black text-slate-200 uppercase tracking-widest border-b border-navy-800 pb-2">Distribución por Sector Geotécnico (Solo M)</h4>
                       <div className="space-y-2.5">
                         {(() => {
                           const sectorPalette = [
@@ -1073,11 +1259,11 @@ export default function PltEnsayosView({
                           const entries = Object.entries(reportStats.sectorCnt).sort((a, b) => b[1] - a[1]);
 
                           if (entries.length === 0) {
-                            return <p className="text-xs text-slate-400 italic">Sin sectores geotécnicos registrados.</p>;
+                            return <p className="text-xs text-slate-400 italic">Sin sectores geotécnicos con rotura M registrados.</p>;
                           }
 
                           return entries.map(([sector, count], idx) => {
-                            const pct = reportStats.total > 0 ? (count / reportStats.total) * 100 : 0;
+                            const pct = reportStats.intactCount > 0 ? (count / reportStats.intactCount) * 100 : 0;
                             return (
                               <div key={sector} className="space-y-1">
                                 <div className="flex justify-between text-xs font-bold text-slate-300">
@@ -1101,7 +1287,7 @@ export default function PltEnsayosView({
                         <div className="flex items-center justify-between p-3 bg-navy-900/60 border border-navy-800 rounded-xl">
                           <div className="space-y-0.5">
                             <span className="font-bold text-slate-200 block">Criterio Longitud (L ≥ D)</span>
-                            <span className="text-xs text-slate-400">Muestras con longitud suficiente</span>
+                            <span className="text-xs text-slate-400">Distancia mínima al extremo = 0.5D</span>
                           </div>
                           <div className="text-right">
                             <span className="font-mono font-bold text-emerald-400 text-sm block">{reportStats.valL} / {reportStats.total}</span>
@@ -1134,11 +1320,49 @@ export default function PltEnsayosView({
                     </div>
                   </div>
 
+                  {/* Fórmulas y Criterios Normativos (ASTM / ISRM) */}
+                  <div className="bg-navy-950/60 border border-navy-800 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-navy-800 pb-2">
+                      <h4 className="text-xs font-black text-slate-200 uppercase tracking-widest flex items-center gap-2">
+                        <Calculator size={15} className="text-cyan-400" />
+                        <span>Fórmulas y Criterios Normativos (ASTM / ISRM)</span>
+                      </h4>
+                      <span className="text-xs text-slate-400 font-mono font-bold">Muestras Irregulares</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-navy-900/70 border border-navy-800 space-y-1">
+                        <div className="font-bold text-cyan-300">Ancho Equivalente y Validez Geométrica</div>
+                        <div className="font-mono text-slate-100">W = (W1 + W2) / 2 &nbsp;;&nbsp; 0.3W &lt; D &lt; W &nbsp;;&nbsp; L ≥ D</div>
+                        <div className="text-slate-400">Distancia mínima al extremo = 0.5D. Is(50) solo se calcula cuando 0.3W &lt; D &lt; W.</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-navy-900/70 border border-navy-800 space-y-1">
+                        <div className="font-bold text-cyan-300">Diámetro Equivalente (De)</div>
+                        <div className="font-mono text-slate-100">De = √(4 × D × W / π) &nbsp;[cm]</div>
+                        <div className="text-slate-400">Tolerancia máxima de redondeo respecto al archivo origen: ±0.005 cm.</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-navy-900/70 border border-navy-800 space-y-1">
+                        <div className="font-bold text-sky-300">Factor de Corrección por Tamaño (F)</div>
+                        <div className="font-mono text-slate-100">F = (De_mm / 50)^0.45 &nbsp;(con De_mm = De × 10)</div>
+                        <div className="text-slate-400">Adimensional; normaliza la probeta irregular al diámetro estándar de 50 mm.</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-navy-900/70 border border-navy-800 space-y-1">
+                        <div className="font-bold text-teal-300">Índice de Carga Puntual (Is e Is(50))</div>
+                        <div className="font-mono text-slate-100">Is = (P × 1000) / De_mm² &nbsp;;&nbsp; Is(50) = F × Is &nbsp;[MPa]</div>
+                        <div className="text-slate-400">P en kN (×1000 a N). Precaución si 55 &lt; P ≤ 60 kN; alerta y observación obligatoria si P &gt; 60 kN.</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-navy-900/70 border border-navy-800 space-y-1 md:col-span-2">
+                        <div className="font-bold text-amber-300">Resistencia a Compresión Simple Estimada (RCS / UCS)</div>
+                        <div className="font-mono text-slate-100">RCS = Is(50) × K &nbsp;[MPa]</div>
+                        <div className="text-slate-400">K según combinación litológica declarada en muestreo. Únicamente Tipo de Rotura M (Matriz) integra estimaciones de roca intacta.</div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Footer */}
                   <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 rounded-xl bg-navy-950/60 border border-navy-800 text-xs text-slate-400 font-bold uppercase tracking-wider">
                     <span className="flex items-center gap-2">
                       <Activity size={13} className="text-violet-400" />
-                      {reportStats.total} ensayos reportados {hasActiveFilters && `(de ${reportStats.totalUnfiltered} totales)`}
+                      {reportStats.total} ensayos reportados ({reportStats.intactCount} Tipo M roca intacta) {hasActiveFilters && `(de ${reportStats.totalUnfiltered} totales)`}
                     </span>
                     <span>Normas ISRM & Suggested Methods</span>
                   </div>

@@ -226,6 +226,76 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         d_cell(curr_a_r, 4, count / tot_c, alignment=alignment_right, num_fmt='0.00%', border=border_thin, fill=rf)
         curr_a_r += 1
 
+    # 4b. Tabla: Criterio Roca Intacta (M/E/C) y Fórmulas Oficiales PLT (Cols B..H, sin traslape con J18)
+    r_frac = curr_a_r + 2
+    res_frac = compact.get("resumen_fractura") or diag.get("resumen_fractura") or {}
+    cnt_m = safe_int(res_frac.get("M", 0))
+    cnt_e = safe_int(res_frac.get("E", 0))
+    cnt_c = safe_int(res_frac.get("C", 0))
+    cnt_o = safe_int(res_frac.get("otros", 0))
+    tot_frac = max(1, cnt_m + cnt_e + cnt_c + cnt_o)
+
+    d_cell(r_frac, 2, "CRITERIO DE ROCA INTACTA (SOLO TIPO M) Y FÓRMULAS OFICIALES PLT", font=font_section)
+    frac_headers = ["Tipo Rotura", "Registros (N)", "% del Total", "Incorporación en Resistencia de Roca Intacta"]
+    ws_dash.merged_cells.ranges.add(CellRange(min_col=5, min_row=r_frac + 1, max_col=8, max_row=r_frac + 1))
+    d_cell(r_frac + 1, 2, frac_headers[0], font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    d_cell(r_frac + 1, 3, frac_headers[1], font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    d_cell(r_frac + 1, 4, frac_headers[2], font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    d_cell(r_frac + 1, 5, frac_headers[3], font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    for col_fill in (6, 7, 8):
+        d_cell(r_frac + 1, col_fill, None, fill=fill_primary, border=border_thin)
+
+    frac_rows = [
+        ("M (Matriz)", cnt_m, "INCORPORADO: Único tipo de rotura válido para estimar resistencia de roca intacta (Is50 / RCS)."),
+        ("E (Estructura)", cnt_e, "EXCLUIDO de estimaciones de roca intacta (control estructural / plano de discontinuidad)."),
+        ("C (Combinada)", cnt_c, "EXCLUIDO de estimaciones de roca intacta (rotura mixta matriz + estructura)."),
+        ("Otros / Vacío", cnt_o, "EXCLUIDO / INVÁLIDO: Valores fuera del catálogo estricto [M, E, C]."),
+    ]
+    curr_f_r = r_frac + 2
+    for label, count, note_txt in frac_rows:
+        rf = fill_zebra if curr_f_r % 2 == 0 else None
+        ws_dash.merged_cells.ranges.add(CellRange(min_col=5, min_row=curr_f_r, max_col=8, max_row=curr_f_r))
+        d_cell(curr_f_r, 2, label, font=font_bold, alignment=alignment_left, border=border_thin, fill=rf)
+        d_cell(curr_f_r, 3, count, alignment=alignment_right, num_fmt='#,##0', border=border_thin, fill=rf)
+        d_cell(curr_f_r, 4, count / tot_frac, alignment=alignment_right, num_fmt='0.00%', border=border_thin, fill=rf)
+        d_cell(curr_f_r, 5, note_txt, font=font_regular, alignment=alignment_left, border=border_thin, fill=rf)
+        for col_fill in (6, 7, 8):
+            d_cell(curr_f_r, col_fill, None, border=border_thin, fill=rf)
+        curr_f_r += 1
+
+    r_form = curr_f_r + 2
+    d_cell(r_form, 2, "FÓRMULAS Y CRITERIOS NORMATIVOS DEL ENSAYO PLT (ASTM / ISRM)", font=font_section)
+    ws_dash.merged_cells.ranges.add(CellRange(min_col=3, min_row=r_form + 1, max_col=4, max_row=r_form + 1))
+    ws_dash.merged_cells.ranges.add(CellRange(min_col=5, min_row=r_form + 1, max_col=8, max_row=r_form + 1))
+    d_cell(r_form + 1, 2, "Parámetro", font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    d_cell(r_form + 1, 3, "Fórmula Oficial", font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    d_cell(r_form + 1, 4, None, fill=fill_primary, border=border_thin)
+    d_cell(r_form + 1, 5, "Criterio y Unidades", font=font_header, fill=fill_primary, alignment=alignment_center, border=border_thin)
+    for col_fill in (6, 7, 8):
+        d_cell(r_form + 1, col_fill, None, fill=fill_primary, border=border_thin)
+
+    formula_specs = [
+        ("Ancho promedio (W)", "W = (W1 + W2) / 2", "Promedio de anchos medidos en bloques irregulares (cm)."),
+        ("Validez geométrica", "0.3·W < D < W  |  L ≥ D (dist. mín. ≥ 0.5·D)", "Relación D/W entre 0.3 y 1.0 y distancia mínima libre 0.5D."),
+        ("Diámetro equivalente (De)", "De = √(4 × D × W / π)", "Reproducido en cm con tolerancia máxima de ±0.005 cm."),
+        ("Factor de corrección (F)", "F = (De_mm / 50)^0.45 = ((De·10) / 50)^0.45", "Corrección por tamaño respecto a probeta patrón de 50 mm."),
+        ("Índice sin corrección (Is)", "Is = (P × 1000) / (De_mm)²", "P: Fuerza de rotura (kN), De_mm = De × 10 (mm) → MPa."),
+        ("Índice corregido Is(50)", "Is(50) = F × Is", "Índice corregido a 50 mm (MPa); requiere 0.3W < D < W."),
+        ("Resistencia UCS / RCS", "RCS = Is(50) × K", "K: Factor litológico asociado a la litología; alerta >55/>60 kN."),
+    ]
+    curr_fm_r = r_form + 2
+    for p_name, p_formula, p_desc in formula_specs:
+        rf = fill_zebra if curr_fm_r % 2 == 0 else None
+        ws_dash.merged_cells.ranges.add(CellRange(min_col=3, min_row=curr_fm_r, max_col=4, max_row=curr_fm_r))
+        ws_dash.merged_cells.ranges.add(CellRange(min_col=5, min_row=curr_fm_r, max_col=8, max_row=curr_fm_r))
+        d_cell(curr_fm_r, 2, p_name, font=font_bold, alignment=alignment_left, border=border_thin, fill=rf)
+        d_cell(curr_fm_r, 3, p_formula, font=font_bold, alignment=alignment_left, border=border_thin, fill=rf)
+        d_cell(curr_fm_r, 4, None, border=border_thin, fill=rf)
+        d_cell(curr_fm_r, 5, p_desc, font=font_regular, alignment=alignment_left, border=border_thin, fill=rf)
+        for col_fill in (6, 7, 8):
+            d_cell(curr_fm_r, col_fill, None, border=border_thin, fill=rf)
+        curr_fm_r += 1
+
     # 5. Tabla: Principales Desviaciones Críticas (Columna Derecha)
     d_cell(9, 10, "PRINCIPALES DESVIACIONES CRÍTICAS", font=font_section)
     headers_top = ["Regla de Consistencia", "Cantidad (N)", "% Incidencia"]

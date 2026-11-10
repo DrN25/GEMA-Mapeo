@@ -15,6 +15,11 @@ import { getPltGridColumns } from './columnsDefinition';
 import { useGridStore } from './gridStore';
 import { FloatingEditor } from './FloatingEditor';
 
+export interface CellAlertInfo {
+  severity: 'CRITICA' | 'ADVERTENCIA' | 'VACIO';
+  messages: string[];
+}
+
 export interface VirtualizedGridProps {
   initialRecords?: Record<string, any>[];
   rowKey?: string;
@@ -25,6 +30,8 @@ export interface VirtualizedGridProps {
   onChange?: (records: Record<string, any>[]) => void;
   defaultPageSize?: number;
   isLoading?: boolean;
+  alertsByRowId?: Map<number, Record<string, CellAlertInfo>>;
+  rowIndexById?: Map<number, number>;
 }
 
 const EMPTY_DATA: any[] = [];
@@ -182,11 +189,13 @@ interface GridRowProps {
   virtualRow: { index: number; start: number; size: number };
   rowId: number;
   rowDisplayIndex: number;
+  origRowIdx?: number;
   record: Record<string, any>;
   rowVersion: number;
   leafColumns: any[];
   activeColKey: string | null;
-  qaqcRowStatus?: { hasCritical: boolean; hasWarning: boolean };
+  rowAlerts?: Record<string, CellAlertInfo>;
+  rowAlertsSig?: string;
   onCellClick: (rowIdx: number, colKey: string, e: React.MouseEvent<HTMLTableCellElement>) => void;
   onCellDoubleClick: (rowIdx: number, colKey: string, e: React.MouseEvent<HTMLTableCellElement>) => void;
   onInsertRowBelow: (rowIdx: number) => void;
@@ -197,9 +206,11 @@ const GridRow = React.memo<GridRowProps>(({
   virtualRow,
   rowId,
   rowDisplayIndex,
+  origRowIdx,
   record,
   leafColumns,
   activeColKey,
+  rowAlerts,
   onCellClick,
   onCellDoubleClick,
   onInsertRowBelow,
@@ -289,16 +300,29 @@ const GridRow = React.memo<GridRowProps>(({
           ? 'bg-slate-900/40 text-slate-500 cursor-not-allowed select-none opacity-80'
           : 'cursor-cell text-slate-200';
 
+        const cellAlert = rowAlerts?.[colKey];
+        let alertClasses = '';
+        if (cellAlert?.severity === 'CRITICA') {
+          alertClasses = 'bg-red-500/15 text-red-200 ring-1 ring-inset ring-red-500/70';
+        } else if (cellAlert?.severity === 'VACIO') {
+          alertClasses = 'bg-violet-500/15 text-violet-200 ring-1 ring-inset ring-violet-500/70';
+        } else if (cellAlert?.severity === 'ADVERTENCIA') {
+          alertClasses = 'bg-amber-500/15 text-amber-200 ring-1 ring-inset ring-amber-500/60';
+        }
+
         return (
           <td
             key={colKey}
+            id={origRowIdx !== undefined ? `plt-${colKey}-${origRowIdx}` : undefined}
+            tabIndex={origRowIdx !== undefined ? -1 : undefined}
+            title={cellAlert ? cellAlert.messages.join('\n') : undefined}
             data-testid={`cell-${virtualRow.index}-${colKey}`}
             data-col-key={colKey}
             data-row-idx={virtualRow.index}
             onClick={(e) => onCellClick(virtualRow.index, colKey, e)}
             onDoubleClick={(e) => onCellDoubleClick(virtualRow.index, colKey, e)}
             style={stickyStyle}
-            className={`px-2 py-1.5 text-center truncate border-r border-b border-navy-800/60 select-none relative ${stickyClasses} ${lockedClasses} ${activeRing}`}
+            className={`px-2 py-1.5 text-center truncate border-r border-b border-navy-800/60 select-none relative ${stickyClasses} ${lockedClasses} ${alertClasses} ${activeRing}`}
           >
             {displayVal}
           </td>
@@ -310,10 +334,12 @@ const GridRow = React.memo<GridRowProps>(({
   return (
     prev.rowId === next.rowId &&
     prev.rowDisplayIndex === next.rowDisplayIndex &&
+    prev.origRowIdx === next.origRowIdx &&
     prev.virtualRow.index === next.virtualRow.index &&
     prev.virtualRow.start === next.virtualRow.start &&
     prev.rowVersion === next.rowVersion &&
     prev.activeColKey === next.activeColKey &&
+    prev.rowAlertsSig === next.rowAlertsSig &&
     prev.leafColumns === next.leafColumns
   );
 });
@@ -330,7 +356,9 @@ export const VirtualizedGrid: React.FC<VirtualizedGridProps> = ({
   onDeleteRow,
   onChange,
   defaultPageSize = 50,
-  isLoading = false
+  isLoading = false,
+  alertsByRowId,
+  rowIndexById
 }) => {
   const rowIds = useGridStore(s => s.rowIds);
   const rowVersions = useGridStore(s => s.rowVersions);
@@ -675,13 +703,39 @@ export const VirtualizedGrid: React.FC<VirtualizedGridProps> = ({
 
               const activeColKey = activeCell?.rowIdx === virtualRow.index ? activeCell.colKey : null;
               const rowVersion = rowVersions.get(rowId) || 1;
-              const alerts = qaqcAlertsByRowId.get(rowId) || [];
-              const qaqcStatus = {
-                hasCritical: alerts.some(a => a.type === 'CRÍTICO'),
-                hasWarning: alerts.some(a => a.type === 'AVISO')
-              };
+              const extRowAlerts = alertsByRowId?.get(rowId);
+              const storeAlerts = qaqcAlertsByRowId.get(rowId) || [];
+              let mergedRowAlerts: Record<string, CellAlertInfo> | undefined = extRowAlerts;
+
+              if (storeAlerts.length > 0) {
+                const rank: Record<'CRITICA' | 'VACIO' | 'ADVERTENCIA', number> = {
+                  CRITICA: 3,
+                  VACIO: 2,
+                  ADVERTENCIA: 1,
+                };
+                mergedRowAlerts = extRowAlerts ? { ...extRowAlerts } : {};
+                for (const sa of storeAlerts) {
+                  const sev: 'CRITICA' | 'ADVERTENCIA' = sa.type === 'CRÍTICO' ? 'CRITICA' : 'ADVERTENCIA';
+                  const cur = mergedRowAlerts[sa.field];
+                  if (!cur) {
+                    mergedRowAlerts[sa.field] = { severity: sev, messages: [sa.message] };
+                  } else {
+                    const nextSev = rank[sev] > rank[cur.severity] ? sev : cur.severity;
+                    const msgs = cur.messages.includes(sa.message) ? cur.messages : [...cur.messages, sa.message];
+                    mergedRowAlerts[sa.field] = { severity: nextSev, messages: msgs };
+                  }
+                }
+              }
+
+              const rowAlertsSig = mergedRowAlerts
+                ? Object.entries(mergedRowAlerts)
+                    .map(([k, v]) => `${k}:${v.severity}:${v.messages.length}`)
+                    .sort()
+                    .join('|')
+                : '';
 
               const actualGlobalIdx = (validPage - 1) * pageSize + virtualRow.index;
+              const origRowIdx = rowIndexById ? rowIndexById.get(rowId) : actualGlobalIdx;
 
               return (
                 <GridRow
@@ -689,10 +743,13 @@ export const VirtualizedGrid: React.FC<VirtualizedGridProps> = ({
                   virtualRow={virtualRow}
                   rowId={rowId}
                   rowDisplayIndex={actualGlobalIdx}
+                  origRowIdx={origRowIdx}
                   record={rec}
                   rowVersion={rowVersion}
                   leafColumns={leafColumns}
                   activeColKey={activeColKey}
+                  rowAlerts={mergedRowAlerts}
+                  rowAlertsSig={rowAlertsSig}
                   onCellClick={handleCellClick}
                   onCellDoubleClick={handleCellDoubleClick}
                   onInsertRowBelow={handleInsertRow}

@@ -29,11 +29,18 @@ export interface QaQcAlert {
   section: string;
 }
 
+export interface WindowQaQcExtraCtx {
+  dbCellNames?: string[];
+  originalCelda?: string | null;
+  knownCells?: string[];
+}
+
 interface RuleCtx {
   header: WindowHeader;
   joints: JointRow[];
   largoEntero: number;
   campaniaYearMap: Record<number, number>;
+  extraCtx?: WindowQaQcExtraCtx;
 }
 
 type Evaluator = (ctx: RuleCtx, row?: JointRow) => string | null;
@@ -70,6 +77,36 @@ const isIntegerVal = (v: any): boolean => {
 
 const isBlankOrNegative = (v: any): boolean => isBlankVal(v) || (num(v) ?? 0) < 0;
 
+function normalizeCeldaLocal(celda: string): string {
+  if (!celda) return '';
+  const raw = String(celda).trim().toUpperCase();
+  const matches = raw.match(/[A-Z]+|[0-9]+/g);
+  if (!matches) return raw;
+  const normalizedSegments = matches.map(segment => {
+    if (/^[0-9]+$/.test(segment)) {
+      const parsed = parseInt(segment, 10);
+      return isNaN(parsed) ? segment : String(parsed);
+    }
+    return segment;
+  });
+  let result = '';
+  normalizedSegments.forEach((seg, idx) => {
+    if (idx === 0) {
+      result += seg;
+    } else {
+      const prev = normalizedSegments[idx - 1];
+      const isCurrentNum = /^[0-9]+$/.test(seg);
+      const isPrevNum = /^[0-9]+$/.test(prev);
+      if ((isCurrentNum && isPrevNum) || (!isCurrentNum && isPrevNum)) {
+        result += '-' + seg;
+      } else {
+        result += seg;
+      }
+    }
+  });
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Sinónimos de grupos litológicos (misma lógica que la UI de bloqueo)
 // ---------------------------------------------------------------------------
@@ -98,6 +135,40 @@ const RULES: QaQcRuleDef[] = [
       !header.celda || String(header.celda).trim() === ''
         ? 'El nombre de la celda de mapeo es obligatorio.'
         : null,
+  },
+  {
+    id: 'CELDA_DUPLICADA',
+    severity: 'CRITICA',
+    enabled: true,
+    global: true,
+    fieldId: 'header-celda',
+    section: 'DATOS DE REGISTRO',
+    evalua: ({ header, extraCtx }) => {
+      if (!extraCtx) return null;
+      const rawUpper = String(header.celda || '').trim().toUpperCase();
+      const norm = normalizeCeldaLocal(rawUpper);
+      if (!norm) return null;
+      const normOrig = extraCtx.originalCelda
+        ? normalizeCeldaLocal(extraCtx.originalCelda)
+        : null;
+      if (normOrig && norm === normOrig) return null;
+
+      const dbDup = (extraCtx.dbCellNames || []).find(
+        c => normalizeCeldaLocal(c) === norm,
+      );
+      if (dbDup) {
+        return `El código de celda '${rawUpper}' ya existe o equivale a '${String(dbDup).trim().toUpperCase()}' en la base de datos. No se permiten celdas duplicadas.`;
+      }
+
+      const localDup = (extraCtx.knownCells || []).find(c => {
+        const cu = String(c || '').trim().toUpperCase();
+        return cu !== '' && cu !== rawUpper && normalizeCeldaLocal(cu) === norm;
+      });
+      if (localDup) {
+        return `El código de celda '${rawUpper}' equivale a la celda existente '${String(localDup).trim().toUpperCase()}' en el workspace. No se permiten celdas duplicadas.`;
+      }
+      return null;
+    },
   },
 
   // ============ A2/A3. COORDENADAS FROM == TO ============
@@ -802,10 +873,11 @@ export function validateWindowQAQC(
   largoRaw: number,
   campanias?: Record<number, number>,
   evaluateAll: boolean = false,
+  extraCtx?: WindowQaQcExtraCtx,
 ): QaQcAlert[] {
   const largoEntero = Math.round(Number(largoRaw) || 0);
   const campaniaYearMap = campanias || buildCampaniaYearMap();
-  const ctx: RuleCtx = { header, joints, largoEntero, campaniaYearMap };
+  const ctx: RuleCtx = { header, joints, largoEntero, campaniaYearMap, extraCtx };
   const alerts: QaQcAlert[] = [];
 
   for (const rule of RULES) {
