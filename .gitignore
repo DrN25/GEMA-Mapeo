@@ -1,36 +1,55 @@
+# Local reference material and archives
 Material/
 docs/
 *.zip
 *.rar
 *.7z
 
-# Archivos pesados y de usuario
-backend/uploads/
+# Runtime uploads and field data (keep the application Excel templates)
+uploads/
 *.xlsx
 !Sistema/backend/templates/*.xlsx
-!backend/templates/*.xlsx
 *.csv
 
-# Base de datos local (SQLite)
-*.db
-*.sqlite
-*.sqlite3
+# Local environment configuration; sanitized examples may be versioned
+.env*
+!.env.example
+!.env.*.example
 
-# Archivos compilados y cachés
+# Python environments, compiled files and test/tool caches
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
+Sistema/tests/.cache/
 
+# Node dependencies and build output (package-lock.json remains versioned)
 node_modules/
 dist/
 dist-ssr/
+.vite/
+*.tsbuildinfo
 *.local
 
-# Logs de depuración
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# OS metadata and Office lock files (after the Excel template exception)
+.DS_Store
+Thumbs.db
+Desktop.ini
+~$*

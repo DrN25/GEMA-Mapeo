@@ -1,59 +1,6 @@
-Material/
-docs/
-*.zip
-*.rar
-*.7z
-
-# Archivos pesados y de usuario
-backend/uploads/
-Sistema/backend/uploads/
-*.xlsx
-!backend/templates/*.xlsx
-*.csv
-
-# Base de datos local (SQLite)
-*.db
-*.sqlite
-*.sqlite3
-
-# Archivos compilados y cachés
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.coverage
-htmlcov/
-*.pyc
-__pycache__
-
-# Variables de entorno
-.env
-.env*
-
-# Entornos virtuales
-venv/
-.venv/
-backend/venv/
-
-node_modules/
-dist/
-dist-ssr/
-*.local
-
-# Logs de depuración
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-# Scripts de evaluacion/experimentos (no son logica de produccion)
-backend/scripts/
-
-# Binarios descargados
-cloudflared.exe
-
-# Cache de tests
-tests/.cache/
-
-# Scripts y configs temporales de verificación
-frontend/scripts/
-frontend/tsconfig.verify.json
+# Common exclusions are maintained in the repository-root .gitignore.
+# Keep the existing project-specific scratch/diagnostic exclusions here.
+/backend/scripts/
+/frontend/scripts/
+/frontend/tsconfig.verify.json
+/cloudflared.exe
