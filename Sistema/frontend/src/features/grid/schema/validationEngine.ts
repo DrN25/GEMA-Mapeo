@@ -2,28 +2,29 @@
 import type { ColumnSchema, QAQCAlert } from './types';
 import { GLOBAL_EMPTY_TOKENS } from './types';
 
+const GLOBAL_EMPTY_SET = new Set<string>(GLOBAL_EMPTY_TOKENS);
+
 export function isEmptyValue(
   val: any,
   extraTokens?: string[],
   excludedTokens?: string[]
 ): boolean {
-  if (val === null || val === undefined) return true;
+  if (val === null || val === undefined || val === '') return true;
+  if (typeof val !== 'string') return false;
 
-  if (typeof val === 'string') {
-    const trimmed = val.trim();
-    if (trimmed === '') return true;
+  const trimmed = val.trim();
+  if (trimmed === '') return true;
 
-    if (excludedTokens && excludedTokens.includes(trimmed)) {
-      return false;
-    }
+  if (excludedTokens && excludedTokens.includes(trimmed)) {
+    return false;
+  }
 
-    if (GLOBAL_EMPTY_TOKENS.includes(trimmed)) {
-      return true;
-    }
+  if (GLOBAL_EMPTY_SET.has(trimmed)) {
+    return true;
+  }
 
-    if (extraTokens && extraTokens.includes(trimmed)) {
-      return true;
-    }
+  if (extraTokens && extraTokens.includes(trimmed)) {
+    return true;
   }
 
   return false;
@@ -36,8 +37,10 @@ export function validateCell(
 ): QAQCAlert | null {
   const rowId = Number(row.id || row.idd || 0);
 
-  // 1. Validación de vacíos según política
-  const isValEmpty = isEmptyValue(val, col.extraEmptyTokens, col.emptyTokensExclude);
+  // 1. Validación de vacíos según política (vía rápida para números no nulos)
+  const isValEmpty = typeof val === 'number'
+    ? false
+    : (val === null || val === undefined || val === '' || isEmptyValue(val, col.extraEmptyTokens, col.emptyTokensExclude));
   if (isValEmpty) {
     if (col.emptyPolicy === 'block') {
       return {

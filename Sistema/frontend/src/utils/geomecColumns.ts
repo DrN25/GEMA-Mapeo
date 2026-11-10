@@ -307,7 +307,7 @@ export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
 
     { key: "nivel", label: COLUMN_LABELS.nivel, type: "decimal", width: 80, group: 2, required: true, synonyms: ["nivel"] },
     { key: "celda_mapeo", label: COLUMN_LABELS.celda_mapeo, type: "text", width: 110, group: 2, required: true, synonyms: ["celda de mapeo", "celdamapeo", "celda_mapeo", "celda"] },
-    { key: "muestra", label: COLUMN_LABELS.muestra, type: "text", width: 80, group: 2, required: true, synonyms: ["muestra"] },
+    { key: "muestra", label: COLUMN_LABELS.muestra, type: "select", width: 80, group: 2, required: true, options: ["A", "B", "C", "D"], synonyms: ["muestra"] },
     { key: "codigo_muestra", label: COLUMN_LABELS.codigo_muestra, type: "text", width: 110, group: 2, computed: true },
     { key: "litologia_1", label: COLUMN_LABELS.litologia_1, type: "lito1", width: 90, group: 2, required: true, synonyms: ["litologia 1", "litología 1", "litologia_1", "lito1"] },
     { key: "litologia_2", label: COLUMN_LABELS.litologia_2, type: "lito2", width: 90, group: 2, synonyms: ["litologia 2", "litología 2", "litologia_2", "lito2"] },
@@ -331,12 +331,12 @@ export const PLT_COLUMN_DEFS: PltColumnConfig[] = [
     { key: "direccion_rotura", label: COLUMN_LABELS.direccion_rotura, type: "select", width: 110, group: 5, options: CAT_DIRECCION_ROTURA, synonyms: ["direccion rotura", "dirección rotura", "dirección de ruptura", "direccion_rotura"] },
     { key: "tipo_fractura", label: COLUMN_LABELS.tipo_fractura, type: "select", width: 110, group: 5, options: CAT_TIPO_FRACTURA, synonyms: ["tipo fractura", "tipo de fractura", "tipo_fractura"] },
 
-    { key: "diametro_equivalente", label: COLUMN_LABELS.diametro_equivalente, type: "decimal", width: 120, group: 6, computed: true },
+    { key: "diametro_equivalente", label: COLUMN_LABELS.diametro_equivalente, type: "decimal", width: 120, group: 6, computed: true, synonyms: ["diametro equivalente (cm)", "diametro equivalente", "diámetro equivalente (cm)", "diámetro equivalente", "diametro equivalente (mm)", "diámetro equivalente (mm)", "diam equiv", "diam equiv de", "de (cm)", "de (mm)"] },
     { key: "f", label: COLUMN_LABELS.f, type: "decimal", width: 85, group: 6, computed: true },
     { key: "is_mpa", label: COLUMN_LABELS.is_mpa, type: "decimal", width: 80, group: 6, computed: true },
     { key: "is_50", label: COLUMN_LABELS.is_50, type: "decimal", width: 85, group: 6, computed: true },
 
-    { key: "factor_conversion_k", label: COLUMN_LABELS.factor_conversion_k, type: "decimal", width: 80, group: 7, computed: true, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
+    { key: "factor_conversion_k", label: COLUMN_LABELS.factor_conversion_k, type: "decimal", width: 80, group: 7, synonyms: ["factor k", "factork", "factor de conversión k", "factor_conversion_k"] },
     { key: "ucs", label: COLUMN_LABELS.ucs, type: "decimal", width: 80, group: 7, computed: true },
     { key: "resistencia_isrm", label: COLUMN_LABELS.resistencia_isrm, type: "text", width: 90, group: 7, computed: true },
     { key: "denominacion_isrm", label: COLUMN_LABELS.denominacion_isrm, type: "text", width: 220, group: 7, computed: true, hidden: true },
@@ -380,11 +380,11 @@ export function getIsrmClass(ucs: number | null) {
 
 export function applyPltFormulas(row: any) {
     const r = { ...row };
-    const num = (v: any) => (v !== null && v !== undefined && v !== "" && !isNaN(Number(v))) ? Number(v) : null;
+    const num = (v: any) => (v !== null && v !== undefined && String(v).trim() !== "" && !isNaN(Number(v))) ? Number(v) : null;
 
     const celdaStr = String(r.celda_mapeo || "").trim().toUpperCase();
-    const muestraStr = String(r.muestra || "").trim();
-    r.codigo_muestra = celdaStr ? (muestraStr ? `${celdaStr}_${muestraStr}` : celdaStr) : (muestraStr || "");
+    const muestraStr = String(r.muestra || "").trim().toUpperCase();
+    r.codigo_muestra = celdaStr ? (muestraStr ? `${celdaStr}${muestraStr}` : celdaStr) : (muestraStr || "");
 
     const w1 = num(r.ancho_w1);
     const w2 = num(r.ancho_w2);
@@ -396,22 +396,30 @@ export function applyPltFormulas(row: any) {
 
     r.muestra_valida_longitud = (L !== null && D !== null) ? (L >= D ? "SÍ" : "NO") : null;
     r.muestra_valida_ancho = (D !== null && W !== null) ? (D > 0.3 * W && D < W ? "SÍ" : "NO") : null;
-    r.diametro_equivalente = (D !== null && W !== null) ? roundTo(Math.sqrt(4 * D * W / Math.PI), 4) : null;
-    r.f = (r.diametro_equivalente !== null) ? roundTo(Math.pow((r.diametro_equivalente * 10) / 50, 0.45), 4) : null;
+    r.diametro_equivalente = (D !== null && W !== null && D > 0 && W > 0) ? roundTo(Math.sqrt(4 * D * W / Math.PI), 4) : null;
+    r.f = (r.diametro_equivalente !== null && r.diametro_equivalente > 0) ? roundTo(Math.pow((r.diametro_equivalente * 10) / 50, 0.45), 4) : null;
 
     const P = num(r.fuerza_p);
     r.is_mpa = (P !== null && r.diametro_equivalente !== null && r.diametro_equivalente > 0)
         ? roundTo((P * 1000) / Math.pow(r.diametro_equivalente * 10, 2), 4)
         : null;
 
-    // Conforme a temp.md: SI (Muestra válida - ancho == "SI") ENTONCES (F * Is) SINO NULL
+    // SI (Muestra válida - ancho == "SÍ") ENTONCES (F * Is) SINO NULL
     r.is_50 = (r.muestra_valida_ancho === "SÍ" && r.is_mpa !== null && r.f !== null)
         ? roundTo(r.is_mpa * r.f, 4)
         : null;
 
-    const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, r.model2022 || null);
-    r.factor_conversion_k = res.k;
-    r.tipo_litologico = res.clase;
+    const hasExplicitLito = Boolean(r.litologia_1 || r.litologia_2 || r.litologia_3 || r.model2022);
+    const hasExistingK = num(r.factor_conversion_k) !== null;
+    if (hasExplicitLito) {
+        const res = resolveLithologyCascade(r.litologia_1, r.litologia_2, r.litologia_3, r.model2022 || null);
+        if (!hasExistingK && res.k !== null && res.k !== undefined) {
+            r.factor_conversion_k = res.k;
+        }
+        r.tipo_litologico = res.clase || "";
+    } else if (!r.tipo_litologico) {
+        r.tipo_litologico = "";
+    }
 
     const K = num(r.factor_conversion_k);
     r.ucs = (r.is_50 !== null && K !== null) ? roundTo(r.is_50 * K, 3) : null;
@@ -431,7 +439,7 @@ export function arePltRowsEqual(a: any, b: any): boolean {
         'litologia_1', 'litologia_2', 'litologia_3', 'tipo_litologico',
         'este', 'norte', 'elevacion', 'espesor_d', 'longitud_l',
         'ancho_w1', 'ancho_w2', 'fuerza_p', 'direccion_rotura',
-        'tipo_fractura', 'observaciones'
+        'tipo_fractura', 'factor_conversion_k', 'observaciones'
     ];
 
     for (const f of fields) {

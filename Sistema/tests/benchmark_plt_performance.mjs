@@ -6,18 +6,34 @@
  * - Medición estadística de inserción y eliminación de filas sobre 10,000 registros.
  * - Benchmark en Chromium real con Playwright para medir latencia de render y double_rAF.
  */
+import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import module from 'node:module';
 
 const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
+const FRONTEND = path.resolve(TESTS_DIR, '..', 'frontend');
 const FRONTEND_MODULES = path.resolve(TESTS_DIR, '../frontend/node_modules');
-module.globalPaths.push(FRONTEND_MODULES);
+const require = createRequire(import.meta.url);
+const CjsModule = require('node:module');
+process.env.NODE_PATH = [FRONTEND_MODULES, process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
+CjsModule._initPaths();
 const CACHE = path.join(TESTS_DIR, '.cache');
 
-const require = createRequire(import.meta.url);
+if (
+  !existsSync(path.join(CACHE, 'features', 'grid', 'gridStore.js')) ||
+  !existsSync(path.join(CACHE, 'features', 'grid', 'schema', 'pltColumns.js')) ||
+  !existsSync(path.join(CACHE, 'utils', 'pltQaQcRules.js'))
+) {
+  execSync(
+    `npx tsc src\\utils\\geomecColumns.ts src\\utils\\pltQaQcRules.ts src\\features\\grid\\gridStore.ts src\\features\\grid\\schema\\pltColumns.ts src\\features\\grid\\schema\\validationEngine.ts ` +
+    `--rootDir src --module commonjs --outDir ${CACHE} --target es2022 --skipLibCheck --esModuleInterop --ignoreConfig --types react`,
+    { cwd: FRONTEND, stdio: 'inherit' }
+  );
+}
+
 const gc = require(path.join(CACHE, 'utils', 'geomecColumns.js'));
 const { useGridStore } = require(path.join(CACHE, 'features', 'grid', 'gridStore.js'));
 const { PLT_SCHEMA } = require(path.join(CACHE, 'features', 'grid', 'schema', 'pltColumns.js'));

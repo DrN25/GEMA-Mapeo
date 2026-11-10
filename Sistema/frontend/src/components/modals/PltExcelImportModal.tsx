@@ -190,12 +190,22 @@ export default function PltExcelImportModal({
         const cleanL3 = String(rowObj.litologia_3 || "").trim().toUpperCase();
         const cleanM2022 = String(rowObj.model2022 || "").trim().toUpperCase();
 
+        if (!cleanL1 && !cleanL2 && !cleanL3 && !cleanM2022) {
+            rowObj.litologia_1 = "";
+            rowObj.litologia_2 = "";
+            rowObj.litologia_3 = "";
+            rowObj.tipo_litologico = rowObj.tipo_litologico || "";
+            return;
+        }
+
         const res = resolveLithologyCascade(cleanL1, cleanL2, cleanL3, cleanM2022 || null);
         rowObj.litologia_1 = res.lito1;
         rowObj.litologia_2 = res.lito2;
         rowObj.litologia_3 = res.lito3;
         rowObj.tipo_litologico = res.clase;
-        rowObj.factor_conversion_k = res.k;
+        if (rowObj.factor_conversion_k === null || rowObj.factor_conversion_k === undefined || rowObj.factor_conversion_k === "") {
+            rowObj.factor_conversion_k = res.k;
+        }
     };
 
     const runGrouping = (grid: any[][], headerRowIndex: number, currentMappings: Record<string, number>) => {
@@ -205,16 +215,26 @@ export default function PltExcelImportModal({
             return idx !== undefined ? row[idx] : undefined;
         };
 
-        const getNum = (row: any[], key: string, fallback = 0) => {
-            const val = getVal(row, key);
-            if (val === null || val === undefined || val === "") return fallback;
+        const parseFloatStrict = (val: any): number | null => {
+            if (val === null || val === undefined || String(val).trim() === "") return null;
             let s = String(val).trim();
             if (s.includes(',')) {
                 const commas = (s.match(/,/g) || []).length;
                 s = commas === 1 ? s.replace(',', '.') : s.replace(/,/g, '');
             }
-            const num = parseFloat(s);
-            return isNaN(num) ? fallback : num;
+            const parsed = parseFloat(s);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const getNum = (row: any[], key: string, fallback = 0) => {
+            const parsed = parseFloatStrict(getVal(row, key));
+            return parsed === null ? fallback : parsed;
+        };
+
+        const getOptNum = (row: any[], key: string, scale = 1): number | null => {
+            const parsed = parseFloatStrict(getVal(row, key));
+            if (parsed === null) return null;
+            return scale === 1 ? parsed : Math.round(parsed * scale) / scale;
         };
 
         const getStr = (row: any[], key: string, fallback = "") => {
@@ -232,6 +252,8 @@ export default function PltExcelImportModal({
             let nivelVal = getNum(row, 'nivel', 3960);
             if (nivelVal > 4999) nivelVal = 4999;
 
+            const rawDe = getOptNum(row, 'diametro_equivalente', 10000);
+
             const rowObj: any = {
                 id: Date.now() + r,
                 campana: Math.round(getNum(row, 'campana', new Date().getFullYear())),
@@ -242,42 +264,48 @@ export default function PltExcelImportModal({
                 zona_mapeo: getStr(row, 'zona_mapeo'),
                 nivel: Math.round(nivelVal * 100) / 100,
                 celda_mapeo: celdaMapeo,
-                muestra: getStr(row, 'muestra'),
+                muestra: getStr(row, 'muestra').toUpperCase(),
                 codigo_muestra: "",
                 litologia_1: getStr(row, 'litologia_1'),
                 litologia_2: getStr(row, 'litologia_2'),
                 litologia_3: getStr(row, 'litologia_3'),
                 model2022: getStr(row, 'model2022'),
-                tipo_litologico: getStr(row, 'tipo_litologico', 'INTRUSIVOS'),
-                este: getVal(row, 'este') !== null && getVal(row, 'este') !== "" ? Math.round(Math.abs(getNum(row, 'este')) * 10000) / 10000 : null,
-                norte: getVal(row, 'norte') !== null && getVal(row, 'norte') !== "" ? Math.round(Math.abs(getNum(row, 'norte')) * 1000) / 1000 : null,
-                elevacion: getVal(row, 'elevacion') !== null && getVal(row, 'elevacion') !== "" ? Math.round(Math.abs(getNum(row, 'elevacion')) * 100) / 100 : null,
-                espesor_d: getVal(row, 'espesor_d') !== null && getVal(row, 'espesor_d') !== "" ? Math.round(Math.abs(getNum(row, 'espesor_d')) * 10) / 10 : null,
-                longitud_l: getVal(row, 'longitud_l') !== null && getVal(row, 'longitud_l') !== "" ? Math.round(Math.abs(getNum(row, 'longitud_l')) * 100) / 100 : null,
-                ancho_w1: getVal(row, 'ancho_w1') !== null && getVal(row, 'ancho_w1') !== "" ? Math.round(Math.abs(getNum(row, 'ancho_w1')) * 100) / 100 : null,
-                ancho_w2: getVal(row, 'ancho_w2') !== null && getVal(row, 'ancho_w2') !== "" ? Math.round(Math.abs(getNum(row, 'ancho_w2')) * 100) / 100 : null,
-                fuerza_p: getVal(row, 'fuerza_p') !== null && getVal(row, 'fuerza_p') !== "" ? Math.round(Math.abs(getNum(row, 'fuerza_p')) * 1000) / 1000 : null,
+                tipo_litologico: getStr(row, 'tipo_litologico'),
+                este: getOptNum(row, 'este', 10000),
+                norte: getOptNum(row, 'norte', 1000),
+                elevacion: getOptNum(row, 'elevacion', 100),
+                espesor_d: getOptNum(row, 'espesor_d', 100),
+                longitud_l: getOptNum(row, 'longitud_l', 100),
+                ancho_w1: getOptNum(row, 'ancho_w1', 100),
+                ancho_w2: getOptNum(row, 'ancho_w2', 100),
+                fuerza_p: getOptNum(row, 'fuerza_p', 1000),
+                _raw_de: rawDe,
                 direccion_rotura: (() => {
-                    const rawDir = getStr(row, 'direccion_rotura', 'Pa').trim();
-                    const cleanDir = rawDir.toUpperCase().replace(/\//g, "").replace(/\./g, "");
-                    if (cleanDir === "PA" || cleanDir === "PARALELA") return "Pa";
+                    const rawDir = getStr(row, 'direccion_rotura', '').trim();
+                    if (!rawDir) return "";
+                    const cleanDir = rawDir.toUpperCase().replace(/\//g, "").replace(/\./g, "").replace(/\s+/g, "");
+                    if (cleanDir === "PA" || cleanDir === "PARALELA" || cleanDir === "PARALELO") return "Pa";
                     if (cleanDir === "PE" || cleanDir === "PERPENDICULAR") return "Pe";
-                    return "NA";
+                    if (cleanDir === "NA" || cleanDir === "NOAPLICA") return "NA";
+                    return rawDir;
                 })(),
                 tipo_fractura: (() => {
-                    const rawFrac = getStr(row, 'tipo_fractura', 'M').trim().toUpperCase();
-                    if (rawFrac === "E" || rawFrac.includes("ESTRUCTURA")) return "E";
-                    if (rawFrac === "C" || rawFrac.includes("COMBINADA")) return "C";
-                    return "M";
+                    const rawFrac = getStr(row, 'tipo_fractura', '').trim();
+                    if (!rawFrac) return "";
+                    const upperFrac = rawFrac.toUpperCase();
+                    if (upperFrac === "M" || upperFrac === "MATRIZ") return "M";
+                    if (upperFrac === "E" || upperFrac === "ESTRUCTURA") return "E";
+                    if (upperFrac === "C" || upperFrac === "COMBINADA") return "C";
+                    return rawFrac;
                 })(),
-                factor_conversion_k: getVal(row, 'factor_conversion_k') !== null && getVal(row, 'factor_conversion_k') !== "" ? Math.round(Math.abs(getNum(row, 'factor_conversion_k')) * 100) / 100 : null,
+                factor_conversion_k: getOptNum(row, 'factor_conversion_k', 100),
                 observaciones: getStr(row, 'observaciones'),
                 _dirty: true
             };
 
             const cUp = rowObj.celda_mapeo.trim().toUpperCase();
-            const mUp = rowObj.muestra.trim();
-            rowObj.codigo_muestra = cUp && mUp ? `${cUp}_${mUp}` : "";
+            const mUp = rowObj.muestra.trim().toUpperCase();
+            rowObj.codigo_muestra = cUp && mUp ? `${cUp}${mUp}` : "";
 
             resolveImportedLithology(rowObj);
             list.push(rowObj);

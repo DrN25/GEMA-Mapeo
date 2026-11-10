@@ -47,18 +47,17 @@ export function groupPltRowsByCelda(rows: any[], knownCells: string[]): PltImpor
  * Re-etiqueta un conjunto de registros a la celda de destino: actualiza
  * celda_mapeo con el CÓDIGO REAL de la celda (trim + mayúsculas, sin
  * normalizar: normalizeCeldaCode solo sirve para comparar/agrupar, el valor
- * persistido debe ser el código tal cual, p.ej. "TEST_004") y regenera
- * codigo_muestra con el mismo criterio del modal y de applyPltFormulas
- * ({CELDA}_{muestra}, guion bajo — el formato persistido en la tabla).
+ * persistido debe ser el código tal cual, p.ej. "AG57") y regenera
+ * codigo_muestra concatenando {CELDA}{MUESTRA} sin guion bajo (p.ej. "AG57A").
  */
 export function retagPltRows(rows: any[], targetCelda: string): any[] {
   const cUp = String(targetCelda || '').trim().toUpperCase();
   return (rows || []).map(r => {
-    const mUp = String(r.muestra || '').trim();
+    const mUp = String(r.muestra || '').trim().toUpperCase();
     return {
       ...r,
       celda_mapeo: cUp,
-      codigo_muestra: cUp && mUp ? `${cUp}_${mUp}` : ''
+      codigo_muestra: cUp && mUp ? `${cUp}${mUp}` : ''
     };
   });
 }

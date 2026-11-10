@@ -137,7 +137,7 @@ ok(sm.getPendingPltCells().includes(CELDA_TEST), 'Celda marcada como pendiente e
 const deltaInStore = sm.getPltDelta(CELDA_TEST);
 ok(deltaInStore.length === 3, `Delta guardado en localStorage contiene 3 filas (obtuvo ${deltaInStore.length})`);
 ok(deltaInStore[0].fuerza_p === 9.9, 'Delta almacena el valor modificado (fuerza_p = 9.9)');
-ok(deltaInStore[2].codigo_muestra === `${CELDA_TEST}_03`, `Delta almacena la fila agregada con codigo_muestra autocalculado (${CELDA_TEST}_03)`);
+ok(deltaInStore[2].codigo_muestra === `${CELDA_TEST}03`, `Delta almacena la fila agregada con codigo_muestra autocalculado (${CELDA_TEST}03)`);
 
 // 3.3 SIMULACIÓN DE REINICIO DE PÁGINA (F5)
 console.log('\n--- 4. SIMULACIÓN DE REINICIO DE PÁGINA (RECARGA / F5) ---');

@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle, BookOpen } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
 import { validateMapeoWindow, validatePltEnsayosList } from '../../utils/mandatoryRules';
-import { validateWindowQAQC } from '../../utils/qaqcValidator';
+import { validateWindowQAQC, type WindowQaQcExtraCtx } from '../../utils/qaqcValidator';
+import { validatePltQAQC } from '../../utils/pltQaQcRules';
 import type { PendingValidation } from '../../utils/cellRegistry';
 
 export interface PltDiffSummary {
@@ -24,6 +25,9 @@ interface SaveConfirmModalProps {
   onOpenCatalogs?: () => void;
   /** Celdas pendientes con estado de validación inválido (persistido). */
   invalidPendingCells?: PendingValidation[];
+  dbCellNames?: string[];
+  originalCelda?: string | null;
+  knownCells?: string[];
 }
 
 export default function SaveConfirmModal({
@@ -35,7 +39,10 @@ export default function SaveConfirmModal({
   pltDiff,
   pltEnsayos = [],
   onOpenCatalogs,
-  invalidPendingCells = []
+  invalidPendingCells = [],
+  dbCellNames = [],
+  originalCelda = null,
+  knownCells = []
 }: SaveConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -52,24 +59,36 @@ export default function SaveConfirmModal({
     return Array.isArray(pltEnsayos) && pltEnsayos.length > 0 ? validatePltEnsayosList(pltEnsayos) : [];
   }, [pltEnsayos]);
 
-  // Revisión sincrónica QA/QC de combinaciones inválidas y errores críticos
+  // Revisión sincrónica QA/QC de ventana activa + ensayos PLT
   const qaqcAlerts = useMemo(() => {
-    if (!activeWindow) return [];
-    const ef = activeWindow.header.este_from || 0;
-    const nf = activeWindow.header.norte_from || 0;
-    const cf = activeWindow.header.cota_from || 0;
-    const et = activeWindow.header.este_to || 0;
-    const nt = activeWindow.header.norte_to || 0;
-    const ct = activeWindow.header.cota_to || 0;
-    const dx = et - ef;
-    const dy = nt - nf;
-    const dz = ct - cf;
-    const distCalc = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    const rawLargo = typeof activeWindow.header.largo === 'number' ? activeWindow.header.largo : parseFloat(String(activeWindow.header.largo || 0));
-    const largo = !isNaN(rawLargo) && rawLargo > 0 ? rawLargo : distCalc;
+    const windowAlerts = activeWindow
+      ? (() => {
+          const ef = activeWindow.header.este_from || 0;
+          const nf = activeWindow.header.norte_from || 0;
+          const cf = activeWindow.header.cota_from || 0;
+          const et = activeWindow.header.este_to || 0;
+          const nt = activeWindow.header.norte_to || 0;
+          const ct = activeWindow.header.cota_to || 0;
+          const dx = et - ef;
+          const dy = nt - nf;
+          const dz = ct - cf;
+          const distCalc = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const rawLargo = typeof activeWindow.header.largo === 'number'
+            ? activeWindow.header.largo
+            : parseFloat(String(activeWindow.header.largo || 0));
+          const largo = !isNaN(rawLargo) && rawLargo > 0 ? rawLargo : distCalc;
+          const extraCtx: WindowQaQcExtraCtx = { dbCellNames, originalCelda, knownCells };
 
-    return validateWindowQAQC(activeWindow.header, activeWindow.joints, largo, undefined, true);
-  }, [activeWindow]);
+          return validateWindowQAQC(activeWindow.header, activeWindow.joints, largo, undefined, true, extraCtx);
+        })()
+      : [];
+
+    const pltAlerts = Array.isArray(pltEnsayos) && pltEnsayos.length > 0
+      ? validatePltQAQC(pltEnsayos, activeWindow?.header ?? null)
+      : [];
+
+    return [...windowAlerts, ...pltAlerts];
+  }, [activeWindow, pltEnsayos, dbCellNames, originalCelda, knownCells]);
 
   // CRITICAS y VACIOS bloquean el guardado; ADVERTENCIAS no.
   const qaqcCriticas = qaqcAlerts.filter(a => a.type === 'CRITICA');
@@ -350,18 +369,6 @@ export default function SaveConfirmModal({
                     </div>
                   ))}
 
-                  {/* QA/QC Advertencias (no bloquean) */}
-                  {qaqcAdvertencias.map((err, idx) => (
-                    <div key={`qaqc-warn-${idx}`} className="text-xs bg-amber-950/60 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between text-amber-100 shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                        <span className="font-semibold leading-tight">{err.message}</span>
-                      </div>
-                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/30 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/40 tracking-wider">
-                        Advertencia
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
 
@@ -391,6 +398,34 @@ export default function SaveConfirmModal({
                 </p>
               </div>
 
+            </div>
+          )}
+
+          {/* Advertencias QA/QC (siempre visibles si existen; NO bloquean el guardado) */}
+          {qaqcAdvertencias.length > 0 && (
+            <div className="bg-amber-950/50 border border-amber-500/40 rounded-2xl p-4 space-y-2.5 text-amber-100 shadow-sm">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-500/20 pb-2">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-300 uppercase tracking-wider">
+                  <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+                  <span>Advertencias QA/QC (No bloquean guardado)</span>
+                </div>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200">
+                  {qaqcAdvertencias.length}
+                </span>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {qaqcAdvertencias.map((err, idx) => (
+                  <div key={`qaqc-warn-${idx}`} className="text-xs bg-amber-950/60 border border-amber-500/35 rounded-xl p-2.5 flex items-center justify-between text-amber-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                      <span className="font-semibold leading-tight">{err.message}</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-500/25 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/35 tracking-wider">
+                      Advertencia
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

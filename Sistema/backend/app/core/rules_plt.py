@@ -118,7 +118,7 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_TIPO_FRACTURA_INVALIDO", "Tipo de fractura no admitido (debe ser M, E o C).", "ALERTA"
     ),
     "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE", "Diámetro equivalente De (cm) no coincide con la fórmula sqrt(4*D*W/pi).", "ALERTA"
+        "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE", "Diámetro equivalente De (cm) no coincide con la fórmula sqrt(4*D*W/pi) dentro de ±0.005 cm.", "ALERTA"
     ),
     "CAT_PLT_FACTOR_F_INCONGRUENTE": RuleCategoryPLT(
         "CAT_PLT_FACTOR_F_INCONGRUENTE", "Factor de corrección F no coincide con la fórmula ((De*10)/50)^0.45.", "ALERTA"
@@ -130,7 +130,7 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_IS50_INCONGRUENTE", "Índice Is(50) (MPa) no coincide con la fórmula Is * F.", "ALERTA"
     ),
     "CAT_PLT_FACTOR_K_INCONGRUENTE": RuleCategoryPLT(
-        "CAT_PLT_FACTOR_K_INCONGRUENTE", "Factor de conversión K no coincide con el valor asignado por el catálogo litológico.", "ALERTA"
+        "CAT_PLT_FACTOR_K_INCONGRUENTE", "Factor de conversión K no coincide con el valor asignado por el catálogo litológico.", "ADVERTENCIA"
     ),
     "CAT_PLT_FACTOR_K_RANGO": RuleCategoryPLT(
         "CAT_PLT_FACTOR_K_RANGO", "Factor de conversión K fuera de rango razonable [5, 30].", "ALERTA"
@@ -153,18 +153,35 @@ CATEGORIES_REGISTRY_PLT: Dict[str, RuleCategoryPLT] = {
     "CAT_PLT_CELDA_EXCEDENTE": RuleCategoryPLT(
         "CAT_PLT_CELDA_EXCEDENTE", "La celda de mapeo posee más de 4 muestras registradas.", "ADVERTENCIA"
     ),
+    "CAT_PLT_COORD_DUPLICADAS_MUESTRAS": RuleCategoryPLT(
+        "CAT_PLT_COORD_DUPLICADAS_MUESTRAS", "Muestras de la misma celda registran coordenadas idénticas (Este, Norte y Elevación).", "ALERTA"
+    ),
+    "CAT_PLT_CARGA_P_PRECAUCION": RuleCategoryPLT(
+        "CAT_PLT_CARGA_P_PRECAUCION", "Carga aplicada P supera 55 kN (rango de precaución 55–60 kN).", "ADVERTENCIA"
+    ),
+    "CAT_PLT_CARGA_P_VERIFICACION": RuleCategoryPLT(
+        "CAT_PLT_CARGA_P_VERIFICACION", "Carga aplicada P supera 60 kN (alerta de verificación del registro).", "ALERTA"
+    ),
+    "CAT_PLT_OBSERVACION_OBLIGATORIA_P": RuleCategoryPLT(
+        "CAT_PLT_OBSERVACION_OBLIGATORIA_P", "Observación obligatoria vacía para ensayo con Fuerza P > 60 kN.", "VACIO"
+    ),
+    "CAT_PLT_GEOMETRIA_INVALIDA": RuleCategoryPLT(
+        "CAT_PLT_GEOMETRIA_INVALIDA", "Geometría de probeta fuera de norma ASTM/ISRM (0.3W < D < W o L >= D).", "ADVERTENCIA"
+    ),
 }
 
 # Categorías que aplican exclusivamente al Formato de Campo Compacto (03 feb1.xlsx)
 COMPACT_FIELD_CATEGORIES: Set[str] = {
     "CAT_CAMPO_OBLIGATORIO_VACIO",
     "CAT_PLT_MUESTRA_INVALIDA",
+    "CAT_PLT_MUESTRA_DUPLICADA",
     "CAT_PLT_CODIGO_MUESTRA_INCONGRUENTE",
     "CAT_PLT_LITO1_INVALIDA",
     "CAT_PLT_LITOLOGIA_COMBINACION_INVALIDA",
     "CAT_PLT_COORD_ESTE_RANGO",
     "CAT_PLT_COORD_NORTE_RANGO",
     "CAT_PLT_ELEVACION_RANGO",
+    "CAT_PLT_COORD_DUPLICADAS_MUESTRAS",
     "CAT_PLT_ESPESOR_D_RANGO",
     "CAT_PLT_LONGITUD_L_RANGO",
     "CAT_PLT_ANCHO_W1_RANGO",
@@ -172,7 +189,11 @@ COMPACT_FIELD_CATEGORIES: Set[str] = {
     "CAT_PLT_ANCHO_W_INCONGRUENTE",
     "CAT_PLT_MUESTRA_VALIDA_LONG_INCONGRUENTE",
     "CAT_PLT_MUESTRA_VALIDA_ANCHO_INCONGRUENTE",
+    "CAT_PLT_GEOMETRIA_INVALIDA",
     "CAT_PLT_FUERZA_P_RANGO",
+    "CAT_PLT_CARGA_P_PRECAUCION",
+    "CAT_PLT_CARGA_P_VERIFICACION",
+    "CAT_PLT_OBSERVACION_OBLIGATORIA_P",
     "CAT_PLT_DIRECCION_ROTURA_INVALIDA",
     "CAT_PLT_TIPO_FRACTURA_INVALIDO",
     "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
@@ -388,7 +409,7 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "ERR_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         "CAT_PLT_DIAMETRO_EQUIV_INCONGRUENTE",
         ["Diámetro equivalente (cm)"],
-        "El diámetro De ({actual} cm) no coincide con la fórmula √(4*W*D/π) = {expected} cm.",
+        "El diámetro De ({actual} cm) no coincide con la fórmula √(4*W*D/π) = {expected} cm (tolerancia máx. ±0.005 cm).",
     ),
     "ERR_PLT_FACTOR_F_INCONGRUENTE": ErrorRulePLT(
         "ERR_PLT_FACTOR_F_INCONGRUENTE",
@@ -455,5 +476,35 @@ RULES_REGISTRY_PLT: Dict[str, ErrorRulePLT] = {
         "CAT_PLT_CELDA_EXCEDENTE",
         ["Celda de mapeo", "Código de muestra"],
         "Celda '{celda}': Registro excedente con {count}/4 muestras ({secuencia}).",
+    ),
+    "ERR_PLT_COORD_DUPLICADAS_EN_CELDA": ErrorRulePLT(
+        "ERR_PLT_COORD_DUPLICADAS_EN_CELDA",
+        "CAT_PLT_COORD_DUPLICADAS_MUESTRAS",
+        ["Este (m)", "Norte (m)", "Elevación (msnm)"],
+        "Celda '{celda}': Muestras ({muestras}) registran coordenadas idénticas ({coords}). Cada muestra debe tener coordenadas distintas.",
+    ),
+    "WRN_PLT_CARGA_P_ALTA": ErrorRulePLT(
+        "WRN_PLT_CARGA_P_ALTA",
+        "CAT_PLT_CARGA_P_PRECAUCION",
+        ["Fuerza P (kN)"],
+        "Carga aplicada P = {value} kN supera el límite recomendado de 55 kN (rango de precaución 55–60 kN).",
+    ),
+    "ERR_PLT_CARGA_P_VERIFICACION": ErrorRulePLT(
+        "ERR_PLT_CARGA_P_VERIFICACION",
+        "CAT_PLT_CARGA_P_VERIFICACION",
+        ["Fuerza P (kN)"],
+        "Carga aplicada P = {value} kN supera 60 kN: alerta de verificación del registro (requiere comentario obligatorio en Observaciones).",
+    ),
+    "ERR_PLT_OBSERVACION_OBLIGATORIA_CARGA_P": ErrorRulePLT(
+        "ERR_PLT_OBSERVACION_OBLIGATORIA_CARGA_P",
+        "CAT_PLT_OBSERVACION_OBLIGATORIA_P",
+        ["Observaciones"],
+        "Carga aplicada P = {p} kN (> 60 kN): es obligatorio registrar un comentario en Observaciones.",
+    ),
+    "WRN_PLT_GEOMETRIA_FUERA_NORMA": ErrorRulePLT(
+        "WRN_PLT_GEOMETRIA_FUERA_NORMA",
+        "CAT_PLT_GEOMETRIA_INVALIDA",
+        ["Muestra válida - Longitud", "Muestra válida - Ancho"],
+        "Probeta fuera de criterio geométrico ASTM/ISRM ({motivo}).",
     ),
 }
