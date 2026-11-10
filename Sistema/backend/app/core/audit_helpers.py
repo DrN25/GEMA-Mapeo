@@ -338,6 +338,7 @@ def aggregate_audit_metrics(diag: dict, years_filter: str = None) -> dict:
     top_column_errors = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
 
     return {
+        "ruleset_version": diag.get("ruleset_version", "legacy_unknown"),
         "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "consolidado_observaciones": consolidado_tabla,
         "resumen_por_celda_padre": resumen_celdas,

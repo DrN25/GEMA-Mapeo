@@ -151,11 +151,6 @@ export default function GeomecTable<T extends { id: any;[key: string]: any }>({
                 onCellChange(rowId, col.key, -1);
                 return;
             }
-            if (col.range) {
-                const isNegativeAllowed = col.key === 'dip' || col.key === 'dip_dir' || col.key === 'dip_talud' || col.key === 'dip_hw' || col.key === 'dipdir_talud';
-                const minVal = isNegativeAllowed ? col.range[0] : Math.max(0, col.range[0]);
-                num = Math.min(col.range[1], Math.max(minVal, num));
-            }
             onCellChange(rowId, col.key, num);
         } else {
             onCellChange(rowId, col.key, sanitizedVal);

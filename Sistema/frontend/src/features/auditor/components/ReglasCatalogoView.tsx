@@ -6,10 +6,13 @@ import {
     Compass, Sparkles
 } from 'lucide-react';
 import { getAuthHeaders } from '../../../utils/apiClient';
-import fallbackRulesData from '../data/reglasFallback.json';
+
 
 export interface ReglaCatalogo {
     code: string;
+    scope?: string[];
+    views?: string[];
+    enabled?: boolean;
     category_code: string;
     category_name: string;
     columns: string[];
@@ -33,7 +36,8 @@ export default function ReglasCatalogoView({
     initialSelectedRule = null,
     onBackToAudit
 }: ReglasCatalogoViewProps) {
-    const [reglas, setReglas] = useState<ReglaCatalogo[]>(() => fallbackRulesData as ReglaCatalogo[]);
+    const [reglas, setReglas] = useState<ReglaCatalogo[]>([]);
+    const [catalogState, setCatalogState] = useState<string>('Cargando reglas activas…');
     const [loading, setLoading] = useState<boolean>(false);
     const [selectedRule, setSelectedRule] = useState<ReglaCatalogo | null>(null);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -51,18 +55,28 @@ export default function ReglasCatalogoView({
         const fetchReglas = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${apiBase}/api/geomecanica/reglas`, {
+                const res = await fetch(`${apiBase}/api/validation/rules`, {
                     headers: getAuthHeaders(),
                     cache: 'no-store'
                 });
                 if (res.ok) {
-                    const data = await res.json();
+                    const payload = await res.json();
+                    const data = payload.rules?.map((r: ReglaCatalogo) => ({ ...r, severity: r.severity === "CRITICA" ? "ALERTA" : r.severity }));
                     if (Array.isArray(data) && data.length > 0 && isMounted) {
                         setReglas(data);
+                        setCatalogState(`Reglas activas · ${payload.ruleset_version}`);
+                        try { localStorage.setItem("gema_rules_catalog_v1", JSON.stringify({ rules: data, version: payload.ruleset_version })); } catch { /* Storage may be full; catalog remains usable. */ }
                     }
-                }
+                } else { throw new Error(`HTTP ${res.status}`); }
             } catch (err) {
-                console.warn('Usando catálogo local de reglas (modo fallback offline):', err);
+                if (isMounted) {
+                    setCatalogState('Sin conexión: el catálogo puede estar desactualizado.');
+                    try {
+                        const cached = JSON.parse(localStorage.getItem('gema_rules_catalog_v1') || 'null');
+                        if (Array.isArray(cached?.rules)) setReglas(cached.rules);
+                    } catch { /* No valid cached catalog. */ }
+                }
+                console.warn('Catálogo no disponible:', err);
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -204,6 +218,7 @@ export default function ReglasCatalogoView({
 
     return (
         <div className="flex-1 flex flex-col h-full bg-navy-950 text-slate-100 overflow-hidden font-sans">
+            <p className="px-4 py-2 text-xs text-slate-400" role="status">{catalogState}</p>
             {/* Encabezado Principal */}
             <div className="bg-navy-900 border-b border-navy-800 px-6 py-4 shrink-0 shadow-sm dark:shadow-lg">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

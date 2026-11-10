@@ -52,7 +52,6 @@ import {
   getLocalOnlyPendingSummaries,
   getPendingCellNames,
   getPendingCellSummaries,
-  hasCellValidation,
   isCellPending,
   setCellValidation,
   clearCellValidation,
@@ -80,11 +79,11 @@ import {
   type CalculatorResult
 } from './utils/rmrCalculator';
 
-import { validateWindowQAQC } from './utils/qaqcValidator';
+import { useWindowValidation } from './hooks/useWindowValidation';
+import { validateWindows, validationErrorMessage } from './services/validationApi';
 import type { QaQcAlert } from './utils/qaQcRules';
-import { buildCampaniaYearMap } from './utils/qaQcRules';
-import { resetTouchedFields, subscribeTouched } from './utils/qaQcTouch';
-import { validateMapeoWindow, validatePltEnsayosList, toVacioAlerts, isBlockingValidationAlert, type MissingFieldIssue } from './utils/mandatoryRules';
+import { resetTouchedFields } from './utils/qaQcTouch';
+import { validatePltEnsayosList, toVacioAlerts, isBlockingValidationAlert } from './utils/mandatoryRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || (
@@ -598,60 +597,35 @@ const [connectionLost, setConnectionLost] = useState(false);
     }
   }, [workspaceDiff.totalWindowsWithChanges, pltDiffSummary.totalChanges]);
 
-  // Re-render de validaciones cuando se marca un campo como "tocado" (blur)
-  const [touchedTick, setTouchedTick] = useState(0);
+  const liveValidation = useWindowValidation(API_BASE, activeWindow, catalogsLoaded);
+  const activeWindowRef = useRef(activeWindow);
+  activeWindowRef.current = activeWindow;
   useEffect(() => {
-    return subscribeTouched(() => setTouchedTick(t => t + 1));
-  }, []);
-
-  // Keep RMR calculations and QA/QC validation updated in real-time
+    if (!activeWindow || !catalogsLoaded) { setCalculated(null); return; }
+    const result = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
+    const geometry = liveValidation.result?.derived.geometry;
+    setCalculated(geometry ? { ...result, largo: geometry.length_m, dip_hole: geometry.dip_hw,
+      az_hole: geometry.az_hw, dip_dir_talud: geometry.dipdir_talud } : result);
+  }, [activeWindow, catalogsLoaded, liveValidation.result]);
   useEffect(() => {
-    if (!catalogsLoaded) {
-      setAlerts([]);
-      return;
-    }
+    const mappingAlerts = liveValidation.result?.issues || [];
+    const pltAlerts = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
+    const pendingAlert: QaQcAlert[] = activeWindow && !liveValidation.result ? [{
+      fieldId: 'header-celda', ruleId: 'VALIDATION_PENDING', type: 'ADVERTENCIA', section: 'VALIDACIÓN',
+      message: liveValidation.error || 'Validando el borrador con el servidor…'
+    }] : [];
+    setAlerts([...mappingAlerts, ...pltAlerts, ...pendingAlert]);
     if (activeWindow) {
-      const res = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
-      setCalculated(res);
-      const errs = validateWindowQAQC(activeWindow.header, activeWindow.joints, res.largo, buildCampaniaYearMap(), true);
-      const vacios = toVacioAlerts(validateMapeoWindow(activeWindow));
-      const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
-      const allAlerts = [...errs, ...vacios, ...pltVacios];
-      setAlerts(allAlerts);
-      // Estado persistido de validación de la celda activa (lo consume el bloqueo del guardado).
-      // Solo persisten CRITICAS y VACIOS: las ADVERTENCIAS se muestran en el panel QA/QC
-      // pero NO deben impedir guardar en la base de datos.
-      const blockingAlerts = allAlerts.filter(a => isBlockingValidationAlert(a.type));
-      setCellValidation(activeWindow.header.celda, blockingAlerts.map(a => a.message || JSON.stringify(a)));
-    } else {
-      const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
-      setCalculated(null);
-      setAlerts([...pltVacios]);
+      setCellValidation(activeWindow.header.celda, liveValidation.result
+        ? mappingAlerts.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message)
+        : ['Borrador pendiente de validación con el servidor.'], liveValidation.result ? { rulesetVersion: liveValidation.result.ruleset_version, draftFingerprint: fastHashObject(activeWindow) } : {});
     }
-  }, [activeWindow, touchedTick, catalogsLoaded, pltEnsayos]);
+  }, [activeWindow, liveValidation.result, liveValidation.error, pltEnsayos]);
 
   // Resetear el registro de campos "tocados" al cambiar de ventana activa
   useEffect(() => {
     resetTouchedFields();
   }, [activeWindow?.header?.celda]);
-
-  // Reevaluación en cascada de distancias (m) al largo máximo de la celda.
-  // La misma política se aplica al snapshot/baseline en handleSelectWindow,
-  // para que caché y snapshot nunca diverjan por este ajuste automático.
-  // IMPORTANTE: el largo se computa FRESCO desde la ventana activa. Usar
-  // `calculated?.largo` aquí era un bug: al cambiar de celda, el efecto corría
-  // con el largo de la celda ANTERIOR (stale) y clampeaba distancias que el
-  // baseline (clampeado con el largo correcto) no tocó → la celda quedaba
-  // pendiente con "cambios de discontinuidad" fantasma e intermitente.
-  useEffect(() => {
-    if (!activeWindow) return;
-
-    const computedLargo = calculateWindowGeomec(activeWindow.header, activeWindow.joints).largo;
-    const adjustedJoints = applyDistanceCascade(activeWindow.header, activeWindow.joints, computedLargo);
-    if (adjustedJoints !== activeWindow.joints) {
-      setActiveWindow(prev => prev ? { ...prev, joints: adjustedJoints } : null);
-    }
-  }, [activeWindow?.header]);
 
   // Synchronize photo loading from localStorage when the active window celda changes
   useEffect(() => {
@@ -1221,7 +1195,7 @@ const [connectionLost, setConnectionLost] = useState(false);
 
       addPendingCell(celda);
       // Estado de validación desde el primer momento (bloquea el guardado si está incompleta)
-      setCellValidation(celda, validateMapeoWindow(windowData).map(i => i.message));
+      setCellValidation(celda, ['Borrador importado pendiente de validación.']);
       imported++;
     }
 
@@ -1504,26 +1478,26 @@ const [connectionLost, setConnectionLost] = useState(false);
       }
     }
 
-    // Bloqueo por QA/QC (F1/F2): se consulta el estado de validación PERSISTIDO
-    // de cada celda pendiente (actualizado en cada evaluación). Si una celda no
-    // tiene registro (p.ej. importada sin abrir), se evalúa aquí mismo (fallback).
-    for (const w of windowsToSave) {
-      if (!hasCellValidation(w.header.celda)) {
-        setCellValidation(w.header.celda, validateMapeoWindow(w).map(i => i.message));
+    // A fresh server evaluation for every selected draft, including unopened imports.
+    // Cached validation messages are presentation only, never a save certificate.
+    const expectedActive = JSON.stringify(activeWindowRef.current);
+    const validated = new Map<string, import('./types/validation').WindowValidation>();
+    try {
+      for (let offset = 0; offset < windowsToSave.length; offset += 20) {
+        const batch = windowsToSave.slice(offset, offset + 20);
+        const response = await validateWindows(API_BASE, batch);
+        response.windows.forEach((result, i) => {
+          validated.set(batch[i].header.celda, result);
+          setCellValidation(batch[i].header.celda, result.issues.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message), { rulesetVersion: result.ruleset_version, draftFingerprint: fastHashObject(batch[i]) });
+        });
       }
-    }
-    const invalidCells = getInvalidPendingCells()
-      .filter(v => windowsToSave.some(w => w.header.celda === v.celda));
-    if (invalidCells.length > 0) {
-      setIsLoadingWindow(false);
-      setSyncStatus('unsaved');
-      setSyncMessage('No se guardó: hay celdas con campos pendientes o inconsistencias QA/QC.');
-      alert(
-        `No se puede guardar: ${invalidCells
-          .map(v => `${v.celda} (${v.count} problema(s))`)
-          .join(', ')}. Abra cada celda y corrija los campos señalados en el panel QA/QC.`
-      );
-      return;
+      if (expectedActive !== JSON.stringify(activeWindowRef.current)) throw new Error('El borrador cambió durante la validación. Vuelva a guardar.');
+      const invalid = [...validated.entries()].filter(([, result]) => !result.can_save);
+      if (invalid.length) throw new Error(invalid.map(([code,result]) => `${code}: ${result.issues.filter(i => isBlockingValidationAlert(i.type)).map(i => i.message).join('; ')}`).join('\n'));
+    } catch (err) {
+      setIsLoadingWindow(false); setSyncStatus('unsaved');
+      const message = err instanceof Error ? err.message : 'No se pudo validar el guardado.';
+      setSyncMessage(message); alert(message); return;
     }
 
     // Guardado por lotes de 4 concurrentes: mismo payload y mismo manejo de
@@ -1535,6 +1509,7 @@ const [connectionLost, setConnectionLost] = useState(false);
     const saveWindow = async (winData: WindowData): Promise<{ ok: true } | { ok: false; title: string; errorMessage: string; connectionError?: boolean }> => {
       const nonVacantJoints = (winData.joints || []).filter(j => !(j.distancia === -1 && j.dip === -1 && j.espaciamiento === -1));
       const winCalc = calculateWindowGeomec(winData.header, winData.joints);
+      const effectiveGeometry = validated.get(winData.header.celda)?.derived.geometry;
 
       const payload = {
         codigo: winData.header.celda,
@@ -1547,15 +1522,15 @@ const [connectionLost, setConnectionLost] = useState(false);
         este_fin: winData.header.este_to || 0,
         norte_fin: winData.header.norte_to || 0,
         cota_fin: winData.header.cota_to || 0,
-        largo_m: winCalc.largo,
+        largo_m: winData.header.largo == null ? validated.get(winData.header.celda)?.derived.geometry?.length_m : Number(winData.header.largo),
         altura: winData.header.altura !== undefined && winData.header.altura !== null ? winData.header.altura : null,
         altura_m: winData.header.altura !== undefined && winData.header.altura !== null ? winData.header.altura : null,
-        dip: HOLE_AUTO ? winCalc.dip_hole : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
-        dip_hw: HOLE_AUTO ? winCalc.dip_hole : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
-        azimut_hole: HOLE_AUTO ? winCalc.az_hole : (winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null),
-        az_hw: HOLE_AUTO ? winCalc.az_hole : (winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null),
+        dip: HOLE_AUTO ? (effectiveGeometry?.dip_hw ?? winCalc.dip_hole) : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
+        dip_hw: HOLE_AUTO ? (effectiveGeometry?.dip_hw ?? winCalc.dip_hole) : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
+        azimut_hole: HOLE_AUTO ? (effectiveGeometry?.az_hw ?? winCalc.az_hole) : (winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null),
+        az_hw: HOLE_AUTO ? (effectiveGeometry?.az_hw ?? winCalc.az_hole) : (winData.header.az_hw !== undefined && winData.header.az_hw !== null ? winData.header.az_hw : null),
         dip_talud: winData.header.dip_talud !== undefined && winData.header.dip_talud !== null ? winData.header.dip_talud : null,
-        dipdir_talud: HOLE_AUTO ? winCalc.dip_dir_talud : (winData.header.dipdir_talud !== undefined && winData.header.dipdir_talud !== null ? winData.header.dipdir_talud : null),
+        dipdir_talud: HOLE_AUTO ? (effectiveGeometry?.dipdir_talud ?? winCalc.dip_dir_talud) : (winData.header.dipdir_talud !== undefined && winData.header.dipdir_talud !== null ? winData.header.dipdir_talud : null),
         alteracion: (winData.header.alteracion || winData.header.alt_mapeo) && (winData.header.alteracion || winData.header.alt_mapeo) !== '-1' ? (winData.header.alteracion || winData.header.alt_mapeo)!.toLowerCase().trim() : null,
         altura_mapeo: (winData.header.alteracion || winData.header.alt_mapeo) && (winData.header.alteracion || winData.header.alt_mapeo) !== '-1' ? (winData.header.alteracion || winData.header.alt_mapeo)!.toLowerCase().trim() : null,
         alteracion_codigo: (winData.header.alteracion || winData.header.alt_mapeo) && (winData.header.alteracion || winData.header.alt_mapeo) !== '-1' ? (winData.header.alteracion || winData.header.alt_mapeo)!.toLowerCase().trim() : null,
@@ -1615,7 +1590,7 @@ const [connectionLost, setConnectionLost] = useState(false);
           resistencia_codigo: (winData.header.resistencia_ucs && winData.header.resistencia_ucs !== '-1') ? winData.header.resistencia_ucs : null,
           gsi_estructura: (winData.header.gsi_estructura && winData.header.gsi_estructura !== '-1') ? winData.header.gsi_estructura : null,
           gsi_superficie: (winData.header.gsi_superficie && winData.header.gsi_superficie !== '-1') ? winData.header.gsi_superficie : null,
-          gsi_visual: GSI_VISUAL_AUTO ? (suggestGsiVisual(winCalc.rqd_est, winCalc.condicion_rating_89) ?? null) : (winData.header.gsi_visual || null),
+          gsi_visual: validated.get(winData.header.celda)?.derived.gsi_visual ?? null,
           control_estructural: winData.header.control_estructural || null,
           efectos_voladura: winData.header.efectos_voladura || null,
           ucs_mpa: winData.header.ucs_mpa || null,
@@ -1653,7 +1628,7 @@ const [connectionLost, setConnectionLost] = useState(false);
           return { ok: true };
         } else {
           const errData = await res.json().catch(() => ({}));
-          const detailMsg = errData.detail || `Error (${res.status}) al guardar la celda en la base de datos.`;
+          const detailMsg = validationErrorMessage(errData.detail, `Error (${res.status}) al guardar la celda en la base de datos.`);
           return {
             ok: false,
             title: res.status === 403 ? 'Acceso Denegado' : 'Error al Guardar',
@@ -2298,6 +2273,8 @@ const [connectionLost, setConnectionLost] = useState(false);
 
               {/* ANÁLISIS GEOMECÁNICO RMR SIEMPRE EXPANDIDO */}
               <RmrAnalysis
+                effectiveGsi={liveValidation.result?.derived.gsi_visual}
+                gsiInvalid={liveValidation.result?.issues.some(i => i.ruleId === 'GSI_VISUAL_RANGO')}
                 header={activeWindow.header}
                 onChange={(header) => setActiveWindow({ ...activeWindow, header })}
                 calculated={calculated}
@@ -2426,6 +2403,9 @@ const [connectionLost, setConnectionLost] = useState(false);
         isOpen={showSaveConfirmModal}
         onClose={() => setShowSaveConfirmModal(false)}
         onConfirmSave={handleConfirmSave}
+        validationAlerts={liveValidation.result?.issues || []}
+        validationPending={!!activeWindow && !liveValidation.result}
+        validationError={liveValidation.error}
         activeWindow={activeWindow}
         workspaceDiff={workspaceDiff}
         pltDiff={pltDiffSummary}

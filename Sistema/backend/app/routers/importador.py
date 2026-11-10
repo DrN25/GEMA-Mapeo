@@ -673,6 +673,22 @@ def execute_import_excel(
     if not payload.celdas:
         raise HTTPException(status_code=400, detail="Debe seleccionar al menos una celda para importar.")
 
+    # Validate the complete selection before the first write (including resolver inserts).
+    from app.validation.adapters import from_import
+    from app.validation.service import evaluate_window
+    from app.validation.context import assert_valid, campaign_year
+    for selected in payload.celdas:
+        draft = from_import(selected)
+        result = evaluate_window(draft, operation='import_save', campaign_year=campaign_year(draft['header'].get('campania')))
+        assert_valid(result)
+        geometry = result['derived']['geometry']
+        if geometry:
+            selected.excel_data.update(dip=geometry['dip_hw'], azimut_hole=geometry['az_hw'], dipdir_talud=geometry['dipdir_talud'])
+            if selected.excel_data.get('largo_m') is None:
+                selected.excel_data['largo_m'] = geometry['length_m']
+        selected.excel_data['gsi_visual_rmr76'] = result['derived']['gsi_visual']
+        selected.excel_data['gsi_visual_rmr89'] = result['derived']['gsi_visual']
+
     resolver = GEMACatalogResolver(db)
     ventanas_creadas = 0
     estructuras_creadas = 0

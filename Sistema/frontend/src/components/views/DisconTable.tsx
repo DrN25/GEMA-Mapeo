@@ -148,9 +148,7 @@ export default function DisconTable({
   const handleCellChange = (rowId: any, columnKey: string, val: any) => {
     const updated = joints.map(j => {
       if (j.id === rowId) {
-        const clampedVal = (columnKey === 'distancia' || columnKey === 'espaciamiento') && val !== -1 && val !== null && val !== undefined
-          ? Math.min(largoMax, Math.max(0, val))
-          : val;
+        const clampedVal = val; // Preserve observation; domain bounds are validated by Python.
         return { ...j, [columnKey]: clampedVal };
       }
       return j;

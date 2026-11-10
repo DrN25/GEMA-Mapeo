@@ -122,7 +122,7 @@ export default function VentanaForm({
     if (isNaN(num)) {
       handleChange(field, undefined);
     } else {
-      handleChange(field, Math.max(0, num));
+      handleChange(field, num);
     }
   };
 
@@ -313,19 +313,21 @@ export default function VentanaForm({
 
   const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
   const calculatedLargo = hasCoords
-    ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
+    ? Math.round(Math.hypot(fx - ix, fy - iy, fc - ic) * 1000) / 1000
     : null;
   const headerLargoNum = header.largo !== undefined && header.largo !== null ? Number(header.largo) : NaN;
-  const displayLargo = calculatedLargo !== null ? calculatedLargo : (!isNaN(headerLargoNum) && headerLargoNum > 0 ? Math.round(headerLargoNum) : null);
+  const displayLargo = Number.isFinite(headerLargoNum) ? headerLargoNum : calculatedLargo;
 
   // NO recalcular el largo al montar: mutar el header en el primer render marca
   // la celda como pendiente (BORRADOR) sin interacción del usuario. Solo se
   // recalcula cuando las coordenadas CAMBIAN por interacción del usuario.
   const prevCoordsKeyRef = React.useRef<string | null>(null);
+  const prevCellRef = React.useRef(header.celda);
 
   React.useEffect(() => {
     const coordsKey = `${header.este_from}-${header.norte_from}-${header.cota_from}-${header.este_to}-${header.norte_to}-${header.cota_to}`;
-    if (prevCoordsKeyRef.current === null) {
+    if (prevCoordsKeyRef.current === null || prevCellRef.current !== header.celda) {
+      prevCellRef.current = header.celda;
       prevCoordsKeyRef.current = coordsKey;
       return;
     }
@@ -616,7 +618,7 @@ export default function VentanaForm({
                       return;
                     }
                     const num = parseFloat(val);
-                    handleChange('altura', isNaN(num) ? undefined : Math.min(99, Math.max(0, num)));
+                    handleChange('altura', isNaN(num) ? undefined : num);
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -641,7 +643,7 @@ export default function VentanaForm({
                       return;
                     }
                     const num = parseFloat(val);
-                    handleChange('dip_talud', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
+                    handleChange('dip_talud', isNaN(num) ? undefined : num);
                   }}
                   className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                 />
@@ -687,7 +689,7 @@ export default function VentanaForm({
                         return;
                       }
                       const num = parseFloat(val);
-                      handleChange('dipdir_talud', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
+                      handleChange('dipdir_talud', isNaN(num) ? undefined : num);
                     }}
                     className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                   />
@@ -739,7 +741,7 @@ export default function VentanaForm({
                         return;
                       }
                       const num = parseFloat(val);
-                      handleChange('dip_hw', isNaN(num) ? undefined : Math.min(90, Math.max(-90, num)));
+                      handleChange('dip_hw', isNaN(num) ? undefined : num);
                     }}
                     className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                   />
@@ -792,7 +794,7 @@ export default function VentanaForm({
                         return;
                       }
                       const num = parseFloat(val);
-                      handleChange('az_hw', isNaN(num) ? undefined : Math.min(359.99, Math.max(0, num)));
+                      handleChange('az_hw', isNaN(num) ? undefined : num);
                     }}
                     className="w-full bg-navy-900/40 border border-navy-700/70 rounded-lg px-3 py-1.5 text-slate-100 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-center"
                   />
