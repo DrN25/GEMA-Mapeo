@@ -18,7 +18,6 @@ import {
   AlertTriangle,
   Calculator
 } from 'lucide-react';
-import { FormulaTooltipTrigger } from '../Common/FormulaTooltip';
 import PltExcelImportModal from '../modals/PltExcelImportModal';
 import { VirtualizedGrid, type CellAlertInfo } from '../../features/grid';
 import { LITHOLOGY_CLASSIFICATION } from '../../utils/catalogData';
@@ -862,6 +861,7 @@ export default function PltEnsayosView({
         defaultPageSize={50}
         alertsByRowId={alertsByRowId}
         rowIndexById={rowIndexById}
+        showFormulas={showFormulas}
         onChange={(updatedRecords) => {
           if (!hasActiveFilters) {
             onChange(updatedRecords);

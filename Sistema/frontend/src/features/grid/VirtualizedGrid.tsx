@@ -14,6 +14,7 @@ import type { GridColumnDef, FloatingEditorPosition, ColumnPinned } from './type
 import { getPltGridColumns } from './columnsDefinition';
 import { useGridStore } from './gridStore';
 import { FloatingEditor } from './FloatingEditor';
+import { FormulaTooltipTrigger } from '../../components/Common/FormulaTooltip';
 
 export interface CellAlertInfo {
   severity: 'CRITICA' | 'ADVERTENCIA' | 'VACIO';
@@ -32,6 +33,7 @@ export interface VirtualizedGridProps {
   isLoading?: boolean;
   alertsByRowId?: Map<number, Record<string, CellAlertInfo>>;
   rowIndexById?: Map<number, number>;
+  showFormulas?: boolean;
 }
 
 const EMPTY_DATA: any[] = [];
@@ -53,6 +55,36 @@ export function formatDisplayValue(val: any, colDef?: GridColumnDef): string {
 
   const s = String(val).trim();
   return s === '' ? '—' : s;
+}
+
+export function getPltFormulaConfig(
+  colKey: string,
+  record: Record<string, any>,
+  rawVal: any
+): { formulaId: string; params: Record<string, any> } | null {
+  switch (colKey) {
+    case 'ancho_w':
+      return { formulaId: 'plt_ancho_w', params: { w1: record.ancho_w1, w2: record.ancho_w2, val: rawVal } };
+    case 'muestra_valida_longitud':
+      return { formulaId: 'plt_valida_long', params: { l: record.longitud_l, d: record.espesor_d, val: rawVal } };
+    case 'muestra_valida_ancho':
+      return { formulaId: 'plt_valida_ancho', params: { d: record.espesor_d, w: record.ancho_w, val: rawVal } };
+    case 'diametro_equivalente':
+      return { formulaId: 'plt_diam_equiv', params: { d: record.espesor_d, w: record.ancho_w, val: rawVal } };
+    case 'f':
+      return { formulaId: 'plt_f_factor', params: { de: record.diametro_equivalente, val: rawVal } };
+    case 'is_mpa':
+      return { formulaId: 'plt_is_mpa', params: { p: record.fuerza_p, de: record.diametro_equivalente, val: rawVal } };
+    case 'is_50':
+      return { formulaId: 'plt_is50', params: { isVal: record.is_mpa, f: record.f, val: rawVal } };
+    case 'ucs':
+      return { formulaId: 'plt_ucs', params: { is50: record.is_50, k: record.factor_conversion_k, val: rawVal } };
+    case 'resistencia_isrm':
+    case 'denominacion_isrm':
+      return { formulaId: 'plt_isrm', params: { ucs: record.ucs, val: rawVal } };
+    default:
+      return null;
+  }
 }
 
 // =========================================================================
@@ -146,15 +178,21 @@ const GridHeader = React.memo<GridHeaderProps>(({
               stickyClasses += ' z-20';
             }
 
+            const headerHint = colDef?.hint || (typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : undefined);
+
             return (
               <th
                 key={header.id}
                 data-col-id={header.id}
                 colSpan={header.colSpan}
                 style={styleObj}
+                title={headerHint}
                 className={`px-2 py-1 border-r border-b border-navy-800 font-bold text-center truncate relative ${stickyClasses}`}
               >
-                <div className="flex items-center justify-center relative w-full h-full overflow-hidden">
+                <div
+                  className="flex items-center justify-center relative w-full h-full overflow-hidden"
+                  title={headerHint}
+                >
                   <span className="truncate">
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </span>
@@ -196,6 +234,7 @@ interface GridRowProps {
   activeColKey: string | null;
   rowAlerts?: Record<string, CellAlertInfo>;
   rowAlertsSig?: string;
+  showFormulas?: boolean;
   onCellClick: (rowIdx: number, colKey: string, e: React.MouseEvent<HTMLTableCellElement>) => void;
   onCellDoubleClick: (rowIdx: number, colKey: string, e: React.MouseEvent<HTMLTableCellElement>) => void;
   onInsertRowBelow: (rowIdx: number) => void;
@@ -211,6 +250,7 @@ const GridRow = React.memo<GridRowProps>(({
   leafColumns,
   activeColKey,
   rowAlerts,
+  showFormulas = true,
   onCellClick,
   onCellDoubleClick,
   onInsertRowBelow,
@@ -279,6 +319,23 @@ const GridRow = React.memo<GridRowProps>(({
         const rawVal = record[colKey];
         const displayVal = formatDisplayValue(rawVal, colDef);
 
+        const isValidaCol = colKey === 'muestra_valida_longitud' || colKey === 'muestra_valida_ancho';
+        const formattedDisplay = isValidaCol ? (
+          rawVal === 'SÍ' ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 select-none">
+              ✓ SÍ
+            </span>
+          ) : rawVal === 'NO' ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-black bg-rose-500/10 border border-rose-500/20 text-rose-400 select-none">
+              ✗ NO
+            </span>
+          ) : (
+            <span className="text-slate-500 font-semibold select-none">—</span>
+          )
+        ) : (
+          displayVal
+        );
+
         let stickyClasses = '';
         let stickyStyle: React.CSSProperties = {};
         if (isStickyLeft) {
@@ -310,12 +367,26 @@ const GridRow = React.memo<GridRowProps>(({
           alertClasses = 'bg-amber-500/15 text-amber-200 ring-1 ring-inset ring-amber-500/60';
         }
 
+        const formulaConfig = getPltFormulaConfig(colKey, record, rawVal);
+        const hasActiveFormula = Boolean(formulaConfig && showFormulas);
+
+        let cellTitle: string | undefined = undefined;
+        if (cellAlert) {
+          cellTitle = cellAlert.messages.join('\n');
+        } else if (!hasActiveFormula) {
+          if (colDef?.hint) {
+            cellTitle = colDef.hint;
+          } else if (rawVal !== null && rawVal !== undefined && rawVal !== '') {
+            cellTitle = String(rawVal);
+          }
+        }
+
         return (
           <td
             key={colKey}
             id={origRowIdx !== undefined ? `plt-${colKey}-${origRowIdx}` : undefined}
             tabIndex={origRowIdx !== undefined ? -1 : undefined}
-            title={cellAlert ? cellAlert.messages.join('\n') : undefined}
+            title={cellTitle}
             data-testid={`cell-${virtualRow.index}-${colKey}`}
             data-col-key={colKey}
             data-row-idx={virtualRow.index}
@@ -324,7 +395,19 @@ const GridRow = React.memo<GridRowProps>(({
             style={stickyStyle}
             className={`px-2 py-1.5 text-center truncate border-r border-b border-navy-800/60 select-none relative ${stickyClasses} ${lockedClasses} ${alertClasses} ${activeRing}`}
           >
-            {displayVal}
+            {hasActiveFormula && formulaConfig ? (
+              <FormulaTooltipTrigger
+                formulaId={formulaConfig.formulaId}
+                params={formulaConfig.params}
+                position="top"
+                enabled={showFormulas}
+                className="w-full h-full flex items-center justify-center cursor-help"
+              >
+                {formattedDisplay}
+              </FormulaTooltipTrigger>
+            ) : (
+              formattedDisplay
+            )}
           </td>
         );
       })}
@@ -340,6 +423,7 @@ const GridRow = React.memo<GridRowProps>(({
     prev.rowVersion === next.rowVersion &&
     prev.activeColKey === next.activeColKey &&
     prev.rowAlertsSig === next.rowAlertsSig &&
+    prev.showFormulas === next.showFormulas &&
     prev.leafColumns === next.leafColumns
   );
 });
@@ -358,7 +442,8 @@ export const VirtualizedGrid: React.FC<VirtualizedGridProps> = ({
   defaultPageSize = 50,
   isLoading = false,
   alertsByRowId,
-  rowIndexById
+  rowIndexById,
+  showFormulas = true
 }) => {
   const rowIds = useGridStore(s => s.rowIds);
   const rowVersions = useGridStore(s => s.rowVersions);
@@ -750,6 +835,7 @@ export const VirtualizedGrid: React.FC<VirtualizedGridProps> = ({
                   activeColKey={activeColKey}
                   rowAlerts={mergedRowAlerts}
                   rowAlertsSig={rowAlertsSig}
+                  showFormulas={showFormulas}
                   onCellClick={handleCellClick}
                   onCellDoubleClick={handleCellDoubleClick}
                   onInsertRowBelow={handleInsertRow}
