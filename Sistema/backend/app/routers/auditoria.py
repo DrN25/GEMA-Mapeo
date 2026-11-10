@@ -4,6 +4,7 @@ import json
 import shutil
 import math
 import openpyxl
+import gc
 import time
 import traceback
 from datetime import datetime
@@ -13,6 +14,7 @@ from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import BarChart, Reference
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.cell_range import CellRange
 
 from typing import Optional
 from app import models
@@ -397,6 +399,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
     if not detail_chunks:
         detail_chunks = [[]]
 
+    sev_fills = {
+        "ALERTA": fill_accent_red,
+        "ADVERTENCIA": fill_accent_orange,
+        "VACIO": fill_accent_yellow
+    }
+
     for chunk_idx, chunk_data in enumerate(detail_chunks):
         title = "📋 Detalle de Incidencias"
         if len(detail_chunks) > 1:
@@ -426,11 +434,16 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
             cell.border = border_thin
 
         start_detail_row = ws_detail.max_row + 1
-        for inc_item in chunk_data:
-            row_data = [
-                None,
+        for idx, inc_item in enumerate(chunk_data):
+            curr_row = start_detail_row + idx
+            sev = inc_item.get("tipo_incidencia", "ALERTA")
+            sev_fill = sev_fills.get(sev, fill_accent_yellow)
+            is_even = (curr_row % 2 == 0)
+            row_zebra = fill_zebra if is_even else None
+
+            values = [
                 safe_int(inc_item.get("fila_excel")),
-                inc_item.get("tipo_incidencia", "ALERTA"),
+                sev,
                 inc_item.get("celda_padre"),
                 inc_item.get("celda_hija"),
                 inc_item.get("campania"),
@@ -441,43 +454,25 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
                 inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
                 _resolve_msg(inc_item)
             ]
-            ws_detail.append(row_data)
 
-        end_detail_row = ws_detail.max_row
+            # Fast single-pass cell population & formatting
+            for col_idx, val in enumerate(values, start=2):
+                cell = ws_detail.cell(row=curr_row, column=col_idx, value=val)
+                cell.border = border_thin
+                if col_idx == 3:  # Gravedad
+                    cell.font = font_bold
+                    cell.fill = sev_fill
+                    cell.alignment = alignment_center
+                else:
+                    if row_zebra:
+                        cell.fill = row_zebra
+                    if col_idx in (2, 4, 5, 6, 8, 9, 11):
+                        cell.alignment = alignment_center
+                    else:
+                        cell.alignment = alignment_left
 
-        for r_idx in range(start_detail_row, end_detail_row + 1):
-            if r_idx <= start_detail_row + 150:
-                ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=4).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=5).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=6).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=7).alignment = alignment_left
-                ws_detail.cell(row=r_idx, column=8).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=9).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=10).alignment = alignment_left
-                ws_detail.cell(row=r_idx, column=11).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=12).alignment = alignment_left
-
-                if r_idx % 2 == 0:
-                    for col_idx in range(2, 13):
-                        if col_idx != 3:
-                            ws_detail.cell(row=r_idx, column=col_idx).fill = fill_zebra
-            else:
-                ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
-                ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
-
-            cell_sev = ws_detail.cell(row=r_idx, column=3)
-            sev = cell_sev.value
-            if sev == "ALERTA": cell_sev.fill = fill_accent_red
-            elif sev == "ADVERTENCIA": cell_sev.fill = fill_accent_orange
-            else: cell_sev.fill = fill_accent_yellow
-            cell_sev.font = font_bold
-
-            for col_idx in range(2, 13):
-                ws_detail.cell(row=r_idx, column=col_idx).border = border_thin
-
-        ws_detail.auto_filter.ref = f"B{grid_heading_row}:L{end_detail_row}"
+        end_detail_row = start_detail_row + len(chunk_data) - 1
+        ws_detail.auto_filter.ref = f"B{grid_heading_row}:L{max(grid_heading_row, end_detail_row)}"
 
     # --- HOJAS 4+: DETALLES INDIVIDUALES POR REGLA DE ERROR ---
     for orig_msg, mapping_data in active_sheets_mapping.items():
@@ -497,7 +492,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
         cell_err_desc.font = Font(name="Segoe UI", size=11, bold=True, color="7F1D1D")
         cell_err_desc.fill = fill_accent_red
         cell_err_desc.border = border_thin
-        ws_err.merge_cells(start_row=5, start_column=2, end_row=5, end_column=7)
+        ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=5, max_col=7, max_row=5))
         
         st_affected = len(set(x.get("celda_padre", "N/A") for x in err_records))
         tot_affected = len(err_records)
@@ -572,20 +567,15 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
             })
         msg_stats.sort(key=lambda x: x["total"], reverse=True)
 
-        # Precalcular coordenadas de las secciones para los hipervínculos de navegación
         dist_table_height = len(r_dist_yr)
         jump_link_row = 12 + dist_table_height + 1
         
         table_a_start = jump_link_row + 2
         table_a_height = 2 + len(rule_stats)
         
-        max_allowed_err = 1000000
-        truncated_err = len(err_records) > max_allowed_err
-        err_records_to_write = err_records[:max_allowed_err]
-
+        err_records_to_write = err_records
         indiv_start = table_a_start + table_a_height + 2
-        indiv_height = 2 + len(err_records_to_write) + (1 if truncated_err else 0)
-        
+        indiv_height = 2 + len(err_records_to_write)
         table_b_start = indiv_start + indiv_height + 2
 
         # --- ENLACE DIRECTO DE NAVEGACIÓN RÁPIDA ---
@@ -600,8 +590,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
         ws_err.cell(row=table_a_start + 1, column=2, value="Código de Regla").font = font_header
         ws_err.cell(row=table_a_start + 1, column=2).fill = fill_primary
         ws_err.cell(row=table_a_start + 1, column=2).alignment = alignment_center
-        
-        ws_err.merge_cells(start_row=table_a_start + 1, start_column=2, end_row=table_a_start + 1, end_column=4)
+        ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=table_a_start + 1, max_col=4, max_row=table_a_start + 1))
         for c_idx in [3, 4]:
             ws_err.cell(row=table_a_start + 1, column=c_idx).fill = fill_primary
             
@@ -619,7 +608,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
             r_row = table_a_start + 2 + idx
             ws_err.cell(row=r_row, column=2, value=stat["rule_code"]).font = font_bold
             ws_err.cell(row=r_row, column=2).alignment = alignment_center
-            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=4)
+            ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=r_row, max_col=4, max_row=r_row))
             
             c_tot = ws_err.cell(row=r_row, column=5, value=stat["total"])
             c_tot.font = font_bold
@@ -639,7 +628,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
                 if r_row % 2 == 0:
                     cell.fill = fill_zebra
 
-        # --- LISTADO DETALLADO INDIVIDUAL DE INCIDENCIAS (CON COLUMNA 4 SWAP) ---
+        # --- LISTADO DETALLADO INDIVIDUAL DE INCIDENCIAS (EN UN SOLO PASE) ---
         ws_err.cell(row=indiv_start, column=2, value="REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)").font = font_section
         
         headers_inc = [
@@ -658,47 +647,33 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
         start_data_row = indiv_start + 2
         for idx, inc_item in enumerate(err_records_to_write):
             curr_row = start_data_row + idx
-            ws_err.cell(row=curr_row, column=2, value=safe_int(inc_item.get("fila_excel")))
-            ws_err.cell(row=curr_row, column=3, value=inc_item.get("celda_padre"))
-            ws_err.cell(row=curr_row, column=4, value=inc_item.get("celda_hija"))
-            ws_err.cell(row=curr_row, column=5, value=inc_item.get("tipo_mapeo", "Mapeo de Celdas"))
-            ws_err.cell(row=curr_row, column=6, value=inc_item.get("campania"))
-            ws_err.cell(row=curr_row, column=7, value=inc_item.get("geotecnico"))
-            ws_err.cell(row=curr_row, column=8, value=inc_item.get("sector_geotecnico"))
-            ws_err.cell(row=curr_row, column=9, value=inc_item.get("columna"))
-            ws_err.cell(row=curr_row, column=10, value=inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—")
-            ws_err.cell(row=curr_row, column=11, value=_resolve_msg(inc_item))
-            
-        if truncated_err:
-            curr_row = start_data_row + len(err_records_to_write)
-            ws_err.cell(row=curr_row, column=3, value="--- REPORTE TRUNCADO: SE SUPERÓ EL LÍMITE DE FILAS DE EXCEL (1,048,576) ---")
+            is_even = (curr_row % 2 == 0)
+            row_zebra = fill_zebra if is_even else None
 
-        end_data_row = start_data_row + len(err_records_to_write) - 1 + (1 if truncated_err else 0)
-        
-        for r_idx in range(start_data_row, end_data_row + 1):
-            if r_idx <= start_data_row + 150:
-                ws_err.cell(row=r_idx, column=2).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=3).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=4).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=5).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=6).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=7).alignment = alignment_left
-                ws_err.cell(row=r_idx, column=8).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=9).alignment = alignment_left
-                ws_err.cell(row=r_idx, column=10).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=11).alignment = alignment_left
-                
-                if r_idx % 2 == 0:
-                    for col_idx in range(2, 12):
-                        ws_err.cell(row=r_idx, column=col_idx).fill = fill_zebra
-            else:
-                ws_err.cell(row=r_idx, column=2).alignment = alignment_center
-                ws_err.cell(row=r_idx, column=3).alignment = alignment_center
-                
-            for col_idx in range(2, 12):
-                ws_err.cell(row=r_idx, column=col_idx).border = border_thin
-                
-        ws_err.auto_filter.ref = f"B{header_row_idx}:K{end_data_row}"
+            row_vals = [
+                safe_int(inc_item.get("fila_excel")),
+                inc_item.get("celda_padre"),
+                inc_item.get("celda_hija"),
+                inc_item.get("tipo_mapeo", "Mapeo de Celdas"),
+                inc_item.get("campania"),
+                inc_item.get("geotecnico"),
+                inc_item.get("sector_geotecnico"),
+                inc_item.get("columna"),
+                inc_item.get("valor_actual") if inc_item.get("valor_actual") is not None else "—",
+                _resolve_msg(inc_item)
+            ]
+            for c_idx, val in enumerate(row_vals, start=2):
+                cell = ws_err.cell(row=curr_row, column=c_idx, value=val)
+                cell.border = border_thin
+                if row_zebra:
+                    cell.fill = row_zebra
+                if c_idx in (2, 3, 4, 5, 6, 8, 10):
+                    cell.alignment = alignment_center
+                else:
+                    cell.alignment = alignment_left
+
+        end_data_row = start_data_row + len(err_records_to_write) - 1
+        ws_err.auto_filter.ref = f"B{header_row_idx}:K{max(header_row_idx, end_data_row)}"
 
         # --- TABLA B: RESUMEN POR MENSAJE DE INCONSISTENCIA ÚNICO ---
         ws_err.cell(row=table_b_start, column=2, value="MÉTRICAS POR MENSAJE DE INCONSISTENCIA GEOMECÁNICA ÚNICO").font = font_section
@@ -711,8 +686,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
         ws_err.cell(row=table_b_start + 1, column=2, value="Mensaje de Inconsistencia Geomecánica Único").font = font_header
         ws_err.cell(row=table_b_start + 1, column=2).fill = fill_primary
         ws_err.cell(row=table_b_start + 1, column=2).alignment = alignment_center
-        
-        ws_err.merge_cells(start_row=table_b_start + 1, start_column=2, end_row=table_b_start + 1, end_column=7)
+        ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=table_b_start + 1, max_col=7, max_row=table_b_start + 1))
         for c_idx in range(3, 8):
             ws_err.cell(row=table_b_start + 1, column=c_idx).fill = fill_primary
             
@@ -730,7 +704,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list, es_adm
             r_row = table_b_start + 2 + idx
             ws_err.cell(row=r_row, column=2, value=stat["message"]).font = font_regular
             ws_err.cell(row=r_row, column=2).alignment = alignment_left
-            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=7)
+            ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=r_row, max_col=7, max_row=r_row))
             
             c_tot = ws_err.cell(row=r_row, column=8, value=stat["total"])
             c_tot.font = font_bold
@@ -876,7 +850,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
     try:
         # Paso 1: Ejecutar la validación masiva en validator.py
         print(f"[*] [AUDITORÍA {audit_id}] Paso 1/5: Ejecutando motor de validación QA/QC geomecánica...")
-        validate_bulk_excel(file_path, raw_json_out, cancel_flag_path=_cancel_flag_path(audit_id), project=proyecto)
+        diag = validate_bulk_excel(file_path, raw_json_out, cancel_flag_path=_cancel_flag_path(audit_id), project=proyecto)
         if _is_cancelled(audit_id):
             _cleanup_audit_files(audit_id)
             print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario tras la validación.")
@@ -896,8 +870,9 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
             _cleanup_audit_files(audit_id)
             print(f"[x] [AUDITORÍA {audit_id}] Cancelada por el usuario antes de compilar métricas.")
             return
-        with open(raw_json_out, "r", encoding="utf-8") as f:
-            diag = json.load(f)
+        if diag is None:
+            with open(raw_json_out, "r", encoding="utf-8") as f:
+                diag = json.load(f)
 
         diag["nombre_archivo"] = original_filename or os.path.basename(file_path)
         diag["proyecto"] = proyecto
@@ -939,6 +914,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
         wb_admin.save(excel_admin_tmp)
         safe_replace(excel_admin_tmp, excel_admin_out)
         del wb_admin
+        gc.collect()
 
         # 2. Pre-generar reporte STANDARD / NO-ADMIN (sin recomendaciones)
         excel_std_out = os.path.join(uploads_dir, "history", f"{audit_id}_reporte_standard.xlsx")
@@ -948,6 +924,7 @@ def run_bulk_pipeline_with_id(file_path: str, audit_id: str, original_filename: 
         safe_replace(excel_std_tmp, excel_std_out)
         del wb_std
         del incidencias_list  # liberar RAM tras guardar archivos
+        gc.collect()
 
         # Compatibilidad histórica
         shutil.copyfile(excel_std_out, excel_pregenerated_out)
@@ -1058,11 +1035,12 @@ async def importar_excel_bulk(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Validar de forma síncrona si es un reporte generado por el sistema
+        # Validar de forma síncrona si es un reporte generado por el sistema (modo read_only sin cargar data)
         try:
-            import pandas as pd
-            xls = pd.ExcelFile(file_path, engine='openpyxl')
-            sheet_names = xls.sheet_names
+            wb_check = openpyxl.load_workbook(file_path, read_only=True)
+            sheet_names = wb_check.sheetnames
+            wb_check.close()
+            del wb_check
             is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
             if is_report:
                 try:

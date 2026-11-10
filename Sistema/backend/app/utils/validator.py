@@ -5,6 +5,7 @@ import math
 import time
 from datetime import datetime
 from collections import defaultdict
+import openpyxl
 import pandas as pd
 import numpy as np
 
@@ -751,33 +752,39 @@ def format_raw_value_for_report(raw_val):
 
 def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = None, project: str = "ferrobamba"):
     t_start = time.time()
-    print(f"    [*] [QA/QC] Iniciando lectura de archivo: {os.path.basename(file_path)}")
+    print(f"    [*] [QA/QC] Iniciando lectura de archivo (streaming optimizado): {os.path.basename(file_path)}")
     
-    try: 
-        xls = pd.ExcelFile(file_path, engine='openpyxl')
-        sheet_names = xls.sheet_names
+    try:
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        sheet_names = wb.sheetnames
         
         # Validar si el archivo es un reporte del sistema ya procesado
         is_report = any("DASHBOARD" in s.upper() or "ERRORES" in s.upper() or "INCIDENCIAS" in s.upper() for s in sheet_names)
         if is_report:
+            wb.close()
             raise ValueError("El archivo cargado es un reporte de revisión generado por el sistema. Por favor, cargue la base de datos geomecánica original con sus celdas de mapeo.")
             
-        df = pd.read_excel(xls, sheet_name=sheet_names[0])
-        xls.close()  # liberar el handle del archivo (en Windows impide borrar/limpiar el .xlsx)
-        print(f"    [+] [QA/QC] Archivo cargado con éxito. Filas físicas leídas: {len(df)}")
+        ws = wb[sheet_names[0]]
+        row_iter = ws.iter_rows(values_only=True)
+        
+        try:
+            raw_headers = next(row_iter)
+        except StopIteration:
+            wb.close()
+            raise ValueError("El archivo Excel está vacío.")
+
+        dummy_df = pd.DataFrame(columns=[h if h is not None else f"Unnamed: {i}" for i, h in enumerate(raw_headers)])
+        clean_df = clean_and_rename_columns(dummy_df)
+        clean_headers = list(clean_df.columns)
+        del dummy_df
+        del clean_df
     except ValueError as ve:
         raise ve
     except Exception as e:
         print(f"    [-] [QA/QC] Error crítico al leer el archivo Excel: {e}")
         raise ValueError(f"No se pudo leer el archivo Excel. Verifique que no esté corrupto. Detalle: {str(e)}")
         
-    df = clean_and_rename_columns(df)
-    print(f"    [*] [QA/QC] Columnas depuradas. Aplicando propagación de estación y sanitización de vacíos...")
-    
-    # 1. Solo propagar CELDA_PADRE para poder asociar las celdas hijas a su estación
-    if 'CELDA_PADRE' in df.columns:
-        df['CELDA_PADRE'] = df['CELDA_PADRE'].replace([-1, -1.0, '-1', '-1.0'], np.nan)
-        df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
+    print(f"    [*] [QA/QC] Columnas depuradas ({len(clean_headers)} columnas). Iniciando validación por streaming...")
         
     # Normalización ultra-robusta de nombres de columnas para sanitizar con seguridad
     def clean_col_name(s):
@@ -801,24 +808,19 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
         'GEOTECNICO', 'Nivel', 'Lito 1', 'Lito 2', 'Lito 3', 'Unidad Litologica', 'sector_geotecnico', 'sector_geotecnicos'
     ]
 
-    df_col_map = {clean_col_name(c): c for c in df.columns}
-    resolved_propagate_cols = []
-    for p_col in propagate_cols:
-        norm_p = clean_col_name(p_col)
-        if norm_p in df_col_map:
-            resolved_propagate_cols.append(df_col_map[norm_p])
+    df_col_map = {clean_col_name(c): c for c in clean_headers}
+    resolved_propagate_cols = [df_col_map[clean_col_name(p)] for p in propagate_cols if clean_col_name(p) in df_col_map]
 
-    # Sanitizar valores de Excel sin propagar con ffill, previniendo duplicados falsos en celdas hijas
-    for col in resolved_propagate_cols:
-        col_clean = clean_col_name(col)
-        if col_clean not in ['DIP', 'DIPTALUD']:
-            df[col] = df[col].replace([-1, -1.0, '-1', '-1.0'], np.nan)
+    structural_mandatory_cols = [
+        'TIPO', 'TIPO DE ESTRUCT', 'TIPO DE ESTRUCTURA', 'JRC', 'RUGOSIDAD DE ESTRUCTURAS', 
+        'FORMA DE ESTRUCTURA', 'ALTERACION', 'ESPESOR mm.', 'ABERTURA mm.', 'CONTINUIDAD m.', 
+        'ESPACIAMIENTO m.', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS',
+        'TIPO DE  RELLENO 1', 'TIPO DE RELLENO 1', 'Dist. de estr.', 'DISTANCIA', 'DISTANCIA DE ESTRUCTURA',
+        'x', 'y', 'z', 'X', 'Y', 'Z'
+    ]
+    structural_mandatory_clean = set(clean_col_name(c) for c in structural_mandatory_cols)
 
-    records = df.to_dict(orient='records')
-    
-    print(f"    [*] [QA/QC] Ejecutando validaciones QA/QC sobre {len(records)} registros individuales...")
     incidencias, resumen_celdas = [], {}
-    total_filas = len(records)
     total_vacios, total_advertencias, total_alertas, total_ok = 0, 0, 0, 0
     filas_por_campana, filas_por_geotecnico = {}, {}
     vacios_por_campana, vacios_por_geotecnico = {}, {}
@@ -831,8 +833,39 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
     seen_coords_cells = {}
     active_celda_padre = None
     active_block_key = None
+    last_celda_padre = None
 
-    for idx, row_dict in enumerate(records):
+    idx = 0
+    negative_one_values = {-1, -1.0, '-1', '-1.0'}
+
+    for raw_row in row_iter:
+        # Omitir filas vacías al final del archivo
+        if all(v is None or str(v).strip() == "" for v in raw_row):
+            continue
+
+        # Cancelación cooperativa: revisar el flag cada 2000 filas para abortar rápido
+        if cancel_flag_path and idx % 2000 == 0 and os.path.exists(cancel_flag_path):
+            wb.close()
+            raise AuditCancelledError(f"Revisión cancelada por el usuario en la fila {idx + 2}.")
+        fila_excel = idx + 2
+
+        row_dict = dict(zip(clean_headers, raw_row))
+
+        # 1. Forward-fill CELDA_PADRE en streaming (sin DataFrame ni duplicaciones masivas)
+        celda_raw = row_dict.get('CELDA_PADRE')
+        if celda_raw in negative_one_values:
+            celda_raw = None
+        if celda_raw is not None and str(celda_raw).strip() != "":
+            last_celda_padre = celda_raw
+        else:
+            row_dict['CELDA_PADRE'] = last_celda_padre
+
+        # 2. Sanitizar -1 en resolved_propagate_cols (excepto DIP y DIP_TALUD)
+        for col_name in resolved_propagate_cols:
+            c_clean = clean_col_name(col_name)
+            if c_clean not in ('DIP', 'DIPTALUD'):
+                if row_dict.get(col_name) in negative_one_values:
+                    row_dict[col_name] = None
         # Cancelación cooperativa: revisar el flag cada 2000 filas para abortar rápido
         if cancel_flag_path and idx % 2000 == 0 and os.path.exists(cancel_flag_path):
             raise AuditCancelledError(f"Revisión cancelada por el usuario en la fila {idx + 2}.")
@@ -1008,16 +1041,7 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
             else:
                 seen_celda_blocks[celda_padre] = fila_excel
 
-        structural_mandatory_cols = [
-            'TIPO', 'TIPO DE ESTRUCT', 'TIPO DE ESTRUCTURA', 'JRC', 'RUGOSIDAD DE ESTRUCTURAS', 
-            'FORMA DE ESTRUCTURA', 'ALTERACION', 'ESPESOR mm.', 'ABERTURA mm.', 'CONTINUIDAD m.', 
-            'ESPACIAMIENTO m.', 'DIP_ESTRUC', 'DIP DIR', 'NUMERO DE ESTRUCTURAS', 'N_ESTRUCTURAS',
-            'TIPO DE  RELLENO 1', 'TIPO DE RELLENO 1', 'Dist. de estr.', 'DISTANCIA', 'DISTANCIA DE ESTRUCTURA',
-            'x', 'y', 'z', 'X', 'Y', 'Z'
-        ]
-        structural_mandatory_clean = [clean_col_name(c) for c in structural_mandatory_cols]
-
-        for col_key in df.columns:
+        for col_key in clean_headers:
             if col_key in ['COMENTARIO', 'CELDA_DUPLICADA_IGNORE', 'TIPO DE  RELLENO 2', 'TIPO DE RELLENO 2'] or str(col_key).startswith('Unnamed:'): 
                 continue
                 
@@ -1127,7 +1151,10 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
         validate_structural_row(row_dict, resolved_dist_celda, registrar_error, parent_coords=curr_coords)
 
         if not row_has_errors: total_ok += 1
+        idx += 1
 
+    wb.close()
+    total_filas = idx
     total_celdas_ok = sum(1 for c, data in resumen_celdas.items() if data["alertas"] == 0 and data["vacios"] == 0)
     for c, data in resumen_celdas.items():
         if data["alertas"] > 0: data["estado_celda"] = "ALERTA"
@@ -1158,3 +1185,4 @@ def validate_bulk_excel(file_path, output_json_path, cancel_flag_path: str = Non
 
     elapsed = time.time() - t_start
     print(f"    [+] [QA/QC] Validación geomecánica finalizada en {elapsed:.2f}s. Alertas: {total_alertas} | Vacíos: {total_vacios} | Advertencias: {total_advertencias}")
+    return output_json

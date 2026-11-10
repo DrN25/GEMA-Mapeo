@@ -9,6 +9,7 @@ import openpyxl
 from openpyxl.chart import BarChart, Reference
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.cell_range import CellRange
 
 from app.core.excel_styles import get_styles, write_kpi_card
 from app.core.audit_helpers import safe_int, safe_float, get_safe_sheet_name
@@ -528,7 +529,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         cell_err_desc.font = Font(name="Segoe UI", size=11, bold=True, color="7F1D1D")
         cell_err_desc.fill = fill_accent_red
         cell_err_desc.border = border_thin
-        ws_err.merge_cells(start_row=5, start_column=2, end_row=5, end_column=7)
+        ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=5, max_col=7, max_row=5))
 
         st_affected = len(set(x.get("celda_mapeo", x.get("celda_padre", "N/A")) for x in err_records))
         tot_affected = len(err_records)
@@ -633,7 +634,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         ws_err.cell(row=table_a_start + 1, column=2, value="Código de Regla").font = font_header
         ws_err.cell(row=table_a_start + 1, column=2).fill = fill_primary
         ws_err.cell(row=table_a_start + 1, column=2).alignment = alignment_center
-        ws_err.merge_cells(start_row=table_a_start + 1, start_column=2, end_row=table_a_start + 1, end_column=4)
+        ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=table_a_start + 1, max_col=4, max_row=table_a_start + 1))
         for c_idx in [3, 4]:
             ws_err.cell(row=table_a_start + 1, column=c_idx).fill = fill_primary
 
@@ -651,7 +652,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
             r_row = table_a_start + 2 + idx
             ws_err.cell(row=r_row, column=2, value=stat["rule_code"]).font = font_bold
             ws_err.cell(row=r_row, column=2).alignment = alignment_center
-            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=4)
+            ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=r_row, max_col=4, max_row=r_row))
 
             c_tot = ws_err.cell(row=r_row, column=5, value=stat["total"])
             c_tot.font = font_bold
@@ -752,7 +753,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
         ws_err.cell(row=table_b_start + 1, column=2).fill = fill_primary
         ws_err.cell(row=table_b_start + 1, column=2).alignment = alignment_center
 
-        ws_err.merge_cells(start_row=table_b_start + 1, start_column=2, end_row=table_b_start + 1, end_column=7)
+        ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=table_b_start + 1, max_col=7, max_row=table_b_start + 1))
         for c_idx in range(3, 8):
             ws_err.cell(row=table_b_start + 1, column=c_idx).fill = fill_primary
 
@@ -770,7 +771,7 @@ def export_plt_audit_to_excel(diag: dict, compact: dict, filtered: list) -> open
             r_row = table_b_start + 2 + idx
             ws_err.cell(row=r_row, column=2, value=stat["message"]).font = font_regular
             ws_err.cell(row=r_row, column=2).alignment = alignment_left
-            ws_err.merge_cells(start_row=r_row, start_column=2, end_row=r_row, end_column=7)
+            ws_err.merged_cells.ranges.add(CellRange(min_col=2, min_row=r_row, max_col=7, max_row=r_row))
 
             c_tot = ws_err.cell(row=r_row, column=8, value=stat["total"])
             c_tot.font = font_bold
