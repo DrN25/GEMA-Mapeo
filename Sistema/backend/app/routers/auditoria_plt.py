@@ -5,16 +5,14 @@ así como endpoints de status, cancelación e historial.
 """
 
 import os
-import io
 import json
 import shutil
-import openpyxl
 from datetime import datetime
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks, Form
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from typing import Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
+from fastapi.responses import FileResponse, JSONResponse
 
-from app.core.audit_helpers import safe_replace
+from app.core.excel_styles import save_upload_to_temp, wb_to_temp_file_response
 from app.utils.plt_validator import validate_plt_excel
 from app.core.audit_plt_helpers import (
     aggregate_plt_audit_metrics,
@@ -56,17 +54,18 @@ def _cleanup_audit_files(audit_id: str):
 
 def _pregenerate_plt_excel(diag: dict, compact: dict, excel_out_path: str, public_out_path: str):
     """Genera y guarda el libro Excel completo en disco."""
+    wb = None
     try:
         incidencias_list = diag.get("incidencias", [])
         wb = export_plt_audit_to_excel(diag, compact, incidencias_list)
-        
-        # 1. Guardar en histórico
-        wb.save(excel_out_path)
 
-        # 2. Guardar en caché pública
-        try:
-            wb.save(public_out_path)
-        except Exception:
+        # 1. Guardar en histórico (una sola llamada a wb.save para write_only)
+        wb.save(excel_out_path)
+        wb.close()
+        wb = None
+
+        # 2. Copiar a caché pública
+        if public_out_path and public_out_path != excel_out_path:
             try:
                 shutil.copyfile(excel_out_path, public_out_path)
             except Exception:
@@ -76,6 +75,12 @@ def _pregenerate_plt_excel(diag: dict, compact: dict, excel_out_path: str, publi
         print(f"[QAQC PLT] [PRE-GENERACIÓN EXCEL] Reporte Excel guardado en disco ({size_kb:.1f} KB) -> '{os.path.basename(excel_out_path)}'")
     except Exception as e:
         print(f"[QAQC PLT] [ERROR PRE-GENERACIÓN] Error al generar Excel: {e}")
+    finally:
+        if wb is not None:
+            try:
+                wb.close()
+            except Exception:
+                pass
 
 
 @router.post("/auditoria/plt/cancelar")
@@ -120,15 +125,14 @@ async def upload_plt_audit_file(
 
     audit_id = f"plt_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     saved_excel_path = os.path.join(plt_history_dir, f"{audit_id}.xlsx")
-    temp_path = os.path.join(plt_history_dir, f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
+    temp_path = None
 
     try:
-        content = await file.read()
-        with open(temp_path, "wb") as f:
-            f.write(content)
+        file_ext = os.path.splitext(file.filename)[1] or ".xlsx"
+        temp_path = await save_upload_to_temp(file, suffix=file_ext)
         shutil.copyfile(temp_path, saved_excel_path)
 
-        file_size_kb = len(content) / 1024.0
+        file_size_kb = os.path.getsize(temp_path) / 1024.0
         print(f"[QAQC PLT] [ARCHIVO] Archivo guardado en uploads/plt_history ({file_size_kb:.1f} KB). Iniciando motor de validación QAQC...")
 
         # 1. Ejecutar motor de validación
@@ -197,7 +201,7 @@ async def upload_plt_audit_file(
         print(f"[QAQC PLT] [ERROR] Error durante la revisión PLT: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error durante la revisión PLT: {str(e)}")
     finally:
-        if os.path.exists(temp_path):
+        if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
             except Exception:
@@ -386,7 +390,10 @@ def download_plt_excel_report(
     # Si no había filtros, guardar también en disco
     if not is_filtered:
         os.makedirs(os.path.dirname(pregenerated_file), exist_ok=True)
-        wb.save(pregenerated_file)
+        try:
+            wb.save(pregenerated_file)
+        finally:
+            wb.close()
         if not audit_id:
             shutil.copyfile(pregenerated_file, LATEST_PLT_EXCEL)
         return FileResponse(
@@ -395,19 +402,11 @@ def download_plt_excel_report(
             filename=filename,
         )
 
-    stream = io.BytesIO()
-    wb.save(stream)
-    stream.seek(0)
-
+    response = wb_to_temp_file_response(wb, filename)
     elapsed_sec = (datetime.now() - start_time).total_seconds()
-    size_kb = stream.getbuffer().nbytes / 1024.0
+    size_kb = os.path.getsize(response.path) / 1024.0
     print(f"[QAQC PLT] [ENVIADO] Reporte Excel generado ({size_kb:.1f} KB) en {elapsed_sec:.2f}s -> '{filename}'")
-
-    return StreamingResponse(
-        stream,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    return response
 
 
 @router.get("/auditoria/plt/auditorias")

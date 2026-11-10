@@ -25,8 +25,10 @@ from app.core.catalogs import (
     LITHOLOGY_FULL_CATALOG,
     LITHOLOGY_GROUP_SYNONYMS,
     PROJECT_GEOLOGY_CONFIG,
+    get_project_geology_config,
     normalize_project_name,
 )
+from app.core.excel_styles import dedup_pandas_headers
 from app.core.rules_plt import RULES_REGISTRY_PLT, CATEGORIES_REGISTRY_PLT, COMPACT_FIELD_CATEGORIES
 
 
@@ -334,15 +336,15 @@ def detect_plt_file_format(file_path: str) -> Tuple[str, int]:
     - 'COMPACT_FIELD': Encabezados en fila 3 (index 2), datos desde fila 6.
     - 'STANDARD_34': Encabezados en fila 0 o 1, 34 columnas estándar.
     """
+    wb = None
     try:
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         ws = wb.active
 
-        sample_rows = []
-        for r in range(1, 9):
-            row_vals = [ws.cell(row=r, column=c).value for c in range(1, 30)]
-            sample_rows.append(row_vals)
-        wb.close()
+        sample_rows = [
+            list(r_vals[:29])
+            for r_vals in ws.iter_rows(min_row=1, max_row=8, max_col=29, values_only=True)
+        ]
 
         # Chequear si fila 3 (index 2) tiene 'Código de muestra' o 'Espesor'
         if len(sample_rows) >= 3:
@@ -359,6 +361,12 @@ def detect_plt_file_format(file_path: str) -> Tuple[str, int]:
         return "FORMAT_STANDARD_34", 1
     except Exception:
         return "STANDARD_34", 1
+    finally:
+        if wb is not None:
+            try:
+                wb.close()
+            except Exception:
+                pass
 
 
 def detect_header_row(file_path: str, max_check: int = 10) -> int:
@@ -374,65 +382,114 @@ def validate_plt_standard_34(
     file_path: str,
     header_row_idx: int = 1,
     tolerance: float = 0.1,
+    project: str = "ferrobamba",
 ) -> dict:
     """
     Audita un archivo Excel de Ensayos PLT en formato estándar de 34 columnas.
     """
-    df_raw = pd.read_excel(file_path, sheet_name=0, header=header_row_idx, keep_default_na=False)
-
+    wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
     col_map: Dict[str, str] = {}
-    for canon_key, synonyms in PLT_CANONICAL_COLUMNS.items():
-        found = False
-        for raw_col in df_raw.columns:
-            raw_norm = _norm_str(raw_col)
-            if raw_norm in synonyms:
-                col_map[canon_key] = raw_col
-                found = True
-                break
-        if not found:
-            for raw_col in df_raw.columns:
+    col_pos: Dict[str, int] = {}
+    rows_compact: List[Tuple[Any, ...]] = []
+
+    try:
+        ws = wb.worksheets[0]
+        hdr_rows = list(ws.iter_rows(
+            min_row=header_row_idx + 1,
+            max_row=header_row_idx + 1,
+            values_only=True,
+        ))
+        if not hdr_rows:
+            return {
+                "formato_detectado": "FORMAT_STANDARD_34",
+                "total_filas_procesadas": 0,
+                "incidencias": [],
+                "resumen_por_celda": {},
+            }
+
+        columns = dedup_pandas_headers(hdr_rows[0])
+        col_idx_map: Dict[str, int] = {}
+
+        for canon_key, synonyms in PLT_CANONICAL_COLUMNS.items():
+            found = False
+            for c_i, raw_col in enumerate(columns):
                 raw_norm = _norm_str(raw_col)
-                if any(s in raw_norm for s in synonyms if len(s) > 3):
+                if raw_norm in synonyms:
                     col_map[canon_key] = raw_col
+                    col_idx_map[canon_key] = c_i
+                    found = True
                     break
+            if not found:
+                for c_i, raw_col in enumerate(columns):
+                    raw_norm = _norm_str(raw_col)
+                    if any(s in raw_norm for s in synonyms if len(s) > 3):
+                        col_map[canon_key] = raw_col
+                        col_idx_map[canon_key] = c_i
+                        break
+
+        mapped_keys = list(col_idx_map.keys())
+        col_pos = {k: pos for pos, k in enumerate(mapped_keys)}
+        mapped_indices = [col_idx_map[k] for k in mapped_keys]
+        max_col_to_read = (max(mapped_indices) + 1) if mapped_indices else 1
+
+        for row_tuple in ws.iter_rows(
+            min_row=header_row_idx + 2,
+            max_col=max_col_to_read,
+            values_only=True,
+        ):
+            rlen = len(row_tuple)
+            compact_row = tuple(
+                ("" if row_tuple[ci] is None else row_tuple[ci]) if ci < rlen else ""
+                for ci in mapped_indices
+            )
+            rows_compact.append(compact_row)
+    finally:
+        wb.close()
+
+    # Paridad con pandas: recortar filas completamente vacías al final de la hoja
+    while rows_compact and all(v == "" for v in rows_compact[-1]):
+        rows_compact.pop()
 
     incidencias: List[dict] = []
-    total_filas = len(df_raw)
+    total_filas = len(rows_compact)
 
-    cell_groups: Dict[Tuple[str, str], List[dict]] = defaultdict(list)
-    for idx, row in df_raw.iterrows():
+    pos_fecha = col_pos.get("fecha_ensayo")
+    pos_celda = col_pos.get("celda_mapeo")
+    pos_muestra = col_pos.get("muestra")
+    pos_campania = col_pos.get("campania")
+    pos_tipo_lito = col_pos.get("tipo_litologico")
+    pos_nivel = col_pos.get("nivel")
+    err_check_positions = [col_pos[k] for k in ("is50_mpa", "ucs_mpa", "fuerza_p", "ancho_w") if k in col_pos]
+
+    cell_groups: Dict[Tuple[str, str], List[Tuple[int, str, int]]] = defaultdict(list)
+    for idx, row_t in enumerate(rows_compact):
         fila_excel = idx + header_row_idx + 2
-        fecha_raw = row.get(col_map.get("fecha_ensayo"))
+        fecha_raw = row_t[pos_fecha] if pos_fecha is not None else None
         _, fecha_str = sanitize_date(fecha_raw)
-        celda_raw = str(row.get(col_map.get("celda_mapeo"), "") or "").strip().upper()
-        muestra_raw = str(row.get(col_map.get("muestra"), "") or "").strip().upper()
+        celda_raw = str((row_t[pos_celda] if pos_celda is not None else "") or "").strip().upper()
+        muestra_raw = str((row_t[pos_muestra] if pos_muestra is not None else "") or "").strip().upper()
 
         group_key = (fecha_str or "SIN_FECHA", celda_raw or f"FILA_{fila_excel}")
-        cell_groups[group_key].append({
-            "fila_excel": fila_excel,
-            "muestra": muestra_raw,
-            "row_data": row
-        })
+        cell_groups[group_key].append((fila_excel, muestra_raw, idx))
 
     resumen_celdas: Dict[str, dict] = {}
     for (fecha_k, celda_k), group_rows in cell_groups.items():
         count_muestras = len(group_rows)
-        muestras_secuencia = [r["muestra"] for r in group_rows]
+        muestras_secuencia = [r[1] for r in group_rows]
         secuencia_str = "-".join(muestras_secuencia) if muestras_secuencia else "VACÍA"
-        filas_nums = [r["fila_excel"] for r in group_rows]
+        filas_nums = [r[0] for r in group_rows]
 
-        first_row = group_rows[0]["row_data"]
-        camp_val = first_row.get(col_map.get("campania"))
-        lito_val = normalize_lithology_group(first_row.get(col_map.get("tipo_litologico")))
-        nivel_val = sanitize_number(first_row.get(col_map.get("nivel")))
+        first_row = rows_compact[group_rows[0][2]]
+        camp_val = first_row[pos_campania] if pos_campania is not None else None
+        lito_val = normalize_lithology_group(first_row[pos_tipo_lito] if pos_tipo_lito is not None else None)
+        nivel_val = sanitize_number(first_row[pos_nivel] if pos_nivel is not None else None)
 
         cell_summary_key = f"{celda_k} ({fecha_k})" if fecha_k != "SIN_FECHA" else celda_k
 
         has_formula_err = any(
-            is_formula_error(r["row_data"].get(col_map.get(k)))
+            is_formula_error(rows_compact[r[2]][ep])
             for r in group_rows
-            for k in ("is50_mpa", "ucs_mpa", "fuerza_p", "ancho_w")
-            if col_map.get(k)
+            for ep in err_check_positions
         )
 
         if has_formula_err:
@@ -441,7 +498,7 @@ def validate_plt_standard_34(
                 rule_obj = RULES_REGISTRY_PLT["ERR_PLT_CELDA_ANOMALA"]
                 cat_obj = CATEGORIES_REGISTRY_PLT.get(rule_obj.category_code)
                 incidencias.append({
-                    "fila_excel": r["fila_excel"],
+                    "fila_excel": r[0],
                     "tipo_incidencia": cat_obj.severity if cat_obj else "ALERTA",
                     "rule_code": "ERR_PLT_CELDA_ANOMALA",
                     "celda_mapeo": celda_k,
@@ -511,20 +568,25 @@ def validate_plt_standard_34(
             "vacios": 0,
         }
 
+    del cell_groups
+
     # Validación fila a fila
+    proj_cfg = get_project_geology_config(project)
+    proj_catalog = proj_cfg.get("catalog") or LITHOLOGY_FULL_CATALOG
+    proj_intrusive_litos = set(INTRUSIVE_LITOS) | set(proj_cfg.get("intrusive_codes") or set())
     valid_litos_set = set(
-        [_norm_str(x.get("lito1")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito1")]
-        + [_norm_str(x.get("lito2")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito2")]
-        + [_norm_str(x.get("lito3")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito3")]
+        [_norm_str(x.get("lito1")) for x in proj_catalog if x.get("lito1")]
+        + [_norm_str(x.get("lito2")) for x in proj_catalog if x.get("lito2")]
+        + [_norm_str(x.get("lito3")) for x in proj_catalog if x.get("lito3")]
     )
 
-    for idx, row in df_raw.iterrows():
+    for idx, row_t in enumerate(rows_compact):
         fila_excel = idx + header_row_idx + 2
 
         def get_val(key: str) -> Any:
-            col_name = col_map.get(key)
-            if col_name and col_name in row:
-                v = row[col_name]
+            p = col_pos.get(key)
+            if p is not None:
+                v = row_t[p]
                 return None if pd.isna(v) else v
             return None
 
@@ -624,7 +686,7 @@ def validate_plt_standard_34(
 
         if not l1:
             reg_err("litologia_1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Litología 1")
-        elif l1 not in valid_litos_set and l1 not in INTRUSIVE_LITOS:
+        elif l1 not in valid_litos_set and l1 not in proj_intrusive_litos:
             reg_err("litologia_1", l1, "ERR_PLT_LITO1_NO_RECONOCIDO", value=l1)
 
         if not l2:
@@ -637,7 +699,7 @@ def validate_plt_standard_34(
         elif l3 not in valid_litos_set:
             reg_err("litologia_3", l3, "ERR_PLT_LITO3_NO_RECONOCIDO", value=l3)
 
-        exp_tipo, exp_k = resolve_expected_lithology(l1, l2, l3)
+        exp_tipo, exp_k = resolve_expected_lithology(l1, l2, l3, project=project)
         if l1 and l2 and l3:
             if not exp_tipo:
                 reg_err("litologia_1", f"{l1}/{l2}/{l3}", "ERR_PLT_COMBINACION_LITOLOGICA_NO_VALIDA",
@@ -851,6 +913,8 @@ def validate_plt_standard_34(
                 reg_err("resistencia_isrm", isrm_raw, "ERR_PLT_RESISTENCIA_ISRM_CATALOGO",
                         actual=isrm_raw, ucs_val=round(effective_ucs, 1), expected=exp_isrm)
 
+    del rows_compact
+
     return {
         "formato_detectado": "FORMAT_STANDARD_34",
         "total_filas_procesadas": total_filas,
@@ -866,61 +930,67 @@ def validate_plt_compact_field(
     file_path: str,
     header_row_idx: int = 2,
     tolerance: float = 0.1,
+    project: str = "ferrobamba",
 ) -> dict:
     """
     Valida planillas de campo compactas de Ensayos PLT (ej. 03 feb1.xlsx).
     Encabezados en fila 3 (index 2), datos desde fila 6 (index 5).
     """
-    wb = openpyxl.load_workbook(file_path, data_only=True)
-    ws = wb.active
-
+    wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
     rows_data: List[dict] = []
     current_cell = ""
 
-    for r in range(6, ws.max_row + 1):
-        row_vals = [ws.cell(row=r, column=c).value for c in range(1, 30)]
-        if not any(v is not None for v in row_vals):
-            continue
+    try:
+        ws = wb.active
 
-        celda_raw = row_vals[0]
-        cod_muestra_raw = row_vals[1]
+        for r, row_tuple in enumerate(ws.iter_rows(min_row=6, max_col=29, values_only=True), start=6):
+            row_vals = list(row_tuple)
+            if len(row_vals) < 29:
+                row_vals.extend([None] * (29 - len(row_vals)))
+            if not any(v is not None for v in row_vals):
+                continue
 
-        if celda_raw and str(celda_raw).strip():
-            current_cell = str(celda_raw).strip().upper()
+            celda_raw = row_vals[0]
+            cod_muestra_raw = row_vals[1]
 
-        extracted_cell, extracted_sample = extract_cell_and_sample(cod_muestra_raw, current_cell)
-        if extracted_cell:
-            current_cell = extracted_cell
+            if celda_raw and str(celda_raw).strip():
+                current_cell = str(celda_raw).strip().upper()
 
-        rows_data.append({
-            "fila_excel": r,
-            "celda": current_cell,
-            "muestra": extracted_sample,
-            "cod_muestra": cod_muestra_raw,
-            "lito1": row_vals[2],
-            "lito2": row_vals[3],
-            "lito3": row_vals[4],
-            "este": row_vals[5],
-            "norte": row_vals[6],
-            "cota": row_vals[7],
-            "d": row_vals[8],
-            "l": row_vals[9],
-            "w1": row_vals[10],
-            "w2": row_vals[11],
-            "w": row_vals[12],
-            "val_l": row_vals[13],
-            "val_w": row_vals[14],
-            "p": row_vals[15],
-            "dir": row_vals[16],
-            "frac": row_vals[17],
-            "de": row_vals[18],
-            "f": row_vals[19],
-            "is": row_vals[20],
-            "is50": row_vals[21],
-            "ucs": row_vals[22],
-            "isrm": row_vals[23],
-            "obs": row_vals[24] if len(row_vals) > 24 else None,
-        })
+            extracted_cell, extracted_sample = extract_cell_and_sample(cod_muestra_raw, current_cell)
+            if extracted_cell:
+                current_cell = extracted_cell
+
+            rows_data.append({
+                "fila_excel": r,
+                "celda": current_cell,
+                "muestra": extracted_sample,
+                "cod_muestra": cod_muestra_raw,
+                "lito1": row_vals[2],
+                "lito2": row_vals[3],
+                "lito3": row_vals[4],
+                "este": row_vals[5],
+                "norte": row_vals[6],
+                "cota": row_vals[7],
+                "d": row_vals[8],
+                "l": row_vals[9],
+                "w1": row_vals[10],
+                "w2": row_vals[11],
+                "w": row_vals[12],
+                "val_l": row_vals[13],
+                "val_w": row_vals[14],
+                "p": row_vals[15],
+                "dir": row_vals[16],
+                "frac": row_vals[17],
+                "de": row_vals[18],
+                "f": row_vals[19],
+                "is": row_vals[20],
+                "is50": row_vals[21],
+                "ucs": row_vals[22],
+                "isrm": row_vals[23],
+                "obs": row_vals[24] if len(row_vals) > 24 else None,
+            })
+    finally:
+        wb.close()
 
     incidencias: List[dict] = []
     total_filas = len(rows_data)
@@ -1023,10 +1093,13 @@ def validate_plt_compact_field(
         }
 
     # 2. Validación Fila a Fila sobre columnas presentes en Formato de Campo
+    proj_cfg = get_project_geology_config(project)
+    proj_catalog = proj_cfg.get("catalog") or LITHOLOGY_FULL_CATALOG
+    proj_intrusive_litos = set(INTRUSIVE_LITOS) | set(proj_cfg.get("intrusive_codes") or set())
     valid_litos_set = set(
-        [_norm_str(x.get("lito1")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito1")]
-        + [_norm_str(x.get("lito2")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito2")]
-        + [_norm_str(x.get("lito3")) for x in LITHOLOGY_FULL_CATALOG if x.get("lito3")]
+        [_norm_str(x.get("lito1")) for x in proj_catalog if x.get("lito1")]
+        + [_norm_str(x.get("lito2")) for x in proj_catalog if x.get("lito2")]
+        + [_norm_str(x.get("lito3")) for x in proj_catalog if x.get("lito3")]
     )
 
     for rd in rows_data:
@@ -1085,7 +1158,7 @@ def validate_plt_compact_field(
 
         if not lito1_val:
             reg_err_comp("Lito 1", None, "ERR_PLT_CAMPO_OBLIGATORIO_VACIO", col_name="Lito 1")
-        elif lito1_val not in valid_litos_set and lito1_val not in INTRUSIVE_LITOS:
+        elif lito1_val not in valid_litos_set and lito1_val not in proj_intrusive_litos:
             reg_err_comp("Lito 1", lito1_val, "ERR_PLT_LITO1_NO_RECONOCIDO", value=lito1_val)
 
         if not lito2_val:
@@ -1098,7 +1171,7 @@ def validate_plt_compact_field(
         elif lito3_val not in valid_litos_set:
             reg_err_comp("Lito 3", lito3_val, "ERR_PLT_LITO3_NO_RECONOCIDO", value=lito3_val)
 
-        exp_tipo, exp_k = resolve_expected_lithology(lito1_val, lito2_val, lito3_val)
+        exp_tipo, exp_k = resolve_expected_lithology(lito1_val, lito2_val, lito3_val, project=project)
         if lito1_val and lito2_val and lito3_val and not exp_tipo:
             reg_err_comp("Lito 1", f"{lito1_val}/{lito2_val}/{lito3_val}", "ERR_PLT_COMBINACION_LITOLOGICA_NO_VALIDA",
                          lito1=lito1_val, lito2=lito2_val, lito3=lito3_val)
@@ -1312,6 +1385,7 @@ def validate_plt_excel(
     file_path: str,
     output_json_path: Optional[str] = None,
     tolerance: float = 0.1,
+    project: str = "ferrobamba",
 ) -> dict:
     """
     Audita un archivo Excel de Ensayos PLT (.xlsx / .xlsm) contra las reglas QAQC oficiales.
@@ -1324,9 +1398,9 @@ def validate_plt_excel(
     formato_tipo, header_row_idx = detect_plt_file_format(file_path)
 
     if "COMPACT" in str(formato_tipo):
-        diag = validate_plt_compact_field(file_path, header_row_idx=header_row_idx, tolerance=tolerance)
+        diag = validate_plt_compact_field(file_path, header_row_idx=header_row_idx, tolerance=tolerance, project=project)
     else:
-        diag = validate_plt_standard_34(file_path, header_row_idx=header_row_idx, tolerance=tolerance)
+        diag = validate_plt_standard_34(file_path, header_row_idx=header_row_idx, tolerance=tolerance, project=project)
 
     elapsed_sec = time.time() - t_start
     total_filas = diag.get("total_filas_procesadas", 0)

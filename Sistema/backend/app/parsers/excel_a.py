@@ -391,14 +391,13 @@ def detect_format(ws: Worksheet) -> str:
     """Detecta si la hoja es formato A (estaciones por bloque 'UBICACIÓN'),
     formato B (tabla plana con columna 'CELDA'), o 'unknown' si no
     coincide con ninguno de los formatos soportados."""
-    for r in range(1, min(ws.max_row, 200) + 1):
-        for c in range(1, 40):
-            v = ws.cell(row=r, column=c).value
+    rows_window = list(ws.iter_rows(min_row=1, max_row=200, max_col=39, values_only=True))
+    for row in rows_window:
+        for v in row:
             if text_matches(v, "UBICACION"):
                 return "a"
-    for r in range(1, min(ws.max_row, 200) + 1):
-        for c in range(1, 40):
-            v = ws.cell(row=r, column=c).value
+    for row in rows_window:
+        for v in row:
             if text_matches(v, "CELDA"):
                 return "b"
     return "unknown"
