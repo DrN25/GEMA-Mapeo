@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.excel_styles import save_upload_to_temp, wb_to_temp_file_response
@@ -137,7 +138,12 @@ async def upload_plt_audit_file(
 
         # 1. Ejecutar motor de validación
         start_time = datetime.now()
-        diag = validate_plt_excel(temp_path, tolerance=tolerance, project=resolved_proyecto)
+        diag = await run_in_threadpool(
+            validate_plt_excel,
+            temp_path,
+            tolerance=tolerance,
+            project=resolved_proyecto,
+        )
         elapsed_sec = (datetime.now() - start_time).total_seconds()
 
         if _is_cancelled(audit_id):
@@ -175,7 +181,13 @@ async def upload_plt_audit_file(
             json.dump(metricas, f, ensure_ascii=False)
 
         # 5. Pre-generar y guardar el reporte Excel (.xlsx) en uploads/
-        _pregenerate_plt_excel(diag, metricas, hist_excel, LATEST_PLT_EXCEL)
+        await run_in_threadpool(
+            _pregenerate_plt_excel,
+            diag,
+            metricas,
+            hist_excel,
+            LATEST_PLT_EXCEL,
+        )
 
         integ = metricas.get("integridad_celdas", {})
         print(
