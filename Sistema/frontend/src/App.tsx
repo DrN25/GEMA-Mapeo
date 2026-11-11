@@ -555,10 +555,10 @@ const [connectionLost, setConnectionLost] = useState(false);
     refreshAllCellNames();
   }, []);
 
-  const knownCells = useMemo(
-    () => [...new Set([...allCellNames, ...pendingCellNames])],
-    [allCellNames, pendingCellNames]
-  );
+  // Local storage can change independently of React. Read the current names,
+  // but keep the QA/QC dependency stable while their contents are unchanged.
+  const knownCellsKey = JSON.stringify([...new Set([...allCellNames, ...pendingCellNames])]);
+  const knownCells = useMemo<string[]>(() => JSON.parse(knownCellsKey), [knownCellsKey]);
 
   const qaqcExtraCtx = useMemo<WindowQaQcExtraCtx>(() => ({
     dbCellNames: allCellNames.length > 0 ? allCellNames : windows.map(w => w.name),
