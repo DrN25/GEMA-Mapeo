@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAuthHeaders } from '../../utils/apiClient';
+import { getAuthHeaders, confirmConnection, isConnectionFailureStatus } from '../../utils/apiClient';
 import {
     FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
     Loader2, RefreshCw, Trash2, X, WifiOff, BookOpen
@@ -404,6 +404,9 @@ export default function BulkAuditor({ apiBase, onNavigateToRules, variant = 'ful
                 setProcessingAuditId(data.audit_id);
                 setProcessingFileName(data.filename || payload.file.name);
             } else {
+                if (isConnectionFailureStatus(res.status)) {
+                    void confirmConnection(cleanBase);
+                }
                 let errorMsg = `Error del servidor (HTTP ${res.status})`;
                 if (res.status === 413) {
                     errorMsg = "El archivo supera el límite de tamaño permitido por el túnel público (máximo 100 MB en Cloudflare). Para archivos mayores a 100 MB, ejecútelo directamente en la red local (localhost).";
@@ -422,6 +425,10 @@ export default function BulkAuditor({ apiBase, onNavigateToRules, variant = 'ful
                 setMessage(errorMsg);
             }
         } catch (e: any) {
+            if (e?.name !== 'AbortError') {
+                const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+                void confirmConnection(cleanBase);
+            }
             setStatus('error');
             setMessage('Error de red al intentar conectar con el servidor: ' + (e.message || 'Sin conexión'));
         }
@@ -660,7 +667,7 @@ export default function BulkAuditor({ apiBase, onNavigateToRules, variant = 'ful
                                 className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 font-bold transition-all hover:underline cursor-pointer"
                             >
                                 <BookOpen size={13} />
-                                <span>Ver Diccionario de Reglas y Criterios QA/QC (76) &rarr;</span>
+                                <span>Ver Diccionario de Reglas y Criterios QA/QC &rarr;</span>
                             </button>
                         </div>
                     )}

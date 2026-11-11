@@ -3,23 +3,22 @@ comparativo.py — Router independiente para generar reportes Excel comparativos
 entre dos auditorias geomecanicas. Completamente desacoplado de auditoria.py.
 """
 import os
-import io
-import re
+import gc
 import json
+import math
 import shutil
-import time
 import tempfile
 from datetime import datetime
 from collections import Counter, defaultdict
 
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, Reference
+from openpyxl.worksheet.cell_range import CellRange
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
-from fastapi.responses import StreamingResponse
 
-from app.utils.validator import validate_bulk_excel
+from app.utils.validator import validate_bulk_excel, sanitize_value, format_raw_value_for_report
 from app.core.catalogs import MANDATORY_COLS_COUNT
 from app.core.rules import RULES_REGISTRY, CATEGORIES_REGISTRY
 from app.core.audit_helpers import (
@@ -28,7 +27,13 @@ from app.core.audit_helpers import (
     get_safe_sheet_name,
     get_incidence_category_name,
 )
-from app.core.excel_styles import get_styles, write_kpi_card
+from app.core.excel_styles import (
+    get_styles,
+    make_wo_cell,
+    dedup_pandas_headers,
+    save_upload_to_temp,
+    wb_to_temp_file_response,
+)
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -53,45 +58,138 @@ def _build_key_map(incs: list) -> dict:
             m[k] = i
     return m
 
+_PANDAS_NA_STRINGS_CMP = frozenset({
+    "", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN",
+    "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A",
+    "NA", "NULL", "NaN", "None", "n/a", "nan", "null",
+    "#NULL!", "#DIV/0!", "#VALUE!", "#REF!", "#NAME?", "#NUM!",
+})
+
+
+def _is_pd_na_cmp(val) -> bool:
+    if val is None:
+        return True
+    if isinstance(val, float) and math.isnan(val):
+        return True
+    if isinstance(val, str) and val in _PANDAS_NA_STRINGS_CMP:
+        return True
+    return False
+
+
+def _clean_rename_col_list(raw_cols: list) -> list:
+    cols = []
+    cota_seen, celda_seen, dip_seen = 0, 0, 0
+    for col in raw_cols:
+        col_str = str(col).strip()
+        if "." in col_str:
+            parts = col_str.split(".")
+            base_name = ".".join(parts[:-1]).strip()
+            if parts[-1].isdigit():
+                if base_name == "DIP":
+                    cols.append("DIP_ESTRUC")
+                    continue
+                elif base_name in ("CELDA", "COTA"):
+                    col_str = base_name
+        if col_str == "COTA":
+            if cota_seen == 0:
+                cols.append("COTA_FROM")
+                cota_seen += 1
+            else:
+                cols.append("COTA_TO")
+        elif col_str == "CELDA":
+            if celda_seen == 0:
+                cols.append("CELDA_PADRE")
+                celda_seen += 1
+            else:
+                cols.append("CELDA_DUPLICADA_IGNORE")
+        elif col_str == "DIP":
+            if dip_seen == 0:
+                cols.append("DIP")
+                dip_seen += 1
+            else:
+                cols.append("DIP_ESTRUC")
+        else:
+            cols.append(col_str)
+    return cols
+
+
 def _load_values_from_excel(excel_path, keys_to_query):
     values_map = {}
     celda_counts = {}
     if not keys_to_query or not excel_path or not os.path.exists(excel_path):
         return values_map, celda_counts
+    wb = None
     try:
-        import pandas as pd
-        import numpy as np
-        from app.utils.validator import clean_and_rename_columns, sanitize_value
-        # ponytail: openpyxl es el estándar del backend, calamine eliminado
-        df = pd.read_excel(excel_path, engine='openpyxl')
-        df = clean_and_rename_columns(df)
-        if 'CELDA_PADRE' not in df.columns:
+        wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+        ws = wb.worksheets[0]
+        row_iter = ws.iter_rows(values_only=True)
+        raw_header = next(row_iter, None)
+        if not raw_header:
             return values_map, celda_counts
-            
-        df['CELDA_PADRE'] = df['CELDA_PADRE'].replace([-1, -1.0, '-1', '-1.0'], np.nan)
-        df['CELDA_PADRE'] = df['CELDA_PADRE'].ffill()
-        
-        c_padres = df['CELDA_PADRE'].tolist()
-        
-        from collections import defaultdict
-        celda_to_indices = defaultdict(list)
-        for idx, val in enumerate(c_padres):
-            cp = sanitize_value(val, str)
-            if cp:
-                celda_to_indices[cp].append(idx)
-                
-        celda_counts = {cp: len(indices) for cp, indices in celda_to_indices.items()}
-                
+
+        clean_cols = _clean_rename_col_list(dedup_pandas_headers(raw_header))
+        col_to_idx = {}
+        for idx, cname in enumerate(clean_cols):
+            if cname not in col_to_idx:
+                col_to_idx[cname] = idx
+
+        celda_col_idx = col_to_idx.get("CELDA_PADRE")
+        if celda_col_idx is None:
+            return values_map, celda_counts
+
+        targets_by_cp_nth = defaultdict(list)
         for celda_p, n_th, columna in keys_to_query:
-            indices = celda_to_indices.get(celda_p)
-            if indices and len(indices) >= n_th:
-                row_idx = indices[n_th - 1]
-                if columna in df.columns:
-                    val = df.at[row_idx, columna]
-                    if pd.notna(val) and val is not None:
-                        values_map[(celda_p, n_th, columna)] = val
+            ci = col_to_idx.get(columna)
+            if ci is not None:
+                targets_by_cp_nth[(celda_p, n_th)].append((columna, ci))
+
+        last_cp = None
+        pending_empty = 0
+        neg_markers = (-1, -1.0, "-1", "-1.0")
+
+        for raw_row in row_iter:
+            row_has_data = False
+            for v in raw_row:
+                if v is not None and not _is_pd_na_cmp(v):
+                    row_has_data = True
+                    break
+            if not row_has_data:
+                if last_cp is not None:
+                    pending_empty += 1
+                continue
+
+            if pending_empty:
+                if last_cp is not None:
+                    celda_counts[last_cp] = celda_counts.get(last_cp, 0) + pending_empty
+                pending_empty = 0
+
+            r_len = len(raw_row)
+            cval = raw_row[celda_col_idx] if celda_col_idx < r_len else None
+            if not _is_pd_na_cmp(cval) and cval not in neg_markers:
+                cp_clean = sanitize_value(cval, str)
+                if cp_clean:
+                    last_cp = cp_clean
+
+            if not last_cp:
+                continue
+
+            nth = celda_counts.get(last_cp, 0) + 1
+            celda_counts[last_cp] = nth
+
+            tcols = targets_by_cp_nth.get((last_cp, nth))
+            if tcols:
+                for col_name, ci in tcols:
+                    val = raw_row[ci] if ci < r_len else None
+                    if not _is_pd_na_cmp(val):
+                        values_map[(last_cp, nth, col_name)] = val
     except Exception as e:
         print(f"Error loading Excel for comparison values ({excel_path}): {e}")
+    finally:
+        if wb is not None:
+            try:
+                wb.close()
+            except Exception:
+                pass
     return values_map, celda_counts
 
 def _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=None, excel_path_b=None) -> dict:
@@ -300,86 +398,97 @@ def _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=None, exc
         "celda_counts_b": celda_counts_b,
     }
 
-# ─── Helpers de escritura Excel ──────────────────────────────────────────────
+# ─── Helpers de escritura Excel (write_only streaming) ─────────────────────────
 
-def _write_header_row(ws, row, cols, s, fill=None):
+def _make_sparse_row(row_dict: dict) -> list:
+    if not row_dict:
+        return []
+    hi = max(row_dict.keys())
+    return [row_dict.get(c) for c in range(1, hi + 1)]
+
+
+def _wo_header_cells(ws, cols, s, fill=None):
     f = fill or s["fill_primary"]
-    for ci, text in enumerate(cols, start=2):
-        c = ws.cell(row=row, column=ci, value=text)
-        c.font = s["font_header"]; c.fill = f
-        c.alignment = s["align_center"]; c.border = s["border_thin"]
+    return [
+        make_wo_cell(
+            ws, text,
+            font=s["font_header"], fill=f,
+            alignment=s["align_center"], border=s["border_thin"],
+        )
+        for text in cols
+    ]
 
-def _delta_cell(ws, row, col, val_a, val_b, s, fmt_pct=False, invert=False):
+
+def _delta_wo_cell(ws, val_a, val_b, s, fmt_pct=False, invert=False):
     if val_a is None or val_b is None:
-        ws.cell(row=row, column=col, value="—").alignment = s["align_center"]; return
+        return make_wo_cell(ws, "—", alignment=s["align_center"])
     delta = _safe_float(val_b) - _safe_float(val_a)
     disp = f"{delta:+.2f}%" if fmt_pct else (f"{int(delta):+d}" if delta == int(delta) else f"{delta:+.2f}")
     improved = (delta < 0) if not invert else (delta > 0)
-    c = ws.cell(row=row, column=col, value=disp)
-    c.alignment = s["align_center"]; c.border = s["border_thin"]
-    if delta == 0:      c.font = s["font_delta_gray"]
-    elif improved:      c.font = s["font_delta_green"]; c.fill = s["fill_green"]
-    else:               c.font = s["font_delta_red"];   c.fill = s["fill_red"]
+    if delta == 0:
+        return make_wo_cell(ws, disp, font=s["font_delta_gray"], alignment=s["align_center"], border=s["border_thin"])
+    if improved:
+        return make_wo_cell(ws, disp, font=s["font_delta_green"], fill=s["fill_green"], alignment=s["align_center"], border=s["border_thin"])
+    return make_wo_cell(ws, disp, font=s["font_delta_red"], fill=s["fill_red"], alignment=s["align_center"], border=s["border_thin"])
 
-def _kpi_card_comparativo(ws, row, col, label, va, vb, s, fmt="n", invert=False):
+
+def _kpi_card_comparativo_grid(ws, grid: dict, row: int, col: int, label: str, va, vb, s, fmt="n", invert=False):
     """
-    Crea una tarjeta KPI limpia de 3 celdas horizontales.
-    Formato:
-      Fila 5: ESTRUCTURAS (combinado)
-      Fila 6: Base (A) | Actual (B) | Δ (Diferencia)
-      Fila 7:   76,005 |    8,782  |  -67,223 (verde/rojo)
+    Construye una tarjeta KPI de 3x3 celdas sobre el grid disperso del Dashboard.
     """
-    # 1. Título de la tarjeta
-    ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col+2)
-    lbl = ws.cell(row=row, column=col, value=label)
-    lbl.font = s["font_kpi_lbl"]
-    lbl.alignment = s["align_center"]
-    lbl.fill = s["fill_kpi_gray"]
-    lbl.border = s["border_kpi"]
+    ws.merged_cells.ranges.add(CellRange(min_col=col, min_row=row, max_col=col + 2, max_row=row))
+    grid[row][col] = make_wo_cell(
+        ws, label, font=s["font_kpi_lbl"], alignment=s["align_center"],
+        fill=s["fill_kpi_gray"], border=s["border_kpi"],
+    )
+    grid[row][col + 1] = make_wo_cell(ws, None, border=s["border_kpi"])
+    grid[row][col + 2] = make_wo_cell(ws, None, border=s["border_kpi"])
 
-    # 2. Sub-encabezados de columnas de la tarjeta
-    headers = ["Base (A)", "Actual (B)", "Δ"]
-    for i, h in enumerate(headers):
-        c_sub = ws.cell(row=row+1, column=col+i, value=h)
-        c_sub.font = Font(name="Segoe UI", size=8, bold=True, color="555555")
-        c_sub.alignment = s["align_center"]
-        c_sub.fill = s["fill_kpi_gray"]
-        c_sub.border = s["border_kpi"]
+    sub_font = Font(name="Segoe UI", size=8, bold=True, color="555555")
+    for i, h in enumerate(("Base (A)", "Actual (B)", "Δ")):
+        grid[row + 1][col + i] = make_wo_cell(
+            ws, h, font=sub_font, alignment=s["align_center"],
+            fill=s["fill_kpi_gray"], border=s["border_kpi"],
+        )
 
-    # 3. Valores y Delta
-    fmt_val = (lambda v: f"{_safe_float(v):.2f}%") if fmt=="pct" else (lambda v: f"{_safe_int(v):,}")
+    fmt_val = (lambda v: f"{_safe_float(v):.2f}%") if fmt == "pct" else (lambda v: f"{_safe_int(v):,}")
     da, db = _safe_float(va), _safe_float(vb)
     delta = db - da
     improved = (delta < 0) if not invert else (delta > 0)
-    
     if fmt == "pct":
         dstr = f"{delta:+.2f}%"
     else:
         dstr = f"{int(delta):+d}" if delta == int(delta) else f"{delta:+.2f}"
 
-    c_a = ws.cell(row=row+2, column=col, value=fmt_val(va))
-    c_b = ws.cell(row=row+2, column=col+1, value=fmt_val(vb))
-    c_d = ws.cell(row=row+2, column=col+2, value=dstr if delta != 0 else "=")
-
-    c_a.font = s["font_kpi_blue"]; c_a.fill = s["fill_zebra"]
-    c_b.font = s["font_kpi_blue"]; c_b.fill = s["fill_zebra"]
-    
+    grid[row + 2][col] = make_wo_cell(ws, fmt_val(va), font=s["font_kpi_blue"], fill=s["fill_zebra"], border=s["border_kpi"])
+    grid[row + 2][col + 1] = make_wo_cell(ws, fmt_val(vb), font=s["font_kpi_blue"], fill=s["fill_zebra"], border=s["border_kpi"])
     if delta == 0:
-        c_d.font = s["font_delta_gray"]
-        c_d.fill = s["fill_zebra"]
+        grid[row + 2][col + 2] = make_wo_cell(ws, "=", font=s["font_delta_gray"], fill=s["fill_zebra"], border=s["border_kpi"])
     elif improved:
-        c_d.font = s["font_delta_green"]
-        c_d.fill = s["fill_green"]
+        grid[row + 2][col + 2] = make_wo_cell(ws, dstr, font=s["font_delta_green"], fill=s["fill_green"], border=s["border_kpi"])
     else:
-        c_d.font = s["font_delta_red"]
-        c_d.fill = s["fill_red"]
+        grid[row + 2][col + 2] = make_wo_cell(ws, dstr, font=s["font_delta_red"], fill=s["fill_red"], border=s["border_kpi"])
 
-    # Aplicar bordes
-    for r in range(row, row+3):
-        for c_idx in range(col, col+3):
-            ws.cell(row=r, column=c_idx).border = s["border_kpi"]
 
-# ─── Generador de Excel ───────────────────────────────────────────────────────
+def _compute_sample_widths(rows: list, widths: dict) -> dict:
+    """Replica el auto-ajuste de ancho basado en las primeras 14 filas."""
+    col_vals = defaultdict(list)
+    for row in rows[:14]:
+        for col_idx, cell in enumerate(row, start=1):
+            if col_idx < 2 or cell is None:
+                continue
+            val = cell.value if hasattr(cell, "value") else cell
+            if val is not None:
+                val_str = str(val)
+                col_vals[col_idx].append("Ver Registros" if val_str.startswith("=HYPERLINK") else val_str)
+    for col_idx, vals in col_vals.items():
+        if vals:
+            max_len = max(len(v) for v in vals)
+            widths[col_idx] = min(max(max_len + 4, 11), 52)
+    return widths
+
+
+# ─── Generador de Excel (write_only streaming) ────────────────────────────────
 
 def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
     s      = _make_styles()
@@ -387,8 +496,7 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
     meta_b = datos["meta_b"]
     kpis   = datos["kpis"]
     totales = datos["totales"]
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
+
     inc_a_filtered = datos.get("inc_a_filtered", [])
     inc_b_filtered = datos.get("inc_b_filtered", [])
     values_map_a = datos.get("values_map_a", {})
@@ -396,9 +504,14 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
     celda_counts_a = datos.get("celda_counts_a", {})
     celda_counts_b = datos.get("celda_counts_b", {})
 
-    wb = openpyxl.Workbook()
+    wb = openpyxl.Workbook(write_only=True)
+
+    # ── HOJA 1: DASHBOARD ──────────────────────────────────────────────────
+    ws = wb.create_sheet("📊 Dashboard")
 
     version_sheet = wb.create_sheet('Versiones QAQC')
+    version_sheet.column_dimensions['A'].width = 20
+    version_sheet.column_dimensions['B'].width = 110
     version_a = datos.get('ruleset_a', 'legacy_unknown')
     version_b = datos.get('ruleset_b', 'legacy_unknown')
     version_sheet.append(['Revisión', 'Versión de reglas'])
@@ -406,26 +519,23 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
     version_sheet.append(['B', version_b])
     if version_a != version_b or version_a == 'legacy_unknown':
         version_sheet.append(['ADVERTENCIA', 'Criterios distintos o desconocidos: una incidencia ausente no acredita por sí sola una corrección.'])
-    version_sheet.column_dimensions['A'].width = 20
-    version_sheet.column_dimensions['B'].width = 110
-
-    # ── HOJA 1: DASHBOARD ──────────────────────────────────────────────────
-    ws = wb.active
-    ws.title = "📊 Dashboard"
     ws.sheet_view.showGridLines = False
-    ws.column_dimensions["A"].width = 2
+    ws.column_dimensions["A"].width = 3
     for ci in range(2, 25):
         ws.column_dimensions[get_column_letter(ci)].width = 14
     ws.row_dimensions[2].height = 38
 
-    ws.merge_cells("B2:P2")
-    t = ws.cell(row=2, column=2, value="COMPARATIVA DE REVISIÓN Y CONTROL DE CALIDAD")
-    t.font = s["font_title"]; t.alignment = s["align_center"]; t.fill = s["fill_primary"]
+    dash_grid = defaultdict(dict)
+    ws.merged_cells.ranges.add(CellRange("B2:P2"))
+    dash_grid[2][2] = make_wo_cell(
+        ws, "COMPARATIVA DE REVISIÓN Y CONTROL DE CALIDAD",
+        font=s["font_title"], alignment=s["align_center"], fill=s["fill_primary"],
+    )
 
     # Alerta o Banner si hay desajuste de campañas
     row_start_kpi = 5
     if datos["has_camp_mismatch"]:
-        ws.merge_cells("B4:P4")
+        ws.merged_cells.ranges.add(CellRange("B4:P4"))
         if datos["is_filtered_by_common"]:
             warning_text = f"⚠️ ADVERTENCIA: Mismatch de campañas. Se filtraron solo las campañas comunes: {', '.join(datos['campanias_comunes'])}."
             fill_warn = s["fill_orange"]
@@ -434,13 +544,13 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
             warning_text = f"❌ ALERTA: Desajuste total de campañas. A: {datos['meta_a']['campanias']} vs B: {datos['meta_b']['campanias']}."
             fill_warn = s["fill_red"]
             font_warn = Font(name="Segoe UI", size=9, bold=True, color="C00000")
-            
-        c_warn = ws.cell(row=4, column=2, value=warning_text)
-        c_warn.font = font_warn; c_warn.fill = fill_warn; c_warn.alignment = s["align_center"]
-        c_warn.border = s["border_thin"]
+
+        dash_grid[4][2] = make_wo_cell(
+            ws, warning_text, font=font_warn, fill=fill_warn,
+            alignment=s["align_center"], border=s["border_thin"],
+        )
         row_start_kpi = 6
 
-    # KPI Cards con layout corregido
     kpi_definitions = [
         ("ESTRUCTURAS",   kpis["total_filas"][0],  kpis["total_filas"][1],  "n", False),
         ("ESTACIONES",    kpis["celdas"][0],        kpis["celdas"][1],        "n", False),
@@ -449,77 +559,75 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
         ("ADVERTENCIAS",  kpis["advertencias"][0],  kpis["advertencias"][1],  "n", False),
     ]
     for ki, (lbl, va, vb, fmt, inv) in enumerate(kpi_definitions):
-        _kpi_card_comparativo(ws, row_start_kpi, 2 + ki*3, lbl, va, vb, s, fmt, inv)
+        _kpi_card_comparativo_grid(ws, dash_grid, row_start_kpi, 2 + ki * 3, lbl, va, vb, s, fmt, inv)
 
     # Fila de Integridad global
     row_int = row_start_kpi + 4
-    ws.merge_cells(start_row=row_int, start_column=2, end_row=row_int, end_column=4)
-    ws.cell(row=row_int, column=2, value="INTEGRIDAD GLOBAL").font = s["font_kpi_lbl"]
-    ws.cell(row=row_int, column=2).alignment = s["align_center"]; ws.cell(row=row_int, column=2).fill = s["fill_kpi_gray"]
-    ws.cell(row=row_int, column=2).border = s["border_kpi"]
-    
-    ws.cell(row=row_int+1, column=2, value="Base (A)").font = Font(name="Segoe UI", size=8, bold=True, color="555555")
-    ws.cell(row=row_int+1, column=2).alignment = s["align_center"]
-    ws.cell(row=row_int+1, column=2).fill = s["fill_kpi_gray"]
-    ws.cell(row=row_int+1, column=2).border = s["border_kpi"]
-    
-    ws.cell(row=row_int+1, column=3, value="Actual (B)").font = Font(name="Segoe UI", size=8, bold=True, color="555555")
-    ws.cell(row=row_int+1, column=3).alignment = s["align_center"]
-    ws.cell(row=row_int+1, column=3).fill = s["fill_kpi_gray"]
-    ws.cell(row=row_int+1, column=3).border = s["border_kpi"]
-    
-    ws.cell(row=row_int+1, column=4, value="Δ").font = Font(name="Segoe UI", size=8, bold=True, color="555555")
-    ws.cell(row=row_int+1, column=4).alignment = s["align_center"]
-    ws.cell(row=row_int+1, column=4).fill = s["fill_kpi_gray"]
-    ws.cell(row=row_int+1, column=4).border = s["border_kpi"]
-    
-    for ci2, val in [(2, kpis["integridad"][0]), (3, kpis["integridad"][1])]:
-        c = ws.cell(row=row_int+2, column=ci2, value=f"{_safe_float(val):.2f}%")
-        c.font = s["font_kpi_green"]; c.alignment = s["align_center"]; c.fill = s["fill_zebra"]; c.border = s["border_kpi"]
-    _delta_cell(ws, row_int+2, 4, kpis["integridad"][0], kpis["integridad"][1], s, fmt_pct=True, invert=True)
+    ws.merged_cells.ranges.add(CellRange(min_col=2, min_row=row_int, max_col=4, max_row=row_int))
+    dash_grid[row_int][2] = make_wo_cell(
+        ws, "INTEGRIDAD GLOBAL", font=s["font_kpi_lbl"],
+        alignment=s["align_center"], fill=s["fill_kpi_gray"], border=s["border_kpi"],
+    )
+
+    sub_font_int = Font(name="Segoe UI", size=8, bold=True, color="555555")
+    for ci_sub, lbl_sub in ((2, "Base (A)"), (3, "Actual (B)"), (4, "Δ")):
+        dash_grid[row_int + 1][ci_sub] = make_wo_cell(
+            ws, lbl_sub, font=sub_font_int, alignment=s["align_center"],
+            fill=s["fill_kpi_gray"], border=s["border_kpi"],
+        )
+
+    for ci2, val in ((2, kpis["integridad"][0]), (3, kpis["integridad"][1])):
+        dash_grid[row_int + 2][ci2] = make_wo_cell(
+            ws, f"{_safe_float(val):.2f}%", font=s["font_kpi_green"],
+            alignment=s["align_center"], fill=s["fill_zebra"], border=s["border_kpi"],
+        )
+    dash_grid[row_int + 2][4] = _delta_wo_cell(ws, kpis["integridad"][0], kpis["integridad"][1], s, fmt_pct=True, invert=True)
 
     # Tabla resumen de cambios
     row_res = row_int + 5
-    ws.cell(row=row_res, column=2, value="CONSOLIDADO DE CAMBIOS DE INCIDENCIAS").font = s["font_section"]
+    dash_grid[row_res][2] = make_wo_cell(ws, "CONSOLIDADO DE CAMBIOS DE INCIDENCIAS", font=s["font_section"])
     for ri2, (lbl2, qty, fill2) in enumerate([
-        ("NUEVAS (Regresiones)",    totales["nuevas"],      s["fill_new"]),
-        ("RESUELTAS (Mejoras)",  totales["resueltas"],   s["fill_resolved"]),
-        ("PERSISTENTES",         totales["persistentes"],s["fill_kpi_gray"]),
-    ], start=row_res+1):
-        c1 = ws.cell(row=ri2, column=2, value=lbl2)
-        c1.font = s["font_bold"]; c1.fill = fill2; c1.border = s["border_thin"]
-        c2 = ws.cell(row=ri2, column=3, value=qty)
-        c2.font = s["font_bold"]; c2.alignment = s["align_right"]; c2.fill = fill2; c2.border = s["border_thin"]
-        c2.number_format = '#,##0'
+        ("NUEVAS (Regresiones)", totales["nuevas"], s["fill_new"]),
+        ("RESUELTAS (Mejoras)", totales["resueltas"], s["fill_resolved"]),
+        ("PERSISTENTES", totales["persistentes"], s["fill_kpi_gray"]),
+    ], start=row_res + 1):
+        dash_grid[ri2][2] = make_wo_cell(ws, lbl2, font=s["font_bold"], fill=fill2, border=s["border_thin"])
+        dash_grid[ri2][3] = make_wo_cell(
+            ws, qty, font=s["font_bold"], alignment=s["align_right"],
+            fill=fill2, border=s["border_thin"], num_fmt='#,##0',
+        )
 
     # Tabla oculta / auxiliar para Gráficos
     row_chart_tbl = row_res + 6
-    ws.cell(row=row_chart_tbl, column=2, value="CATEGORIA").font = s["font_bold"]
-    ws.cell(row=row_chart_tbl, column=3, value="BASE (A)").font = s["font_bold"]
-    ws.cell(row=row_chart_tbl, column=4, value="ACTUAL (B)").font = s["font_bold"]
-    
+    dash_grid[row_chart_tbl][2] = make_wo_cell(ws, "CATEGORIA", font=s["font_bold"])
+    dash_grid[row_chart_tbl][3] = make_wo_cell(ws, "BASE (A)", font=s["font_bold"])
+    dash_grid[row_chart_tbl][4] = make_wo_cell(ws, "ACTUAL (B)", font=s["font_bold"])
+
     chart_metrics = [
         ("Alertas", kpis["alertas"][0], kpis["alertas"][1]),
         ("Vacios", kpis["vacios"][0], kpis["vacios"][1]),
-        ("Advertencias", kpis["advertencias"][0], kpis["advertencias"][1])
+        ("Advertencias", kpis["advertencias"][0], kpis["advertencias"][1]),
     ]
     for idx, (cat_name, val_a, val_b) in enumerate(chart_metrics, start=1):
-        ws.cell(row=row_chart_tbl+idx, column=2, value=cat_name).font = s["font_regular"]
-        ws.cell(row=row_chart_tbl+idx, column=3, value=val_a).font = s["font_regular"]
-        ws.cell(row=row_chart_tbl+idx, column=4, value=val_b).font = s["font_regular"]
-        ws.cell(row=row_chart_tbl+idx, column=3).number_format = '#,##0'
-        ws.cell(row=row_chart_tbl+idx, column=4).number_format = '#,##0'
+        rr = row_chart_tbl + idx
+        dash_grid[rr][2] = make_wo_cell(ws, cat_name, font=s["font_regular"])
+        dash_grid[rr][3] = make_wo_cell(ws, val_a, font=s["font_regular"], num_fmt='#,##0')
+        dash_grid[rr][4] = make_wo_cell(ws, val_b, font=s["font_regular"], num_fmt='#,##0')
 
-    # Gráfico de barras en 3D/Clustered de Alertas, Vacíos y Advertencias
+    max_dash_row = max(dash_grid.keys()) if dash_grid else 1
+    for r in range(1, max_dash_row + 1):
+        ws.append(_make_sparse_row(dash_grid.get(r)))
+    dash_grid.clear()
+
     chart = BarChart()
     chart.type = "col"
     chart.style = 10
     chart.title = "Frecuencia de Desviaciones (Base vs Actual)"
     chart.y_axis.title = "Cantidad de Ocurrencias"
     chart.x_axis.title = "Categoría"
-    
-    data = Reference(ws, min_col=3, min_row=row_chart_tbl, max_col=4, max_row=row_chart_tbl+3)
-    cats = Reference(ws, min_col=2, min_row=row_chart_tbl+1, max_row=row_chart_tbl+3)
+
+    data = Reference(ws, min_col=3, min_row=row_chart_tbl, max_col=4, max_row=row_chart_tbl + 3)
+    cats = Reference(ws, min_col=2, min_row=row_chart_tbl + 1, max_row=row_chart_tbl + 3)
     chart.add_data(data, titles_from_data=True)
     chart.set_categories(cats)
     chart.width = 18
@@ -528,12 +636,8 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
 
     # ── HOJA 2: RESUMEN EJECUTIVO ─────────────────────────────────────────
     ws2 = wb.create_sheet("📋 Resumen Ejecutivo")
-    ws2.column_dimensions["A"].width = 2; ws2.column_dimensions["B"].width = 30
-    for ci2 in range(3,9): ws2.column_dimensions[get_column_letter(ci2)].width = 18
-    ws2.merge_cells("B2:H2")
-    ws2.cell(row=2, column=2, value="RESUMEN EJECUTIVO COMPARATIVO").font = s["font_title"]
-    ws2.cell(row=2, column=2).alignment = s["align_center"]; ws2.cell(row=2, column=2).fill = s["fill_primary"]
-    _write_header_row(ws2, 4, ["Indicador", f"A ({meta_a['nombre'][:18]})", f"B ({meta_b['nombre'][:18]})", "Delta Abs.", "Delta %", "Tendencia"], s)
+    ws2_widths = {1: 3, 2: 30, 3: 18, 4: 18, 5: 18, 6: 18, 7: 18, 8: 18}
+    ws2.merged_cells.ranges.add(CellRange("B2:H2"))
     exec_rows = [
         ("Estructuras",    kpis["total_filas"][0],    kpis["total_filas"][1],    False, "n"),
         ("Estaciones",     kpis["celdas"][0],          kpis["celdas"][1],          False, "n"),
@@ -544,6 +648,12 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
         ("Incidencias nuevas",    0,                   totales["nuevas"],           False, "n"),
         ("Incidencias resueltas", totales["resueltas"],0,                           True,  "n"),
     ]
+    ws2_buf = [
+        [],
+        [None, make_wo_cell(ws2, "RESUMEN EJECUTIVO COMPARATIVO", font=s["font_title"], alignment=s["align_center"], fill=s["fill_primary"])],
+        [],
+        [None] + _wo_header_cells(ws2, ["Indicador", f"A ({meta_a['nombre'][:18]})", f"B ({meta_b['nombre'][:18]})", "Delta Abs.", "Delta %", "Tendencia"], s),
+    ]
     for ri2, (lbl, va, vb, inv, fmt) in enumerate(exec_rows, start=5):
         va_f, vb_f = _safe_float(va), _safe_float(vb)
         delta_abs  = vb_f - va_f
@@ -551,97 +661,146 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
         improved   = (delta_abs < 0) if not inv else (delta_abs > 0)
         trend      = "Mejora" if improved else ("Deterioro" if delta_abs != 0 else "Igual")
         row_fill2  = s["fill_green"] if improved else (s["fill_red"] if delta_abs != 0 else None)
-        disp_a     = f"{va_f:.2f}%" if fmt=="pct" else _safe_int(va)
-        disp_b     = f"{vb_f:.2f}%" if fmt=="pct" else _safe_int(vb)
-        disp_da    = f"{delta_abs:+.2f}%" if fmt=="pct" else f"{int(delta_abs):+d}"
+        disp_a     = f"{va_f:.2f}%" if fmt == "pct" else _safe_int(va)
+        disp_b     = f"{vb_f:.2f}%" if fmt == "pct" else _safe_int(vb)
+        disp_da    = f"{delta_abs:+.2f}%" if fmt == "pct" else f"{int(delta_abs):+d}"
         disp_dp    = f"{delta_pct2:+.1f}%"
-        for ci2, val2 in [(2,lbl),(3,disp_a),(4,disp_b),(5,disp_da),(6,disp_dp),(7,trend)]:
-            c = ws2.cell(row=ri2, column=ci2, value=val2)
-            c.border = s["border_thin"]
-            c.alignment = s["align_right"] if ci2>3 else s["align_left"]
-            c.font = s["font_bold"] if ci2==2 else (s["font_delta_green"] if (ci2==7 and improved) else (s["font_delta_red"] if (ci2==7 and delta_abs!=0) else s["font_regular"]))
-            if row_fill2 and ci2>=5: c.fill = row_fill2
-            elif ri2%2==0: c.fill = s["fill_zebra"]
-            
-    ws2.auto_filter.ref = f"B4:H{len(exec_rows)+4}"
+        row_cells = [None]
+        for ci2, val2 in ((2, lbl), (3, disp_a), (4, disp_b), (5, disp_da), (6, disp_dp), (7, trend)):
+            c_font = s["font_bold"] if ci2 == 2 else (s["font_delta_green"] if (ci2 == 7 and improved) else (s["font_delta_red"] if (ci2 == 7 and delta_abs != 0) else s["font_regular"]))
+            c_fill = row_fill2 if (row_fill2 and ci2 >= 5) else (s["fill_zebra"] if ri2 % 2 == 0 else None)
+            row_cells.append(make_wo_cell(
+                ws2, val2, font=c_font, fill=c_fill,
+                alignment=s["align_right"] if ci2 > 3 else s["align_left"],
+                border=s["border_thin"],
+            ))
+        ws2_buf.append(row_cells)
+
+    _compute_sample_widths(ws2_buf, ws2_widths)
+    for ci_w, w_val in ws2_widths.items():
+        ws2.column_dimensions[get_column_letter(ci_w)].width = w_val
+    for r_vals in ws2_buf:
+        ws2.append(r_vals)
+    ws2.auto_filter.ref = f"B4:H{len(exec_rows) + 4}"
 
     # ── HOJA 3: POR CAMPAÑA ───────────────────────────────────────────────
     ws3 = wb.create_sheet("📅 Por Campaña")
-    ws3.column_dimensions["A"].width=2; ws3.column_dimensions["B"].width=14
-    for ci2 in range(3,15): ws3.column_dimensions[get_column_letter(ci2)].width=13
-    ws3.merge_cells("B2:M2")
-    ws3.cell(row=2, column=2, value="DISTRIBUCION COMPARATIVA POR CAMPANA").font = s["font_title"]
-    ws3.cell(row=2, column=2).alignment=s["align_center"]; ws3.cell(row=2, column=2).fill=s["fill_primary"]
-    _write_header_row(ws3, 4, ["Campana","Celdas A","Celdas B","Alertas A","Alertas B","D.Alertas","Vacios A","Vacios B","D.Vacios","Adv A","Adv B","D.Adv"], s)
+    ws3_widths = {1: 3, 2: 14}
+    for ci2 in range(3, 15):
+        ws3_widths[ci2] = 13
+    ws3.merged_cells.ranges.add(CellRange("B2:M2"))
+    ws3_buf = [
+        [],
+        [None, make_wo_cell(ws3, "DISTRIBUCION COMPARATIVA POR CAMPANA", font=s["font_title"], alignment=s["align_center"], fill=s["fill_primary"])],
+        [],
+        [None] + _wo_header_cells(ws3, ["Campana","Celdas A","Celdas B","Alertas A","Alertas B","D.Alertas","Vacios A","Vacios B","D.Vacios","Adv A","Adv B","D.Adv"], s),
+    ]
     for ri2, row in enumerate(datos["dist_campana"], start=5):
-        vals = [row["campania"],row["celdas_a"],row["celdas_b"],
-                row["alertas_a"],row["alertas_b"],row["alertas_b"]-row["alertas_a"],
-                row["vacios_a"], row["vacios_b"], row["vacios_b"]-row["vacios_a"],
-                row["adv_a"],    row["adv_b"],    row["adv_b"]-row["adv_a"]]
+        vals = [
+            row["campania"], row["celdas_a"], row["celdas_b"],
+            row["alertas_a"], row["alertas_b"], row["alertas_b"] - row["alertas_a"],
+            row["vacios_a"],  row["vacios_b"],  row["vacios_b"]  - row["vacios_a"],
+            row["adv_a"],     row["adv_b"],     row["adv_b"]     - row["adv_a"],
+        ]
+        row_cells = [None]
         for ci2, val2 in enumerate(vals, start=2):
-            c = ws3.cell(row=ri2, column=ci2, value=val2)
-            c.border = s["border_thin"]
-            c.alignment = s["align_right"] if ci2>2 else s["align_left"]
-            if ci2 in (7,10,13):
+            c_font = None
+            c_fill = None
+            if ci2 in (7, 10, 13):
                 d = _safe_int(val2)
-                if d<0: c.font=s["font_delta_green"]; c.fill=s["fill_green"]
-                elif d>0: c.font=s["font_delta_red"];  c.fill=s["fill_red"]
-                else: c.font=s["font_delta_gray"]
-            elif ri2%2==0: c.fill=s["fill_zebra"]
-            
-    ws3.auto_filter.ref = f"B4:M{len(datos['dist_campana'])+4}"
+                if d < 0:
+                    c_font, c_fill = s["font_delta_green"], s["fill_green"]
+                elif d > 0:
+                    c_font, c_fill = s["font_delta_red"], s["fill_red"]
+                else:
+                    c_font = s["font_delta_gray"]
+            elif ri2 % 2 == 0:
+                c_fill = s["fill_zebra"]
+            row_cells.append(make_wo_cell(
+                ws3, val2, font=c_font, fill=c_fill,
+                alignment=s["align_right"] if ci2 > 2 else s["align_left"],
+                border=s["border_thin"],
+            ))
+        ws3_buf.append(row_cells)
+
+    _compute_sample_widths(ws3_buf, ws3_widths)
+    for ci_w, w_val in ws3_widths.items():
+        ws3.column_dimensions[get_column_letter(ci_w)].width = w_val
+    for r_vals in ws3_buf:
+        ws3.append(r_vals)
+    ws3.auto_filter.ref = f"B4:M{len(datos['dist_campana']) + 4}"
 
     # ── HOJA 4: POR SECTOR ────────────────────────────────────────────────
     ws4 = wb.create_sheet("📍 Por Sector")
-    ws4.column_dimensions["A"].width=2; ws4.column_dimensions["B"].width=22
-    for ci2 in range(3,12): ws4.column_dimensions[get_column_letter(ci2)].width=14
-    ws4.merge_cells("B2:J2")
-    ws4.cell(row=2, column=2, value="DISTRIBUCION COMPARATIVA POR SECTOR GEOTECNICO").font=s["font_title"]
-    ws4.cell(row=2, column=2).alignment=s["align_center"]; ws4.cell(row=2, column=2).fill=s["fill_primary"]
-    _write_header_row(ws4, 4, ["Sector","Celdas A","Celdas B","Alertas A","Alertas B","D.Alertas","Vacios A","Vacios B","D.Vacios"], s)
+    ws4_widths = {1: 3, 2: 22}
+    for ci2 in range(3, 12):
+        ws4_widths[ci2] = 14
+    ws4.merged_cells.ranges.add(CellRange("B2:J2"))
+    ws4_buf = [
+        [],
+        [None, make_wo_cell(ws4, "DISTRIBUCION COMPARATIVA POR SECTOR GEOTECNICO", font=s["font_title"], alignment=s["align_center"], fill=s["fill_primary"])],
+        [],
+        [None] + _wo_header_cells(ws4, ["Sector","Celdas A","Celdas B","Alertas A","Alertas B","D.Alertas","Vacios A","Vacios B","D.Vacios"], s),
+    ]
     for ri2, row in enumerate(datos["dist_sector"], start=5):
-        vals=[row["sector"],row["celdas_a"],row["celdas_b"],
-              row["alertas_a"],row["alertas_b"],row["alertas_b"]-row["alertas_a"],
-              row["vacios_a"], row["vacios_b"], row["vacios_b"]-row["vacios_a"]]
+        vals = [
+            row["sector"], row["celdas_a"], row["celdas_b"],
+            row["alertas_a"], row["alertas_b"], row["alertas_b"] - row["alertas_a"],
+            row["vacios_a"],  row["vacios_b"],  row["vacios_b"]  - row["vacios_a"],
+        ]
+        row_cells = [None]
         for ci2, val2 in enumerate(vals, start=2):
-            c=ws4.cell(row=ri2, column=ci2, value=val2); c.border=s["border_thin"]
-            c.alignment=s["align_right"] if ci2>2 else s["align_left"]
-            if ci2 in (7,10):
-                d=_safe_int(val2)
-                if d<0: c.font=s["font_delta_green"]; c.fill=s["fill_green"]
-                elif d>0: c.font=s["font_delta_red"];  c.fill=s["fill_red"]
-                else: c.font=s["font_delta_gray"]
-            elif ri2%2==0: c.fill=s["fill_zebra"]
-            
-    ws4.auto_filter.ref = f"B4:J{len(datos['dist_sector'])+4}"
+            c_font = None
+            c_fill = None
+            if ci2 in (7, 10):
+                d = _safe_int(val2)
+                if d < 0:
+                    c_font, c_fill = s["font_delta_green"], s["fill_green"]
+                elif d > 0:
+                    c_font, c_fill = s["font_delta_red"], s["fill_red"]
+                else:
+                    c_font = s["font_delta_gray"]
+            elif ri2 % 2 == 0:
+                c_fill = s["fill_zebra"]
+            row_cells.append(make_wo_cell(
+                ws4, val2, font=c_font, fill=c_fill,
+                alignment=s["align_right"] if ci2 > 2 else s["align_left"],
+                border=s["border_thin"],
+            ))
+        ws4_buf.append(row_cells)
+
+    _compute_sample_widths(ws4_buf, ws4_widths)
+    for ci_w, w_val in ws4_widths.items():
+        ws4.column_dimensions[get_column_letter(ci_w)].width = w_val
+    for r_vals in ws4_buf:
+        ws4.append(r_vals)
+    ws4.auto_filter.ref = f"B4:J{len(datos['dist_sector']) + 4}"
 
     # ── HOJA 5: MASTER REGISTRO DE ERRORES (CATÁLOGO / ÍNDICE) ───────────
     ws_cat = wb.create_sheet(title="❌ Catálogo de Errores")
     ws_cat.views.sheetView[0].showGridLines = True
-    
-    ws_cat.cell(row=2, column=2, value="REGISTRO MAESTRO DE ERRORES COMPARATIVO").font = s["font_title"]
-    ws_cat.cell(row=3, column=2, value="Lista consolidada de desviaciones geomecánicas. Use los hipervínculos para navegar.").font = s["font_subtitle"]
-    
-    headers_cat = ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Casos A", "Casos B", "Delta (B-A)", "Enlace Detalle"]
-    _write_header_row(ws_cat, 5, headers_cat, s)
+    for ci_w, w_val in ((1, 3), (2, 6), (3, 16), (4, 52), (5, 12), (6, 12), (7, 12), (8, 22)):
+        ws_cat.column_dimensions[get_column_letter(ci_w)].width = w_val
 
-    # Agrupar incidencias por su nombre simplificado / categoría
+    ws_cat.append([])
+    ws_cat.append([None, make_wo_cell(ws_cat, "REGISTRO MAESTRO DE ERRORES COMPARATIVO", font=s["font_title"])])
+    ws_cat.append([None, make_wo_cell(ws_cat, "Lista consolidada de desviaciones geomecánicas. Use los hipervínculos para navegar.", font=s["font_subtitle"])])
+    ws_cat.append([])
+    ws_cat.append([None] + _wo_header_cells(ws_cat, ["ID", "Gravedad", "Regla de Consistencia Evaluada", "Casos A", "Casos B", "Delta (B-A)", "Enlace Detalle"], s))
+
     incidencias_por_error_a = defaultdict(list)
-    for inc in (inc_a_filtered):
-        msg_simplificado = get_incidence_category_name(inc)
-        incidencias_por_error_a[msg_simplificado].append(inc)
-        
+    for inc in inc_a_filtered:
+        incidencias_por_error_a[get_incidence_category_name(inc)].append(inc)
+
     incidencias_por_error_b = defaultdict(list)
-    for inc in (inc_b_filtered):
-        msg_simplificado = get_incidence_category_name(inc)
-        incidencias_por_error_b[msg_simplificado].append(inc)
+    for inc in inc_b_filtered:
+        incidencias_por_error_b[get_incidence_category_name(inc)].append(inc)
 
     catalog_frequencies = []
-    for c_idx, cat in enumerate(CATEGORIES_REGISTRY.values(), start=1):
+    for cat in CATEGORIES_REGISTRY.values():
         rule_msg = cat.name
         matches_a = incidencias_por_error_a[rule_msg]
         matches_b = incidencias_por_error_b[rule_msg]
-        
         if len(matches_a) > 0 or len(matches_b) > 0:
             catalog_frequencies.append({
                 "msg": rule_msg,
@@ -650,148 +809,152 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
                 "count_b": len(matches_b),
                 "delta": len(matches_b) - len(matches_a),
                 "matches_a": matches_a,
-                "matches_b": matches_b
+                "matches_b": matches_b,
             })
-            
-    catalog_frequencies = sorted(catalog_frequencies, key=lambda x: max(x["count_a"], x["count_b"]), reverse=True)
+
+    catalog_frequencies.sort(key=lambda x: max(x["count_a"], x["count_b"]), reverse=True)
+    incidencias_por_error_a.clear()
+    incidencias_por_error_b.clear()
 
     r_cat = 6
     active_sheets_mapping = {}
-    
     for c_idx, rule in enumerate(catalog_frequencies, start=1):
-        ws_cat.cell(row=r_cat, column=2, value=c_idx).font = s["font_regular"]
-        ws_cat.cell(row=r_cat, column=2).alignment = s["align_center"]
-        ws_cat.cell(row=r_cat, column=2).border = s["border_thin"]
-        
-        c_sev = ws_cat.cell(row=r_cat, column=3, value=rule["severity"])
-        c_sev.font = s["font_bold"]; c_sev.alignment = s["align_center"]; c_sev.border = s["border_thin"]
-        if rule["severity"] == "ALERTA": c_sev.fill = s["fill_red"]
-        elif rule["severity"] == "ADVERTENCIA": c_sev.fill = s["fill_orange"]
-        else: c_sev.fill = s["fill_yellow"]
-        
-        ws_cat.cell(row=r_cat, column=4, value=rule["msg"]).font = s["font_bold"]
-        ws_cat.cell(row=r_cat, column=4).border = s["border_thin"]
-        
-        c_ca = ws_cat.cell(row=r_cat, column=5, value=rule["count_a"])
-        c_ca.font = s["font_bold"]; c_ca.alignment = s["align_right"]; c_ca.border = s["border_thin"]
-        c_ca.number_format = '#,##0'
-        
-        c_cb = ws_cat.cell(row=r_cat, column=6, value=rule["count_b"])
-        c_cb.font = s["font_bold"]; c_cb.alignment = s["align_right"]; c_cb.border = s["border_thin"]
-        c_cb.number_format = '#,##0'
-        
-        c_delta = ws_cat.cell(row=r_cat, column=7, value=rule["delta"])
-        c_delta.font = s["font_bold"]; c_delta.alignment = s["align_right"]; c_delta.border = s["border_thin"]
-        c_delta.number_format = '#,##0'
-        
-        # Semaforización del delta en el catálogo
-        if rule["delta"] < 0:
-            c_delta.font = s["font_delta_green"]; c_delta.fill = s["fill_green"]
-        elif rule["delta"] > 0:
-            c_delta.font = s["font_delta_red"]; c_delta.fill = s["fill_red"]
+        sev_fill = s["fill_red"] if rule["severity"] == "ALERTA" else (s["fill_orange"] if rule["severity"] == "ADVERTENCIA" else s["fill_yellow"])
+        d_val = rule["delta"]
+        if d_val < 0:
+            d_font, d_fill = s["font_delta_green"], s["fill_green"]
+        elif d_val > 0:
+            d_font, d_fill = s["font_delta_red"], s["fill_red"]
+        else:
+            d_font, d_fill = s["font_bold"], None
 
-        c_link = ws_cat.cell(row=r_cat, column=8)
         tab_name = _get_safe_sheet_name(rule["msg"], c_idx)
         active_sheets_mapping[rule["msg"]] = {
-            "tab_name": tab_name, 
-            "matches_a": rule["matches_a"], 
+            "tab_name": tab_name,
+            "matches_a": rule["matches_a"],
             "matches_b": rule["matches_b"],
-            "severity": rule["severity"]
+            "severity": rule["severity"],
         }
-        
-        c_link.value = f'=HYPERLINK("#\'Ref {c_idx}\'!B2", "🔍 Ver Cambios")'
-        c_link.font = s["font_link"]; c_link.alignment = s["align_center"]; c_link.border = s["border_thin"]
-        
-        if r_cat % 2 == 0 and c_delta.fill == s["fill_zebra"]:
-            ws_cat.cell(row=r_cat, column=4).fill = s["fill_zebra"]
-            c_ca.fill = s["fill_zebra"]
-            c_cb.fill = s["fill_zebra"]
-            
+
+        ws_cat.append([
+            None,
+            make_wo_cell(ws_cat, c_idx, font=s["font_regular"], alignment=s["align_center"], border=s["border_thin"]),
+            make_wo_cell(ws_cat, rule["severity"], font=s["font_bold"], fill=sev_fill, alignment=s["align_center"], border=s["border_thin"]),
+            make_wo_cell(ws_cat, rule["msg"], font=s["font_bold"], border=s["border_thin"]),
+            make_wo_cell(ws_cat, rule["count_a"], font=s["font_bold"], alignment=s["align_right"], border=s["border_thin"], num_fmt='#,##0'),
+            make_wo_cell(ws_cat, rule["count_b"], font=s["font_bold"], alignment=s["align_right"], border=s["border_thin"], num_fmt='#,##0'),
+            make_wo_cell(ws_cat, d_val, font=d_font, fill=d_fill, alignment=s["align_right"], border=s["border_thin"], num_fmt='#,##0'),
+            make_wo_cell(ws_cat, f'=HYPERLINK("#\'Ref {c_idx}\'!B2", "🔍 Ver Cambios")', font=s["font_link"], alignment=s["align_center"], border=s["border_thin"]),
+        ])
         r_cat += 1
-        
-    ws_cat.auto_filter.ref = f"B5:H{r_cat-1}"
+
+    catalog_frequencies.clear()
+    ws_cat.auto_filter.ref = f"B5:H{r_cat - 1}"
 
     # ── HOJA 6: CELDAS CRÍTICAS ───────────────────────────────────────────
     ws6 = wb.create_sheet("⚠️ Celdas Críticas")
-    ws6.column_dimensions["A"].width=2; ws6.column_dimensions["B"].width=22
-    for ci2 in range(3,9): ws6.column_dimensions[get_column_letter(ci2)].width=14
-    ws6.merge_cells("B2:H2")
-    h_peor = ws6.cell(row=2, column=2, value="CELDAS QUE EMPEORARON (mas alertas en B)")
-    h_peor.font=s["font_section"]; h_peor.alignment=s["align_center"]
-    h_peor.fill=PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
-    _write_header_row(ws6, 3, ["Celda","Alertas A","Alertas B","Vacios A","Vacios B","Delta Alert."],
-                      s, fill=PatternFill(start_color="9B1C1C", end_color="9B1C1C", fill_type="solid"))
-    for ri2, row in enumerate(datos["celdas_peor"], start=4):
-        for ci2, val2 in [(2,row["celda"]),(3,row["alertas_a"]),(4,row["alertas_b"]),
-                          (5,row["vacios_a"]),(6,row["vacios_b"]),(7,f'+{row["delta"]}')]:
-            c=ws6.cell(row=ri2, column=ci2, value=val2); c.border=s["border_thin"]
-            c.fill=s["fill_new"]; c.font=s["font_bold"] if ci2 in (2,7) else s["font_regular"]
-            c.alignment=s["align_right"] if ci2>2 else s["align_left"]
-
+    ws6_widths = {1: 3, 2: 22}
+    for ci2 in range(3, 9):
+        ws6_widths[ci2] = 14
     r_mejor = len(datos["celdas_peor"]) + 6
-    ws6.merge_cells(start_row=r_mejor, start_column=2, end_row=r_mejor, end_column=7)
-    h_mejor = ws6.cell(row=r_mejor, column=2, value="CELDAS QUE MEJORARON (menos alertas en B)")
-    h_mejor.font=s["font_section"]; h_mejor.alignment=s["align_center"]
-    h_mejor.fill=PatternFill(start_color="166534", end_color="166534", fill_type="solid")
-    _write_header_row(ws6, r_mejor+1, ["Celda","Alertas A","Alertas B","Vacios A","Vacios B","Delta Alert."],
-                      s, fill=PatternFill(start_color="14532D", end_color="14532D", fill_type="solid"))
-    for ri2, row in enumerate(datos["celdas_mejor"], start=r_mejor+2):
-        for ci2, val2 in [(2,row["celda"]),(3,row["alertas_a"]),(4,row["alertas_b"]),
-                          (5,row["vacios_a"]),(6,row["vacios_b"]),(7,str(row["delta"]))]:
-            c=ws6.cell(row=ri2, column=ci2, value=val2); c.border=s["border_thin"]
-            c.fill=s["fill_resolved"]; c.font=s["font_bold"] if ci2 in (2,7) else s["font_regular"]
-            c.alignment=s["align_right"] if ci2>2 else s["align_left"]
+    ws6.merged_cells.ranges.add(CellRange("B2:H2"))
+    ws6.merged_cells.ranges.add(CellRange(min_col=2, min_row=r_mejor, max_col=7, max_row=r_mejor))
+
+    ws6_fill_peor_h = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
+    ws6_fill_peor_hdr = PatternFill(start_color="9B1C1C", end_color="9B1C1C", fill_type="solid")
+    ws6_fill_mej_h = PatternFill(start_color="166534", end_color="166534", fill_type="solid")
+    ws6_fill_mej_hdr = PatternFill(start_color="14532D", end_color="14532D", fill_type="solid")
+
+    ws6_buf = [
+        [],
+        [None, make_wo_cell(ws6, "CELDAS QUE EMPEORARON (mas alertas en B)", font=s["font_section"], alignment=s["align_center"], fill=ws6_fill_peor_h)],
+        [None] + _wo_header_cells(ws6, ["Celda","Alertas A","Alertas B","Vacios A","Vacios B","Delta Alert."], s, fill=ws6_fill_peor_hdr),
+    ]
+    for row in datos["celdas_peor"]:
+        row_cells = [None]
+        for ci2, val2 in ((2, row["celda"]), (3, row["alertas_a"]), (4, row["alertas_b"]),
+                          (5, row["vacios_a"]), (6, row["vacios_b"]), (7, f'+{row["delta"]}')):
+            row_cells.append(make_wo_cell(
+                ws6, val2,
+                font=s["font_bold"] if ci2 in (2, 7) else s["font_regular"],
+                fill=s["fill_new"],
+                alignment=s["align_right"] if ci2 > 2 else s["align_left"],
+                border=s["border_thin"],
+            ))
+        ws6_buf.append(row_cells)
+
+    ws6_buf.append([])
+    ws6_buf.append([])
+    ws6_buf.append([None, make_wo_cell(ws6, "CELDAS QUE MEJORARON (menos alertas en B)", font=s["font_section"], alignment=s["align_center"], fill=ws6_fill_mej_h)])
+    ws6_buf.append([None] + _wo_header_cells(ws6, ["Celda","Alertas A","Alertas B","Vacios A","Vacios B","Delta Alert."], s, fill=ws6_fill_mej_hdr))
+    for row in datos["celdas_mejor"]:
+        row_cells = [None]
+        for ci2, val2 in ((2, row["celda"]), (3, row["alertas_a"]), (4, row["alertas_b"]),
+                          (5, row["vacios_a"]), (6, row["vacios_b"]), (7, str(row["delta"]))):
+            row_cells.append(make_wo_cell(
+                ws6, val2,
+                font=s["font_bold"] if ci2 in (2, 7) else s["font_regular"],
+                fill=s["fill_resolved"],
+                alignment=s["align_right"] if ci2 > 2 else s["align_left"],
+                border=s["border_thin"],
+            ))
+        ws6_buf.append(row_cells)
+
+    _compute_sample_widths(ws6_buf, ws6_widths)
+    for ci_w, w_val in ws6_widths.items():
+        ws6.column_dimensions[get_column_letter(ci_w)].width = w_val
+    for r_vals in ws6_buf:
+        ws6.append(r_vals)
 
     # ── HOJAS 7+: DETALLES INDIVIDUALES POR REGLA DE ERROR COMPARATIVO ────
-    # Mapea clave (celda, col) para rastrear de forma exacta
+    ref_widths = (
+        (1, 3), (2, 11), (3, 11), (4, 16), (5, 16), (6, 11),
+        (7, 24), (8, 24), (9, 20), (10, 20), (11, 24),
+    )
+    headers_detail = ["Fila A", "Fila B", "Celda Padre", "Celda Hija", "Campaña", "Sector", "Columna de Falla", "Valor Antiguo (A)", "Valor Nuevo (B)", "Estado de Cambio"]
+
     for idx_rule, (rule_msg, mapping_data) in enumerate(active_sheets_mapping.items(), start=1):
-        sh_name = f"Ref {idx_rule}" # Nombre acotado y seguro para Excel
+        sh_name = f"Ref {idx_rule}"
         matches_a = mapping_data["matches_a"]
         matches_b = mapping_data["matches_b"]
         severity = mapping_data["severity"]
-        
+
         ws_err = wb.create_sheet(title=sh_name)
         ws_err.views.sheetView[0].showGridLines = True
-        
-        # Link para regresar al catálogo maestro
-        c_back = ws_err.cell(row=2, column=2)
-        c_back.value = '=HYPERLINK("#\'❌ Catálogo de Errores\'!B2", "⬅ Volver al Catálogo de Errores")'
-        c_back.font = s["font_link"]
-        c_back.alignment = s["align_left"]
-        
-        ws_err.cell(row=4, column=2, value="ANÁLISIS COMPARATIVO DE INCIDENCIA").font = s["font_section"]
-        cell_err_desc = ws_err.cell(row=5, column=2, value=f"Regla: {rule_msg.upper()}")
-        cell_err_desc.font = Font(name="Segoe UI", size=10, bold=True, color="7F1D1D" if severity=="ALERTA" else "7F5F1D")
-        cell_err_desc.fill = s["fill_red"] if severity=="ALERTA" else s["fill_orange"]
-        cell_err_desc.border = s["border_thin"]
-        ws_err.merge_cells(start_row=5, start_column=2, end_row=5, end_column=11)
-        
-        # Subheaders
-        headers_detail = ["Fila A", "Fila B", "Celda Padre", "Celda Hija", "Campaña", "Sector", "Columna de Falla", "Valor Antiguo (A)", "Valor Nuevo (B)", "Estado de Cambio"]
-        _write_header_row(ws_err, 7, headers_detail, s)
-        
-        # Combinar incidencias de A y B por su clave única (celda_padre, columna)
+        for ci_w, w_val in ref_widths:
+            ws_err.column_dimensions[get_column_letter(ci_w)].width = w_val
+        ws_err.merged_cells.ranges.add(CellRange("B5:K5"))
+
+        err_desc_font = Font(name="Segoe UI", size=10, bold=True, color="7F1D1D" if severity == "ALERTA" else "7F5F1D")
+        err_desc_fill = s["fill_red"] if severity == "ALERTA" else s["fill_orange"]
+
+        ws_err.append([])
+        ws_err.append([None, make_wo_cell(ws_err, '=HYPERLINK("#\'❌ Catálogo de Errores\'!B2", "⬅ Volver al Catálogo de Errores")', font=s["font_link"], alignment=s["align_left"])])
+        ws_err.append([])
+        ws_err.append([None, make_wo_cell(ws_err, "ANÁLISIS COMPARATIVO DE INCIDENCIA", font=s["font_section"])])
+        ws_err.append([None, make_wo_cell(ws_err, f"Regla: {rule_msg.upper()}", font=err_desc_font, fill=err_desc_fill, border=s["border_thin"])])
+        ws_err.append([])
+        ws_err.append([None] + _wo_header_cells(ws_err, headers_detail, s))
+
         combined_records = {}
         for r_a in matches_a:
             key_rec = (r_a.get("celda_padre"), r_a.get("columna"))
             combined_records[key_rec] = {"a": r_a, "b": None}
-            
+
         for r_b in matches_b:
             key_rec = (r_b.get("celda_padre"), r_b.get("columna"))
             if key_rec in combined_records:
                 combined_records[key_rec]["b"] = r_b
             else:
                 combined_records[key_rec] = {"a": None, "b": r_b}
-                
+
         r_idx = 8
         for (celda_p, col_falla), cmp_data in combined_records.items():
             rec_a = cmp_data["a"]
             rec_b = cmp_data["b"]
-            
-            # Resolver estado del cambio
+
             if rec_a and rec_b:
                 estado_str = "PERSISTENTE"
-                fill_row = s["fill_new"]
                 fila_a = rec_a.get("fila_excel", "")
                 fila_b = rec_b.get("fila_excel", "")
                 val_antiguo = rec_a.get("valor_actual", "—")
@@ -801,154 +964,90 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
                 celda_h = rec_b.get("celda_hija", "")
             elif rec_a and not rec_b:
                 estado_str = "RESUELTA (Mejorado)"
-                fill_row = s["fill_resolved"]
                 fila_a = rec_a.get("fila_excel", "")
                 fila_b = "—"
                 val_antiguo = rec_a.get("valor_actual", "—")
-                
-                # Intentar obtener el valor corregido real de Excel B
                 val_nuevo = "CORREGIDO / OK"
-                
+
                 celda_p = rec_a.get("celda_padre", "")
                 celda_h = rec_a.get("celda_hija", "")
                 columna = rec_a.get("columna", "")
-                
+
                 n_th = 1
                 if celda_h and "-" in celda_h:
                     parts = celda_h.split("-")
                     if len(parts) >= 2 and parts[-1].isdigit():
                         n_th = int(parts[-1])
-                        
-                # Si el número de estructura es mayor que las existentes en B, es que la fila fue eliminada
+
                 if celda_counts_b and (celda_p not in celda_counts_b or n_th > celda_counts_b[celda_p]):
                     val_nuevo = "FILA ELIMINADA / OK"
                 elif values_map_b:
                     raw_val_b = values_map_b.get((celda_p, n_th, columna))
                     if raw_val_b is not None:
-                        from app.utils.validator import format_raw_value_for_report
                         formatted_b = format_raw_value_for_report(raw_val_b)
                         if formatted_b is not None:
                             val_nuevo = formatted_b
-                            
+
                 resolved_camp = rec_a.get("campania", "")
                 resolved_sector = rec_a.get("sector_geotecnico", "")
-                celda_h = rec_a.get("celda_hija", "")
             else:
                 estado_str = "NUEVA (Regresión)"
-                fill_row = s["fill_new"]
                 fila_a = "—"
                 fila_b = rec_b.get("fila_excel", "")
-                
-                # Intentar obtener el valor antiguo correcto real de Excel A
                 val_antiguo = "—"
-                
+
                 celda_p = rec_b.get("celda_padre", "")
                 celda_h = rec_b.get("celda_hija", "")
                 columna = rec_b.get("columna", "")
-                
+
                 n_th = 1
                 if celda_h and "-" in celda_h:
                     parts = celda_h.split("-")
                     if len(parts) >= 2 and parts[-1].isdigit():
                         n_th = int(parts[-1])
-                        
-                # Si el número de estructura es mayor que las existentes en A, es que la fila es nueva/creada
+
                 if celda_counts_a and (celda_p not in celda_counts_a or n_th > celda_counts_a[celda_p]):
                     val_antiguo = "FILA CREADA (Nueva)"
                 elif values_map_a:
                     raw_val_a = values_map_a.get((celda_p, n_th, columna))
                     if raw_val_a is not None:
-                        from app.utils.validator import format_raw_value_for_report
                         formatted_a = format_raw_value_for_report(raw_val_a)
                         if formatted_a is not None:
                             val_antiguo = formatted_a
-                            
+
                 val_nuevo = rec_b.get("valor_actual", "—")
                 resolved_camp = rec_b.get("campania", "")
                 resolved_sector = rec_b.get("sector_geotecnico", "")
-                celda_h = rec_b.get("celda_hija", "")
 
             row_values = [
-                fila_a,
-                fila_b,
-                celda_p,
-                celda_h,
-                resolved_camp,
-                resolved_sector,
-                col_falla,
-                val_antiguo,
-                val_nuevo,
-                estado_str
+                fila_a, fila_b, celda_p, celda_h,
+                resolved_camp, resolved_sector, col_falla,
+                val_antiguo, val_nuevo, estado_str,
             ]
-            
+            row_cells = [None]
+            zebra_fill = s["fill_zebra"] if r_idx % 2 == 0 else None
             for col_idx, val in enumerate(row_values, start=2):
-                cell = ws_err.cell(row=r_idx, column=col_idx, value=val)
-                cell.font = s["font_regular"]
-                cell.border = s["border_thin"]
-                cell.alignment = s["align_left"] if col_idx in (4,5,7,8,9,10) else s["align_center"]
-                
-                # Resaltado condicional por estado de cambio
+                c_align = s["align_left"] if col_idx in (4, 5, 7, 8, 9, 10) else s["align_center"]
                 if col_idx == 11:
-                    cell.font = s["font_bold"]
                     if estado_str.startswith("RESUELTA"):
-                        cell.fill = s["fill_resolved"]
-                        cell.font = s["font_delta_green"]
+                        c_fill, c_font = s["fill_resolved"], s["font_delta_green"]
                     elif estado_str.startswith("NUEVA"):
-                        cell.fill = s["fill_new"]
-                        cell.font = s["font_delta_red"]
+                        c_fill, c_font = s["fill_new"], s["font_delta_red"]
                     else:
-                        cell.fill = s["fill_yellow"]
-                        cell.font = s["font_delta_gray"]
-                elif r_idx % 2 == 0 and col_idx < 11:
-                    cell.fill = s["fill_zebra"]
-                    
+                        c_fill, c_font = s["fill_yellow"], s["font_delta_gray"]
+                else:
+                    c_fill, c_font = zebra_fill, s["font_regular"]
+                row_cells.append(make_wo_cell(
+                    ws_err, val, font=c_font, fill=c_fill,
+                    alignment=c_align, border=s["border_thin"],
+                ))
+            ws_err.append(row_cells)
             r_idx += 1
-            
-        # Configurar filtros automáticos en las hojas de detalles
-        ws_err.auto_filter.ref = f"B7:K{r_idx-1}"
 
-    # --- AUTO-AJUSTE DINÁMICO DE COLUMNAS AL FINAL ---
-    for ws in wb.worksheets:
-        ws.column_dimensions['A'].width = 3
-        if ws.title.startswith("Ref "):
-            ws.column_dimensions['B'].width = 11  # Fila A
-            ws.column_dimensions['C'].width = 11  # Fila B
-            ws.column_dimensions['D'].width = 16  # Celda Padre
-            ws.column_dimensions['E'].width = 16  # Celda Hija
-            ws.column_dimensions['F'].width = 11  # Campaña
-            ws.column_dimensions['G'].width = 24  # Sector
-            ws.column_dimensions['H'].width = 24  # Columna de Falla
-            ws.column_dimensions['I'].width = 20  # Valor Antiguo
-            ws.column_dimensions['J'].width = 20  # Valor Nuevo
-            ws.column_dimensions['K'].width = 24  # Estado de Cambio
-        elif ws.title == "❌ Catálogo de Errores":
-            ws.column_dimensions['B'].width = 6   # ID
-            ws.column_dimensions['C'].width = 16  # Gravedad
-            ws.column_dimensions['D'].width = 52  # Regla
-            ws.column_dimensions['E'].width = 12  # Casos A
-            ws.column_dimensions['F'].width = 12  # Casos B
-            ws.column_dimensions['G'].width = 12  # Delta
-            ws.column_dimensions['H'].width = 22  # Enlace
-        elif ws.title == "📊 Dashboard":
-            # Mantener los anchos definidos para el dashboard
-            pass
-        else:
-            # Auto-ajuste dinámico de las otras hojas (Ej. Resumen Ejecutivo, Campaña, Sector)
-            for col_idx in range(2, ws.max_column + 1):
-                vals = []
-                for row_idx in range(1, min(15, ws.max_row + 1)):
-                    val = ws.cell(row=row_idx, column=col_idx).value
-                    if val is not None:
-                        val_str = str(val)
-                        if val_str.startswith("=HYPERLINK"):
-                            vals.append("Ver Registros")
-                        else:
-                            vals.append(val_str)
-                if not vals: continue
-                max_len = max(len(v) for v in vals)
-                col_letter = get_column_letter(col_idx)
-                ws.column_dimensions[col_letter].width = min(max(max_len + 4, 11), 52)
+        combined_records.clear()
+        ws_err.auto_filter.ref = f"B7:K{r_idx - 1}"
 
+    active_sheets_mapping.clear()
     return wb
 
 # ─── Helpers para cargar archivos de historial ───────────────────────────────
@@ -965,11 +1064,7 @@ def _load_audit_files(audit_id: str):
     return diag, compact
 
 def _stream_wb(wb, fname):
-    buf = io.BytesIO()
-    wb.save(buf); buf.seek(0)
-    return StreamingResponse(buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={fname}"})
+    return wb_to_temp_file_response(wb, fname)
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
@@ -985,7 +1080,11 @@ def reporte_comparativo_historial(audit_id_a: str, audit_id_b: str):
     excel_path_a = os.path.join(uploads_dir, "history", f"{audit_id_a}.xlsx")
     excel_path_b = os.path.join(uploads_dir, "history", f"{audit_id_b}.xlsx")
     datos = _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=excel_path_a, excel_path_b=excel_path_b)
+    del diag_a, compact_a, diag_b, compact_b
+    gc.collect()
     wb    = generar_excel_comparativo_core(datos)
+    del datos
+    gc.collect()
     fname = f"comparativo_{audit_id_a}_vs_{audit_id_b}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _stream_wb(wb, fname)
 
@@ -1000,22 +1099,20 @@ async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: U
             raise HTTPException(status_code=400, detail=f"Formato no soportado. Solo se aceptan archivos .xlsx (Excel 2007+): {f.filename}")
     ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
     tmp_dir = tempfile.mkdtemp(dir=uploads_dir)
+    path_a = None
+    path_b = None
     try:
-        path_a = os.path.join(tmp_dir, f"cmp_a_{ts}.xlsx")
-        path_b = os.path.join(tmp_dir, f"cmp_b_{ts}.xlsx")
         raw_a  = os.path.join(tmp_dir, "diag_a.json")
         raw_b  = os.path.join(tmp_dir, "diag_b.json")
 
-        with open(path_a, "wb") as buf: shutil.copyfileobj(file_a.file, buf)
-        with open(path_b, "wb") as buf: shutil.copyfileobj(file_b.file, buf)
+        path_a = await save_upload_to_temp(file_a, suffix=".xlsx")
+        path_b = await save_upload_to_temp(file_b, suffix=".xlsx")
 
-        validate_bulk_excel(path_a, raw_a, project=proyecto)
-        with open(raw_a, "r", encoding="utf-8") as f2: diag_a = json.load(f2)
+        diag_a = validate_bulk_excel(path_a, raw_a, project=proyecto)
         diag_a["nombre_archivo"] = file_a.filename
         diag_a["proyecto"] = proyecto
 
-        validate_bulk_excel(path_b, raw_b, project=proyecto)
-        with open(raw_b, "r", encoding="utf-8") as f2: diag_b = json.load(f2)
+        diag_b = validate_bulk_excel(path_b, raw_b, project=proyecto)
         diag_b["nombre_archivo"] = file_b.filename
         diag_b["proyecto"] = proyecto
 
@@ -1026,7 +1123,17 @@ async def reporte_comparativo_importar(file_a: UploadFile = File(...), file_b: U
         compact_b["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         datos = _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=path_a, excel_path_b=path_b)
-        wb    = generar_excel_comparativo_core(datos)
+        del diag_a, compact_a, diag_b, compact_b
+        gc.collect()
+        wb = generar_excel_comparativo_core(datos)
+        del datos
+        gc.collect()
         return _stream_wb(wb, f"comparativo_{ts}.xlsx")
     finally:
+        for p in (path_a, path_b):
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
         shutil.rmtree(tmp_dir, ignore_errors=True)

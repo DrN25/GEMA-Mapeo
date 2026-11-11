@@ -14,7 +14,11 @@ const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.resolve(TESTS_DIR, '..', 'frontend');
 const CACHE = path.join(TESTS_DIR, '.cache');
 
-if (!existsSync(path.join(CACHE, 'utils', 'rmrCalculator.js')) || !existsSync(path.join(CACHE, 'utils', 'qaQcRules.js'))) {
+if (
+  !existsSync(path.join(CACHE, 'utils', 'rmrCalculator.js')) ||
+  !existsSync(path.join(CACHE, 'utils', 'qaQcRules.js')) ||
+  !existsSync(path.join(CACHE, 'utils', 'windowTransform.js'))
+) {
   execSync(
     `npx tsc src\\utils\\rmrCalculator.ts src\\utils\\catalogData.ts src\\utils\\rmrInterpolation.ts ` +
     `src\\utils\\qaQcRules.ts src\\utils\\qaQcTouch.ts src\\utils\\campaniasCatalog.ts ` +

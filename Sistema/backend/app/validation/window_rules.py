@@ -6,6 +6,18 @@ of these records, not a second hand-maintained description of their limits.
 from dataclasses import dataclass, field
 from .normalization import number, blank
 
+_GSI_CATALOG_CACHE = None
+
+
+def _gsi_catalog_maps():
+    global _GSI_CATALOG_CACHE
+    if _GSI_CATALOG_CACHE is None:
+        from app.core.catalogs import GSI_SUPERFICIE_DISPLAY_CATALOG, GSI_ESTRUCTURA_DISPLAY_CATALOG
+        est_map = {str(x['codigo']).upper(): x for x in GSI_ESTRUCTURA_DISPLAY_CATALOG}
+        sup_map = {str(x['codigo']).upper(): x for x in GSI_SUPERFICIE_DISPLAY_CATALOG}
+        _GSI_CATALOG_CACHE = (est_map, sup_map)
+    return _GSI_CATALOG_CACHE
+
 
 @dataclass(frozen=True)
 class WindowRule:
@@ -49,9 +61,9 @@ class WindowRule:
             expected = next(profile for upper, profile in p['bands'] if value < upper or upper == 20)
             return expected != rug
         if self.kind == 'gsi_range':
-            from app.core.catalogs import GSI_SUPERFICIE_DISPLAY_CATALOG, GSI_ESTRUCTURA_DISPLAY_CATALOG
-            est = next((x for x in GSI_ESTRUCTURA_DISPLAY_CATALOG if x['codigo'] == str(header.get('gsi_estructura', '')).upper()), None)
-            sup = next((x for x in GSI_SUPERFICIE_DISPLAY_CATALOG if x['codigo'] == str(header.get('gsi_superficie', '')).upper()), None)
+            est_map, sup_map = _gsi_catalog_maps()
+            est = est_map.get(str(header.get('gsi_estructura', '')).upper())
+            sup = sup_map.get(str(header.get('gsi_superficie', '')).upper())
             return effective_gsi is not None and est is not None and sup is not None and not est['min'] + sup['min'] <= effective_gsi <= min(85, est['max'] + sup['max'])
         raise ValueError(f'Unknown evaluator: {self.kind}')
 

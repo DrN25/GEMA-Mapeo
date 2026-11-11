@@ -76,9 +76,36 @@ def from_import(item):
     return from_save(data)
 
 
-def from_excel(row, length=None):
+def resolve_excel_keys(clean_headers):
+    """Pre-resolve canonical HEADER_COLUMNS and JOINT_COLUMNS once per Excel workbook."""
+    from .predicates import _clean_k
+    exact = {col for col in clean_headers if not str(col).startswith('Unnamed:')}
+    norm_map = {}
+    for col in clean_headers:
+        if not str(col).startswith('Unnamed:'):
+            norm_map.setdefault(_clean_k(col), col)
+
+    def _map(columns):
+        return {
+            key: (col if col in exact else norm_map.get(_clean_k(col)))
+            for key, col in columns.items()
+        }
+
+    return _map(HEADER_COLUMNS), _map(JOINT_COLUMNS)
+
+
+def from_excel(row, length=None, *, header_keys=None, joint_keys=None, include_header=True):
     from .predicates import get_row_val
-    header={key:get_row_val(row,col) for key,col in HEADER_COLUMNS.items()}
-    header['largo']=length
-    joint={key:get_row_val(row,col) for key,col in JOINT_COLUMNS.items()}
-    return {'header':header,'joints':[joint]}
+    if include_header:
+        if header_keys is not None:
+            header = {key: (row.get(col) if col is not None else None) for key, col in header_keys.items()}
+        else:
+            header = {key: get_row_val(row, col) for key, col in HEADER_COLUMNS.items()}
+        header['largo'] = length
+    else:
+        header = {'largo': length}
+    if joint_keys is not None:
+        joint = {key: (row.get(col) if col is not None else None) for key, col in joint_keys.items()}
+    else:
+        joint = {key: get_row_val(row, col) for key, col in JOINT_COLUMNS.items()}
+    return {'header': header, 'joints': [joint]}

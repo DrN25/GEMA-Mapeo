@@ -6,6 +6,7 @@ from app.database import get_db
 from app import models, schemas
 from app.core.security import verify_password, hash_password, create_access_token
 from app.auth.dependencies import get_current_user
+from app.auth.scope import find_identity
 
 router = APIRouter()
 
@@ -23,12 +24,7 @@ def login(credentials: schemas.LoginSchema, db: Session = Depends(get_db)):
             detail="Debe ingresar su nombre de usuario o correo electrónico."
         )
 
-    user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == val.upper()) |
-        (models.Usuario.usuario == val) |
-        (models.Usuario.email == val.lower()) |
-        (models.Usuario.email == val)
-    ).first()
+    user = find_identity(db, val)
 
     if not user or not verify_password(credentials.password, user.contrasena_hash):
         raise HTTPException(
@@ -42,13 +38,18 @@ def login(credentials: schemas.LoginSchema, db: Session = Depends(get_db)):
             detail="Su cuenta de usuario se encuentra inhabilitada ('I') o desactivada ('*')."
         )
 
+    # Validar configuración de sesión antes de guardar el acceso.
+    try:
+        access_token = create_access_token({"sub": str(user.usuario_id), "rol": user.rol.nombre, "ver": user.version_seguridad})
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="La sesión aún no está configurada.") from exc
+
     # Actualizar UltimoAcceso
     user.ultimo_acceso = datetime.now()
     db.commit()
 
     rol_nombre = user.rol.nombre if user.rol else "lectura"
 
-    access_token = create_access_token(data={"sub": user.usuario, "rol": rol_nombre})
 
     user_out = schemas.UserOutSchema(
         usuario_id=user.usuario_id,
@@ -88,7 +89,8 @@ def get_me(current_user: models.Usuario = Depends(get_current_user)):
     )
 
 
-import random
+import secrets
+from datetime import timedelta
 import string
 import logging
 import os
@@ -96,7 +98,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # Diccionario en memoria para almacenar códigos de recuperación temporales
-# { "email_o_usuario": { "code": "123456", "expires": timestamp } }
+# Indexado por UsuarioID para separar cuentas con el mismo correo.
 RECOVERY_CODES = {}
 
 
@@ -120,6 +122,7 @@ def change_password(
         )
 
     current_user.contrasena_hash = hash_password(data.new_password.strip())
+    current_user.version_seguridad += 1
     current_user.fecha_modificacion = datetime.now()
     current_user.usuario_modificacion = current_user.usuario
     db.commit()
@@ -134,7 +137,7 @@ def forgot_password(
 ):
     """
     Solicita la recuperación de contraseña enviando un código de 6 dígitos al correo del usuario.
-    Usa Resend API (HTTP/443) en producción — compatible con Render Free Plan.
+    Envía el código por correo mediante Brevo.
     """
     val = data.email_or_username.strip()
     if not val:
@@ -143,12 +146,7 @@ def forgot_password(
             detail="Debe ingresar su nombre de usuario o correo electrónico."
         )
 
-    user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == val.upper()) |
-        (models.Usuario.usuario == val) |
-        (models.Usuario.email == val.lower()) |
-        (models.Usuario.email == val)
-    ).first()
+    user = find_identity(db, val)
 
     if not user:
         raise HTTPException(
@@ -163,15 +161,7 @@ def forgot_password(
         )
 
     # Generar código numérico de 6 dígitos
-    code = "".join(random.choices(string.digits, k=6))
-    RECOVERY_CODES[user.email.lower()] = {
-        "code": code,
-        "usuario": user.usuario,
-        "created_at": datetime.now()
-    }
-    if user.usuario:
-        RECOVERY_CODES[user.usuario.upper()] = RECOVERY_CODES[user.email.lower()]
-
+    code = "".join((secrets.choice(string.digits) for _ in range(6)))
     # Envío de correo vía Brevo API (HTTP/443) — funciona en Render Free Plan
     brevo_api_key = os.getenv("BREVO_API_KEY")
     brevo_sender_name = os.getenv("BREVO_SENDER_NAME", "GEMA Mapeo")
@@ -203,18 +193,15 @@ def forgot_password(
                 email_sent = True
                 logger.info(f"Correo Brevo enviado exitosamente a {user.email}")
             else:
-                logger.warning(f"Brevo respondió {response.status_code}: {response.text}. Se utilizó el código generado: {code}")
-        except Exception as e:
-            logger.warning(f"No se pudo enviar correo vía Brevo: {e}. Se utilizó el código generado: {code}")
+                logger.warning("Brevo rechazó el correo de recuperación (%s).", response.status_code)
+        except Exception:
+            logger.warning("No se pudo enviar el correo de recuperación.")
 
-    logger.info(f"🔑 CÓDIGO DE RECUPERACIÓN GEMA para '{user.usuario}' ({user.email}): {code}")
+    if not email_sent:
+        raise HTTPException(status_code=503, detail="No se pudo enviar el código. Contacte al administrador.")
 
-    return {
-        "message": f"Código de verificación generado para {user.email}.",
-        "email": user.email,
-        "code_preview": code if not email_sent else None,
-        "email_sent": email_sent
-    }
+    RECOVERY_CODES[user.usuario_id] = {"code": code, "expires": datetime.now() + timedelta(minutes=10), "attempts": 0}
+    return {"message": "Código enviado al correo registrado.", "email": user.email, "email_sent": True}
 
 
 @router.post("/reset-password")
@@ -242,21 +229,21 @@ def reset_password(
             detail="La nueva contraseña debe tener al menos 4 caracteres."
         )
 
-    user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == val.upper()) |
-        (models.Usuario.usuario == val) |
-        (models.Usuario.email == val.lower()) |
-        (models.Usuario.email == val)
-    ).first()
+    user = find_identity(db, val)
 
-    if not user:
+    if not user or user.estado != "A":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario o correo no encontrado."
         )
 
-    recovery = RECOVERY_CODES.get(user.email.lower()) or RECOVERY_CODES.get(user.usuario.upper())
-    if not recovery or recovery["code"] != code_input:
+    recovery = RECOVERY_CODES.get(user.usuario_id)
+    if recovery and (recovery["expires"] <= datetime.now() or recovery["attempts"] >= 5):
+        RECOVERY_CODES.pop(user.usuario_id, None)
+        recovery = None
+    if recovery:
+        recovery["attempts"] += 1
+    if not recovery or not secrets.compare_digest(recovery["code"].encode(), code_input.encode()):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El código de verificación es incorrecto o ha expirado."
@@ -264,13 +251,13 @@ def reset_password(
 
     # Actualizar contraseña
     user.contrasena_hash = hash_password(new_pass)
+    user.version_seguridad += 1
     user.fecha_modificacion = datetime.now()
     user.usuario_modificacion = user.usuario
     db.commit()
 
     # Consumir el código
-    RECOVERY_CODES.pop(user.email.lower(), None)
-    RECOVERY_CODES.pop(user.usuario.upper(), None)
+    RECOVERY_CODES.pop(user.usuario_id, None)
 
     return {"message": "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva clave."}
 

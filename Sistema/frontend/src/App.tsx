@@ -42,7 +42,8 @@ import {
   isProyectadasDirty,
   type ProyectadasCoords
 } from './utils/proyectadas';
-import { apiFetch, pingBackend, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState } from './utils/apiClient';
+import { apiFetch, confirmConnection, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState, setConnectionState } from './utils/apiClient';
+import { CONNECTION_CONFIG } from './config/connection';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
   discardLocalCell,
@@ -82,8 +83,10 @@ import {
 import { useWindowValidation } from './hooks/useWindowValidation';
 import { validateWindows, validationErrorMessage } from './services/validationApi';
 import type { QaQcAlert } from './utils/qaQcRules';
+import { validateWindowDuplicateCelda, type WindowQaQcExtraCtx } from './utils/qaqcValidator';
 import { resetTouchedFields } from './utils/qaQcTouch';
 import { validatePltEnsayosList, toVacioAlerts, isBlockingValidationAlert } from './utils/mandatoryRules';
+import { validatePltQAQC } from './utils/pltQaQcRules';
 import { arePltRowsEqual, applyPltFormulas } from './utils/geomecColumns';
 
 const API_BASE = import.meta.env.VITE_API_BASE || (
@@ -380,105 +383,189 @@ const [connectionLost, setConnectionLost] = useState(false);
     loadCatalogs();
   }, []);
 
-  // Cronómetro de actividad y verificación de conexión:
-  // - Se registra la última interacción del usuario (clic, tecla, scroll, toque).
-  // - Pings automáticos cada 1 minuto mientras haya actividad reciente (hasta
-  //   45 min sin interactuar): el backend (Render free) no duerme mientras el
-  //   usuario trabaja o acaba de irse.
-  // - Pasados 45 min sin interacción, los pings pasan a cada 20 minutos: la
-  //   instancia duerme entre pings (ahorra horas del plan free) y aun así se
-  //   detecta una caída en menos de 20 min.
-  // - El cronómetro corre siempre, incluso con la pestaña en segundo plano
-  //   (el navegador puede espaciar los timers, pero el ping llega igual).
-  // - Si un ping falla, se confirma con un segundo ping (60 s) antes de mostrar
-  //   el modal: evita falsos positivos por un blip de red.
-  // - Volver a la pestaña (visibilitychange): ping inmediato.
+  // Cronómetro de actividad y verificación de conexión (config en config/connection.ts):
+  // - Con actividad reciente (pestaña visible): ping rápido cada 20 s; en pestaña
+  //   oculta con keep-awake activo: cada 8 min para mantener despierto hasta 45 min.
+  // - Tras 45 min sin interacción (stopPingsAfterKeepAwake): se detienen los pings
+  //   para no despertar un backend en reposo; al volver a la pestaña o interactuar,
+  //   se envía un ping inmediato y se reanuda el ciclo.
+  // - Si falla el ping rápido o una petición (red/timeout/502/503/504),
+  //   confirmConnection realiza una confirmación corta de 1 intento (confirmMaxAttempts = 1, confirmTimeoutMs = 8000) y solo
+  //   entonces marca offline; en offline reintenta cada 4 s y cierra el modal solo.
   const catalogsLoadedRef = useRef(false);
   useEffect(() => {
     catalogsLoadedRef.current = catalogsLoaded;
   }, [catalogsLoaded]);
 
   const lastActivityRef = useRef(Date.now());
-
-  useEffect(() => {
-    const markActivity = () => { lastActivityRef.current = Date.now(); };
-    const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(ev => window.addEventListener(ev, markActivity, { passive: true }));
-    return () => {
-      events.forEach(ev => window.removeEventListener(ev, markActivity));
-    };
-  }, []);
+  const scheduleReconnectRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let disposed = false;
     let timer: number | undefined;
+    let stoppedByKeepAwake = false;
+    let inIdleHiddenMode = false;
+    let inFlightHeartbeat: Promise<void> | null = null;
 
-    const confirmLost = async () => {
-      const ok = await pingBackend(API_BASE);
-      if (disposed) return;
-      if (ok) {
-        setDbOnline(true);
-      } else {
-        setDbOnline(false);
-        setConnectionLost(true);
+    const clearTimer = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
       }
     };
 
-    const heartbeat = async () => {
+    const runHeartbeat = async () => {
       if (disposed) return;
-      const ok = await pingBackendFast(API_BASE);
-      if (disposed) return;
-      if (ok) {
-        setDbOnline(true);
-      } else {
-        await confirmLost();
-      }
+      if (inFlightHeartbeat) return inFlightHeartbeat;
+
+      inFlightHeartbeat = (async () => {
+        try {
+          if (getConnectionState() === 'offline') {
+            const ok = await confirmConnection(API_BASE);
+            if (disposed) return;
+            if (ok) {
+              setDbOnline(true);
+              setConnectionLost(false);
+            }
+            return;
+          }
+
+          const ok = await pingBackendFast(API_BASE);
+          if (disposed) return;
+          if (ok) {
+            setConnectionState('online');
+            setDbOnline(true);
+            setConnectionLost(false);
+          } else {
+            const confirmedOk = await confirmConnection(API_BASE);
+            if (disposed) return;
+            if (confirmedOk) {
+              setDbOnline(true);
+              setConnectionLost(false);
+            } else {
+              setDbOnline(false);
+              setConnectionLost(true);
+            }
+          }
+        } finally {
+          inFlightHeartbeat = null;
+        }
+      })();
+
+      return inFlightHeartbeat;
     };
 
     const scheduleNext = () => {
+      clearTimer();
       if (disposed) return;
+
+      const offline = getConnectionState() === 'offline';
       const inactiveMs = Date.now() - lastActivityRef.current;
-      const delay = inactiveMs < 45 * 60_000 ? 60_000 : 20 * 60_000;
+      const keepAwakeExpired = inactiveMs >= CONNECTION_CONFIG.keepAwakeMs;
+
+      if (!offline && keepAwakeExpired && CONNECTION_CONFIG.stopPingsAfterKeepAwake) {
+        stoppedByKeepAwake = true;
+        inIdleHiddenMode = false;
+        return;
+      }
+
+      stoppedByKeepAwake = false;
+      let delay: number;
+      if (offline) {
+        inIdleHiddenMode = false;
+        delay = CONNECTION_CONFIG.reconnectIntervalMs;
+      } else if (document.visibilityState === 'visible' && !keepAwakeExpired) {
+        inIdleHiddenMode = false;
+        delay = CONNECTION_CONFIG.activeIntervalMs;
+      } else {
+        inIdleHiddenMode = keepAwakeExpired;
+        delay = CONNECTION_CONFIG.hiddenIntervalMs;
+      }
+
       timer = window.setTimeout(async () => {
-        await heartbeat();
+        timer = undefined;
+        if (disposed) return;
+
+        const nowOffline = getConnectionState() === 'offline';
+        const nowInactiveMs = Date.now() - lastActivityRef.current;
+        if (!nowOffline && nowInactiveMs >= CONNECTION_CONFIG.keepAwakeMs && CONNECTION_CONFIG.stopPingsAfterKeepAwake) {
+          stoppedByKeepAwake = true;
+          inIdleHiddenMode = false;
+          return;
+        }
+
+        await runHeartbeat();
         if (!disposed) scheduleNext();
       }, delay);
     };
 
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible' && !timer) heartbeat();
+    const triggerImmediateAndReschedule = () => {
+      if (disposed) return;
+      clearTimer();
+      stoppedByKeepAwake = false;
+      inIdleHiddenMode = false;
+      void runHeartbeat().then(() => {
+        if (!disposed) scheduleNext();
+      });
     };
 
+    const markActivity = () => {
+      lastActivityRef.current = Date.now();
+      if (stoppedByKeepAwake || inIdleHiddenMode) {
+        triggerImmediateAndReschedule();
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        lastActivityRef.current = Date.now();
+        triggerImmediateAndReschedule();
+      } else if (!stoppedByKeepAwake && getConnectionState() !== 'offline') {
+        scheduleNext();
+      }
+    };
+
+    scheduleReconnectRef.current = () => {
+      if (!disposed) scheduleNext();
+    };
+
+    const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(ev => window.addEventListener(ev, markActivity, { passive: true }));
     document.addEventListener('visibilitychange', onVisibility);
     scheduleNext();
+
     return () => {
       disposed = true;
+      scheduleReconnectRef.current = () => {};
+      events.forEach(ev => window.removeEventListener(ev, markActivity));
       document.removeEventListener('visibilitychange', onVisibility);
-      if (timer) window.clearTimeout(timer);
+      clearTimer();
     };
   }, []);
 
-  // Monitor global de conexión: cualquier petición que agote sus reintentos
-  // (apiClient marca 'offline') activa el modal al instante. Al volver 'online'
-  // solo se actualiza el indicador: el modal se cierra con sus botones.
+  // Monitor global de conexión: cualquier petición o ping de confirmación que
+  // marque 'offline' abre el modal; al volver 'online' se cierra automáticamente.
   useEffect(() => {
     const unsubscribe = onConnectionChange((state) => {
       if (state === 'offline') {
         setDbOnline(false);
         setConnectionLost(true);
+        scheduleReconnectRef.current();
       } else {
         setDbOnline(true);
+        setConnectionLost(false);
       }
     });
     if (getConnectionState() === 'offline') {
       setDbOnline(false);
       setConnectionLost(true);
+      scheduleReconnectRef.current();
     }
     return unsubscribe;
   }, []);
 
   const handleRetryConnection = async () => {
-    const ok = await pingBackend(API_BASE);
+    const ok = await confirmConnection(API_BASE);
     if (ok) {
       setDbOnline(true);
       setConnectionLost(false);
@@ -539,7 +626,7 @@ const [connectionLost, setConnectionLost] = useState(false);
   // Se obtiene con un fetch DEDICADO de todas las celdas (independiente del
   // filtro/búsqueda actual del dashboard, que limitaría la lista).
   const [allCellNames, setAllCellNames] = useState<string[]>([]);
-  useEffect(() => {
+  const refreshAllCellNames = () => {
     fetch(`${API_BASE}/api/ventanas/celdas`, { headers: getAuthHeaders() })
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
@@ -548,12 +635,21 @@ const [connectionLost, setConnectionLost] = useState(false);
         }
       })
       .catch(() => { /* sin backend: solo borradores locales */ });
+  };
+  useEffect(() => {
+    refreshAllCellNames();
   }, []);
 
-  const knownCells = useMemo(
-    () => [...new Set([...allCellNames, ...pendingCellNames])],
-    [allCellNames, pendingCellNames]
-  );
+  // Local storage can change independently of React. Read the current names,
+  // but keep the QA/QC dependency stable while their contents are unchanged.
+  const knownCellsKey = JSON.stringify([...new Set([...allCellNames, ...pendingCellNames])]);
+  const knownCells = useMemo<string[]>(() => JSON.parse(knownCellsKey), [knownCellsKey]);
+
+  const qaqcExtraCtx = useMemo<WindowQaQcExtraCtx>(() => ({
+    dbCellNames: allCellNames.length > 0 ? allCellNames : windows.map(w => w.name),
+    originalCelda: dbSnapshotData?.header?.celda || null,
+    knownCells,
+  }), [allCellNames, windows, dbSnapshotData?.header?.celda, knownCells]);
 
   useEffect(() => {
     if (!activeWindow) return;
@@ -600,27 +696,58 @@ const [connectionLost, setConnectionLost] = useState(false);
   const liveValidation = useWindowValidation(API_BASE, activeWindow, catalogsLoaded);
   const activeWindowRef = useRef(activeWindow);
   activeWindowRef.current = activeWindow;
+
   useEffect(() => {
-    if (!activeWindow || !catalogsLoaded) { setCalculated(null); return; }
+    if (!activeWindow || !catalogsLoaded) {
+      setCalculated(null);
+      return;
+    }
     const result = calculateWindowGeomec(activeWindow.header, activeWindow.joints);
     const geometry = liveValidation.result?.derived.geometry;
-    setCalculated(geometry ? { ...result, largo: geometry.length_m, dip_hole: geometry.dip_hw,
-      az_hole: geometry.az_hw, dip_dir_talud: geometry.dipdir_talud } : result);
+    setCalculated(
+      geometry
+        ? {
+            ...result,
+            largo: geometry.length_m,
+            dip_hole: geometry.dip_hw,
+            az_hole: geometry.az_hw,
+            dip_dir_talud: geometry.dipdir_talud,
+          }
+        : result
+    );
   }, [activeWindow, catalogsLoaded, liveValidation.result]);
+
   useEffect(() => {
-    const mappingAlerts = liveValidation.result?.issues || [];
-    const pltAlerts = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
-    const pendingAlert: QaQcAlert[] = activeWindow && !liveValidation.result ? [{
-      fieldId: 'header-celda', ruleId: 'VALIDATION_PENDING', type: 'ADVERTENCIA', section: 'VALIDACIÓN',
-      message: liveValidation.error || 'Validando el borrador con el servidor…'
-    }] : [];
-    setAlerts([...mappingAlerts, ...pltAlerts, ...pendingAlert]);
-    if (activeWindow) {
-      setCellValidation(activeWindow.header.celda, liveValidation.result
-        ? mappingAlerts.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message)
-        : ['Borrador pendiente de validación con el servidor.'], liveValidation.result ? { rulesetVersion: liveValidation.result.ruleset_version, draftFingerprint: fastHashObject(activeWindow) } : {});
+    if (!catalogsLoaded) {
+      setAlerts([]);
+      return;
     }
-  }, [activeWindow, liveValidation.result, liveValidation.error, pltEnsayos]);
+    const mappingAlerts = liveValidation.result?.issues || [];
+    const dupAlerts = activeWindow ? validateWindowDuplicateCelda(activeWindow.header, qaqcExtraCtx) : [];
+    const pltQaQc = validatePltQAQC(pltEnsayos, activeWindow?.header ?? null);
+    const pltVacios = toVacioAlerts(validatePltEnsayosList(pltEnsayos));
+    const pendingAlert: QaQcAlert[] = activeWindow && !liveValidation.result ? [{
+      fieldId: 'header-celda',
+      ruleId: 'VALIDATION_PENDING',
+      type: 'ADVERTENCIA',
+      section: 'VALIDACIÓN',
+      message: liveValidation.error || 'Validando el borrador con el servidor…',
+    }] : [];
+    setAlerts([...mappingAlerts, ...dupAlerts, ...pltQaQc, ...pltVacios, ...pendingAlert]);
+    if (activeWindow) {
+      const blockingMessages = [
+        ...mappingAlerts.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message),
+        ...dupAlerts.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message),
+      ];
+      setCellValidation(
+        activeWindow.header.celda,
+        liveValidation.result ? blockingMessages : ['Borrador pendiente de validación con el servidor.'],
+        liveValidation.result
+          ? { rulesetVersion: liveValidation.result.ruleset_version, draftFingerprint: fastHashObject(activeWindow) }
+          : {}
+      );
+    }
+  }, [activeWindow, liveValidation.result, liveValidation.error, catalogsLoaded, pltEnsayos, qaqcExtraCtx]);
 
   // Resetear el registro de campos "tocados" al cambiar de ventana activa
   useEffect(() => {
@@ -1104,6 +1231,7 @@ const [connectionLost, setConnectionLost] = useState(false);
              setSyncStatus('unsaved');
            }
            fetchWindows();
+           refreshAllCellNames();
       } else {
         throw new Error();
       }
@@ -1194,7 +1322,7 @@ const [connectionLost, setConnectionLost] = useState(false);
       safeSetItem(`geolog_window_${celda}`, JSON.stringify(windowData), ctx);
 
       addPendingCell(celda);
-      // Estado de validación desde el primer momento (bloquea el guardado si está incompleta)
+      // Estado inicial mientras se ejecuta validación fresca contra el servidor
       setCellValidation(celda, ['Borrador importado pendiente de validación.']);
       imported++;
     }
@@ -1304,6 +1432,7 @@ const [connectionLost, setConnectionLost] = useState(false);
 
     // Refrescar listado de celdas
     fetchWindows();
+    refreshAllCellNames();
   };
 
   // Paginación y filtros del Dashboard
@@ -1478,26 +1607,93 @@ const [connectionLost, setConnectionLost] = useState(false);
       }
     }
 
-    // A fresh server evaluation for every selected draft, including unopened imports.
-    // Cached validation messages are presentation only, never a save certificate.
+    // Validación fresca en servidor para todo borrador a guardar, más detección de celda duplicada
     const expectedActive = JSON.stringify(activeWindowRef.current);
     const validated = new Map<string, import('./types/validation').WindowValidation>();
     try {
+      for (const w of windowsToSave) {
+        const isExistingSnapshot = Boolean(localStorage.getItem(`geolog_window_snapshot_${w.header.celda}`));
+        const dupErrors = validateWindowDuplicateCelda(w.header, {
+          dbCellNames: qaqcExtraCtx.dbCellNames,
+          originalCelda: isExistingSnapshot ? w.header.celda : null,
+          knownCells: qaqcExtraCtx.knownCells,
+        });
+        if (dupErrors.length > 0) {
+          throw new Error(`${w.header.celda}: ${dupErrors.map(e => e.message).join('; ')}`);
+        }
+      }
       for (let offset = 0; offset < windowsToSave.length; offset += 20) {
         const batch = windowsToSave.slice(offset, offset + 20);
         const response = await validateWindows(API_BASE, batch);
         response.windows.forEach((result, i) => {
           validated.set(batch[i].header.celda, result);
-          setCellValidation(batch[i].header.celda, result.issues.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message), { rulesetVersion: result.ruleset_version, draftFingerprint: fastHashObject(batch[i]) });
+          setCellValidation(
+            batch[i].header.celda,
+            result.issues.filter(a => isBlockingValidationAlert(a.type)).map(a => a.message),
+            { rulesetVersion: result.ruleset_version, draftFingerprint: fastHashObject(batch[i]) }
+          );
         });
       }
-      if (expectedActive !== JSON.stringify(activeWindowRef.current)) throw new Error('El borrador cambió durante la validación. Vuelva a guardar.');
+      if (expectedActive !== JSON.stringify(activeWindowRef.current)) {
+        throw new Error('El borrador cambió durante la validación. Vuelva a guardar.');
+      }
       const invalid = [...validated.entries()].filter(([, result]) => !result.can_save);
-      if (invalid.length) throw new Error(invalid.map(([code,result]) => `${code}: ${result.issues.filter(i => isBlockingValidationAlert(i.type)).map(i => i.message).join('; ')}`).join('\n'));
+      if (invalid.length) {
+        throw new Error(
+          invalid
+            .map(([code, result]) => `${code}: ${result.issues.filter(i => isBlockingValidationAlert(i.type)).map(i => i.message).join('; ')}`)
+            .join('\n')
+        );
+      }
     } catch (err) {
-      setIsLoadingWindow(false); setSyncStatus('unsaved');
+      setIsLoadingWindow(false);
+      setSyncStatus('unsaved');
       const message = err instanceof Error ? err.message : 'No se pudo validar el guardado.';
-      setSyncMessage(message); alert(message); return;
+      setSyncMessage(message);
+      alert(message);
+      return;
+    }
+
+    // Validación previa de ensayos PLT pendientes (4 muestras A-B-C-D, coordenadas, K, carga P/Obs)
+    const pltPendingToValidate = new Set<string>(getPendingPltCells());
+    const activeCeldaNormPre = activeWindow?.header?.celda?.trim()?.toUpperCase();
+    if (activeCeldaNormPre && JSON.stringify(pltEnsayos) !== JSON.stringify(pltSnapshotRef.current)) {
+      pltPendingToValidate.add(activeCeldaNormPre);
+    }
+    const pltBlockingCells: string[] = [];
+    for (const celdaName of pltPendingToValidate) {
+      const isCurrentActive = activeCeldaNormPre === celdaName;
+      const rowsToValidate = isCurrentActive ? pltEnsayos : getPltDelta(celdaName);
+      if (!Array.isArray(rowsToValidate) || rowsToValidate.length === 0) continue;
+
+      let cellHeader: WindowHeader | null = isCurrentActive ? (activeWindow?.header ?? null) : null;
+      if (!cellHeader) {
+        const winMatch = windowsToSave.find(w => w.header.celda?.trim()?.toUpperCase() === celdaName);
+        if (winMatch) {
+          cellHeader = winMatch.header;
+        } else {
+          try {
+            const cachedRaw = localStorage.getItem(`geolog_window_${celdaName}`) || localStorage.getItem(`geolog_window_snapshot_${celdaName}`);
+            if (cachedRaw) cellHeader = JSON.parse(cachedRaw)?.header ?? null;
+          } catch { /* sin cabecera cacheada */ }
+        }
+      }
+
+      const pltVacios = validatePltEnsayosList(rowsToValidate);
+      const pltCritical = validatePltQAQC(rowsToValidate, cellHeader).filter(a => isBlockingValidationAlert(a.type));
+      const totalIssues = pltVacios.length + pltCritical.length;
+      if (totalIssues > 0) {
+        pltBlockingCells.push(`${celdaName} (${totalIssues} problema(s) PLT)`);
+      }
+    }
+    if (pltBlockingCells.length > 0) {
+      setIsLoadingWindow(false);
+      setSyncStatus('unsaved');
+      setSyncMessage('No se guardó: hay ensayos PLT con campos obligatorios vacíos o errores críticos QA/QC.');
+      alert(
+        `No se puede guardar ensayos PLT: ${pltBlockingCells.join(', ')}. Revise el panel QA/QC (4 muestras A-B-C-D, coordenadas, código sin guion y observaciones si P > 60 kN).`
+      );
+      return;
     }
 
     // Guardado por lotes de 4 concurrentes: mismo payload y mismo manejo de
@@ -1522,7 +1718,7 @@ const [connectionLost, setConnectionLost] = useState(false);
         este_fin: winData.header.este_to || 0,
         norte_fin: winData.header.norte_to || 0,
         cota_fin: winData.header.cota_to || 0,
-        largo_m: winData.header.largo == null ? validated.get(winData.header.celda)?.derived.geometry?.length_m : Number(winData.header.largo),
+        largo_m: winData.header.largo == null ? effectiveGeometry?.length_m : Number(winData.header.largo),
         altura: winData.header.altura !== undefined && winData.header.altura !== null ? winData.header.altura : null,
         altura_m: winData.header.altura !== undefined && winData.header.altura !== null ? winData.header.altura : null,
         dip: HOLE_AUTO ? (effectiveGeometry?.dip_hw ?? winCalc.dip_hole) : (winData.header.dip_hw !== undefined && winData.header.dip_hw !== null ? winData.header.dip_hw : null),
@@ -1732,6 +1928,7 @@ const [connectionLost, setConnectionLost] = useState(false);
       setSyncStatus('unsaved');
     }
     fetchWindows();
+    refreshAllCellNames();
 
     if (successCount > 0) {
       setSaveResultData({
@@ -2300,6 +2497,8 @@ const [connectionLost, setConnectionLost] = useState(false);
                 pltEnsayos={pltEnsayos}
                 onChange={handlePltChange}
                 activeWindowCelda={activeWindow?.header.celda || null}
+                activeHeader={activeWindow?.header || null}
+                alerts={alerts}
                 showFormulas={showFormulas}
                 knownCells={knownCells}
                 onImportToCell={handlePltImport}
@@ -2400,18 +2599,21 @@ const [connectionLost, setConnectionLost] = useState(false);
 
       {/* Modales de Confirmación, Descarte y Resultados */}
       <SaveConfirmModal
-        isOpen={showSaveConfirmModal}
-        onClose={() => setShowSaveConfirmModal(false)}
-        onConfirmSave={handleConfirmSave}
         validationAlerts={liveValidation.result?.issues || []}
         validationPending={!!activeWindow && !liveValidation.result}
         validationError={liveValidation.error}
+        isOpen={showSaveConfirmModal}
+        onClose={() => setShowSaveConfirmModal(false)}
+        onConfirmSave={handleConfirmSave}
         activeWindow={activeWindow}
         workspaceDiff={workspaceDiff}
         pltDiff={pltDiffSummary}
         pltEnsayos={pltEnsayos}
         onOpenCatalogs={() => setIsCatalogModalOpen(true)}
         invalidPendingCells={getInvalidPendingCells()}
+        dbCellNames={qaqcExtraCtx.dbCellNames}
+        originalCelda={qaqcExtraCtx.originalCelda}
+        knownCells={qaqcExtraCtx.knownCells}
       />
 
       <DiscardModal

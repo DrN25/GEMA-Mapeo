@@ -236,4 +236,5 @@ def aggregate_plt_audit_metrics(diag: dict, years_filter: Optional[str] = None) 
         "error_types_detailed": error_types_detailed,
         "top_5_alertas": top_5_alertas,
         "resumen_por_celda": resumen_celdas,
+        "resumen_fractura": diag.get("resumen_fractura", {"M": 0, "E": 0, "C": 0, "otros": 0}),
     }

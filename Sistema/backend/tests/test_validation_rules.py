@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import json
 import pytest
 from app.validation.service import evaluate_window, evaluate_excel_extensions, catalog_data, INACTIVE, ALIASES
-from app.validation.registry import RULES_REGISTRY
+from app.validation.registry import RULES_REGISTRY, CATEGORIES_REGISTRY
 from app.validation.window_rules import WINDOW_RULES
-from app.validation.adapters import from_save, from_import, header_row, joint_row
+from app.validation.adapters import from_save, from_import, header_row, joint_row, resolve_excel_keys
 from app.validation.context import assert_valid, campaign_year
 from app.validation.derived import effective_gsi
 from app.core.catalogs import get_lithology_catalog_for_project
@@ -243,3 +243,54 @@ def test_excel_writes_version_and_preserves_raw(tmp_path):
     diag=json.loads(output.read_text(encoding='utf-8'))
     assert diag['ruleset_version'].startswith('mapeo-v1.')
     assert any(i['rule_code']=='ALTURA_NEGATIVA' for i in diag['incidencias'])
+
+
+def test_category_names_are_unique_across_registry():
+    admin_names = [cat.name for cat in CATEGORIES_REGISTRY.values()]
+    assert len(admin_names) == len(set(admin_names))
+    assert (
+        CATEGORIES_REGISTRY['CAT_WINDOW_CRITICA'].get_name(es_admin=False)
+        != CATEGORIES_REGISTRY['CAT_WINDOW_ADVERTENCIA'].get_name(es_admin=False)
+    )
+
+
+def test_evaluate_excel_extensions_resolved_keys_parity():
+    row = {
+        '  CELDA_PADRE ': 'VNT-01',
+        'Altura': -3,
+        'DIP': 120,
+        'DIP_ESTRUC': 12.5,
+        'DIP DIR': 360,
+        'Dist. de estr.': 'bad-num',
+        'Campaña': 2026,
+        'FECHA': '2025-05-01',
+        'TIPO': 'JN',
+        'GSI_ESTRUCTURA': 'B',
+        'GSI_SUPERFICIE': 'VG',
+        "GSI VISUAL '89": 10,
+    }
+    header_keys, joint_keys = resolve_excel_keys(list(row.keys()))
+
+    for is_parent in (True, False):
+        baseline_hits = []
+        fast_hits = []
+        evaluate_excel_extensions(
+            row,
+            10.0,
+            lambda col, val, code: baseline_hits.append((col, val, code)),
+            campaign_year=2026,
+            is_parent=is_parent,
+        )
+        evaluate_excel_extensions(
+            row,
+            10.0,
+            lambda col, val, code: fast_hits.append((col, val, code)),
+            campaign_year=2026,
+            is_parent=is_parent,
+            header_keys=header_keys,
+            joint_keys=joint_keys,
+        )
+        assert fast_hits == baseline_hits
+        assert ('DIP_ESTRUC', 12.5, 'DIP_ESTRUCTURA_ENTERO') in fast_hits
+        assert ('Dist. de estr.', 'bad-num', 'ERR_VALOR_NUMERICO_INVALIDO') in fast_hits
+        assert (('Altura', -3, 'ALTURA_NEGATIVA') in fast_hits) is is_parent

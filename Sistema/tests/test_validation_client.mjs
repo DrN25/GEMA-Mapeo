@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -48,7 +48,9 @@ test('structured save errors remain readable', () => {
 test('PLT required fields and severity policy remain independent', () => {
   const plt = require(path.join(cache, 'utils/mandatoryRules.js'));
   assert.equal(plt.validatePltEnsayosList([]).length, 0);
-  assert.equal(plt.validatePltEnsayosList([{}]).length, 10);
+  const expectedMandatoryCount = Object.values(plt.MANDATORY_FIELD_RULES.pltEnsayos).filter(Boolean).length;
+  assert.equal(expectedMandatoryCount, 19);
+  assert.equal(plt.validatePltEnsayosList([{}]).length, expectedMandatoryCount);
   assert.equal(plt.isBlockingValidationAlert('ADVERTENCIA'), false);
   assert.equal(plt.isBlockingValidationAlert('VACIO'), true);
 });
@@ -92,7 +94,11 @@ test('offline hook retains no stale approval', async () => {
 });
 
 test('Python GSI subgraph matches the editor across mixed families and materials', () => {
-  const python = path.resolve(here, '../backend/.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  const venvRel = process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python';
+  const python = [
+    path.resolve(here, '../backend/.venv', venvRel),
+    path.resolve(here, '../backend/venv', venvRel),
+  ].find(p => existsSync(p)) || 'python';
   const code = `
 import json, random
 from app.core import catalogs as c

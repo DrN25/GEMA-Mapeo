@@ -1,9 +1,14 @@
 """
 app/core/excel_styles.py
-Paleta de estilos openpyxl compartida entre auditoria.py y comparativo.py.
-Define una única función get_styles() que retorna el dict completo de estilos.
+Paleta de estilos openpyxl compartida entre auditoria.py y comparativo.py,
+y utilidades de streaming en disco para libros write_only y archivos subidos.
 """
+import os
+import tempfile
+from fastapi.responses import FileResponse
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from starlette.background import BackgroundTask
 
 
 def get_styles() -> dict:
@@ -87,3 +92,110 @@ def write_kpi_card(ws, start_row: int, start_col: int,
 
     ws.merge_cells(start_row=start_row,   start_column=start_col, end_row=start_row,   end_column=start_col + 1)
     ws.merge_cells(start_row=start_row+1, start_column=start_col, end_row=start_row+1, end_column=start_col + 1)
+
+
+def make_wo_cell(ws, val=None, font=None, fill=None, border=None, alignment=None, num_fmt=None) -> WriteOnlyCell:
+    """Construye una celda WriteOnlyCell con estilos opcionales en un solo paso."""
+    cell = WriteOnlyCell(ws, value=val)
+    if font is not None:
+        cell.font = font
+    if fill is not None:
+        cell.fill = fill
+    if border is not None:
+        cell.border = border
+    if alignment is not None:
+        cell.alignment = alignment
+    if num_fmt is not None:
+        cell.number_format = num_fmt
+    return cell
+
+
+def dedup_pandas_headers(raw_headers) -> list:
+    """
+    Normaliza y desambigua encabezados replicando el comportamiento de pandas.read_excel():
+      - None o cadena vacía -> 'Unnamed: {idx}'
+      - Duplicados -> 'Nombre.1', 'Nombre.2', ... evitando colisiones con nombres existentes.
+    """
+    base_names = [
+        f"Unnamed: {i}" if (h is None or h == "") else h
+        for i, h in enumerate(raw_headers)
+    ]
+    potentials = set(base_names)
+    counts = {}
+    out = []
+    for col in base_names:
+        if col not in counts:
+            counts[col] = 0
+            out.append(col)
+        else:
+            cur = counts[col] + 1
+            candidate = f"{col}.{cur}"
+            while candidate in counts or (candidate in potentials and candidate != col):
+                cur += 1
+                candidate = f"{col}.{cur}"
+            counts[col] = cur
+            counts[candidate] = 0
+            out.append(candidate)
+    return out
+
+
+async def save_upload_to_temp(upload_file, suffix: str = ".xlsx", chunk_size: int = 1024 * 1024) -> str:
+    """
+    Vuelca un UploadFile a un archivo temporal en disco por bloques de 1 MB
+    para evitar cargar todo el binario en memoria RAM (bytes/BytesIO).
+    """
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tmp_path = tmp.name
+    try:
+        while True:
+            try:
+                chunk = await upload_file.read(chunk_size)
+            except TypeError:
+                chunk = await upload_file.read()
+                if chunk:
+                    tmp.write(chunk)
+                break
+            if not chunk:
+                break
+            tmp.write(chunk)
+    except Exception:
+        tmp.close()
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        raise
+    tmp.close()
+    return tmp_path
+
+
+def wb_to_temp_file_response(wb, filename: str, headers: dict = None) -> FileResponse:
+    """
+    Guarda un workbook openpyxl en un archivo temporal, libera el workbook de RAM
+    y lo transmite con FileResponse + eliminación automática en background.
+    """
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+        tmp_path = tmp.name
+    try:
+        wb.save(tmp_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        raise
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+
+    return FileResponse(
+        tmp_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename,
+        headers=headers,
+        background=BackgroundTask(os.remove, tmp_path),
+    )

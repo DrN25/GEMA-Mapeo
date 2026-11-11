@@ -40,7 +40,7 @@ export default function AuditHistory({
                             className="bg-navy-950 hover:bg-navy-850 dark:hover:bg-navy-800 border border-navy-800 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-700 dark:hover:text-cyan-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm flex items-center gap-1.5 cursor-pointer"
                         >
                             <BookOpen size={12} className="text-cyan-600 dark:text-cyan-400" />
-                            <span>Diccionario de Reglas (76)</span>
+                            <span>Diccionario de Reglas</span>
                         </button>
                     )}
                     {history.length >= 1 && (

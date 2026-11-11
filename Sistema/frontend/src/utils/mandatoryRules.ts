@@ -61,28 +61,28 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
     tipo_ensayo: true,
     nivel: true,
     celda_mapeo: true,
+    muestra: true,
     codigo_muestra: true,
     litologia_1: true,
     tipo_litologico: true,
+    este: true,
+    norte: true,
+    elevacion: true,
     espesor_d: true,
+    longitud_l: true,
+    ancho_w1: true,
+    ancho_w2: true,
     fuerza_p: true,
+    direccion_rotura: true,
+    tipo_fractura: true,
 
-    // OPCIONALES Y CAMPOS DERIVADOS DE ENSAYO
+    // OPCIONALES Y CAMPOS DERIVADOS DE ENSAYO (observaciones es obligatorio condicionalmente si P > 60 kN)
     ejecutado_por: false,
-    muestra: false,
     litologia_2: false,
     litologia_3: false,
-    este: false,
-    norte: false,
-    elevacion: false,
-    longitud_l: false,
     ancho_w: false,
-    ancho_w1: false,
-    ancho_w2: false,
     muestra_valida_longitud: false,
     muestra_valida_ancho: false,
-    direccion_rotura: false,
-    tipo_fractura: false,
     diametro_equivalente: false,
     f: false,
     is_mpa: false,
@@ -95,9 +95,6 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
     observaciones: false
   }
 };
-
-
-
 
 export const PLT_FIELD_LABELS: Record<string, string> = {
   campana: 'Campaña',
@@ -171,7 +168,6 @@ function isBlank(val: any): boolean {
   return false;
 }
 
-
 export function validatePltEnsayosList(pltEnsayos: any[]): MissingFieldIssue[] {
   if (!Array.isArray(pltEnsayos) || pltEnsayos.length === 0) return [];
   const issues: MissingFieldIssue[] = [];
@@ -189,6 +185,18 @@ export function validatePltEnsayosList(pltEnsayos: any[]): MissingFieldIssue[] {
           message: `PLT Irregulares (Fila ${idx + 1}): El campo '${PLT_FIELD_LABELS[key] || key}' es obligatorio.`
         });
       }
+    }
+
+    const fuerzaPNum = !isBlank(row?.fuerza_p) ? Number(row.fuerza_p) : NaN;
+    if (Number.isFinite(fuerzaPNum) && fuerzaPNum > 60 && isBlank(row?.observaciones)) {
+      issues.push({
+        group: 'plt',
+        section: 'ENSAYOS PLT IRREGULARES',
+        fieldKey: 'observaciones',
+        fieldLabel: PLT_FIELD_LABELS.observaciones || 'Observaciones',
+        rowIndex: idx + 1,
+        message: `PLT Irregulares (Fila ${idx + 1}): Fuerza P = ${fuerzaPNum} kN (> 60 kN). Es obligatorio registrar un comentario en 'Observaciones'.`
+      });
     }
   });
 

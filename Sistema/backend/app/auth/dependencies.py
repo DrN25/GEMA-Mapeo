@@ -1,116 +1,48 @@
 from typing import List, Optional
-from fastapi import Depends, HTTPException, status, Header
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.database import get_db
 from app import models
+from app.auth.scope import system_users
 from app.core.security import decode_access_token
+from app.database import get_db
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
-
-
-def get_current_user(
-    token: Optional[str] = Depends(oauth2_scheme),
-    authorization: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
-) -> models.Usuario:
-    """
-    Inyección de dependencia para validar el token JWT y retornar el usuario activo.
-    Soporta extracción por Bearer scheme estándar y por header directo.
-    """
-    jwt_token = token
-    if not jwt_token and authorization:
-        if authorization.startswith("Bearer "):
-            jwt_token = authorization.split(" ")[1]
-        else:
-            jwt_token = authorization
-
-    if not jwt_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se proporcionó token de autenticación (Header Authorization requerido).",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    payload = decode_access_token(jwt_token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de autenticación inválido o expirado.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    username_or_email = payload.get("sub")
-    if not username_or_email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token sin sujeto de usuario.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Buscar por Usuario o por Email
-    user = db.query(models.Usuario).filter(
-        (models.Usuario.usuario == username_or_email) | (models.Usuario.email == username_or_email)
-    ).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario no encontrado en la base de datos.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Verificar Estado ('A' = Activo)
-    if user.estado != 'A':
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Cuenta de usuario inhabilitada o desactivada. Contacte al administrador.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return user
+bearer = HTTPBearer(auto_error=False)
 
 
 def get_optional_current_user(
-    token: Optional[str] = Depends(oauth2_scheme),
-    authorization: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    db: Session = Depends(get_db),
 ) -> Optional[models.Usuario]:
-    """
-    Inyección de dependencia opcional: retorna el usuario autenticado si el token
-    es válido y el usuario está activo. Si no hay token, el token es inválido, expirado,
-    o el usuario no existe/está inactivo, retorna None sin lanzar excepción 401.
-    """
-    jwt_token = token
-    if not jwt_token and authorization:
-        if authorization.startswith("Bearer "):
-            jwt_token = authorization.split(" ")[1]
-        else:
-            jwt_token = authorization
-
-    if not jwt_token:
+    if not credentials:
         return None
-
-    payload = decode_access_token(jwt_token)
+    payload = decode_access_token(credentials.credentials)
     if not payload:
         return None
-
-    username_or_email = payload.get("sub")
-    if not username_or_email:
+    subject = payload.get("sub")
+    version = payload.get("ver")
+    if not isinstance(subject, str) or not subject.isascii() or not subject.isdecimal():
         return None
-
-    try:
-        user = db.query(models.Usuario).filter(
-            (models.Usuario.usuario == username_or_email) | (models.Usuario.email == username_or_email)
-        ).first()
-
-        if not user or user.estado != 'A':
-            return None
-
-        return user
-    except Exception:
+    if len(subject) > 10 or int(subject) > 2147483647 or type(version) is not int:
         return None
+    return system_users(db).filter(
+        models.Usuario.usuario_id == int(subject),
+        models.Usuario.estado == "A",
+        models.Usuario.version_seguridad == version,
+        models.Role.estado == "A",
+    ).first()
+
+
+def get_current_user(
+    user: Optional[models.Usuario] = Depends(get_optional_current_user),
+) -> models.Usuario:
+    if user is None:
+        raise HTTPException(
+            status_code=401, detail="Sesión inválida o expirada.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 
 def require_role(roles_permitidos: List[str]):

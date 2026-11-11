@@ -128,27 +128,80 @@ def evaluate_window(window, *, operation='window_preview', project='ferrobamba',
             'coverage':{'evaluated_extension_rule_ids':sorted(evaluated),'context':operation}}
 
 
-def evaluate_excel_extensions(row,length,register,*,campaign_year=None,is_parent=True):
+_NUMERIC_HEADER_KEYS = (
+    'largo', 'altura', 'este_from', 'norte_from', 'cota_from', 'este_to', 'norte_to', 'cota_to',
+    'dip_talud', 'dip_hw', 'az_hw', 'dipdir_talud', 'ucs_mpa', 'is50_mpa', 'gsi_visual',
+)
+_NUMERIC_JOINT_KEYS = tuple(JOINT_FIELDS)
+_EXCEL_RULE_SPECS = tuple(
+    (
+        rule,
+        rule.field in JOINT_FIELDS,
+        (JOINT_COLUMNS if rule.field in JOINT_FIELDS else HEADER_COLUMNS).get(rule.field, rule.field),
+        registry.RULES_REGISTRY[rule.code],
+    )
+    for rule in WINDOW_RULES
+)
+_NO_VALUE_REQUIRED_KINDS = frozenset({'campaign_date', 'gsi_range'})
+
+
+def evaluate_excel_extensions(
+    row,
+    length,
+    register,
+    *,
+    campaign_year=None,
+    is_parent=True,
+    header_keys=None,
+    joint_keys=None,
+):
     """Same extension predicates, without imposing form-only required fields on Excel."""
     from .adapters import from_excel
-    window=from_excel(row,length);header=window['header'];joint=window['joints'][0]
     from .normalization import number, blank
-    numeric_header=('largo','altura','este_from','norte_from','cota_from','este_to','norte_to','cota_to','dip_talud','dip_hw','az_hw','dipdir_talud','ucs_mpa','is50_mpa','gsi_visual')
-    for data, columns, keys in ((header,HEADER_COLUMNS,numeric_header),(joint,JOINT_COLUMNS,tuple(JOINT_FIELDS))):
-        if data is header and not is_parent:continue
-        for key in keys:
-            raw=data.get(key)
-            if not blank(raw) and number(raw) is None:
-                register(columns.get(key,key),raw,'ERR_VALOR_NUMERICO_INVALIDO')
-    for rule in WINDOW_RULES:
-        if not registry.RULES_REGISTRY[rule.code].enabled or 'backend' not in registry.RULES_REGISTRY[rule.code].scope or 'excel_review' not in registry.RULES_REGISTRY[rule.code].operations:continue
-        is_joint=rule.field in JOINT_FIELDS
-        if not is_joint and not is_parent:continue
-        if is_joint and str(joint.get('tipo_estructura')).strip() in ('-1','-1.0'):continue
-        data=joint if is_joint else header
+
+    window = from_excel(
+        row,
+        length,
+        header_keys=header_keys,
+        joint_keys=joint_keys,
+        include_header=is_parent,
+    )
+    header = window['header']
+    joint = window['joints'][0]
+
+    if is_parent:
+        for key in _NUMERIC_HEADER_KEYS:
+            raw = header.get(key)
+            if raw is not None and not blank(raw) and number(raw) is None:
+                register(HEADER_COLUMNS.get(key, key), raw, 'ERR_VALOR_NUMERICO_INVALIDO')
+
+    for key in _NUMERIC_JOINT_KEYS:
+        raw = joint.get(key)
+        if raw is not None and not blank(raw) and number(raw) is None:
+            register(JOINT_COLUMNS.get(key, key), raw, 'ERR_VALOR_NUMERICO_INVALIDO')
+
+    is_tipo_sin_reg = str(joint.get('tipo_estructura')).strip() in ('-1', '-1.0')
+    length_num = number(length)
+    gsi_num = number(header.get('gsi_visual')) if is_parent else None
+
+    for rule, is_joint, canonical_col, reg_rule in _EXCEL_RULE_SPECS:
+        if not reg_rule.enabled or 'backend' not in reg_rule.scope or 'excel_review' not in reg_rule.operations:
+            continue
+        if is_joint:
+            if is_tipo_sin_reg:
+                continue
+            data = joint
+        else:
+            if not is_parent:
+                continue
+            data = header
+
+        raw_val = data.get(rule.field)
+        if raw_val is None and rule.kind not in _NO_VALUE_REQUIRED_KINDS:
+            continue
         # No synthetic GSI from one row: review compares the reported value.
-        if rule.fails(data,header,number(length),campaign_year,number(header.get('gsi_visual'))):
-            register((JOINT_COLUMNS if is_joint else HEADER_COLUMNS).get(rule.field,rule.field),data.get(rule.field),rule.code)
+        if rule.fails(data, header, length_num, campaign_year, gsi_num):
+            register(canonical_col, raw_val, rule.code)
 
 
 def catalog_data():

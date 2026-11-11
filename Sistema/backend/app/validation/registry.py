@@ -1078,24 +1078,69 @@ for _rule_code, (_obs_tmpl, _rec_tmpl) in RULE_RECOMMENDATIONS_REGISTRY.items():
 from app.validation.window_rules import WINDOW_RULES, JOINT_FIELDS
 from app.validation.adapters import HEADER_COLUMNS, JOINT_COLUMNS
 
+_WINDOW_CATEGORY_NAMES = {
+    'CRITICA': 'Inconsistencia crítica de datos de mapeo.',
+    'ADVERTENCIA': 'Advertencia de datos de mapeo.',
+}
+
+_WINDOW_RULE_RBAC = {
+    'LARGO_CERO': ('La distancia de celda registrada es 0.', 'La distancia de celda debe ser mayor a cero.'),
+    'LARGO_NEGATIVO': ('La distancia de celda registrada es negativa.', 'La distancia de celda debe ser positiva.'),
+    'LARGO_MAXIMO': ('La distancia de celda supera los 30 m.', 'Verifique que la distancia de celda no exceda 30 m.'),
+    'ALTURA_CERO': ('La altura de ventana registrada es 0.', 'La altura de ventana debe ser mayor a cero.'),
+    'ALTURA_NEGATIVA': ('La altura de ventana registrada es negativa.', 'La altura de ventana debe ser positiva.'),
+    'ALTURA_MAXIMA': ('La altura de ventana supera los 30 m.', 'Verifique que la altura de ventana no exceda 30 m.'),
+    'DIP_HW_RANGO': ('Dip HW fuera del rango permitido.', 'Debe estar entre -90 y 90 grados.'),
+    'DIPDIR_TALUD_RANGO': ('DipDir talud fuera del rango permitido.', 'Debe estar entre 0 y 359.99 grados.'),
+    'AZ_HW_RANGO': ('Azimut HW fuera del rango permitido.', 'Debe estar entre 0 y 359.99 grados.'),
+    'DIP_DIR_RANGO': ('DipDir de estructura fuera del rango permitido.', 'Debe estar entre 0 y 359 grados.'),
+    'FASE_CERO': ('El valor de fase registrado es 0.', 'Fase debe ser mayor a cero.'),
+    'FASE_NEGATIVA': ('El valor de fase registrado es negativo.', 'Fase debe ser positivo.'),
+    'NIVEL_CERO': ('El valor de nivel registrado es 0.', 'Nivel debe ser distinto de cero.'),
+    'NIVEL_NEGATIVO': ('El valor de nivel registrado es negativo.', 'Nivel debe ser positivo.'),
+    'N_ESTRUCTURAS_CERO': ('El número de estructuras registrado es 0.', 'El número de estructuras debe ser mayor a cero.'),
+    'N_ESTRUCTURAS_NEGATIVO': ('El número de estructuras registrado es negativo.', 'El número de estructuras debe ser positivo.'),
+    'DIP_ESTRUCTURA_ENTERO': ('Dip de estructura no es un valor entero.', 'Dip debe ser un número entero.'),
+    'DIP_DIR_ENTERO': ('DipDir de estructura no es un valor entero.', 'DipDir debe ser un número entero.'),
+    'JRC_ENTERO': ('JRC no es un valor entero.', 'JRC debe ser un número entero.'),
+    'RUGOSIDAD_ENTERO': ('La rugosidad registrada no es un valor entero.', 'Rugosidad debe ser un número entero.'),
+    'GSI_VISUAL_ENTERO': ('GSI visual no es un valor entero.', 'GSI visual debe ser un número entero.'),
+    'DISTANCIA_CERO': ('La distancia de estructura registrada es 0.', 'La distancia de estructura debe ser mayor a cero.'),
+    'ABERTURA_CERO_CON_ESPESOR': ('Abertura nula registrada con espesor de relleno positivo.', 'Cuando existe espesor de relleno positivo, revise la abertura.'),
+    'ESPESOR_SUPERA_LARGO': ('El espesor de relleno supera el largo de la celda.', 'El espesor convertido a metros no debe superar el largo de celda.'),
+    'ESPESOR_NO_CERO_RELLENO_LIMPIO': ('Relleno limpio registrado con espesor distinto de cero.', 'El relleno limpio (c/cwf) debe tener espesor cero.'),
+    'ESPACIAMIENTO_EXCEDE_LARGO': ('El espaciamiento supera el largo de la celda.', 'El espaciamiento no debe superar el largo de celda.'),
+    'FECHA_CAMPANA_ANIO': ('La fecha de mapeo no coincide con el año de la campaña.', 'Verifique que el año de fecha corresponda a la campaña.'),
+    'JRC_RUGOSIDAD_CATALOGO': ('Combinación de JRC y perfil de rugosidad fuera de catálogo.', 'Ajuste JRC y rugosidad según las bandas del catálogo.'),
+    'GSI_VISUAL_NEGATIVO': ('GSI visual registrado es negativo.', 'El GSI visual debe ser mayor o igual a cero.'),
+    'GSI_VISUAL_RANGO': ('GSI visual efectivo inconsistente con estructura y superficie seleccionadas.', 'Debe estar dentro del rango combinado de estructura y superficie (máx. 85).'),
+}
+
 # A rule's definition and evaluator are owned by the same Python record.
 for _extension in WINDOW_RULES:
     _category = 'CAT_WINDOW_' + _extension.severity
     if _category not in CATEGORIES_REGISTRY:
         CATEGORIES_REGISTRY[_category] = RuleCategory(
-            _category, 'Validación de datos de mapeo',
-            'ALERTA' if _extension.severity == 'CRITICA' else _extension.severity)
+            _category,
+            _WINDOW_CATEGORY_NAMES.get(_extension.severity, f'Validación de datos de mapeo ({_extension.severity}).'),
+            'ALERTA' if _extension.severity == 'CRITICA' else _extension.severity,
+        )
     if _extension.code in RULES_REGISTRY:
         raise ValueError('Duplicate validation rule: ' + _extension.code)
+    _obs_tmpl, _rec_tmpl = _WINDOW_RULE_RBAC.get(_extension.code, (_extension.message, ''))
     RULES_REGISTRY[_extension.code] = ErrorRule(
         _extension.code, _category,
         [(JOINT_COLUMNS if _extension.field in JOINT_FIELDS else HEADER_COLUMNS).get(_extension.field, _extension.field)],
         _extension.message, description=_extension.message,
-        tipo_mapeo='Mapeo de Estructuras' if _extension.field in JOINT_FIELDS else 'Mapeo de Celdas')
+        tipo_mapeo='Mapeo de Estructuras' if _extension.field in JOINT_FIELDS else 'Mapeo de Celdas',
+        observation_template=_obs_tmpl,
+        recommendation_template=_rec_tmpl)
 
 RULES_REGISTRY['ERR_VALOR_NUMERICO_INVALIDO'] = ErrorRule(
     'ERR_VALOR_NUMERICO_INVALIDO', 'CAT_WINDOW_CRITICA', ['numeric'],
-    'El campo debe ser un número finito.')
+    'El campo debe ser un número finito.',
+    observation_template='Valor no numérico o no finito.',
+    recommendation_template='El campo debe ser un número finito.')
 GEOMECHANICAL_THRESHOLDS['MIN_SEGMENT_LENGTH'] = 0.01
 
 

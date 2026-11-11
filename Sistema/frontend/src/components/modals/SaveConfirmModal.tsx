@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle, BookOpen } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
 import { validatePltEnsayosList } from '../../utils/mandatoryRules';
+import { validateWindowDuplicateCelda } from '../../utils/qaqcValidator';
+import { validatePltQAQC } from '../../utils/pltQaQcRules';
 import type { QaQcAlert } from '../../types/validation';
 import type { PendingValidation } from '../../utils/cellRegistry';
 
@@ -27,10 +29,15 @@ interface SaveConfirmModalProps {
   onOpenCatalogs?: () => void;
   /** Celdas pendientes con estado de validación inválido (persistido). */
   invalidPendingCells?: PendingValidation[];
+  dbCellNames?: string[];
+  originalCelda?: string | null;
+  knownCells?: string[];
 }
 
 export default function SaveConfirmModal({
-  validationAlerts, validationPending, validationError,
+  validationAlerts,
+  validationPending,
+  validationError,
   isOpen,
   onClose,
   onConfirmSave,
@@ -39,30 +46,51 @@ export default function SaveConfirmModal({
   pltDiff,
   pltEnsayos = [],
   onOpenCatalogs,
-  invalidPendingCells = []
+  invalidPendingCells = [],
+  dbCellNames = [],
+  originalCelda = null,
+  knownCells = []
 }: SaveConfirmModalProps) {
-
   const activeHasChanges = workspaceDiff.activeDiff.hasChanges;
   const hasPltChanges = pltDiff && pltDiff.totalChanges > 0;
   const hasAnyWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
 
+  // Campos obligatorios de mapeo (desde validación servidor) y PLT (local)
   const mapeoIssues = validationAlerts.filter(a => a.type === 'VACIO');
+
   const pltIssues = useMemo(() => {
     return Array.isArray(pltEnsayos) && pltEnsayos.length > 0 ? validatePltEnsayosList(pltEnsayos) : [];
   }, [pltEnsayos]);
 
-  const qaqcAlerts = validationAlerts;
+  // Revisión QA/QC de servidor + duplicidad local/BD de celda + ensayos PLT
+  const qaqcAlerts = useMemo(() => {
+    const dupAlerts = activeWindow
+      ? validateWindowDuplicateCelda(activeWindow.header, { dbCellNames, originalCelda, knownCells })
+      : [];
+
+    const pltAlerts = Array.isArray(pltEnsayos) && pltEnsayos.length > 0
+      ? validatePltQAQC(pltEnsayos, activeWindow?.header ?? null)
+      : [];
+
+    return [...validationAlerts.filter(a => a.type !== 'VACIO'), ...dupAlerts, ...pltAlerts];
+  }, [validationAlerts, activeWindow, pltEnsayos, dbCellNames, originalCelda, knownCells]);
 
   // CRITICAS y VACIOS bloquean el guardado; ADVERTENCIAS no.
   const qaqcCriticas = qaqcAlerts.filter(a => a.type === 'CRITICA');
   const qaqcAdvertencias = qaqcAlerts.filter(a => a.type === 'ADVERTENCIA');
 
-  const [selectedScope, setSelectedScope] = useState<'active' | 'all'>(activeHasChanges ? 'active' : 'all');
+  const [selectedScope, setSelectedScope] = useState<'active' | 'all'>(
+    activeHasChanges ? 'active' : 'all'
+  );
   useEffect(() => {
     if (isOpen) setSelectedScope(activeHasChanges ? 'active' : 'all');
   }, [isOpen, activeHasChanges]);
-  const otherInvalidCells = selectedScope === 'all' ? invalidPendingCells.filter(v => v.celda !== activeWindow?.header.celda) : [];
-  // Other drafts are checked afresh after confirmation; stale cache cannot prevent it.
+
+  // Otros borradores se validan en fresco tras confirmar; el cache persistido es solo informativo.
+  const otherInvalidCells = selectedScope === 'all'
+    ? invalidPendingCells.filter(v => v.celda !== activeWindow?.header.celda)
+    : [];
+
   const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcCriticas.length;
   const hasBlockingErrors = totalBlockingIssuesCount > 0 || (!!activeWindow && validationPending);
   if (!isOpen) return null;
@@ -327,18 +355,6 @@ export default function SaveConfirmModal({
                     </div>
                   ))}
 
-                  {/* QA/QC Advertencias (no bloquean) */}
-                  {qaqcAdvertencias.map((err, idx) => (
-                    <div key={`qaqc-warn-${idx}`} className="text-xs bg-amber-950/60 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between text-amber-100 shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                        <span className="font-semibold leading-tight">{err.message}</span>
-                      </div>
-                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-amber-500/30 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/40 tracking-wider">
-                        Advertencia
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
 
@@ -368,6 +384,34 @@ export default function SaveConfirmModal({
                 </p>
               </div>
 
+            </div>
+          )}
+
+          {/* Advertencias QA/QC (siempre visibles si existen; NO bloquean el guardado) */}
+          {qaqcAdvertencias.length > 0 && (
+            <div className="bg-amber-950/50 border border-amber-500/40 rounded-2xl p-4 space-y-2.5 text-amber-100 shadow-sm">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-500/20 pb-2">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-300 uppercase tracking-wider">
+                  <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+                  <span>Advertencias QA/QC (No bloquean guardado)</span>
+                </div>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200">
+                  {qaqcAdvertencias.length}
+                </span>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {qaqcAdvertencias.map((err, idx) => (
+                  <div key={`qaqc-warn-${idx}`} className="text-xs bg-amber-950/60 border border-amber-500/35 rounded-xl p-2.5 flex items-center justify-between text-amber-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                      <span className="font-semibold leading-tight">{err.message}</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-500/25 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/35 tracking-wider">
+                      Advertencia
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

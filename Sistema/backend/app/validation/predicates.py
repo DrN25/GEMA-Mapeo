@@ -21,16 +21,29 @@ from app.validation.registry import RULES_REGISTRY, CATEGORIES_REGISTRY, GEOMECH
 from app.utils.interpolation import rating_continuo_rqd, rating_continuo_r1
 
 
+from functools import lru_cache
+
+_MISSING = object()
+
+
+@lru_cache(maxsize=4096)
+def _clean_k(s):
+    return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
+
+
 def get_row_val(row_dict, key):
-    if key in row_dict:
-        return row_dict[key]
-    
-    def clean_k(s):
-        return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
-    
-    target_norm = clean_k(key)
+    val = row_dict.get(key, _MISSING)
+    if val is not _MISSING:
+        return val
+
+    norm_map = getattr(row_dict, "_norm_lookup", None)
+    if norm_map is not None:
+        resolved = norm_map.get(_clean_k(key))
+        return row_dict.get(resolved) if resolved is not None else None
+
+    target_norm = _clean_k(key)
     for k, v in row_dict.items():
-        if clean_k(k) == target_norm:
+        if _clean_k(k) == target_norm:
             return v
     return None
 

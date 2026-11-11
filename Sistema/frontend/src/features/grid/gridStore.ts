@@ -3,6 +3,12 @@ import { create } from 'zustand';
 import type { CellCoordinate } from './types';
 import type { QAQCAlert } from './schema/types';
 import { PLT_SCHEMA, PLT_SCHEMA_MAP, validateRow } from './schema';
+import { LITHOLOGY_CLASSIFICATION } from '../../utils/catalogData';
+import { resolveExpectedKStrict } from '../../utils/pltQaQcRules';
+
+const LITO_TRIGGER_KEYS = new Set(['litologia_1', 'litologia_2', 'litologia_3', 'model2022']);
+const PLT_CALC_COLS = PLT_SCHEMA.filter(col => Boolean(col.calculate || col.autoGenerate));
+const PLT_VALID_COLS = PLT_SCHEMA.filter(col => col.editor !== 'none' || Boolean(col.customValidators));
 
 function isRecordDifferent(
   a: Record<string, any> | undefined,
@@ -27,7 +33,18 @@ export function recalculateDerivedFields(
   row: Record<string, any>,
   colKey?: string
 ): void {
-  for (const col of PLT_SCHEMA) {
+  const kIsBlank =
+    row.factor_conversion_k === null ||
+    row.factor_conversion_k === undefined ||
+    String(row.factor_conversion_k).trim() === '';
+  if (kIsBlank || (colKey && LITO_TRIGGER_KEYS.has(colKey))) {
+    const kExpected = resolveExpectedKStrict(row);
+    if (kExpected !== null) {
+      row.factor_conversion_k = kExpected;
+    }
+  }
+
+  for (const col of PLT_CALC_COLS) {
     if (col.calculate) {
       const calcVal = col.calculate(row);
       if (calcVal !== undefined) {
@@ -105,11 +122,11 @@ export const useGridStore = create<GridStoreState>((set, get) => ({
       recalculateDerivedFields(rowCopy);
 
       recordsMap.set(validId, rowCopy);
-      originalMap.set(validId, JSON.parse(JSON.stringify(rowCopy)));
+      originalMap.set(validId, { ...rowCopy });
       rowIds.push(validId);
       rowVersions.set(validId, 1);
 
-      const alerts = validateRow(rowCopy, PLT_SCHEMA);
+      const alerts = validateRow(rowCopy, PLT_VALID_COLS);
       if (alerts.length > 0) {
         qaqcMap.set(validId, alerts);
       }
@@ -180,33 +197,75 @@ export const useGridStore = create<GridStoreState>((set, get) => ({
     const existing = recordsById.get(rowId);
     if (!existing) return;
 
-    const updatedRow = { ...existing, [colKey]: value };
+    let normalizedVal = value;
+    const colSchema = PLT_SCHEMA_MAP.get(colKey);
+    if (colSchema && (colSchema.type === 'decimal' || colSchema.type === 'integer')) {
+      if (value === '' || value === null || value === undefined) {
+        normalizedVal = null;
+      } else if (typeof value !== 'number') {
+        const parsed = Number(String(value).trim().replace(/,/g, '.'));
+        if (Number.isFinite(parsed)) {
+          normalizedVal = colSchema.type === 'integer' ? Math.round(parsed) : parsed;
+        }
+      }
+      if (colKey === 'nivel' && typeof normalizedVal === 'number' && normalizedVal > 4999) {
+        normalizedVal = 4999;
+      }
+    }
+
+    const updatedRow: Record<string, any> = { ...existing, [colKey]: normalizedVal };
+
+    if (colKey === 'litologia_1' && LITHOLOGY_CLASSIFICATION.length > 0) {
+      updatedRow.litologia_2 = '';
+      updatedRow.litologia_3 = '';
+      if (normalizedVal) {
+        const matches = LITHOLOGY_CLASSIFICATION.filter(item => item.unidad === normalizedVal);
+        const uniqueL2 = Array.from(new Set(matches.map(m => m.litologia)));
+        if (uniqueL2.length === 1) {
+          updatedRow.litologia_2 = uniqueL2[0];
+          const uniqueL3 = Array.from(new Set(matches.filter(m => m.litologia === uniqueL2[0]).map(m => m.codigo)));
+          if (uniqueL3.length === 1) {
+            updatedRow.litologia_3 = uniqueL3[0];
+          }
+        }
+      }
+    } else if (colKey === 'litologia_2' && LITHOLOGY_CLASSIFICATION.length > 0) {
+      updatedRow.litologia_3 = '';
+      if (normalizedVal) {
+        const matches = LITHOLOGY_CLASSIFICATION.filter(
+          item => item.unidad === updatedRow.litologia_1 && item.litologia === normalizedVal
+        );
+        const uniqueL3 = Array.from(new Set(matches.map(m => m.codigo)));
+        if (uniqueL3.length === 1) {
+          updatedRow.litologia_3 = uniqueL3[0];
+        }
+      }
+    }
+
     recalculateDerivedFields(updatedRow, colKey);
 
     recordsById.set(rowId, updatedRow);
 
     const orig = originalRecordsById.get(rowId);
-    const newDirtySet = new Set(dirtyRowIds);
     if (isRecordDifferent(updatedRow, orig)) {
-      newDirtySet.add(rowId);
+      dirtyRowIds.add(rowId);
     } else {
-      newDirtySet.delete(rowId);
+      dirtyRowIds.delete(rowId);
     }
 
-    const alerts = validateRow(updatedRow, PLT_SCHEMA);
-    const newQaqcMap = new Map(qaqcAlertsByRowId);
+    const alerts = validateRow(updatedRow, PLT_VALID_COLS);
     if (alerts.length > 0) {
-      newQaqcMap.set(rowId, alerts);
+      qaqcAlertsByRowId.set(rowId, alerts);
     } else {
-      newQaqcMap.delete(rowId);
+      qaqcAlertsByRowId.delete(rowId);
     }
 
     const curVer = rowVersions.get(rowId) || 1;
     rowVersions.set(rowId, curVer + 1);
 
     set({
-      dirtyRowIds: newDirtySet,
-      qaqcAlertsByRowId: newQaqcMap,
+      dirtyRowIds,
+      qaqcAlertsByRowId,
       dataVersion: dataVersion + 1
     });
   },
@@ -238,8 +297,9 @@ export const useGridStore = create<GridStoreState>((set, get) => ({
       ancho_w1: null,
       ancho_w2: null,
       fuerza_p: null,
-      direccion_rotura: 'Pa',
-      tipo_fractura: 'M',
+      direccion_rotura: '',
+      tipo_fractura: '',
+      factor_conversion_k: null,
       sector_geotecnico: parentRow?.sector_geotecnico || '',
       zona_mapeo: parentRow?.zona_mapeo || '',
       observaciones: '',
@@ -256,12 +316,11 @@ export const useGridStore = create<GridStoreState>((set, get) => ({
     const insertPos = rowIdx >= 0 ? rowIdx + 1 : nextRowIds.length;
     nextRowIds.splice(insertPos, 0, newId);
 
-    const newDirtySet = new Set(dirtyRowIds);
-    newDirtySet.add(newId);
+    dirtyRowIds.add(newId);
 
     set({
       rowIds: nextRowIds,
-      dirtyRowIds: newDirtySet,
+      dirtyRowIds,
       activeCell: { rowIdx: insertPos, colKey: 'muestra', rowId: newId },
       dataVersion: dataVersion + 1
     });
@@ -277,12 +336,11 @@ export const useGridStore = create<GridStoreState>((set, get) => ({
     qaqcAlertsByRowId.delete(rowId);
 
     const nextRowIds = rowIds.filter(id => id !== rowId);
-    const newDirtySet = new Set(dirtyRowIds);
-    newDirtySet.add(rowId); // Marcar como modificado para sincronizar eliminación
+    dirtyRowIds.add(rowId); // Marcar como modificado para sincronizar eliminación
 
     set({
       rowIds: nextRowIds,
-      dirtyRowIds: newDirtySet,
+      dirtyRowIds,
       activeCell: nextRowIds.length > 0 ? { rowIdx: Math.max(0, Math.min(nextRowIds.length - 1, 0)), colKey: 'campana', rowId: nextRowIds[0] } : null,
       dataVersion: dataVersion + 1
     });

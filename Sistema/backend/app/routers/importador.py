@@ -1,5 +1,7 @@
-import io
+import os
+import gc
 import math
+import openpyxl
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -16,6 +18,7 @@ from app.core.catalogs import infer_lithology_from_lito3
 from app.parsers.excel_a import detect_format, parse_excel_a, normalize_station_to_celda
 from app.core.audit import apply_audit
 from app.auth.dependencies import require_role
+from app.core.excel_styles import dedup_pandas_headers, save_upload_to_temp
 
 router = APIRouter()
 
@@ -219,6 +222,97 @@ STANDARD_FIELD_MAPPINGS = {    "codigo_celda": ["CELDA", "CELDA_PADRE", "CODIGOC
 }
 
 
+_PANDAS_NA_STRINGS_IMP = frozenset({
+    "", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN",
+    "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A",
+    "NA", "NULL", "NaN", "None", "n/a", "nan", "null",
+    "#NULL!", "#DIV/0!", "#VALUE!", "#REF!", "#NAME?", "#NUM!",
+})
+_IMP_EMPTY_MARKERS = (-1, -1.0, "-1", "-1.0", "NAN", "None")
+
+
+def _is_pd_na_imp(val) -> bool:
+    if val is None:
+        return True
+    if isinstance(val, float) and math.isnan(val):
+        return True
+    if isinstance(val, str) and val in _PANDAS_NA_STRINGS_IMP:
+        return True
+    return False
+
+
+def _parse_imp_numeric_str(s: str):
+    """Replica el parseo numérico de cadenas de pandas TextParser."""
+    if "_" in s:
+        return None
+    s_strip = s.strip()
+    if not s_strip:
+        return None
+    try:
+        return int(s_strip)
+    except ValueError:
+        pass
+    try:
+        fv = float(s_strip)
+        if not math.isnan(fv):
+            return fv
+    except ValueError:
+        pass
+    return None
+
+
+def _resolve_import_col_candidates(excel_cols: list, possible_names) -> tuple:
+    if isinstance(possible_names, str):
+        possible_names = [possible_names]
+
+    cleaned_col_map = {}
+    for idx, k in enumerate(excel_cols):
+        k_clean = " ".join(str(k).strip().upper().replace("'", "").replace('"', "").split())
+        cleaned_col_map[k_clean] = idx
+
+    phase1 = []
+    for name in possible_names:
+        n_clean = " ".join(str(name).strip().upper().replace("'", "").replace('"', "").split())
+        if n_clean in cleaned_col_map:
+            phase1.append(cleaned_col_map[n_clean])
+
+    def _clean_k(s):
+        return "".join(str(s).split()).replace(".", "").replace("(", "").replace(")", "").replace("_", "").replace("-", "").upper()
+
+    exact_idx_map = {}
+    norm_idx_map = {}
+    for idx, k in enumerate(excel_cols):
+        if k not in exact_idx_map:
+            exact_idx_map[k] = idx
+        nk = _clean_k(k)
+        if nk not in norm_idx_map:
+            norm_idx_map[nk] = idx
+
+    phase2 = []
+    for name in possible_names:
+        if name in exact_idx_map:
+            phase2.append(exact_idx_map[name])
+        else:
+            tn = _clean_k(name)
+            if tn in norm_idx_map:
+                phase2.append(norm_idx_map[tn])
+
+    return tuple(phase1), tuple(phase2)
+
+
+def _lookup_imp_val(row_seq, cands: tuple):
+    phase1, phase2 = cands
+    for idx in phase1:
+        val = row_seq[idx]
+        if not _is_pd_na_imp(val) and val not in _IMP_EMPTY_MARKERS:
+            return val
+    for idx in phase2:
+        val = row_seq[idx]
+        if val is not None and not _is_pd_na_imp(val) and val not in (-1, -1.0, "-1", "-1.0"):
+            return val
+    return None
+
+
 @router.post("/importar-excel/hojas")
 async def list_excel_sheets(file: UploadFile = File(...)):
     """
@@ -226,14 +320,23 @@ async def list_excel_sheets(file: UploadFile = File(...)):
     contenido de las celdas (openpyxl en modo read_only lee únicamente
     xl/workbook.xml). Es instantáneo incluso para archivos muy grandes.
     """
-    contents = await file.read()
+    tmp_path = None
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True, data_only=False)
-        names = list(wb.sheetnames)
-        wb.close()
+        ext = os.path.splitext(file.filename or "")[1] or ".xlsx"
+        tmp_path = await save_upload_to_temp(file, suffix=ext)
+        wb = openpyxl.load_workbook(tmp_path, read_only=True, data_only=False)
+        try:
+            names = list(wb.sheetnames)
+        finally:
+            wb.close()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
     return {"status": "success", "hojas": names}
 
 
@@ -251,156 +354,437 @@ async def preview_import_excel(
       - 'b' (base de datos): tabla plana con columna 'CELDA' (lógica actual).
     Se procesa la hoja indicada (o la primera si no se especifica).
     """
-    contents = await file.read()
-
-    # Leer hojas disponibles con openpyxl (para selección y auto-detección)
+    tmp_path = None
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True, read_only=False)
-        sheet_names = wb.sheetnames
-        if hoja and hoja in sheet_names:
-            ws = wb[hoja]
-        else:
-            ws = wb[sheet_names[0]]
-            hoja = sheet_names[0]
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
+        ext = os.path.splitext(file.filename or "")[1] or ".xlsx"
+        try:
+            tmp_path = await save_upload_to_temp(file, suffix=ext)
+            wb_ro = openpyxl.load_workbook(tmp_path, data_only=True, read_only=True)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo Excel: {e}")
 
-    fmt = detect_format(ws)
-    if fmt == "unknown":
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "El formato del archivo no es soportado o la hoja seleccionada no contiene datos de mapeo. "
-                "Verifique que esté usando una plantilla válida de mapeo geomecánico "
-                "e intente con otra hoja del libro."
-            )
-        )
-    if fmt == "a":
-        return _preview_excel_a(ws, db, hoja)
+        try:
+            sheet_names = wb_ro.sheetnames
+            if hoja and hoja in sheet_names:
+                ws_ro = wb_ro[hoja]
+            else:
+                ws_ro = wb_ro[sheet_names[0]]
+                hoja = sheet_names[0]
 
-    # ---- Formato B: tabla plana con columna CELDA ----
-    try:
-        df = pd.read_excel(io.BytesIO(contents), sheet_name=hoja)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo leer la hoja '{hoja}': {e}")
+            fmt = detect_format(ws_ro)
+            if fmt == "unknown":
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "El formato del archivo no es soportado o la hoja seleccionada no contiene datos de mapeo. "
+                        "Verifique que esté usando una plantilla válida de mapeo geomecánico "
+                        "e intente con otra hoja del libro."
+                    )
+                )
 
-    if formato == "estaciones":
-        raise HTTPException(
-            status_code=400,
-            detail="El modo de importación seleccionado no está disponible. Por favor utilice el modo Automático."
-        )
+            if fmt == "a":
+                wb_ro.close()
+                wb_dom = openpyxl.load_workbook(tmp_path, data_only=True, read_only=False)
+                try:
+                    return _preview_excel_a(wb_dom[hoja], db, hoja)
+                finally:
+                    wb_dom.close()
 
-    # Encontrar la columna de Celda
-    celda_col = None
-    for c in df.columns:
-        c_upper = str(c).strip().upper()
-        if c_upper in ['CELDA', 'CELDA_PADRE', 'CODIGOCELDA', 'CODIGO_CELDA', 'CELDA.1', 'CELDA_ORIGEN']:
-            celda_col = c
-            break
+            if formato == "estaciones":
+                raise HTTPException(
+                    status_code=400,
+                    detail="El modo de importación seleccionado no está disponible. Por favor utilice el modo Automático."
+                )
 
-    if not celda_col:
-        cols_preview = ", ".join([f"'{c}'" for c in df.columns[:6]])
-        raise HTTPException(
-            status_code=400,
-            detail=f"Formato no reconocido: No se encontró la columna obligatoria 'CELDA' o 'CELDA_PADRE' en el archivo Excel. Se detectaron las columnas: [{cols_preview}]. Verifique la plantilla."
-        )
+            # ---- Formato B: streaming con read_only=True en 2 pasadas (sin DOM ni DataFrames) ----
+            # Pasada 1: determinar rango efectivo de columnas/filas y columnas float64 (con NaNs o floats)
+            row_iter1 = ws_ro.iter_rows(values_only=True)
+            raw_header = next(row_iter1, None)
+            if not raw_header:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Formato no reconocido: No se encontró la columna obligatoria 'CELDA' o 'CELDA_PADRE' en el archivo Excel. Se detectaron las columnas: []. Verifique la plantilla."
+                )
 
-    if df.empty or df.dropna(how='all').empty:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "La hoja seleccionada está vacía o no contiene datos de mapeo. "
-                "Verifique que esté usando una plantilla válida de mapeo geomecánico "
-                "o intente con otra hoja del libro."
-            )
-        )
+            last_hdr_col = -1
+            for ci, v in enumerate(raw_header):
+                if v is not None:
+                    last_hdr_col = ci
 
-    # Detectar mapeo de columnas encontradas
-    detected_mapping = {}
-    excel_cols = [str(c) for c in df.columns]
-    for sys_field, candidates in STANDARD_FIELD_MAPPINGS.items():
-        found = None
-        for col in excel_cols:
-            col_clean = " ".join(col.strip().upper().replace("'", "").replace('"', '').split())
-            for cand in candidates:
-                cand_clean = " ".join(cand.strip().upper().replace("'", "").replace('"', '').split())
-                if col_clean == cand_clean:
-                    found = col
+            saw_int = []
+            saw_float = []
+            saw_other = []
+            non_na_counts = []
+
+            def _ensure_cap(n: int):
+                if n > len(saw_int):
+                    delta = n - len(saw_int)
+                    saw_int.extend([False] * delta)
+                    saw_float.extend([False] * delta)
+                    saw_other.extend([False] * delta)
+                    non_na_counts.extend([0] * delta)
+
+            _ensure_cap(max(last_hdr_col + 1, 1))
+            max_used_col = last_hdr_col
+            last_non_empty_row = 1
+            has_any_non_na_row = False
+
+            for row_num, row in enumerate(row_iter1, start=2):
+                r_len = len(row)
+                last_non_none = -1
+                for ci in range(r_len - 1, -1, -1):
+                    if row[ci] is not None:
+                        last_non_none = ci
+                        break
+                if last_non_none < 0:
+                    continue
+
+                if last_non_none > max_used_col:
+                    max_used_col = last_non_none
+                _ensure_cap(max_used_col + 1)
+
+                row_has_non_na = False
+                for ci in range(last_non_none + 1):
+                    v = row[ci]
+                    if _is_pd_na_imp(v):
+                        continue
+                    row_has_non_na = True
+                    non_na_counts[ci] += 1
+                    tv = type(v)
+                    if tv is int:
+                        saw_int[ci] = True
+                    elif tv is float:
+                        saw_float[ci] = True
+                    elif tv is str:
+                        parsed = _parse_imp_numeric_str(v)
+                        if parsed is None:
+                            saw_other[ci] = True
+                        elif type(parsed) is int:
+                            saw_int[ci] = True
+                        else:
+                            saw_float[ci] = True
+                    else:
+                        saw_other[ci] = True
+
+                if row_has_non_na:
+                    last_non_empty_row = row_num
+                    has_any_non_na_row = True
+
+            effective_ncols = max_used_col + 1 if max_used_col >= 0 else 0
+            raw_hdr_slice = [raw_header[i] if i < len(raw_header) else None for i in range(effective_ncols)]
+            excel_cols = [str(c) for c in dedup_pandas_headers(raw_hdr_slice)]
+
+            # Encontrar la columna de Celda
+            celda_col = None
+            celda_col_idx = None
+            for idx, c in enumerate(excel_cols):
+                c_upper = c.strip().upper()
+                if c_upper in ("CELDA", "CELDA_PADRE", "CODIGOCELDA", "CODIGO_CELDA", "CELDA.1", "CELDA_ORIGEN"):
+                    celda_col = c
+                    celda_col_idx = idx
                     break
-            if found: break
-        detected_mapping[sys_field] = found or candidates[0]
 
-    # Forward fill columnas de cabecera
-    header_cols = [
-        celda_col, 'ESTE_FROM', 'NORTE_FROM', 'COTA', 'ESTE_TO', 'NORTE_TO', 'COTA.1',
-        'Dist.Celda', 'Altura', 'DIP', 'AZ_HOLE', 'DIP_TALUD', 'DIP DIR_TALUD', 'INTEMPERISMO',
-        "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", "DUREZA  '76", "RESISTENCIA ESTIMADA VALOR  '76",
-        "GSI VISUAL  '76", "CONTROL ESTRUCTURAL  '76", "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", "RQD  '76",
-        "FRECUENCIA DE FRACTURAMIENTO x m.  '76", "TAMAÑO DE BLOQUES  x m3  '76", "ESPACIAMIENTO PROMEDIO   '76",
-        "ESPACIAMIENTO - VALOR    '76", "CONDICIÓN DE DISCONTINUIDAD - VALOR     '76", "RMR '76",
-        "( UCS )  (Mpa)", "is50 (Mpa)", "CONDICION DE AGUA  '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89",
-        "RESISTENCIA ESTIMADA VALOR '89", "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89", "EFECTOS DE VOLADURA '89",
-        "RQD - VALOR '89", "RQD '89", "FRECUENCIA DE FRACTURAMIENTO x m. '89", "TAMAÑO DE BLOQUES  x m3 '89",
-        "ESPACIAMIENTO PROMEDIO '89", "ESPACIAMIENTO - VALOR '89", "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89",
-        'FECHA', 'COMENTARIO', 'GEOTECNICO', 'Nivel', 'Lito 1', 'Lito 2', 'Lito 3', 'Unidad Litologica',
-        'Sector Geotecnicos', 'Campaña', 'Año', 'Ano'
-    ]
+            if not celda_col:
+                cols_preview = ", ".join([f"'{c}'" for c in excel_cols[:6]])
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Formato no reconocido: No se encontró la columna obligatoria 'CELDA' o 'CELDA_PADRE' en el archivo Excel. Se detectaron las columnas: [{cols_preview}]. Verifique la plantilla."
+                )
 
-    for col in header_cols:
-        if col in df.columns:
-            df[col] = df[col].ffill()
+            if not has_any_non_na_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "La hoja seleccionada está vacía o no contiene datos de mapeo. "
+                        "Verifique que esté usando una plantilla válida de mapeo geomecánico "
+                        "o intente con otra hoja del libro."
+                    )
+                )
 
-    grouped = df.groupby(celda_col, sort=False)
-    groups = list(grouped)
+            total_data_rows = last_non_empty_row - 1
+            is_numeric_col = [
+                (not saw_other[ci]) and (saw_int[ci] or saw_float[ci])
+                for ci in range(effective_ncols)
+            ]
+            coerce_to_float = [
+                is_numeric_col[ci] and (saw_float[ci] or non_na_counts[ci] < total_data_rows)
+                for ci in range(effective_ncols)
+            ]
 
-    # Prefetch en batch de celdas existentes (1 query IN + catálogos) en vez
-    # de check_duplicate() por celda (~9 queries cada una).
-    existing_map = build_celdas_existing(db, [clean_str(c) for c, _ in groups])
+            def _coerce_imp_cell(v, ci: int):
+                if is_numeric_col[ci]:
+                    tv = type(v)
+                    if tv is int:
+                        return float(v) if coerce_to_float[ci] else v
+                    if tv is float:
+                        return v
+                    if tv is str:
+                        parsed = _parse_imp_numeric_str(v)
+                        if parsed is not None:
+                            return float(parsed) if coerce_to_float[ci] else parsed
+                return v
+
+            # Detectar mapeo de columnas encontradas
+            detected_mapping = {}
+            for sys_field, candidates in STANDARD_FIELD_MAPPINGS.items():
+                found = None
+                for col in excel_cols:
+                    col_clean = " ".join(col.strip().upper().replace("'", "").replace('"', "").split())
+                    for cand in candidates:
+                        cand_clean = " ".join(cand.strip().upper().replace("'", "").replace('"', "").split())
+                        if col_clean == cand_clean:
+                            found = col
+                            break
+                    if found:
+                        break
+                detected_mapping[sys_field] = found or candidates[0]
+
+            # Forward fill columnas de cabecera
+            header_cols_set = {
+                celda_col, "ESTE_FROM", "NORTE_FROM", "COTA", "ESTE_TO", "NORTE_TO", "COTA.1",
+                "Dist.Celda", "Altura", "DIP", "AZ_HOLE", "DIP_TALUD", "DIP DIR_TALUD", "INTEMPERISMO",
+                "CONDICION DE AGUA  '76.", "CONDICION DE AGUA VALOR  '76", "DUREZA  '76", "RESISTENCIA ESTIMADA VALOR  '76",
+                "GSI VISUAL  '76", "CONTROL ESTRUCTURAL  '76", "EFECTOS DE VOLADURA  '76", "RQD - VALOR  '76", "RQD  '76",
+                "FRECUENCIA DE FRACTURAMIENTO x m.  '76", "TAMAÑO DE BLOQUES  x m3  '76", "ESPACIAMIENTO PROMEDIO   '76",
+                "ESPACIAMIENTO - VALOR    '76", "CONDICIÓN DE DISCONTINUIDAD - VALOR     '76", "RMR '76",
+                "( UCS )  (Mpa)", "is50 (Mpa)", "CONDICION DE AGUA  '89", "CONDICION DE AGUA VALOR '89", "DUREZA '89",
+                "RESISTENCIA ESTIMADA VALOR '89", "GSI VISUAL '89", "CONTROL ESTRUCTURAL '89", "EFECTOS DE VOLADURA '89",
+                "RQD - VALOR '89", "RQD '89", "FRECUENCIA DE FRACTURAMIENTO x m. '89", "TAMAÑO DE BLOQUES  x m3 '89",
+                "ESPACIAMIENTO PROMEDIO '89", "ESPACIAMIENTO - VALOR '89", "CONDICIÓN DE DISCONTINUIDAD - VALOR '89", "RMR '89",
+                "FECHA", "COMENTARIO", "GEOTECNICO", "Nivel", "Lito 1", "Lito 2", "Lito 3", "Unidad Litologica",
+                "Sector Geotecnicos", "Campaña", "Año", "Ano",
+            }
+            ffill_indices = [i for i, col in enumerate(excel_cols) if col in header_cols_set]
+            ffill_state = {i: None for i in ffill_indices}
+
+            # Precomputar índices de columnas una sola vez para cabecera y estructuras
+            cands_este_from = _resolve_import_col_candidates(excel_cols, ["ESTE_FROM"])
+            cands_norte_from = _resolve_import_col_candidates(excel_cols, ["NORTE_FROM"])
+            cands_cota_from = _resolve_import_col_candidates(excel_cols, ["COTA"])
+            cands_este_to = _resolve_import_col_candidates(excel_cols, ["ESTE_TO"])
+            cands_norte_to = _resolve_import_col_candidates(excel_cols, ["NORTE_TO"])
+            cands_cota_to = _resolve_import_col_candidates(excel_cols, ["COTA.1", "COTA_TO"])
+            cands_altura = _resolve_import_col_candidates(excel_cols, ["Altura"])
+            cands_largo = _resolve_import_col_candidates(excel_cols, ["Dist.Celda"])
+            cands_lito1 = _resolve_import_col_candidates(excel_cols, ["Lito 1", "LITO1"])
+            cands_lito2 = _resolve_import_col_candidates(excel_cols, ["Lito 2", "LITO2"])
+            cands_lito3 = _resolve_import_col_candidates(excel_cols, ["Lito 3", "LITO3"])
+            cands_unidad = _resolve_import_col_candidates(excel_cols, ["Unidad Litologica"])
+            cands_mapeador = _resolve_import_col_candidates(excel_cols, ["GEOTECNICO"])
+            cands_sector = _resolve_import_col_candidates(excel_cols, ["Sector Geotecnicos", "Sector"])
+            cands_camp = _resolve_import_col_candidates(excel_cols, ["Campaña", "Año", "Ano", "Campania"])
+            cands_fecha = _resolve_import_col_candidates(excel_cols, ["FECHA", "FechaMapeo"])
+            cands_rmr76 = _resolve_import_col_candidates(excel_cols, ["RMR '76"])
+            cands_rmr89 = _resolve_import_col_candidates(excel_cols, ["RMR '89"])
+            cands_dip = _resolve_import_col_candidates(excel_cols, ["DIP"])
+            cands_az = _resolve_import_col_candidates(excel_cols, ["AZ_HOLE", "AZIMUT", "AZIMUT_HOLE"])
+            cands_dip_t = _resolve_import_col_candidates(excel_cols, ["DIP_TALUD", "DIPTALUD"])
+            cands_dipdir_t = _resolve_import_col_candidates(excel_cols, ["DIP DIR_TALUD", "DIPDIR_TALUD", "DIPDIR"])
+            cands_intem = _resolve_import_col_candidates(excel_cols, ["INTEMPERISMO", "ALTERACION"])
+            cands_nivel = _resolve_import_col_candidates(excel_cols, ["Nivel", "NIVEL"])
+            cands_coment = _resolve_import_col_candidates(excel_cols, ["COMENTARIO", "COMENTARIOS"])
+            cands_ucs = _resolve_import_col_candidates(excel_cols, ["( UCS )  (Mpa)", "UCS", "UCS_MPA"])
+            cands_is50 = _resolve_import_col_candidates(excel_cols, ["is50 (Mpa)", "IS50", "IS50_MPA"])
+            cands_cw76 = _resolve_import_col_candidates(excel_cols, ["CONDICION DE AGUA  '76."])
+            cands_cwv76 = _resolve_import_col_candidates(excel_cols, ["CONDICION DE AGUA VALOR  '76"])
+            cands_dur76 = _resolve_import_col_candidates(excel_cols, ["DUREZA  '76"])
+            cands_resv76 = _resolve_import_col_candidates(excel_cols, ["RESISTENCIA ESTIMADA VALOR  '76"])
+            cands_gsi76 = _resolve_import_col_candidates(excel_cols, ["GSI VISUAL  '76"])
+            cands_ce76 = _resolve_import_col_candidates(excel_cols, ["CONTROL ESTRUCTURAL  '76"])
+            cands_ev76 = _resolve_import_col_candidates(excel_cols, ["EFECTOS DE VOLADURA  '76"])
+            cands_rqdv76 = _resolve_import_col_candidates(excel_cols, ["RQD - VALOR  '76"])
+            cands_rqd76 = _resolve_import_col_candidates(excel_cols, ["RQD  '76"])
+            cands_ff76 = _resolve_import_col_candidates(excel_cols, ["FRECUENCIA DE FRACTURAMIENTO x m.  '76"])
+            cands_tb76 = _resolve_import_col_candidates(excel_cols, ["TAMAÑO DE BLOQUES  x m3  '76"])
+            cands_ep76 = _resolve_import_col_candidates(excel_cols, ["ESPACIAMIENTO PROMEDIO   '76"])
+            cands_evl76 = _resolve_import_col_candidates(excel_cols, ["ESPACIAMIENTO - VALOR    '76"])
+            cands_cdv76 = _resolve_import_col_candidates(excel_cols, ["CONDICIÓN DE DISCONTINUIDAD - VALOR     '76"])
+            cands_cw89 = _resolve_import_col_candidates(excel_cols, ["CONDICION DE AGUA  '89"])
+            cands_cwv89 = _resolve_import_col_candidates(excel_cols, ["CONDICION DE AGUA VALOR '89"])
+            cands_dur89 = _resolve_import_col_candidates(excel_cols, ["DUREZA '89"])
+            cands_resv89 = _resolve_import_col_candidates(excel_cols, ["RESISTENCIA ESTIMADA VALOR '89"])
+            cands_gsi89 = _resolve_import_col_candidates(excel_cols, ["GSI VISUAL '89"])
+            cands_ce89 = _resolve_import_col_candidates(excel_cols, ["CONTROL ESTRUCTURAL '89"])
+            cands_ev89 = _resolve_import_col_candidates(excel_cols, ["EFECTOS DE VOLADURA '89"])
+            cands_rqdv89 = _resolve_import_col_candidates(excel_cols, ["RQD - VALOR '89"])
+            cands_rqd89 = _resolve_import_col_candidates(excel_cols, ["RQD '89"])
+            cands_ff89 = _resolve_import_col_candidates(excel_cols, ["FRECUENCIA DE FRACTURAMIENTO x m. '89"])
+            cands_tb89 = _resolve_import_col_candidates(excel_cols, ["TAMAÑO DE BLOQUES  x m3 '89"])
+            cands_ep89 = _resolve_import_col_candidates(excel_cols, ["ESPACIAMIENTO PROMEDIO '89"])
+            cands_evl89 = _resolve_import_col_candidates(excel_cols, ["ESPACIAMIENTO - VALOR '89"])
+            cands_cdv89 = _resolve_import_col_candidates(excel_cols, ["CONDICIÓN DE DISCONTINUIDAD - VALOR '89"])
+
+            st_dip = _resolve_import_col_candidates(excel_cols, ["DIP.1", "DIP_ESTR", "DIP"])
+            st_dipdir = _resolve_import_col_candidates(excel_cols, ["DIP DIR", "DIPDIR"])
+            st_tipo = _resolve_import_col_candidates(excel_cols, ["TIPO"])
+            st_dist = _resolve_import_col_candidates(excel_cols, ["Dist. de estr."])
+            st_aber = _resolve_import_col_candidates(excel_cols, ["ABERTURA mm."])
+            st_esp = _resolve_import_col_candidates(excel_cols, ["ESPESOR mm."])
+            st_cont = _resolve_import_col_candidates(excel_cols, ["CONTINUIDAD m."])
+            st_espac = _resolve_import_col_candidates(excel_cols, ["ESPACIAMIENTO m."])
+            st_nest = _resolve_import_col_candidates(excel_cols, ["NUMERO DE ESTRUCTURAS"])
+            st_ext = _resolve_import_col_candidates(excel_cols, ["NUMERO DE EXTREMOS VISIBLES"])
+            st_rel1 = _resolve_import_col_candidates(excel_cols, ["TIPO DE  RELLENO 1"])
+            st_rel2 = _resolve_import_col_candidates(excel_cols, ["TIPO DE  RELLENO 2"])
+            st_jrc = _resolve_import_col_candidates(excel_cols, ["JRC"])
+            st_rug = _resolve_import_col_candidates(excel_cols, ["RUGOSIDAD DE ESTRUCTURAS"])
+            st_frm = _resolve_import_col_candidates(excel_cols, ["FORMA DE ESTRUCTURA"])
+            st_alt = _resolve_import_col_candidates(excel_cols, ["ALTERACION"])
+
+            struct_needed_indices = sorted({
+                idx
+                for cands in (
+                    st_dip, st_dipdir, st_tipo, st_dist, st_aber, st_esp,
+                    st_cont, st_espac, st_nest, st_ext, st_rel1, st_rel2,
+                    st_jrc, st_rug, st_frm, st_alt,
+                )
+                for group in cands
+                for idx in group
+            })
+            # Map from column index within full row -> same index in compact row_vec (only allocated for used cols)
+            groups_map: Dict[Any, Dict[str, Any]] = {}
+
+            # Pasada 2: agrupar en streaming conservando solo 1 fila cabecera por celda + estructuras compactas
+            row_iter2 = ws_ro.iter_rows(
+                min_row=2, max_row=last_non_empty_row, max_col=effective_ncols, values_only=True
+            )
+            row_buf = [None] * effective_ncols
+            for raw_row in row_iter2:
+                r_len = len(raw_row)
+                for ci in ffill_indices:
+                    v = raw_row[ci] if ci < r_len else None
+                    if not _is_pd_na_imp(v):
+                        ffill_state[ci] = _coerce_imp_cell(v, ci)
+
+                code_raw = ffill_state[celda_col_idx]
+                if _is_pd_na_imp(code_raw):
+                    continue
+                code_celda = clean_str(code_raw)
+                if not code_celda:
+                    continue
+
+                grp = groups_map.get(code_raw)
+                if grp is None:
+                    # Solo para la primera fila de la celda normalizamos todas sus columnas
+                    full_hdr = [None] * effective_ncols
+                    for ci in range(effective_ncols):
+                        if ci in ffill_state:
+                            full_hdr[ci] = ffill_state[ci]
+                        else:
+                            v = raw_row[ci] if ci < r_len else None
+                            if _is_pd_na_imp(v):
+                                full_hdr[ci] = None
+                            else:
+                                full_hdr[ci] = _coerce_imp_cell(v, ci)
+                    grp = {
+                        "code_celda": code_celda,
+                        "header_vals": tuple(full_hdr),
+                        "row_count": 0,
+                        "estructuras": [],
+                    }
+                    groups_map[code_raw] = grp
+                    row_seq = full_hdr
+                else:
+                    # En filas hijas únicamente leemos los ~16 campos de estructura + ffill DIP si aplica
+                    for ci in struct_needed_indices:
+                        if ci in ffill_state:
+                            row_buf[ci] = ffill_state[ci]
+                        else:
+                            v = raw_row[ci] if ci < r_len else None
+                            if _is_pd_na_imp(v):
+                                row_buf[ci] = None
+                            else:
+                                row_buf[ci] = _coerce_imp_cell(v, ci)
+                    row_seq = row_buf
+
+                struct_idx = grp["row_count"]
+                grp["row_count"] = struct_idx + 1
+
+                dip_val = clean_num(_lookup_imp_val(row_seq, st_dip))
+                dipdir_val = clean_num(_lookup_imp_val(row_seq, st_dipdir))
+                if dip_val is None and dipdir_val is None:
+                    continue
+
+                num_est = struct_idx + 1
+                grp["estructuras"].append({
+                    "numero_estructura": num_est,
+                    "familia_id": math.ceil(num_est / 3.0),
+                    "tipo_estructura": clean_str(_lookup_imp_val(row_seq, st_tipo)) or "JN",
+                    "dip": dip_val if dip_val is not None else 0.0,
+                    "dip_dir": dipdir_val if dipdir_val is not None else 0.0,
+                    "distancia_m": clean_num(_lookup_imp_val(row_seq, st_dist)),
+                    "abertura_mm": clean_num(_lookup_imp_val(row_seq, st_aber)),
+                    "espesor_mm": clean_num(_lookup_imp_val(row_seq, st_esp)),
+                    "continuidad_m": clean_num(_lookup_imp_val(row_seq, st_cont)),
+                    "espaciamiento_m": clean_num(_lookup_imp_val(row_seq, st_espac)),
+                    "n_estructuras": sanitize_value(_lookup_imp_val(row_seq, st_nest), int),
+                    "n_extremos_visibles": sanitize_value(_lookup_imp_val(row_seq, st_ext), int),
+                    "relleno_1_codigo": clean_str(_lookup_imp_val(row_seq, st_rel1)),
+                    "relleno_2_codigo": clean_str(_lookup_imp_val(row_seq, st_rel2)),
+                    "jrc": clean_num(_lookup_imp_val(row_seq, st_jrc)),
+                    "rugosidad_codigo": clean_str(_lookup_imp_val(row_seq, st_rug)),
+                    "forma_estructura": clean_str(_lookup_imp_val(row_seq, st_frm)),
+                    "alteracion_codigo": clean_str(_lookup_imp_val(row_seq, st_alt)),
+                })
+        finally:
+            try:
+                wb_ro.close()
+            except Exception:
+                pass
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+    group_list = list(groups_map.values())
+    groups_map.clear()
+    gc.collect()
+
+    # Prefetch en batch de celdas existentes (1 query IN + catálogos)
+    existing_map = build_celdas_existing(db, [g["code_celda"] for g in group_list])
     celdas_preview = []
 
-    for code_raw, block_df in groups:
-        code_celda = clean_str(code_raw)
-        if not code_celda:
-            continue
+    for g in group_list:
+        code_celda = g["code_celda"]
+        header_vals = g["header_vals"]
+        estructuras_preview = g["estructuras"]
 
-        records = block_df.to_dict(orient="records")
-        header_row = records[0]
-
-        # Extraer metadatos de cabecera del Excel (preservando el 0.0 si es 0)
-        este_from_val = clean_num(get_row_val_robust(header_row, ['ESTE_FROM']))
+        este_from_val = clean_num(_lookup_imp_val(header_vals, cands_este_from))
         este_from = este_from_val if este_from_val is not None else 0.0
 
-        norte_from_val = clean_num(get_row_val_robust(header_row, ['NORTE_FROM']))
+        norte_from_val = clean_num(_lookup_imp_val(header_vals, cands_norte_from))
         norte_from = norte_from_val if norte_from_val is not None else 0.0
 
-        cota_from_val = clean_num(get_row_val_robust(header_row, ['COTA']))
+        cota_from_val = clean_num(_lookup_imp_val(header_vals, cands_cota_from))
         cota_from = cota_from_val if cota_from_val is not None else 0.0
 
-        este_to_val = clean_num(get_row_val_robust(header_row, ['ESTE_TO']))
+        este_to_val = clean_num(_lookup_imp_val(header_vals, cands_este_to))
         este_to = este_to_val if este_to_val is not None else 0.0
 
-        norte_to_val = clean_num(get_row_val_robust(header_row, ['NORTE_TO']))
+        norte_to_val = clean_num(_lookup_imp_val(header_vals, cands_norte_to))
         norte_to = norte_to_val if norte_to_val is not None else 0.0
 
-        cota_to_val = clean_num(get_row_val_robust(header_row, ['COTA.1', 'COTA_TO']))
+        cota_to_val = clean_num(_lookup_imp_val(header_vals, cands_cota_to))
         cota_to = cota_to_val if cota_to_val is not None else 0.0
 
-        altura_val = clean_num(get_row_val_robust(header_row, ['Altura']))
+        altura_val = clean_num(_lookup_imp_val(header_vals, cands_altura))
         altura = altura_val if altura_val is not None else 15.0
 
-        largo_val = clean_num(get_row_val_robust(header_row, ['Dist.Celda']))
+        largo_val = clean_num(_lookup_imp_val(header_vals, cands_largo))
         largo = largo_val if largo_val is not None else 15.0
 
-        lito1 = clean_str(get_row_val_robust(header_row, ['Lito 1', 'LITO1'])) or ''
-        lito2 = clean_str(get_row_val_robust(header_row, ['Lito 2', 'LITO2'])) or ''
-        lito3 = clean_str(get_row_val_robust(header_row, ['Lito 3', 'LITO3'])) or ''
-        unidad = clean_str(get_row_val_robust(header_row, ['Unidad Litologica'])) or ''
-        mapeador = clean_str(get_row_val_robust(header_row, ['GEOTECNICO'])) or 'SRK'
-        sector = clean_str(get_row_val_robust(header_row, ['Sector Geotecnicos', 'Sector'])) or 'NW1_B'
-        campania_raw = get_row_val_robust(header_row, ['Campaña', 'Año', 'Ano', 'Campania'])
+        lito1 = clean_str(_lookup_imp_val(header_vals, cands_lito1)) or ""
+        lito2 = clean_str(_lookup_imp_val(header_vals, cands_lito2)) or ""
+        lito3 = clean_str(_lookup_imp_val(header_vals, cands_lito3)) or ""
+        unidad = clean_str(_lookup_imp_val(header_vals, cands_unidad)) or ""
+        mapeador = clean_str(_lookup_imp_val(header_vals, cands_mapeador)) or "SRK"
+        sector = clean_str(_lookup_imp_val(header_vals, cands_sector)) or "NW1_B"
+
+        campania_raw = _lookup_imp_val(header_vals, cands_camp)
         if not campania_raw:
-            fecha_raw = get_row_val_robust(header_row, ['FECHA', 'FechaMapeo'])
+            fecha_raw = _lookup_imp_val(header_vals, cands_fecha)
             campania_raw = str(fecha_raw)[:4] if fecha_raw else "2026"
 
         c_str = str(campania_raw).strip()
@@ -412,93 +796,16 @@ async def preview_import_excel(
             campania_val = f"Campaña {c_str}"
         else:
             campania_val = c_str
-        rmr_76_val = clean_num(get_row_val_robust(header_row, ["RMR '76"]))
-        rmr_89_val = clean_num(get_row_val_robust(header_row, ["RMR '89"]))
 
-        fecha_val = get_row_val_robust(header_row, ['FECHA', 'FechaMapeo'])
-        fecha_str = new_date_str = str(fecha_val)[:10] if fecha_val else datetime.now().strftime("%Y-%m-%d")
+        rmr_76_val = clean_num(_lookup_imp_val(header_vals, cands_rmr76))
+        rmr_89_val = clean_num(_lookup_imp_val(header_vals, cands_rmr89))
 
-        # Parsear estructuras del bloque
-        estructuras_preview = []
-        for struct_idx, row in enumerate(records):
-            dip_val = clean_num(get_row_val_robust(row, ['DIP.1', 'DIP_ESTR', 'DIP']))
-            dipdir_val = clean_num(get_row_val_robust(row, ['DIP DIR', 'DIPDIR']))
+        fecha_val = _lookup_imp_val(header_vals, cands_fecha)
+        fecha_str = str(fecha_val)[:10] if fecha_val else datetime.now().strftime("%Y-%m-%d")
 
-            if dip_val is None and dipdir_val is None:
-                continue
-
-            num_est = struct_idx + 1
-            fam_id = math.ceil(num_est / 3.0)
-
-            estructuras_preview.append({
-                "numero_estructura": num_est,
-                "familia_id": fam_id,
-                "tipo_estructura": clean_str(get_row_val_robust(row, ['TIPO'])) or 'JN',
-                "dip": dip_val if dip_val is not None else 0.0,
-                "dip_dir": dipdir_val if dipdir_val is not None else 0.0,
-                "distancia_m": clean_num(get_row_val_robust(row, ['Dist. de estr.'])),
-                "abertura_mm": clean_num(get_row_val_robust(row, ['ABERTURA mm.'])),
-                "espesor_mm": clean_num(get_row_val_robust(row, ['ESPESOR mm.'])),
-                "continuidad_m": clean_num(get_row_val_robust(row, ['CONTINUIDAD m.'])),
-                "espaciamiento_m": clean_num(get_row_val_robust(row, ['ESPACIAMIENTO m.'])),
-                "n_estructuras": sanitize_value(get_row_val_robust(row, ['NUMERO DE ESTRUCTURAS']), int),
-                "n_extremos_visibles": sanitize_value(get_row_val_robust(row, ['NUMERO DE EXTREMOS VISIBLES']), int),
-                "relleno_1_codigo": clean_str(get_row_val_robust(row, ['TIPO DE  RELLENO 1'])),
-                "relleno_2_codigo": clean_str(get_row_val_robust(row, ['TIPO DE  RELLENO 2'])),
-                "jrc": clean_num(get_row_val_robust(row, ['JRC'])),
-                "rugosidad_codigo": clean_str(get_row_val_robust(row, ['RUGOSIDAD DE ESTRUCTURAS'])),
-                "forma_estructura": clean_str(get_row_val_robust(row, ['FORMA DE ESTRUCTURA'])),
-                "alteracion_codigo": clean_str(get_row_val_robust(row, ['ALTERACION']))
-            })
-
-        # Buscar coincidencia en la Base de Datos SQL Server (batch prefetch)
         code_up = code_celda.strip().upper()
         is_duplicate = code_up in existing_map
         existing_data = existing_map.get(code_up)
-
-        # Extraer metadatos de cabecera y geomecanica del Excel
-        dip_val = clean_num(get_row_val_robust(header_row, ['DIP']))
-        az_hole_val = clean_num(get_row_val_robust(header_row, ['AZ_HOLE', 'AZIMUT', 'AZIMUT_HOLE']))
-        dip_talud_val = clean_num(get_row_val_robust(header_row, ['DIP_TALUD', 'DIPTALUD']))
-        dipdir_talud_val = clean_num(get_row_val_robust(header_row, ['DIP DIR_TALUD', 'DIPDIR_TALUD', 'DIPDIR']))
-        intemperismo_val = clean_str(get_row_val_robust(header_row, ['INTEMPERISMO', 'ALTERACION']))
-        nivel_val = clean_str(get_row_val_robust(header_row, ['Nivel', 'NIVEL']))
-        comentario_val = clean_str(get_row_val_robust(header_row, ['COMENTARIO', 'COMENTARIOS']))
-
-        ucs_val = clean_num(get_row_val_robust(header_row, ["( UCS )  (Mpa)", "UCS", "UCS_MPA"]))
-        is50_val = clean_num(get_row_val_robust(header_row, ["is50 (Mpa)", "IS50", "IS50_MPA"]))
-
-        # RMR 76 campos
-        cond_agua_76 = clean_str(get_row_val_robust(header_row, ["CONDICION DE AGUA  '76."]))
-        cond_agua_val_76 = clean_num(get_row_val_robust(header_row, ["CONDICION DE AGUA VALOR  '76"]))
-        dureza_76 = clean_str(get_row_val_robust(header_row, ["DUREZA  '76"]))
-        res_estimada_val_76 = clean_num(get_row_val_robust(header_row, ["RESISTENCIA ESTIMADA VALOR  '76"]))
-        gsi_visual_76 = clean_num(get_row_val_robust(header_row, ["GSI VISUAL  '76"]))
-        control_est_76 = clean_str(get_row_val_robust(header_row, ["CONTROL ESTRUCTURAL  '76"]))
-        efectos_vol_76 = clean_str(get_row_val_robust(header_row, ["EFECTOS DE VOLADURA  '76"]))
-        rqd_val_76 = clean_num(get_row_val_robust(header_row, ["RQD - VALOR  '76"]))
-        rqd_76 = clean_num(get_row_val_robust(header_row, ["RQD  '76"]))
-        frec_frac_76 = clean_num(get_row_val_robust(header_row, ["FRECUENCIA DE FRACTURAMIENTO x m.  '76"]))
-        tam_bloq_76 = clean_num(get_row_val_robust(header_row, ["TAMAÑO DE BLOQUES  x m3  '76"]))
-        esp_prom_76 = clean_num(get_row_val_robust(header_row, ["ESPACIAMIENTO PROMEDIO   '76"]))
-        esp_val_76 = clean_num(get_row_val_robust(header_row, ["ESPACIAMIENTO - VALOR    '76"]))
-        cond_disc_val_76 = clean_num(get_row_val_robust(header_row, ["CONDICIÓN DE DISCONTINUIDAD - VALOR     '76"]))
-
-        # RMR 89 campos
-        cond_agua_89 = clean_str(get_row_val_robust(header_row, ["CONDICION DE AGUA  '89"]))
-        cond_agua_val_89 = clean_num(get_row_val_robust(header_row, ["CONDICION DE AGUA VALOR '89"]))
-        dureza_89 = clean_str(get_row_val_robust(header_row, ["DUREZA '89"]))
-        res_estimada_val_89 = clean_num(get_row_val_robust(header_row, ["RESISTENCIA ESTIMADA VALOR '89"]))
-        gsi_visual_89 = clean_num(get_row_val_robust(header_row, ["GSI VISUAL '89"]))
-        control_est_89 = clean_str(get_row_val_robust(header_row, ["CONTROL ESTRUCTURAL '89"]))
-        efectos_vol_89 = clean_str(get_row_val_robust(header_row, ["EFECTOS DE VOLADURA '89"]))
-        rqd_val_89 = clean_num(get_row_val_robust(header_row, ["RQD - VALOR '89"]))
-        rqd_89 = clean_num(get_row_val_robust(header_row, ["RQD '89"]))
-        frec_frac_89 = clean_num(get_row_val_robust(header_row, ["FRECUENCIA DE FRACTURAMIENTO x m. '89"]))
-        tam_bloq_89 = clean_num(get_row_val_robust(header_row, ["TAMAÑO DE BLOQUES  x m3 '89"]))
-        esp_prom_89 = clean_num(get_row_val_robust(header_row, ["ESPACIAMIENTO PROMEDIO '89"]))
-        esp_val_89 = clean_num(get_row_val_robust(header_row, ["ESPACIAMIENTO - VALOR '89"]))
-        cond_disc_val_89 = clean_num(get_row_val_robust(header_row, ["CONDICIÓN DE DISCONTINUIDAD - VALOR '89"]))
 
         excel_data = {
             "codigo": code_celda,
@@ -512,13 +819,13 @@ async def preview_import_excel(
             "cota_fin": cota_to,
             "largo_m": largo,
             "altura_m": altura,
-            "dip": dip_val,
-            "azimut_hole": az_hole_val,
-            "dip_talud": dip_talud_val,
-            "dipdir_talud": dipdir_talud_val,
-            "intemperismo": intemperismo_val,
-            "nivel": nivel_val,
-            "comentarios": comentario_val,
+            "dip": clean_num(_lookup_imp_val(header_vals, cands_dip)),
+            "azimut_hole": clean_num(_lookup_imp_val(header_vals, cands_az)),
+            "dip_talud": clean_num(_lookup_imp_val(header_vals, cands_dip_t)),
+            "dipdir_talud": clean_num(_lookup_imp_val(header_vals, cands_dipdir_t)),
+            "intemperismo": clean_str(_lookup_imp_val(header_vals, cands_intem)),
+            "nivel": clean_str(_lookup_imp_val(header_vals, cands_nivel)),
+            "comentarios": clean_str(_lookup_imp_val(header_vals, cands_coment)),
             "lito_1": lito1,
             "lito_2": lito2,
             "lito_3": lito3,
@@ -526,41 +833,41 @@ async def preview_import_excel(
             "mapeador": mapeador,
             "fecha": fecha_str,
             "n_discontinuidades": len(estructuras_preview),
-            "ucs_mpa": ucs_val,
-            "is50_mpa": is50_val,
+            "ucs_mpa": clean_num(_lookup_imp_val(header_vals, cands_ucs)),
+            "is50_mpa": clean_num(_lookup_imp_val(header_vals, cands_is50)),
             # RMR 76
-            "condicion_agua_rmr76": cond_agua_76,
-            "condicion_agua_valor_rmr76": cond_agua_val_76,
-            "dureza_rmr76": dureza_76,
-            "resistencia_estimada_valor_rmr76": res_estimada_val_76,
-            "gsi_visual_rmr76": gsi_visual_76,
-            "control_estructural_rmr76": control_est_76,
-            "efectos_voladura_rmr76": efectos_vol_76,
-            "rqd_valor_rmr76": rqd_val_76,
-            "rqd_rmr76": rqd_76,
-            "frecuencia_fracturamiento_rmr76": frec_frac_76,
-            "tamano_bloques_rmr76": tam_bloq_76,
-            "espaciamiento_promedio_rmr76": esp_prom_76,
-            "espaciamiento_valor_rmr76": esp_val_76,
-            "condicion_discontinuidad_valor_rmr76": cond_disc_val_76,
+            "condicion_agua_rmr76": clean_str(_lookup_imp_val(header_vals, cands_cw76)),
+            "condicion_agua_valor_rmr76": clean_num(_lookup_imp_val(header_vals, cands_cwv76)),
+            "dureza_rmr76": clean_str(_lookup_imp_val(header_vals, cands_dur76)),
+            "resistencia_estimada_valor_rmr76": clean_num(_lookup_imp_val(header_vals, cands_resv76)),
+            "gsi_visual_rmr76": clean_num(_lookup_imp_val(header_vals, cands_gsi76)),
+            "control_estructural_rmr76": clean_str(_lookup_imp_val(header_vals, cands_ce76)),
+            "efectos_voladura_rmr76": clean_str(_lookup_imp_val(header_vals, cands_ev76)),
+            "rqd_valor_rmr76": clean_num(_lookup_imp_val(header_vals, cands_rqdv76)),
+            "rqd_rmr76": clean_num(_lookup_imp_val(header_vals, cands_rqd76)),
+            "frecuencia_fracturamiento_rmr76": clean_num(_lookup_imp_val(header_vals, cands_ff76)),
+            "tamano_bloques_rmr76": clean_num(_lookup_imp_val(header_vals, cands_tb76)),
+            "espaciamiento_promedio_rmr76": clean_num(_lookup_imp_val(header_vals, cands_ep76)),
+            "espaciamiento_valor_rmr76": clean_num(_lookup_imp_val(header_vals, cands_evl76)),
+            "condicion_discontinuidad_valor_rmr76": clean_num(_lookup_imp_val(header_vals, cands_cdv76)),
             "rmr_76": rmr_76_val,
             # RMR 89
-            "condicion_agua_rmr89": cond_agua_89,
-            "condicion_agua_valor_rmr89": cond_agua_val_89,
-            "dureza_rmr89": dureza_89,
-            "resistencia_estimada_valor_rmr89": res_estimada_val_89,
-            "gsi_visual_rmr89": gsi_visual_89,
-            "control_estructural_rmr89": control_est_89,
-            "efectos_voladura_rmr89": efectos_vol_89,
-            "rqd_valor_rmr89": rqd_val_89,
-            "rqd_rmr89": rqd_89,
-            "frecuencia_fracturamiento_rmr89": frec_frac_89,
-            "tamano_bloques_rmr89": tam_bloq_89,
-            "espaciamiento_promedio_rmr89": esp_prom_89,
-            "espaciamiento_valor_rmr89": esp_val_89,
-            "condicion_discontinuidad_valor_rmr89": cond_disc_val_89,
+            "condicion_agua_rmr89": clean_str(_lookup_imp_val(header_vals, cands_cw89)),
+            "condicion_agua_valor_rmr89": clean_num(_lookup_imp_val(header_vals, cands_cwv89)),
+            "dureza_rmr89": clean_str(_lookup_imp_val(header_vals, cands_dur89)),
+            "resistencia_estimada_valor_rmr89": clean_num(_lookup_imp_val(header_vals, cands_resv89)),
+            "gsi_visual_rmr89": clean_num(_lookup_imp_val(header_vals, cands_gsi89)),
+            "control_estructural_rmr89": clean_str(_lookup_imp_val(header_vals, cands_ce89)),
+            "efectos_voladura_rmr89": clean_str(_lookup_imp_val(header_vals, cands_ev89)),
+            "rqd_valor_rmr89": clean_num(_lookup_imp_val(header_vals, cands_rqdv89)),
+            "rqd_rmr89": clean_num(_lookup_imp_val(header_vals, cands_rqd89)),
+            "frecuencia_fracturamiento_rmr89": clean_num(_lookup_imp_val(header_vals, cands_ff89)),
+            "tamano_bloques_rmr89": clean_num(_lookup_imp_val(header_vals, cands_tb89)),
+            "espaciamiento_promedio_rmr89": clean_num(_lookup_imp_val(header_vals, cands_ep89)),
+            "espaciamiento_valor_rmr89": clean_num(_lookup_imp_val(header_vals, cands_evl89)),
+            "condicion_discontinuidad_valor_rmr89": clean_num(_lookup_imp_val(header_vals, cands_cdv89)),
             "rmr_89": rmr_89_val,
-            "raw_header_row": {k: (str(v) if pd.notna(v) else None) for k, v in header_row.items()}
+            "raw_header_row": {k: (str(v) if v is not None else None) for k, v in zip(excel_cols, header_vals)},
         }
 
         celdas_preview.append({
@@ -568,8 +875,10 @@ async def preview_import_excel(
             "is_duplicate": is_duplicate,
             "excel_data": excel_data,
             "existing_data": existing_data,
-            "estructuras": estructuras_preview
+            "estructuras": estructuras_preview,
         })
+
+    group_list.clear()
 
     # Lista completa de códigos existentes en BD: sirve para que el frontend
     # detecte si un NOMBRE RENOMBRADO colisiona con otra celda existente
@@ -587,7 +896,7 @@ async def preview_import_excel(
         "columns_detected": excel_cols,
         "mapping_detected": detected_mapping,
         "existing_codes": all_existing_codes,
-        "celdas": celdas_preview
+        "celdas": celdas_preview,
     }
 
 

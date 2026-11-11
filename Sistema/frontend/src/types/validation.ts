@@ -6,6 +6,8 @@ export interface QaQcAlert {
   section: string;
 }
 
+export type QaQcSeverity = QaQcAlert['type'];
+
 export interface WindowValidation {
   client_id: string;
   can_save: boolean;

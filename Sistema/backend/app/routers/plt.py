@@ -105,7 +105,14 @@ def get_ensayos_plt(celda: Optional[str] = Query(None), db: Session = Depends(ge
         
         celda_code = ventana_map.get(r.ventana_id, "")
         if not celda_code and r.codigo_muestra:
-            celda_code = r.codigo_muestra.split('_')[0] if '_' in r.codigo_muestra else r.codigo_muestra
+            raw_cod = str(r.codigo_muestra).strip()
+            nro_m = str(r.nro_muestra).strip() if r.nro_muestra else ""
+            if nro_m and len(raw_cod) > len(nro_m) and raw_cod.upper().endswith(nro_m.upper()):
+                celda_code = raw_cod[:-len(nro_m)].rstrip("_- ") or raw_cod
+            elif "_" in raw_cod:
+                celda_code = raw_cod.split("_")[0]
+            else:
+                celda_code = raw_cod
 
         lito1_code = lito_map.get(r.litologia1_id, "")
         lito2_code = lito_map.get(r.litologia2_id, "")
@@ -212,11 +219,11 @@ def save_ensayos_plt(
         v_id = ventana_map.get(celda_clean)
         muestra_str = d.muestra.strip() if d.muestra and str(d.muestra).strip() else ""
 
-        # CodigoMuestra: celda_muestra si muestra tiene algo, o celda si muestra está vacía
+        # CodigoMuestra: {celda}{muestra} (ej. AG57A) si muestra tiene valor, o celda si muestra está vacía
         if d.codigo_muestra and str(d.codigo_muestra).strip():
             codigo_m = str(d.codigo_muestra).strip()
         elif celda_clean and muestra_str:
-            codigo_m = f"{celda_clean}_{muestra_str}"
+            codigo_m = f"{celda_clean}{muestra_str}"
         elif celda_clean:
             codigo_m = celda_clean
         else:
