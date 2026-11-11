@@ -3,7 +3,7 @@ import {
     FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
     Loader2, RefreshCw, Trash2, X, WifiOff
 } from 'lucide-react';
-import { apiFetch, getAuthHeaders } from '../../utils/apiClient';
+import { confirmConnection, getAuthHeaders, isConnectionFailureStatus } from '../../utils/apiClient';
 
 import PltImportWizard from './components/PltImportWizard';
 import PltAuditHistory, { type PltAuditHistoryItem } from './components/PltAuditHistory';
@@ -403,6 +403,9 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 setStatus('loaded');
                 fetchHistory();
             } else {
+                if (isConnectionFailureStatus(res.status)) {
+                    void confirmConnection(cleanBase);
+                }
                 let errorMsg = `Error del servidor (HTTP ${res.status})`;
                 try {
                     const err = await res.json();
@@ -415,6 +418,10 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                 setMessage(errorMsg);
             }
         } catch (e: any) {
+            if (e?.name !== 'AbortError') {
+                const cleanBase = apiBase ? apiBase.replace(/\/+$/, '') : '';
+                void confirmConnection(cleanBase);
+            }
             setStatus('error');
             setMessage('Error de red al intentar conectar con el servidor: ' + (e.message || 'Sin conexión'));
         }

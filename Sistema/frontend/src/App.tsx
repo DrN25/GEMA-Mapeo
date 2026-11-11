@@ -42,7 +42,8 @@ import {
   isProyectadasDirty,
   type ProyectadasCoords
 } from './utils/proyectadas';
-import { apiFetch, pingBackend, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState } from './utils/apiClient';
+import { apiFetch, confirmConnection, pingBackendFast, getAuthHeaders, onConnectionChange, getConnectionState, setConnectionState } from './utils/apiClient';
+import { CONNECTION_CONFIG } from './config/connection';
 import { evictSincronizadas, safeSetItem, addPendingCell, removePendingCell, getCachedCellRaw, canImport, addPendingPltCell, removePendingPltCell, getPendingPltCells, savePltDelta, getPltDelta, clearPltDelta } from './utils/storageManager';
 import {
   discardLocalCell,
@@ -382,105 +383,189 @@ const [connectionLost, setConnectionLost] = useState(false);
     loadCatalogs();
   }, []);
 
-  // Cronómetro de actividad y verificación de conexión:
-  // - Se registra la última interacción del usuario (clic, tecla, scroll, toque).
-  // - Pings automáticos cada 1 minuto mientras haya actividad reciente (hasta
-  //   45 min sin interactuar): el backend (Render free) no duerme mientras el
-  //   usuario trabaja o acaba de irse.
-  // - Pasados 45 min sin interacción, los pings pasan a cada 20 minutos: la
-  //   instancia duerme entre pings (ahorra horas del plan free) y aun así se
-  //   detecta una caída en menos de 20 min.
-  // - El cronómetro corre siempre, incluso con la pestaña en segundo plano
-  //   (el navegador puede espaciar los timers, pero el ping llega igual).
-  // - Si un ping falla, se confirma con un segundo ping (60 s) antes de mostrar
-  //   el modal: evita falsos positivos por un blip de red.
-  // - Volver a la pestaña (visibilitychange): ping inmediato.
+  // Cronómetro de actividad y verificación de conexión (config en config/connection.ts):
+  // - Con actividad reciente (pestaña visible): ping rápido cada 20 s; en pestaña
+  //   oculta con keep-awake activo: cada 8 min para mantener despierto hasta 45 min.
+  // - Tras 45 min sin interacción (stopPingsAfterKeepAwake): se detienen los pings
+  //   para no despertar un backend en reposo; al volver a la pestaña o interactuar,
+  //   se envía un ping inmediato y se reanuda el ciclo.
+  // - Si falla el ping rápido o una petición (red/timeout/502/503/504),
+  //   confirmConnection realiza una confirmación corta de 1 intento (confirmMaxAttempts = 1, confirmTimeoutMs = 8000) y solo
+  //   entonces marca offline; en offline reintenta cada 4 s y cierra el modal solo.
   const catalogsLoadedRef = useRef(false);
   useEffect(() => {
     catalogsLoadedRef.current = catalogsLoaded;
   }, [catalogsLoaded]);
 
   const lastActivityRef = useRef(Date.now());
-
-  useEffect(() => {
-    const markActivity = () => { lastActivityRef.current = Date.now(); };
-    const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(ev => window.addEventListener(ev, markActivity, { passive: true }));
-    return () => {
-      events.forEach(ev => window.removeEventListener(ev, markActivity));
-    };
-  }, []);
+  const scheduleReconnectRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let disposed = false;
     let timer: number | undefined;
+    let stoppedByKeepAwake = false;
+    let inIdleHiddenMode = false;
+    let inFlightHeartbeat: Promise<void> | null = null;
 
-    const confirmLost = async () => {
-      const ok = await pingBackend(API_BASE);
-      if (disposed) return;
-      if (ok) {
-        setDbOnline(true);
-      } else {
-        setDbOnline(false);
-        setConnectionLost(true);
+    const clearTimer = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
       }
     };
 
-    const heartbeat = async () => {
+    const runHeartbeat = async () => {
       if (disposed) return;
-      const ok = await pingBackendFast(API_BASE);
-      if (disposed) return;
-      if (ok) {
-        setDbOnline(true);
-      } else {
-        await confirmLost();
-      }
+      if (inFlightHeartbeat) return inFlightHeartbeat;
+
+      inFlightHeartbeat = (async () => {
+        try {
+          if (getConnectionState() === 'offline') {
+            const ok = await confirmConnection(API_BASE);
+            if (disposed) return;
+            if (ok) {
+              setDbOnline(true);
+              setConnectionLost(false);
+            }
+            return;
+          }
+
+          const ok = await pingBackendFast(API_BASE);
+          if (disposed) return;
+          if (ok) {
+            setConnectionState('online');
+            setDbOnline(true);
+            setConnectionLost(false);
+          } else {
+            const confirmedOk = await confirmConnection(API_BASE);
+            if (disposed) return;
+            if (confirmedOk) {
+              setDbOnline(true);
+              setConnectionLost(false);
+            } else {
+              setDbOnline(false);
+              setConnectionLost(true);
+            }
+          }
+        } finally {
+          inFlightHeartbeat = null;
+        }
+      })();
+
+      return inFlightHeartbeat;
     };
 
     const scheduleNext = () => {
+      clearTimer();
       if (disposed) return;
+
+      const offline = getConnectionState() === 'offline';
       const inactiveMs = Date.now() - lastActivityRef.current;
-      const delay = inactiveMs < 45 * 60_000 ? 60_000 : 20 * 60_000;
+      const keepAwakeExpired = inactiveMs >= CONNECTION_CONFIG.keepAwakeMs;
+
+      if (!offline && keepAwakeExpired && CONNECTION_CONFIG.stopPingsAfterKeepAwake) {
+        stoppedByKeepAwake = true;
+        inIdleHiddenMode = false;
+        return;
+      }
+
+      stoppedByKeepAwake = false;
+      let delay: number;
+      if (offline) {
+        inIdleHiddenMode = false;
+        delay = CONNECTION_CONFIG.reconnectIntervalMs;
+      } else if (document.visibilityState === 'visible' && !keepAwakeExpired) {
+        inIdleHiddenMode = false;
+        delay = CONNECTION_CONFIG.activeIntervalMs;
+      } else {
+        inIdleHiddenMode = keepAwakeExpired;
+        delay = CONNECTION_CONFIG.hiddenIntervalMs;
+      }
+
       timer = window.setTimeout(async () => {
-        await heartbeat();
+        timer = undefined;
+        if (disposed) return;
+
+        const nowOffline = getConnectionState() === 'offline';
+        const nowInactiveMs = Date.now() - lastActivityRef.current;
+        if (!nowOffline && nowInactiveMs >= CONNECTION_CONFIG.keepAwakeMs && CONNECTION_CONFIG.stopPingsAfterKeepAwake) {
+          stoppedByKeepAwake = true;
+          inIdleHiddenMode = false;
+          return;
+        }
+
+        await runHeartbeat();
         if (!disposed) scheduleNext();
       }, delay);
     };
 
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible' && !timer) heartbeat();
+    const triggerImmediateAndReschedule = () => {
+      if (disposed) return;
+      clearTimer();
+      stoppedByKeepAwake = false;
+      inIdleHiddenMode = false;
+      void runHeartbeat().then(() => {
+        if (!disposed) scheduleNext();
+      });
     };
 
+    const markActivity = () => {
+      lastActivityRef.current = Date.now();
+      if (stoppedByKeepAwake || inIdleHiddenMode) {
+        triggerImmediateAndReschedule();
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        lastActivityRef.current = Date.now();
+        triggerImmediateAndReschedule();
+      } else if (!stoppedByKeepAwake && getConnectionState() !== 'offline') {
+        scheduleNext();
+      }
+    };
+
+    scheduleReconnectRef.current = () => {
+      if (!disposed) scheduleNext();
+    };
+
+    const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(ev => window.addEventListener(ev, markActivity, { passive: true }));
     document.addEventListener('visibilitychange', onVisibility);
     scheduleNext();
+
     return () => {
       disposed = true;
+      scheduleReconnectRef.current = () => {};
+      events.forEach(ev => window.removeEventListener(ev, markActivity));
       document.removeEventListener('visibilitychange', onVisibility);
-      if (timer) window.clearTimeout(timer);
+      clearTimer();
     };
   }, []);
 
-  // Monitor global de conexión: cualquier petición que agote sus reintentos
-  // (apiClient marca 'offline') activa el modal al instante. Al volver 'online'
-  // solo se actualiza el indicador: el modal se cierra con sus botones.
+  // Monitor global de conexión: cualquier petición o ping de confirmación que
+  // marque 'offline' abre el modal; al volver 'online' se cierra automáticamente.
   useEffect(() => {
     const unsubscribe = onConnectionChange((state) => {
       if (state === 'offline') {
         setDbOnline(false);
         setConnectionLost(true);
+        scheduleReconnectRef.current();
       } else {
         setDbOnline(true);
+        setConnectionLost(false);
       }
     });
     if (getConnectionState() === 'offline') {
       setDbOnline(false);
       setConnectionLost(true);
+      scheduleReconnectRef.current();
     }
     return unsubscribe;
   }, []);
 
   const handleRetryConnection = async () => {
-    const ok = await pingBackend(API_BASE);
+    const ok = await confirmConnection(API_BASE);
     if (ok) {
       setDbOnline(true);
       setConnectionLost(false);

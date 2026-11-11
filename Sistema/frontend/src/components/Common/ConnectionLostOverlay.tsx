@@ -1,12 +1,28 @@
-import { WifiOff, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { WifiOff, RotateCcw, RefreshCw } from 'lucide-react';
+import { CONNECTION_CONFIG } from '../../config/connection';
 
 interface ConnectionLostOverlayProps {
   isOpen: boolean;
-  onRetry: () => void;
+  onRetry: () => Promise<void> | void;
 }
 
 export default function ConnectionLostOverlay({ isOpen, onRetry }: ConnectionLostOverlayProps) {
+  const [manualRetrying, setManualRetrying] = useState(false);
+
   if (!isOpen) return null;
+
+  const { modal } = CONNECTION_CONFIG;
+
+  const handleManualRetry = async () => {
+    if (manualRetrying) return;
+    setManualRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setManualRetrying(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#02040a]/90 backdrop-blur-md animate-fade-in font-sans select-none">
@@ -15,24 +31,30 @@ export default function ConnectionLostOverlay({ isOpen, onRetry }: ConnectionLos
           <WifiOff size={26} />
         </div>
         <div className="space-y-2">
-          <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">Conexión con el servidor perdida</h3>
+          <h3 className="text-sm font-black uppercase tracking-widest text-slate-100">{modal.title}</h3>
+          <div className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold">
+            <RefreshCw size={12} className="animate-spin" />
+            <span>{modal.retryingStatus}</span>
+          </div>
           <p className="text-xs text-slate-300 leading-relaxed font-medium">
-            No se pudo contactar con el servidor del sistema. Puede estar dormido (Render) o detenido. Para continuar, recarga la página: al cargar, el sistema despertará el servidor automáticamente. Tus datos de mapeo se conservan en esta sesión.
+            {modal.description}
           </p>
         </div>
         <div className="flex flex-col gap-2.5 pt-1">
           <button
-            onClick={() => { if (window.confirm('¿Recargar la página ahora?')) window.location.reload(); }}
+            onClick={() => { if (window.confirm(modal.reloadConfirmText)) window.location.reload(); }}
             className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-navy-950 text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-2"
           >
             <RotateCcw size={14} />
-            <span>Recargar página</span>
+            <span>{modal.reloadButtonText}</span>
           </button>
           <button
-            onClick={onRetry}
-            className="w-full py-2.5 rounded-xl bg-navy-900 hover:bg-navy-800 border border-navy-700 text-slate-300 text-xs font-bold transition-all active:scale-95"
+            onClick={handleManualRetry}
+            disabled={manualRetrying}
+            className="w-full py-2.5 rounded-xl bg-navy-900 hover:bg-navy-800 border border-navy-700 text-slate-300 text-xs font-bold transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            Reintentar conexión
+            <RefreshCw size={13} className={manualRetrying ? 'animate-spin' : ''} />
+            <span>{manualRetrying ? modal.retryingButtonText : modal.retryButtonText}</span>
           </button>
         </div>
       </div>
