@@ -1151,7 +1151,8 @@ def descargar_reporte_excel(
         return FileResponse(
             pregenerated_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename=filename
+            filename=filename,
+            headers={"Cache-Control": "no-store", "Vary": "Authorization"},
         )
 
     if audit_id:
@@ -1225,10 +1226,15 @@ def descargar_reporte_excel(
         return FileResponse(
             pregenerated_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename=filename
+            filename=filename,
+            headers={"Cache-Control": "no-store", "Vary": "Authorization"},
         )
 
-    return wb_to_temp_file_response(wb, filename)
+    return wb_to_temp_file_response(
+        wb,
+        filename,
+        headers={"Cache-Control": "no-store", "Vary": "Authorization"},
+    )
 
 @router.get("/geomecanica/reglas")
 @router.get("/auditoria/reglas")

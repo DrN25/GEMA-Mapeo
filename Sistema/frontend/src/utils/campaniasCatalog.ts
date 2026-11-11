@@ -11,16 +11,11 @@ export interface CampaniaItem {
   label: string;
 }
 
-export const CAMPANAS_HARDCODED: CampaniaItem[] = [
-  { id: 1, label: 'Campaña 2020' },
-  { id: 2, label: 'Campaña 2021' },
-  { id: 3, label: 'Campaña 2022' },
-  { id: 4, label: 'Campaña 2023' },
-  { id: 5, label: 'Campaña 2024' },
-  { id: 6, label: 'Campaña 2025' },
-  { id: 7, label: 'Campaña 2026' },
-  { id: 8, label: 'Campaña 2019' },
-];
+// Compatibility name retained for existing selectors. Values come from Python.
+export const CAMPANAS_HARDCODED: CampaniaItem[] = [];
+export function initCampaignCatalog(items: CampaniaItem[]) {
+  CAMPANAS_HARDCODED.splice(0, CAMPANAS_HARDCODED.length, ...items);
+}
 
 /** Devuelve el año de una campaña dado su ID, o null si no se conoce. */
 export function getCampaniaYear(campaniaId: number | string): number | null {

@@ -167,8 +167,8 @@ const ALTERACION_ABBR: Record<string, string> = {
 // 2. CONFIGURACIÓN DE COLUMNAS DE DISCONTINUIDADES
 export const DISCON_COLUMNS: ColumnConfig[] = [
     { key: 'distancia', label: COLUMN_LABELS.distancia, type: 'number', width: 85, precision: 2 },
-    { key: 'dip', label: COLUMN_LABELS.dip, type: 'number', width: 80, precision: 0, range: [-90, 90] },
-    { key: 'dip_dir', label: COLUMN_LABELS.dip_dir, type: 'number', width: 96, precision: 0, range: [0, 359] },
+    { key: 'dip', label: COLUMN_LABELS.dip, type: 'number', width: 80, precision: 0 },
+    { key: 'dip_dir', label: COLUMN_LABELS.dip_dir, type: 'number', width: 96, precision: 0 },
     {
         key: 'tipo_estructura',
         label: COLUMN_LABELS.tipo_estructura,
@@ -176,14 +176,13 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
         width: 96,
         options: Object.keys(STRUCTURE_CATALOG).map(code => ({ value: code, label: code }))
     },
-    { key: 'n_estructuras', label: COLUMN_LABELS.n_estructuras, type: 'number', width: 80, precision: 0, range: [1, 999] },
+    { key: 'n_estructuras', label: COLUMN_LABELS.n_estructuras, type: 'number', width: 80, precision: 0 },
     {
         key: 'abertura',
         label: COLUMN_LABELS.abertura,
         type: 'number',
         width: 144,
         precision: 1,
-        range: [0, 50000],
         formatOnBlur: (val) => val !== undefined && val !== -1 ? `${val.toFixed(1).replace('.', ',')} (${getAberturaClase(val)})` : ''
     },
     {
@@ -192,17 +191,15 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
         type: 'number',
         width: 96,
         precision: 1,
-        range: [0, 50000],
         formatOnBlur: (val) => val !== undefined && val !== -1 ? val.toFixed(1) : ''
     },
-    { key: 'continuidad', label: COLUMN_LABELS.continuidad, type: 'number', width: 96, precision: 2, range: [0, 99] },
+    { key: 'continuidad', label: COLUMN_LABELS.continuidad, type: 'number', width: 96, precision: 2 },
     {
         key: 'espaciamiento',
         label: COLUMN_LABELS.espaciamiento,
         type: 'number',
         width: 96,
         precision: 2,
-        range: [0, 99],
         formatOnBlur: (val) => val !== undefined && val !== -1 ? val.toFixed(2) : ''
     },
     {
@@ -239,8 +236,8 @@ export const DISCON_COLUMNS: ColumnConfig[] = [
     { key: 'r1_76', label: COLUMN_LABELS.r1_sub_76, type: 'number', width: 80, isComputed: true, formulaId: 'rel_single_r76', getFormulaParams: (row) => ({ code: row.relleno1, thickness: row.espesor }) },
     { key: 'r2_76', label: COLUMN_LABELS.r2_sub_76, type: 'number', width: 80, isComputed: true, formulaId: 'rel_single_r76', getFormulaParams: (row) => ({ code: row.relleno2, thickness: row.espesor }) },
 
-    { key: 'jrc', label: COLUMN_LABELS.jrc, type: 'number', width: 80, precision: 0, range: [0, 20] },
-    { key: 'rugosidad', label: COLUMN_LABELS.rugosidad, type: 'number', width: 144, precision: 0, range: [1, 9] },
+    { key: 'jrc', label: COLUMN_LABELS.jrc, type: 'number', width: 80, precision: 0 },
+    { key: 'rugosidad', label: COLUMN_LABELS.rugosidad, type: 'number', width: 144, precision: 0 },
     {
         key: 'forma',
         label: COLUMN_LABELS.forma,

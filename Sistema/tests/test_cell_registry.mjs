@@ -213,9 +213,9 @@ const jointsDesbordados = [
   { id: 2, familia: 1, distancia: 5, tipo_estructura: 'JN', dip: 40, dip_dir: 200, alteracion: 'm' },
 ];
 const cascaded = wt.applyDistanceCascade(headerCascada, jointsDesbordados);
-ok(cascaded[0].distancia === 10, 'distancia 15 > largo 10 → se ajusta a 10');
+ok(cascaded[0].distancia === 15, 'La observación 15 se conserva para mostrar la incidencia; no se recorta al largo10');
 ok(cascaded[1].distancia === 5, 'distancia 5 ≤ largo → NO se toca');
-ok(cascaded !== jointsDesbordados, 'Devuelve un array nuevo solo cuando hay ajustes');
+ok(cascaded === jointsDesbordados, 'La validación no muta el borrador ni su snapshot');
 
 // Idempotencia: aplicar la cascada dos veces no cambia nada (estable entre aperturas)
 const cascaded2 = wt.applyDistanceCascade(headerCascada, cascaded);

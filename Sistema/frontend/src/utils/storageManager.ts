@@ -218,6 +218,8 @@ export function removePendingCell(celda: string): void {
 // ---------------------------------------------------------------------------
 
 export interface CellValidationRecord {
+  rulesetVersion?: string;
+  draftFingerprint?: string;
   ok: boolean;
   count: number;
   issues: string[];

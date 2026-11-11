@@ -368,6 +368,8 @@ def _compare_audits(diag_a, compact_a, diag_b, compact_b, excel_path_a=None, exc
 
     return {
         "meta_a": {"nombre": diag_a.get("nombre_archivo","Revisión A"), "fecha": compact_a.get("fecha_auditoria","N/A"), "campanias": sorted(list(campanias_a))},
+        "ruleset_a": diag_a.get("ruleset_version", "legacy_unknown"),
+        "ruleset_b": diag_b.get("ruleset_version", "legacy_unknown"),
         "meta_b": {"nombre": diag_b.get("nombre_archivo","Revisión B"), "fecha": compact_b.get("fecha_auditoria","N/A"), "campanias": sorted(list(campanias_b))},
         "campanias_comunes": sorted(list(common_campaigns)),
         "is_filtered_by_common": is_filtered_by_common,
@@ -506,6 +508,17 @@ def generar_excel_comparativo_core(datos: dict) -> openpyxl.Workbook:
 
     # ── HOJA 1: DASHBOARD ──────────────────────────────────────────────────
     ws = wb.create_sheet("📊 Dashboard")
+
+    version_sheet = wb.create_sheet('Versiones QAQC')
+    version_sheet.column_dimensions['A'].width = 20
+    version_sheet.column_dimensions['B'].width = 110
+    version_a = datos.get('ruleset_a', 'legacy_unknown')
+    version_b = datos.get('ruleset_b', 'legacy_unknown')
+    version_sheet.append(['Revisión', 'Versión de reglas'])
+    version_sheet.append(['A', version_a])
+    version_sheet.append(['B', version_b])
+    if version_a != version_b or version_a == 'legacy_unknown':
+        version_sheet.append(['ADVERTENCIA', 'Criterios distintos o desconocidos: una incidencia ausente no acredita por sí sola una corrección.'])
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 3
     for ci in range(2, 25):

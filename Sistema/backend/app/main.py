@@ -30,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routers.validation import router as validation_router
 from app.routers.ventanas import router as ventanas_router
 from app.routers.plt import router as plt_router
 from app.routers.auditoria import router as auditoria_router
@@ -44,6 +45,7 @@ from app.agents.router import router as scan_router
 
 app.include_router(auth_router, prefix="/api/auth", tags=["Autenticación"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Administración de Usuarios"])
+app.include_router(validation_router, prefix="/api", tags=["Validación de mapeo"])
 app.include_router(ventanas_router, prefix="/api", tags=["Ventanas"])
 app.include_router(plt_router, prefix="/api", tags=["Ensayos PLT"])
 app.include_router(auditoria_plt_router, prefix="/api", tags=["Revisión QAQC Ensayos PLT"])

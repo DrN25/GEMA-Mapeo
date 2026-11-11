@@ -80,58 +80,13 @@ export function normalizeJoints(loadedJoints: JointRow[], defaultAlt: string = '
     .map((j, idx) => ({ ...j, id: idx + 1 }));
 }
 
-/**
- * Política del sistema en cascada: ninguna distancia de discontinuidad puede
- * exceder el largo de la celda. Ajusta los joints que la violan.
- *
- * Devuelve el MISMO array si no hay nada que ajustar (para evitar re-renders).
- * Debe aplicarse por igual al estado activo Y al snapshot/baseline, para que
- * el caché y el snapshot nunca diverjan por esta política (si divergieran,
- * la celda quedaría marcada pendiente con "cambios de discontinuidad" sin que
- * el usuario toque nada).
- *
- * @param calculatedLargo largo calculado (RMR) si ya está disponible; si no,
- *        se deriva de las coordenadas o del largo del header (misma lógica
- *        que el efecto de cascada de App.tsx).
- */
+/** Compatibility hook: preserve raw observations for server validation. */
 export function applyDistanceCascade(
   header: WindowHeader,
   joints: JointRow[],
   calculatedLargo?: number
 ): JointRow[] {
-  let maxLargo = 0;
-  if (calculatedLargo !== undefined && calculatedLargo !== null && calculatedLargo > 0) {
-    maxLargo = calculatedLargo;
-  } else {
-    const ix = parseFloat(String(header.este_from));
-    const iy = parseFloat(String(header.norte_from));
-    const ic = parseFloat(String(header.cota_from));
-    const fx = parseFloat(String(header.este_to));
-    const fy = parseFloat(String(header.norte_to));
-    const fc = parseFloat(String(header.cota_to));
-    const hasCoords = [ix, iy, ic, fx, fy, fc].every(n => !isNaN(n) && n !== 0);
-    maxLargo = hasCoords
-      ? Math.round(Math.sqrt(Math.pow(fx - ix, 2) + Math.pow(fy - iy, 2) + Math.pow(fc - ic, 2)))
-      : Math.round(Number(header.largo) || 0);
-  }
-
-  if (maxLargo <= 0) return joints;
-  const needsAdjustment = (joints || []).some(
-    j => (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) ||
-         (j.espaciamiento !== undefined && j.espaciamiento !== -1 && j.espaciamiento !== null && j.espaciamiento > maxLargo)
-  );
-  if (!needsAdjustment) return joints;
-
-  return (joints || []).map(j => {
-    let updated = j;
-    if (j.distancia !== undefined && j.distancia !== -1 && j.distancia !== null && j.distancia > maxLargo) {
-      updated = { ...updated, distancia: maxLargo };
-    }
-    if (j.espaciamiento !== undefined && j.espaciamiento !== -1 && j.espaciamiento !== null && j.espaciamiento > maxLargo) {
-      updated = { ...updated, espaciamiento: maxLargo };
-    }
-    return updated;
-  });
+  return joints; // Validation reports inconsistent observations without changing them.
 }
 
 /**

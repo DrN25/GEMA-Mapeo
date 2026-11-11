@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Save, AlertTriangle, Check, FileSpreadsheet, X, Activity, AlertCircle, BookOpen } from 'lucide-react';
 import type { WindowData, AllWindowsDiffSummary } from '../../utils/diffUtils';
-import { validateMapeoWindow, validatePltEnsayosList } from '../../utils/mandatoryRules';
-import { validateWindowQAQC, type WindowQaQcExtraCtx } from '../../utils/qaqcValidator';
+import { validatePltEnsayosList } from '../../utils/mandatoryRules';
+import { validateWindowDuplicateCelda } from '../../utils/qaqcValidator';
 import { validatePltQAQC } from '../../utils/pltQaQcRules';
+import type { QaQcAlert } from '../../types/validation';
 import type { PendingValidation } from '../../utils/cellRegistry';
 
 export interface PltDiffSummary {
@@ -15,6 +16,9 @@ export interface PltDiffSummary {
 }
 
 interface SaveConfirmModalProps {
+  validationAlerts: QaQcAlert[];
+  validationPending: boolean;
+  validationError?: string;
   isOpen: boolean;
   onClose: () => void;
   onConfirmSave: (scope: 'active' | 'all') => void;
@@ -31,6 +35,9 @@ interface SaveConfirmModalProps {
 }
 
 export default function SaveConfirmModal({
+  validationAlerts,
+  validationPending,
+  validationError,
   isOpen,
   onClose,
   onConfirmSave,
@@ -44,70 +51,49 @@ export default function SaveConfirmModal({
   originalCelda = null,
   knownCells = []
 }: SaveConfirmModalProps) {
-  if (!isOpen) return null;
-
   const activeHasChanges = workspaceDiff.activeDiff.hasChanges;
   const hasPltChanges = pltDiff && pltDiff.totalChanges > 0;
   const hasAnyWindowChanges = workspaceDiff.totalWindowsWithChanges > 0;
 
-  // Revisión sincrónica de campos obligatorios
-  const mapeoIssues = useMemo(() => {
-    return activeWindow ? validateMapeoWindow(activeWindow) : [];
-  }, [activeWindow]);
+  // Campos obligatorios de mapeo (desde validación servidor) y PLT (local)
+  const mapeoIssues = validationAlerts.filter(a => a.type === 'VACIO');
 
   const pltIssues = useMemo(() => {
     return Array.isArray(pltEnsayos) && pltEnsayos.length > 0 ? validatePltEnsayosList(pltEnsayos) : [];
   }, [pltEnsayos]);
 
-  // Revisión sincrónica QA/QC de ventana activa + ensayos PLT
+  // Revisión QA/QC de servidor + duplicidad local/BD de celda + ensayos PLT
   const qaqcAlerts = useMemo(() => {
-    const windowAlerts = activeWindow
-      ? (() => {
-          const ef = activeWindow.header.este_from || 0;
-          const nf = activeWindow.header.norte_from || 0;
-          const cf = activeWindow.header.cota_from || 0;
-          const et = activeWindow.header.este_to || 0;
-          const nt = activeWindow.header.norte_to || 0;
-          const ct = activeWindow.header.cota_to || 0;
-          const dx = et - ef;
-          const dy = nt - nf;
-          const dz = ct - cf;
-          const distCalc = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          const rawLargo = typeof activeWindow.header.largo === 'number'
-            ? activeWindow.header.largo
-            : parseFloat(String(activeWindow.header.largo || 0));
-          const largo = !isNaN(rawLargo) && rawLargo > 0 ? rawLargo : distCalc;
-          const extraCtx: WindowQaQcExtraCtx = { dbCellNames, originalCelda, knownCells };
-
-          return validateWindowQAQC(activeWindow.header, activeWindow.joints, largo, undefined, true, extraCtx);
-        })()
+    const dupAlerts = activeWindow
+      ? validateWindowDuplicateCelda(activeWindow.header, { dbCellNames, originalCelda, knownCells })
       : [];
 
     const pltAlerts = Array.isArray(pltEnsayos) && pltEnsayos.length > 0
       ? validatePltQAQC(pltEnsayos, activeWindow?.header ?? null)
       : [];
 
-    return [...windowAlerts, ...pltAlerts];
-  }, [activeWindow, pltEnsayos, dbCellNames, originalCelda, knownCells]);
+    return [...validationAlerts.filter(a => a.type !== 'VACIO'), ...dupAlerts, ...pltAlerts];
+  }, [validationAlerts, activeWindow, pltEnsayos, dbCellNames, originalCelda, knownCells]);
 
   // CRITICAS y VACIOS bloquean el guardado; ADVERTENCIAS no.
   const qaqcCriticas = qaqcAlerts.filter(a => a.type === 'CRITICA');
   const qaqcAdvertencias = qaqcAlerts.filter(a => a.type === 'ADVERTENCIA');
 
-  // Celdas pendientes inválidas DISTINTAS de la activa (la activa ya se cubre
-  // con mapeoIssues + qaqcCriticas + pltIssues).
-  const otherInvalidCells = invalidPendingCells.filter(
-    v => v.celda !== activeWindow?.header.celda
-  );
-  const otherInvalidCount = otherInvalidCells.reduce((acc, v) => acc + v.count, 0);
-
-  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcCriticas.length + otherInvalidCount;
-  const hasBlockingErrors = totalBlockingIssuesCount > 0;
-
-  // Si la celda activa tiene cambios, por defecto seleccionamos 'active'; de lo contrario 'all'
   const [selectedScope, setSelectedScope] = useState<'active' | 'all'>(
     activeHasChanges ? 'active' : 'all'
   );
+  useEffect(() => {
+    if (isOpen) setSelectedScope(activeHasChanges ? 'active' : 'all');
+  }, [isOpen, activeHasChanges]);
+
+  // Otros borradores se validan en fresco tras confirmar; el cache persistido es solo informativo.
+  const otherInvalidCells = selectedScope === 'all'
+    ? invalidPendingCells.filter(v => v.celda !== activeWindow?.header.celda)
+    : [];
+
+  const totalBlockingIssuesCount = mapeoIssues.length + pltIssues.length + qaqcCriticas.length;
+  const hasBlockingErrors = totalBlockingIssuesCount > 0 || (!!activeWindow && validationPending);
+  if (!isOpen) return null;
 
   const isScopeActive = selectedScope === 'active' && activeHasChanges;
   const targetDiff = isScopeActive
@@ -299,7 +285,7 @@ export default function SaveConfirmModal({
                     ¡GUARDADO BLOQUEADO POR COMBINACIÓN INVÁLIDA O CAMPOS FALTANTES!
                   </h4>
                   <p className="text-xs text-rose-300 font-medium mt-0.5">
-                    El sistema detectó {totalBlockingIssuesCount} problema(s) crítico(s) que impiden sincronizar con la base de datos SQL.
+                    {validationPending ? (validationError || 'Esperando la validación actual del servidor. Los borradores se conservan.') : `El sistema detectó ${totalBlockingIssuesCount} problema(s) que impiden guardar.`}
                   </p>
                 </div>
               </div>

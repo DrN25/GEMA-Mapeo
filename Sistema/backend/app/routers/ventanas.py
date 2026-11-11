@@ -762,6 +762,21 @@ def save_ventana(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(require_role(["admin", "mapeador"]))
 ):
+    # Evaluate the exact data to be persisted before catalog resolution can create rows.
+    from app.validation.adapters import from_save
+    from app.validation.service import evaluate_window
+    from app.validation.context import assert_valid, campaign_year
+    validation = evaluate_window(from_save(data), operation='window_save', campaign_year=campaign_year(data.campania))
+    assert_valid(validation)
+    geometry = validation['derived']['geometry']
+    if geometry:
+        data.dip = data.dip_hw = geometry['dip_hw']
+        data.azimut_hole = data.az_hw = geometry['az_hw']
+        data.dipdir_talud = geometry['dipdir_talud']
+        if data.distancia_celda is None:
+            data.distancia_celda = geometry['length_m']
+    if data.rmr_input is not None:
+        data.rmr_input.gsi_visual = validation['derived']['gsi_visual']
     code_up = data.codigo.strip().upper()
     resolver = GEMACatalogResolver(db)
 

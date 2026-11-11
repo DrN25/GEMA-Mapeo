@@ -14,7 +14,11 @@ const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.resolve(TESTS_DIR, '..', 'frontend');
 const CACHE = path.join(TESTS_DIR, '.cache');
 
-if (!existsSync(path.join(CACHE, 'utils', 'rmrCalculator.js')) || !existsSync(path.join(CACHE, 'utils', 'qaQcRules.js'))) {
+if (
+  !existsSync(path.join(CACHE, 'utils', 'rmrCalculator.js')) ||
+  !existsSync(path.join(CACHE, 'utils', 'qaQcRules.js')) ||
+  !existsSync(path.join(CACHE, 'utils', 'windowTransform.js'))
+) {
   execSync(
     `npx tsc src\\utils\\rmrCalculator.ts src\\utils\\catalogData.ts src\\utils\\rmrInterpolation.ts ` +
     `src\\utils\\qaQcRules.ts src\\utils\\qaQcTouch.ts src\\utils\\campaniasCatalog.ts ` +
@@ -39,7 +43,7 @@ globalThis.localStorage = {
 const require = createRequire(import.meta.url);
 const rmr = require(path.join(CACHE, 'utils', 'rmrCalculator.js'));
 const cat = require(path.join(CACHE, 'utils', 'catalogData.js'));
-const qaqc = require(path.join(CACHE, 'utils', 'qaQcRules.js'));
+
 const wt = require(path.join(CACHE, 'utils', 'windowTransform.js'));
 
 let passed = 0;
@@ -111,27 +115,8 @@ r = rmr.calculateWindowGeomec({
 }, []);
 ok(Math.abs(r.dip_dir_talud - 180) < 1, `DipDir ignora header viejo (999) con HOLE_AUTO → 180 (obtuvo ${r.dip_dir_talud})`);
 
-console.log('\n=== 6. Regla QA/QC GSI_VISUAL_RANGO (CRÍTICA) ===');
-// Con GSI_VISUAL_AUTO=true la regla IGNORA header.gsi_visual y valida la
-// SUGERENCIA derivada por fórmula. Con joints vacíos la sugerencia es
-// determinística: sin estructuras → rqd_est=0, jcond=0 → min(85, round(0+0)) = 0.
-const baseHeader = { celda: 'QC1', gsi_estructura: 'VB', gsi_superficie: 'G' };
-const alerts = (header) => qaqc.validateWindowQAQC(header, [], 10, undefined, true)
-  .filter(a => a.ruleId === 'GSI_VISUAL_RANGO');
-
-// VB/G → [47,66]: sugerencia 0 queda FUERA → CRÍTICA, aunque el header diga 58
-const a58 = alerts({ ...baseHeader, gsi_visual: 58 });
-ok(a58.length === 1 && a58[0].type === 'CRITICA', 'VB/G + [] → sugerencia 0 fuera de [47,66] → CRÍTICA (header 58 ignorado)');
-ok(a58.length === 1 && a58[0].message.includes('47 a 66'), 'Mensaje incluye rango 47 a 66');
-ok(alerts({ ...baseHeader, gsi_visual: 85 }).length === 1, 'VB/G + header 85 → CRÍTICA (header ignorado, se valida la sugerencia 0)');
-ok(alerts({ ...baseHeader }).length === 1, 'VB/G + sin gsi_visual en header → CRÍTICA (la sugerencia nunca falta)');
-// D/VP → [0,19]: la sugerencia 0 queda DENTRO → PASA (valida la sugerencia, no el header)
-ok(alerts({ celda: 'QC1', gsi_estructura: 'D', gsi_superficie: 'VP', gsi_visual: 99 }).length === 0,
-  'D/VP + [] → sugerencia 0 dentro de [0,19] → PASA (header 99 ignorado)');
-ok(qaqc.validateWindowQAQC({ ...baseHeader, gsi_superficie: '' }, [], 10, undefined, true)
-  .filter(a => a.ruleId === 'GSI_VISUAL_RANGO').length === 0, 'Sin superficie → sin regla');
-ok(qaqc.validateWindowQAQC({ celda: 'QC1', gsi_estructura: 'XX', gsi_superficie: 'G' }, [], 10, undefined, true)
-  .filter(a => a.ruleId === 'GSI_VISUAL_RANGO').length === 0, 'Estructura fuera de catálogo → sin regla');
+// GSI rule evaluation now lives in backend/tests/test_validation_rules.py.
+// Client races and cross-language GSI fixtures: test_validation_client.mjs.
 
 console.log(`\n${passed} pasaron, ${failed} fallaron\n`);
 process.exit(failed > 0 ? 1 : 0);

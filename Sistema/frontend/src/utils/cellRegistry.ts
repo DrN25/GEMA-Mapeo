@@ -178,9 +178,10 @@ export interface PendingValidation {
 }
 
 /** Persiste el resultado de validación de una celda. */
-export function setCellValidation(celda: string, issueMessages: string[]): void {
+export function setCellValidation(celda: string, issueMessages: string[], metadata: { rulesetVersion?: string; draftFingerprint?: string } = {}): void {
   const clean = issueMessages.filter(Boolean);
   persistValidation(celda, {
+    ...metadata,
     ok: clean.length === 0,
     count: clean.length,
     issues: clean,

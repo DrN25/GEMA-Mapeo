@@ -46,7 +46,9 @@ def get_all_catalogs(proyecto: str = Query("ferrobamba")):
     catalog_proj = get_lithology_catalog_for_project(proyecto)
     lito_colores, lito_validacion = build_display_catalogs(catalog_proj)
 
+    from app.validation.context import CAMPAIGNS
     return {
+        "campaigns": [{"id": id, "label": f"Campaña {year}"} for id, year in CAMPAIGNS],
         "proyecto":             proyecto,
         # Tablas de display para CatalogsView
         "resistencia":          RESISTENCIA_DISPLAY_CATALOG,

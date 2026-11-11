@@ -75,7 +75,7 @@ export default function AuditoriaHub({ apiBase }: AuditoriaHubProps) {
                                     ? 'bg-black/15 text-slate-100 dark:text-slate-950 font-bold'
                                     : 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30'
                             }`}>
-                                76 Reglas
+                                Catálogo
                             </span>
                         </button>
                     </div>

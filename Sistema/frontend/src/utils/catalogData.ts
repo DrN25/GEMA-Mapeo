@@ -1,3 +1,5 @@
+import { initCampaignCatalog } from './campaniasCatalog';
+
 export let LITHOLOGY_CLASSIFICATION: any[] = [];
 export let GROUNDWATER_CATALOG: Record<string, any> = {};
 export let STRENGTH_CATALOG: Record<string, any> = {};
@@ -189,6 +191,7 @@ export function lookupPltKOnly(lito2: string, lito3: string): number | null {
 }
 
 export function initCatalogs(data: any) {
+  if (Array.isArray(data.campaigns)) initCampaignCatalog(data.campaigns);
   // 1. Litologías
   LITHOLOGY_CLASSIFICATION.length = 0;
   data.lithology_full.forEach((item: any) => {

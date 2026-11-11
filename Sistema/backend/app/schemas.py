@@ -9,7 +9,7 @@ Estrategia B+ (confirmada):
 El frontend nunca ve los IDs internos de GEMA. Esto permite importar Excel
 directamente con códigos y mantener el frontend desacoplado del motor de BD.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 from typing import List, Optional, Union, Dict, Any
 from datetime import date, datetime
 
@@ -120,7 +120,7 @@ class VentanaSaveSchema(BaseModel):
     cota_fin: Optional[float] = 0.0
 
     # Geometría bancaria
-    distancia_celda: Optional[float] = None  # DistanciaCelda
+    distancia_celda: Optional[float] = Field(None, validation_alias=AliasChoices("distancia_celda", "largo_m"))  # Both existing API spellings
     altura: Optional[float] = None
     altura_m: Optional[float] = None
     dip: Optional[float] = None              # Dip (del sondaje/celda, no del talud)

@@ -17,6 +17,8 @@ interface RmrAnalysisProps {
   header: WindowHeader;
   onChange: (header: WindowHeader) => void;
   calculated: CalculatorResult | null;
+  effectiveGsi?: number;
+  gsiInvalid?: boolean;
   onClose?: () => void;
   showFormulas?: boolean;
 }
@@ -54,6 +56,8 @@ export default function RmrAnalysis({
   header,
   onChange,
   calculated,
+  effectiveGsi,
+  gsiInvalid = false,
   onClose,
   showFormulas = true
 }: RmrAnalysisProps) {
@@ -64,12 +68,12 @@ export default function RmrAnalysis({
   // es SIEMPRE la sugerencia en vivo (min(85, round(1.5*JCond89 + RQD/2))),
   // nunca el header (que conserva el valor de BD → sin divergencia caché/snapshot
   // → sin riesgo de BORRADOR fantasma). El payload de guardado envía la sugerencia.
-  const gsiVisual = GSI_VISUAL_AUTO && calculated
+  const gsiVisual = effectiveGsi ?? (GSI_VISUAL_AUTO && calculated
     ? (() => {
         const s = suggestGsiVisual(calculated.rqd_est, calculated.condicion_rating_89);
         return s !== undefined && s !== null && s !== 0 ? s : undefined;
       })()
-    : (header.gsi_visual !== undefined && header.gsi_visual !== 0 ? header.gsi_visual : undefined);
+    : (header.gsi_visual !== undefined && header.gsi_visual !== 0 ? header.gsi_visual : undefined));
 
   if (!calculated) {
     return (
@@ -95,7 +99,7 @@ export default function RmrAnalysis({
     if (!isNaN(num) && restricted !== '' && !restricted.endsWith('.')) {
       onChange({
         ...header,
-        [field]: Math.max(0, num)
+        [field]: num
       });
     } else if (restricted === '') {
       onChange({
@@ -115,9 +119,7 @@ export default function RmrAnalysis({
     if (isNaN(num)) {
       onChange({ ...header, [field]: 0 });
     } else {
-      let clamped = Math.max(0, num);
-      if (field === 'ucs_mpa') clamped = Math.min(500, clamped);
-      else if (field === 'is50_mpa') clamped = Math.min(50, clamped);
+      let clamped = num;
       onChange({ ...header, [field]: clamped });
     }
   };
@@ -154,7 +156,7 @@ export default function RmrAnalysis({
 
   const ucsIs50Divergent = ucs !== undefined && is50 !== undefined && ucs <= is50;
   // El GSI visual es autocalculado: se valida contra el rango de la combinación seleccionada.
-  const gsiVisualInvalid = gsiVisual !== undefined && (gsiRange !== null && (gsiVisual < gsiRange.min || gsiVisual > gsiRange.max));
+  const gsiVisualInvalid = gsiInvalid;
 
   return (
     <div className="glass-panel p-6 rounded-xl border border-navy-800 bg-navy-950/20 border-l-4 border-l-violet-500 space-y-6 text-left select-none animate-fade-in shadow-xl">
