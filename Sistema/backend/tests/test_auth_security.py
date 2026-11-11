@@ -1,5 +1,11 @@
+import pytest
 from datetime import timedelta
 from app.core.security import hash_password, verify_password, create_access_token, decode_access_token
+
+
+@pytest.fixture(autouse=True)
+def configure_jwt(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "isolated-unit-test-key")
 
 
 def test_password_hashing_and_verification():
@@ -44,3 +50,15 @@ def test_jwt_expired_or_invalid():
     # Token corrupto o alterado
     invalid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalidpayload.invalidsignature"
     assert decode_access_token(invalid_token) is None
+
+
+
+def test_jwt_from_another_application_is_rejected():
+    from jose import jwt
+    from app.core.security import signing_key
+
+    token = create_access_token({"sub": "1", "ver": 0})
+    claims = jwt.get_unverified_claims(token)
+    claims["aud"] = "gema-logueo-api"
+    foreign_token = jwt.encode(claims, signing_key(), algorithm="HS256")
+    assert decode_access_token(foreign_token) is None

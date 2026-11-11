@@ -18,6 +18,7 @@ los modelos catalog y agregar inner join en routers/ventanas.py:resolve_*.
 """
 from datetime import datetime
 from sqlalchemy import (
+    ForeignKeyConstraint, UniqueConstraint,
     Column, Integer, Float, String, Numeric, Date, DateTime, Boolean, ForeignKey, Identity, func
 )
 from sqlalchemy.orm import relationship
@@ -337,12 +338,28 @@ class EnsayoPLT(Base):
 # ESQUEMA DE AUTENTICACIÓN Y ROLES: auth.Roles y auth.Usuarios
 # ============================================================================
 
-class Role(Base):
-    __tablename__ = "Roles"
+class Sistema(Base):
+    __tablename__ = "Sistemas"
     __table_args__ = {"schema": "auth"}
 
+    sistema_id = Column("SistemaID", Integer, primary_key=True)
+    codigo = Column("Codigo", String(50), nullable=False, unique=True)
+    nombre = Column("Nombre", String(100), nullable=False)
+    estado = Column("Estado", String(1), nullable=False)
+
+
+class Role(Base):
+    __tablename__ = "Roles"
+    __table_args__ = (
+        UniqueConstraint("SistemaID", "Nombre"),
+        UniqueConstraint("SistemaID", "RolID"),
+        {"schema": "auth"},
+    )
+
+    sistema_id = Column("SistemaID", Integer, ForeignKey("auth.Sistemas.SistemaID"), nullable=False)
+    protegido = Column("EsProtegido", Boolean, nullable=False, default=False)
     rol_id = Column("RolID", Integer, primary_key=True)
-    nombre = Column("Nombre", String(50), nullable=False, unique=True)
+    nombre = Column("Nombre", String(50), nullable=False)
     descripcion = Column("Descripcion", String(200), nullable=True)
     estado = Column("Estado", String(1), nullable=False, default="A")
 
@@ -351,14 +368,21 @@ class Role(Base):
 
 class Usuario(Base):
     __tablename__ = "Usuarios"
-    __table_args__ = {"schema": "auth"}
+    __table_args__ = (
+        UniqueConstraint("SistemaID", "Email"),
+        ForeignKeyConstraint(["SistemaID", "RolID"], ["auth.Roles.SistemaID", "auth.Roles.RolID"]),
+        {"schema": "auth"},
+    )
 
+    sistema_id = Column("SistemaID", Integer, nullable=False)
+    protegido = Column("EsProtegido", Boolean, nullable=False, default=False)
+    version_seguridad = Column("VersionSeguridad", Integer, nullable=False, default=0)
     usuario_id = Column("UsuarioID", Integer, primary_key=True)
     usuario = Column("Usuario", String(50), nullable=False, unique=True)
-    email = Column("Email", String(200), nullable=False, unique=True)
+    email = Column("Email", String(200), nullable=False)
     contrasena_hash = Column("ContrasenaHash", String(255), nullable=False)
     nombre_completo = Column("NombreCompleto", String(150), nullable=True)
-    rol_id = Column("RolID", Integer, ForeignKey("auth.Roles.RolID"), nullable=False)
+    rol_id = Column("RolID", Integer, nullable=False)
     geotecnico_id = Column("GeotecnicoID", Integer, ForeignKey("dbo.Geotecnicos.GeotecnicoID"), nullable=True)
     estado = Column("Estado", String(1), nullable=False, default="A")
     ultimo_acceso = Column("UltimoAcceso", DateTime, nullable=True)

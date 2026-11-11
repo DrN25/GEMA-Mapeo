@@ -7,6 +7,37 @@ export const AdminUsersView: React.FC = () => {
   const { authFetch, user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [roleDraft, setRoleDraft] = useState({ id: 0, name: '', description: '' });
+  const [roleFeedback, setRoleFeedback] = useState('');
+  const [showRoles, setShowRoles] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
+
+  const saveRole = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingRole(true);
+    setRoleFeedback('');
+    try {
+      const path = roleDraft.id ? '/api/admin/roles/' + roleDraft.id : '/api/admin/roles';
+      const response = await authFetch(path, {
+        method: roleDraft.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: roleDraft.name.trim(), descripcion: roleDraft.description.trim() || null }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(typeof result.detail === 'string' ? result.detail : 'No se pudo guardar el rol.');
+      }
+      const updated: Role = result;
+      setRoles(previous => [...previous.filter(role => role.rol_id !== updated.rol_id), updated]);
+      setRoleDraft({ id: 0, name: '', description: '' });
+      setRoleFeedback('Rol guardado.');
+      await loadData();
+    } catch (error) {
+      setRoleFeedback(error instanceof Error ? error.message : 'No se pudo guardar el rol.');
+    } finally {
+      setSavingRole(false);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -285,6 +316,7 @@ export const AdminUsersView: React.FC = () => {
 
   return (
     <div className="space-y-6 select-none w-full animate-fade-in text-left font-sans text-slate-300">
+
       {/* Header View: Estilo idéntico a Dashboard.tsx / Mapeo por Ventana */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
@@ -297,6 +329,11 @@ export const AdminUsersView: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 justify-start md:justify-end">
+          <button type="button" aria-expanded={showRoles} aria-controls="mapeo-role-editor"
+            onClick={() => setShowRoles(open => !open)}
+            className="rounded border border-navy-700 px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-slate-200">
+            Roles
+          </button>
           <button
             onClick={() => {
               setNewUsuario('');
@@ -316,6 +353,41 @@ export const AdminUsersView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {showRoles && (
+      <section id="mapeo-role-editor" className="rounded-lg border border-navy-700 bg-navy-900 p-4">
+        <form onSubmit={saveRole} className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs">
+            Rol
+            <select className="rounded bg-navy-950 p-2" value={roleDraft.id} onChange={event => {
+              const role = roles.find(item => item.rol_id === Number(event.target.value));
+              setRoleDraft(role ? { id: role.rol_id, name: role.nombre, description: role.descripcion ?? '' }
+                : { id: 0, name: '', description: '' });
+              setRoleFeedback('');
+            }}>
+              <option value={0}>Nuevo rol</option>
+              {roles.map(role => <option key={role.rol_id} value={role.rol_id}>{role.nombre}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Nombre
+            <input required maxLength={50} className="rounded bg-navy-950 p-2"
+              value={roleDraft.name} onChange={event => setRoleDraft({ ...roleDraft, name: event.target.value })}
+              readOnly={roleDraft.id !== 0 && ['admin', 'mapeador', 'lectura'].includes(roles.find(role => role.rol_id === roleDraft.id)?.nombre ?? '')} />
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Descripción
+            <input maxLength={200} className="rounded bg-navy-950 p-2" value={roleDraft.description}
+              onChange={event => setRoleDraft({ ...roleDraft, description: event.target.value })} />
+          </label>
+          <button type="submit" disabled={savingRole || !roleDraft.name.trim()}
+            className="rounded border border-violet-500/40 px-3 py-2 text-xs font-bold text-violet-400 disabled:opacity-50">
+            Guardar rol
+          </button>
+          <span role="status" className="text-xs">{roleFeedback}</span>
+        </form>
+      </section>
+      )}
 
       {/* Filter Toolbar */}
       <div className="flex flex-wrap items-center gap-2 bg-[#090f1d]/60 border border-slate-800 p-3 rounded-xl">
