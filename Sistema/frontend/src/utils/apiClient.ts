@@ -1,5 +1,6 @@
 // apiClient.ts — Cliente HTTP global con timeout, reintentos con backoff,
 // inyección automática de cabeceras Bearer JWT y monitor de conexión
+import { CONNECTION_CONFIG } from '../config/connection';
 
 type ConnectionState = 'online' | 'offline';
 
@@ -45,9 +46,83 @@ function jitter(ms: number) {
     return ms * (0.7 + Math.random() * 0.6);
 }
 
+export function isConnectionFailureStatus(status: number): boolean {
+    return status === 502 || status === 503 || status === 504;
+}
+
 function isRetryableStatus(status: number) {
     // 5xx (incluye 502/504 durante el boot de Render) y 429 (rate limit)
     return status >= 500 || status === 429;
+}
+
+function extractApiBase(url: string): string {
+    const apiIdx = url.indexOf('/api/');
+    if (apiIdx >= 0) {
+        return url.slice(0, apiIdx).replace(/\/+$/, '');
+    }
+    if (/^https?:\/\//i.test(url)) {
+        try {
+            return new URL(url).origin;
+        } catch {
+            return '';
+        }
+    }
+    return '';
+}
+
+async function probeHealthOnce(baseUrl: string, timeoutMs: number): Promise<boolean> {
+    const cleanBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(`${cleanBase}/api/health`, {
+            method: 'GET',
+            cache: 'no-store',
+            signal: controller.signal,
+        });
+        return res.ok;
+    } catch {
+        return false;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+let inFlightConfirm: { baseUrl: string; promise: Promise<boolean> } | null = null;
+
+/**
+ * Función única que decide el estado global de conexión tras fallos:
+ * dispara un ping de confirmación inmediato y corto (máx. confirmMaxAttempts intentos).
+ * Marca 'online' si responde OK o 'offline' si fallan todos los intentos.
+ */
+export function confirmConnection(baseUrl: string): Promise<boolean> {
+    const cleanBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
+    if (inFlightConfirm && inFlightConfirm.baseUrl === cleanBase) {
+        return inFlightConfirm.promise;
+    }
+
+    const promise = (async () => {
+        const maxAttempts = Math.max(1, CONNECTION_CONFIG.confirmMaxAttempts);
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const ok = await probeHealthOnce(cleanBase, CONNECTION_CONFIG.confirmTimeoutMs);
+            if (ok) {
+                setConnectionState('online');
+                return true;
+            }
+            if (attempt < maxAttempts - 1) {
+                await sleep(CONNECTION_CONFIG.confirmRetryDelayMs);
+            }
+        }
+        setConnectionState('offline');
+        return false;
+    })().finally(() => {
+        if (inFlightConfirm && inFlightConfirm.promise === promise) {
+            inFlightConfirm = null;
+        }
+    });
+
+    inFlightConfirm = { baseUrl: cleanBase, promise };
+    return promise;
 }
 
 /**
@@ -76,6 +151,8 @@ export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise
     } = opts;
 
     const mergedHeaders = getAuthHeaders(headers);
+    const isHealthProbe = /\/api\/health(?:\?|$)/.test(url);
+    const apiBase = extractApiBase(url);
 
     let attempt = 0;
     let lastError: unknown = null;
@@ -110,6 +187,11 @@ export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise
             if (isAbort && signal?.aborted) {
                 throw err;
             }
+            const isGatewayHttpError = err instanceof Error && /^HTTP (502|503|504)$/.test(err.message);
+            const isOtherHttpError = err instanceof Error && /^HTTP /.test(err.message) && !isGatewayHttpError;
+            if (!isHealthProbe && !isOtherHttpError) {
+                void confirmConnection(apiBase);
+            }
             // Timeout propio o fallo de red: reintentar con backoff si quedan intentos
             if (attempt < retries) {
                 attempt += 1;
@@ -124,7 +206,11 @@ export async function apiFetch(url: string, opts: ApiFetchOptions = {}): Promise
         }
     }
 
-    setConnectionState('offline');
+    if (isHealthProbe) {
+        setConnectionState('offline');
+    } else {
+        await confirmConnection(apiBase);
+    }
     throw lastError ?? new Error('Fetch failed');
 }
 
@@ -147,20 +233,8 @@ export async function pingBackend(baseUrl: string): Promise<boolean> {
     }
 }
 
-// Ping de detección rápida: si el backend no responde en 10 s se sospecha caída.
-// Sirve para el cronómetro de actividad; la confirmación real la hace pingBackend.
+// Ping de detección rápida: NO marca offline por sí mismo; solo retorna
+// true/false usando pingTimeoutMs de CONNECTION_CONFIG.
 export async function pingBackendFast(baseUrl: string): Promise<boolean> {
-    try {
-        const res = await apiFetch(`${baseUrl}/api/health`, {
-            timeoutMs: 10_000,
-            retries: 0,
-            baseDelayMs: 0,
-        });
-        const ok = res.ok;
-        setConnectionState(ok ? 'online' : 'offline');
-        return ok;
-    } catch {
-        setConnectionState('offline');
-        return false;
-    }
+    return probeHealthOnce(baseUrl, CONNECTION_CONFIG.pingTimeoutMs);
 }
